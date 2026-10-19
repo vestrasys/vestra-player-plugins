@@ -84,7 +84,8 @@ export function descriptorFromInfo(originalUrl: string, raw: unknown): MediaDesc
 }
 export class YouTubeService {
   private verified?: Promise<void>;
-  constructor(private readonly run: Runner = createRunner()) {}
+  private readonly run: Runner;
+  constructor(run: Runner = createRunner()) { this.run = run; }
   verify(): Promise<void> {
     return this.verified ??= this.run(['--ignore-config', '--version'], { timeoutMs: 15000 }).then(text => {
       if (text.trim() !== YT_DLP_VERSION) throw new Error(`yt-dlp ${YT_DLP_VERSION} is required; found ${text.trim()}. See README.md.`);

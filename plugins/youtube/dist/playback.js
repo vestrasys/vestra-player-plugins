@@ -7,15 +7,11 @@ function newer(state, ticket) {
 }
 /** Own operation IDs are queried after uncertain submission; opening is never blindly retried. */
 export class YouTubePlayback {
+    next = 0;
     source;
     pause;
     pollLimit;
-    next = 0;
-    constructor(source, pause = delay, pollLimit = 400) {
-        this.source = source;
-        this.pause = pause;
-        this.pollLimit = pollLimit;
-    }
+    constructor(source, pause = delay, pollLimit = 400) { this.source = source; this.pause = pause; this.pollLimit = pollLimit; }
     async submit(intent) {
         const id = ++this.next;
         try {

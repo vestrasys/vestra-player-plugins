@@ -10,7 +10,10 @@ function newer(state: SourceState, ticket: SourceTicket): boolean {
 /** Own operation IDs are queried after uncertain submission; opening is never blindly retried. */
 export class YouTubePlayback {
   private next = 0;
-  constructor(private readonly source: Host['source'], private readonly pause = delay, private readonly pollLimit = 400) {}
+  private readonly source: Host['source'];
+  private readonly pause: typeof delay;
+  private readonly pollLimit: number;
+  constructor(source: Host['source'], pause = delay, pollLimit = 400) { this.source = source; this.pause = pause; this.pollLimit = pollLimit; }
   private async submit(intent: Parameters<Host['source']['submit']>[0]): Promise<SourceOperation> {
     const id = ++this.next;
     try { return await this.source.submit(intent, id); }

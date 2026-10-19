@@ -118,11 +118,9 @@ export function descriptorFromInfo(originalUrl, raw) {
     return result;
 }
 export class YouTubeService {
-    run;
     verified;
-    constructor(run = createRunner()) {
-        this.run = run;
-    }
+    run;
+    constructor(run = createRunner()) { this.run = run; }
     verify() {
         return this.verified ??= this.run(['--ignore-config', '--version'], { timeoutMs: 15000 }).then(text => {
             if (text.trim() !== YT_DLP_VERSION)
