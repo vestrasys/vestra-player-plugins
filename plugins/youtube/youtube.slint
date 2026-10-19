@@ -1,0 +1,30 @@
+import { VerticalBox, HorizontalBox, LineEdit, Button, ProgressIndicator } from "std-widgets.slint";
+export component YouTubeWindow inherits Window {
+  title: "YouTube";
+  preferred-width: 620px;
+  preferred-height: 340px;
+  min-width: 480px;
+  min-height: 310px;
+  in-out property <string> url: "";
+  in-out property <string> status: "粘贴 YouTube 视频链接以播放或下载。";
+  in-out property <bool> busy: false;
+  in-out property <float> progress: 0;
+  callback play(string);
+  callback download(string);
+  callback cancel();
+  VerticalBox {
+    padding: 24px;
+    spacing: 16px;
+    Text { text: "YouTube"; font-size: 24px; font-weight: 700; }
+    Text { text: "视频播放与下载"; font-size: 16px; }
+    LineEdit { text <=> root.url; placeholder-text: "https://www.youtube.com/watch?v=…"; enabled: !root.busy; }
+    HorizontalBox {
+      Button { text: "播放"; enabled: !root.busy; clicked => { root.play(root.url); } }
+      Button { text: "下载视频…"; enabled: !root.busy; clicked => { root.download(root.url); } }
+      Button { text: "取消"; enabled: root.busy; clicked => { root.cancel(); } }
+    }
+    ProgressIndicator { progress: root.progress; visible: root.busy; }
+    Text { text: root.status; wrap: word-wrap; vertical-stretch: 1; }
+    Text { text: "下载将保存包含视频和音频的 MKV 文件。"; font-size: 12px; color: #7c7c7c; }
+  }
+}

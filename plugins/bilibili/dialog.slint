@@ -1,0 +1,23 @@
+import { VerticalBox, HorizontalBox, LineEdit, Button } from "std-widgets.slint";
+export component BilibiliWindow inherits Window {
+    title: "Bilibili 视频";
+    width: 540px;
+    height: 230px;
+    in-out property <string> url;
+    in-out property <string> status: "输入 Bilibili 视频链接。";
+    in-out property <bool> busy: false;
+    callback play(string);
+    callback cancel();
+    VerticalBox {
+        padding: 20px;
+        spacing: 12px;
+        Text { text: "Bilibili 视频网址"; }
+        input := LineEdit { text <=> root.url; enabled: !root.busy; accepted => { root.play(root.url); } }
+        Text { text: root.status; wrap: word-wrap; vertical-stretch: 1; }
+        HorizontalBox {
+            alignment: end;
+            Button { text: "取消"; clicked => { root.cancel(); } }
+            Button { text: root.busy ? "解析中…" : "播放"; enabled: !root.busy; clicked => { root.play(root.url); } }
+        }
+    }
+}

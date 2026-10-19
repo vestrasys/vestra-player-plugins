@@ -1,0 +1,22 @@
+{"phase":"downloading","percent":null,"message":"Downloading video and audio…"}
+{"phase":"downloading","percent":0.5,"message":"Downloading 0.5%"}
+{"phase":"downloading","percent":1.4,"message":"Downloading 1.4%"}
+{"phase":"downloading","percent":3.2,"message":"Downloading 3.2%"}
+{"phase":"downloading","percent":6.9,"message":"Downloading 6.9%"}
+{"phase":"downloading","percent":14.2,"message":"Downloading 14.2%"}
+{"phase":"downloading","percent":28.8,"message":"Downloading 28.8%"}
+{"phase":"downloading","percent":58.1,"message":"Downloading 58.1%"}
+{"phase":"downloading","percent":100,"message":"Downloading 100.0%"}
+{"phase":"downloading","percent":100,"message":"Downloading 100.0%"}
+{"phase":"downloading","percent":0.4,"message":"Downloading 0.4%"}
+{"phase":"downloading","percent":1.2,"message":"Downloading 1.2%"}
+{"phase":"downloading","percent":2.8,"message":"Downloading 2.8%"}
+{"phase":"downloading","percent":6.1,"message":"Downloading 6.1%"}
+{"phase":"downloading","percent":12.6,"message":"Downloading 12.6%"}
+{"phase":"downloading","percent":25.6,"message":"Downloading 25.6%"}
+{"phase":"downloading","percent":51.6,"message":"Downloading 51.6%"}
+{"phase":"downloading","percent":100,"message":"Downloading 100.0%"}
+{"phase":"downloading","percent":100,"message":"Downloading 100.0%"}
+{"phase":"merging","percent":null,"message":"Preparing video with audio…"}
+{"phase":"merging","percent":null,"message":"Preparing video with audio…"}
+SAVED public-download-smoke.mkv

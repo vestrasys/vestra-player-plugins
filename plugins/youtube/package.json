@@ -1,0 +1,1 @@
+{"name":"vestra-youtube","version":"0.1.1","type":"module","private":true,"scripts":{"build":"node build.mjs","test":"node --test test.mjs"}}

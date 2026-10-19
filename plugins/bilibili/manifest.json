@@ -1,0 +1,13 @@
+{
+  "id": "bilibili",
+  "version": "0.1.0",
+  "apiVersion": "vestra.experimental/0.1",
+  "entry": "dist/main.js",
+  "capabilities": [
+    "commands",
+    "ui.window",
+    "source.resolve",
+    "playback.read",
+    "playback.control"
+  ]
+}

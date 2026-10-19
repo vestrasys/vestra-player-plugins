@@ -1,0 +1,22 @@
+{
+    "programs": [
+
+    ],
+    "stream_groups": [
+
+    ],
+    "streams": [
+        {
+            "codec_name": "av1",
+            "codec_type": "video"
+        },
+        {
+            "codec_name": "opus",
+            "codec_type": "audio"
+        }
+    ],
+    "format": {
+        "duration": "19.021000",
+        "size": "474561"
+    }
+}
