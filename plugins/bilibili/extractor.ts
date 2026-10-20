@@ -16,6 +16,13 @@ export function validateUrl(input: string): string {
   url.hash = '';
   return url.href;
 }
+/** yt-dlp's own reason in one line: the last ERROR line (or last line) of stderr, without the prefix. */
+export function reason(stderr: string): string {
+  const lines = stderr.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  const line = [...lines].reverse().find(l => l.startsWith('ERROR:')) ?? lines.at(-1) ?? '';
+  const text = line.replace(/^ERROR:\s*/, '').replace(/^\[[^\]]+\]\s*[\w-]+:\s*/, '');
+  return text.length > 160 ? `${text.slice(0, 159)}…` : text;
+}
 export function matchesUrl(input: string): boolean { try { validateUrl(input); return true; } catch { return false; } }
 function resource(format: Format, fallback: unknown): Resource {
   if (typeof format.url !== 'string') throw new Error('提取结果没有媒体地址。');
@@ -55,7 +62,7 @@ export async function extractBilibili(input: string, signal?: AbortSignal): Prom
   signal?.throwIfAborted();
   const output = await new Promise<string>((resolve, reject) => {
     execFile('yt-dlp', ['--ignore-config', '--no-playlist', '--skip-download', '--dump-single-json', '--no-warnings', '--socket-timeout', '12', '--retries', '0', '--extractor-retries', '0', '--format', 'bestvideo+bestaudio/best', '--', originalUrl], { signal, timeout: 45000, maxBuffer: 12 * 1024 * 1024, encoding: 'utf8' }, (error, stdout, stderr) => {
-      if (error) { reject(signal?.aborted ? new Error('已取消解析。') : new Error(`Bilibili 解析失败：${(stderr || error.message).trim().slice(0, 1800)}`)); return; }
+      if (error) { reject(signal?.aborted ? new Error('已取消解析。') : new Error(`Bilibili 解析失败：${reason(stderr) || (error.killed ? '超时。' : (error as { code?: unknown }).code === 'ENOENT' ? '找不到 yt-dlp。' : 'yt-dlp 出错。')}`)); return; }
       resolve(stdout);
     });
   });

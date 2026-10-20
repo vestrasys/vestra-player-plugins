@@ -3,7 +3,13 @@ import { extractBilibili, validateUrl } from "./extractor.ts";
 
 const prompt = "输入 Bilibili 视频链接。";
 
-/** Bilibili: a public resolver for site URLs plus one URL window that opens them. */
+/** Status text is one line (UI-TOOL-05): collapse whitespace and cut long backend reasons. */
+const oneLine = (text: string) => {
+  const flat = text.replace(/\s+/g, " ").trim();
+  return flat.length > 160 ? `${flat.slice(0, 159)}…` : flat;
+};
+
+/** Bilibili: a public resolver for site URLs plus one 「输入链接」 window that opens them. */
 export default async function activate(plugin: Plugin) {
   // Any caller (this window, a playlist link, a generic open) gets the same routing.
   plugin.resolvers.add({
@@ -45,7 +51,7 @@ export default async function activate(plugin: Plugin) {
     } catch (error) {
       // A cancelled request leaves the (closed) window alone.
       if (!run.signal.aborted && running === run)
-        status = describe(error as PluginError, signal);
+        status = oneLine(describe(error as PluginError, signal));
     } finally {
       if (running === run) {
         running = undefined;
@@ -61,8 +67,9 @@ export default async function activate(plugin: Plugin) {
 
   plugin.commands.add({
     id: "bilibili.open",
-    path: ["文件", "网络媒体", "Bilibili 视频…"],
-    order: 212,
+    path: ["打开", "Bilibili 视频…"],
+    order: 112,
+    group: "open",
     run: () => {
       // A fresh window starts empty; an open one keeps what it shows.
       if (!window.opened) [url, status, busy] = ["", prompt, false];
@@ -81,8 +88,13 @@ function describe(error: PluginError, signal: AbortSignal) {
     case "failed":
     case "backend":
       return error.message;
+    case "busy":
+      return "播放器忙，请稍后重试。";
+    case "unsupported":
+    case "unavailable":
+      return "播放器无法打开这个链接。";
     default:
-      // Plain errors (URL validation) carry no code; host refusals keep the old prefix.
-      return error.code ? `播放请求失败：${error.code}` : error.message;
+      // Plain errors (URL validation) carry our own Chinese text; other refusals are not worded by the host.
+      return error.code ? "播放请求失败。" : error.message;
   }
 }

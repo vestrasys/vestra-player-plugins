@@ -5,7 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { HostError, startPlugin, TestHost } from "../../../sdk/plugin/testing.ts";
 import activate from "../main.ts";
-import { descriptorFromInfo, normalizeYouTubeUrl, YouTubeService } from "../service.ts";
+import { descriptorFromInfo, normalizeYouTubeUrl, reason, YouTubeService } from "../service.ts";
 import type { Progress, Runner } from "../service.ts";
 
 const directory = new URL("..", import.meta.url);
@@ -55,7 +55,15 @@ test("split tracks and per-stream headers survive; silent video is rejected", ()
   assert.equal(media.audio!.url, "https://cdn.test/audio");
   assert.equal(media.audio!.headers["User-Agent"], "test");
   assert.equal(media.primary.headers.Bad, undefined);
-  assert.throws(() => descriptorFromInfo("original", { requested_formats: [video] }), /complete video and audio/);
+  assert.throws(() => descriptorFromInfo("original", { requested_formats: [video] }), /完整的视频和音频/);
+});
+
+test("yt-dlp failures are reduced to one line of its own reason", () => {
+  const stderr = "WARNING: x\nERROR: [youtube] jNQXAC9IVRw: Sign in to confirm you're not a bot\n  more detail\n";
+  assert.equal(reason(stderr), "Sign in to confirm you're not a bot");
+  assert.equal(reason("just one line"), "just one line");
+  assert.equal(reason(""), "");
+  assert.equal(reason("x".repeat(400)).length, 160);
 });
 
 test("failed download cleans staging and preserves existing destination", async () => {
@@ -118,9 +126,9 @@ test("activation registers only the public resolver and one menu entrance", asyn
   assert.deepEqual([...host.commands.keys()], ["youtube.open"]);
   assert.deepEqual(host.command("youtube.open").declaration, {
     title: "YouTube 视频…",
-    path: ["文件", "网络媒体", "YouTube 视频…"],
-    order: 213,
-    group: "domain",
+    path: ["打开", "YouTube 视频…"],
+    order: 111,
+    group: "open",
     radio: false,
     bindings: [],
     focus: null,
@@ -143,7 +151,7 @@ test("play submits the normalized URL once and reports ready only from the publi
   assert.equal(window.props.busy, true);
   host.setSource({ phase: "ready" });
   await host.settle();
-  assert.equal(window.props.status, "主机媒体源已就绪。");
+  assert.equal(window.props.status, "视频已就绪。");
   assert.equal(window.props.busy, false);
   await stop();
 });
@@ -163,7 +171,7 @@ test("a lost submit reply is resolved by the same operation without opening agai
   const ids = new Set(opens(host).map((call) => call.operationId));
   assert.equal(ids.size, 1);
   assert.deepEqual(host.sent("source.operation").map((call) => call.operationId), [...ids]);
-  assert.equal(window.props.status, "主机媒体源已就绪。");
+  assert.equal(window.props.status, "视频已就绪。");
   await stop();
 });
 
@@ -178,15 +186,18 @@ test("cancel while loading closes only its own media", async () => {
   assert.equal(close.kind, "close");
   assert.ok(close.expected, "close is conditional on the source stamp");
   assert.equal(host.source.phase, "empty");
-  assert.equal(window.props.status, "已取消。");
-  assert.equal(window.props.busy, false);
+  assert.equal(host.sent("ui.close").length, 1, "取消 also closes the window");
+  // Reopening starts from the prompt again.
+  await host.command("youtube.open").run();
+  assert.equal(host.window("youtube").props.status, "粘贴 YouTube 视频链接以播放或下载。");
+  assert.equal(host.window("youtube").props.busy, false);
   await stop();
 });
 
 test("backend failure, replacement and refusal are never reported as ready", async () => {
   const cases: [(host: TestHost) => void, string][] = [
     [(host) => host.setSource({ phase: "error", terminalReason: { failed: "bot sign-in required" } }), "bot sign-in required"],
-    [(host) => host.openElsewhere("/other.mp4"), "播放请求已被新的媒体源替换。"],
+    [(host) => host.openElsewhere("/other.mp4"), "播放请求已被其他来源替换。"],
   ];
   for (const [act, expected] of cases) {
     const { host, stop } = await start();
@@ -206,7 +217,7 @@ test("backend failure, replacement and refusal are never reported as ready", asy
   });
   window.emit("play", watch);
   await host.settle();
-  assert.equal(window.props.status, "播放失败：no resolver");
+  assert.equal(window.props.status, "播放器无法打开这个链接。");
   await stop();
 });
 
@@ -216,7 +227,7 @@ test("an unsupported URL is explained without touching the source", async () => 
   window.emit("play", "https://youtube.com/playlist?list=abc");
   await host.settle();
   assert.equal(opens(host).length, 0);
-  assert.match(String(window.props.status), /single YouTube video/);
+  assert.match(String(window.props.status), /单个 YouTube 视频/);
   assert.equal(window.props.busy, false);
   await stop();
 });
@@ -240,7 +251,7 @@ test("download shows progress while running and the saved file when done", async
     await host.settle(20);
     assert.equal(window.props.busy, true);
     assert.equal(window.props.progress, 0.5);
-    assert.equal(window.props.status, "Downloading 50.0%");
+    assert.equal(window.props.status, "正在下载 50.0%");
     release();
     await host.settle(20);
     assert.equal(window.props.status, "已保存：saved.mkv");
@@ -278,10 +289,12 @@ test("cancelling the save dialog, cancelling a download, and unloading during on
     await host.settle(20);
     window.emit("cancel");
     await host.settle(20);
-    assert.equal(window.props.status, "已取消。");
     assert.equal(aborted, 1);
+    assert.equal(host.sent("ui.close").length, 1);
+    const reopened = await openWindow(host);
+    assert.equal(reopened.props.busy, false);
     host.dialogAnswers.push([join(dir, "b.mkv")]);
-    window.emit("download", watch);
+    reopened.emit("download", watch);
     await host.settle(20);
     await stop();
     assert.equal(aborted, 2, "unloading stops the running download");

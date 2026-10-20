@@ -4,6 +4,7 @@ import {
   decodeMetadata,
   extractBilibili,
   matchesUrl,
+  reason,
   validateUrl,
 } from "../extractor.ts";
 
@@ -75,4 +76,10 @@ test("pre-aborted resolution never starts process", async () => {
   await assert.rejects(
     extractBilibili("https://b23.tv/test", controller.signal),
   );
+});
+
+test("yt-dlp failures are reduced to one line of its own reason", () => {
+  assert.equal(reason("WARNING: a\nERROR: [BiliBili] BV1xx411c7mD: HTTP Error 412: Precondition Failed\n"), "HTTP Error 412: Precondition Failed");
+  assert.equal(reason(""), "");
+  assert.equal(reason("y".repeat(500)).length, 160);
 });

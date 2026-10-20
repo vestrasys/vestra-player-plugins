@@ -1,23 +1,49 @@
-import { VerticalBox, HorizontalBox, LineEdit, Button } from "std-widgets.slint";
+// 「输入链接」小窗（ui-alignment §7.5 UI-DLG-02）：与 YouTube 窗口同一规格、同一尺寸。
+import { LineEdit } from "std-widgets.slint";
+import { Theme } from "@vestra/theme.slint";
+import { Button, ToolTipArea } from "@vestra/widgets.slint";
+
 export component BilibiliWindow inherits Window {
     title: "Bilibili 视频";
-    width: 540px;
-    height: 230px;
+    width: 420px;
+    height: 122px;
+    background: Theme.bg-panel;
     in-out property <string> url;
     in-out property <string> status: "输入 Bilibili 视频链接。";
     in-out property <bool> busy: false;
     callback play(string);
     callback cancel();
-    VerticalBox {
-        padding: 20px;
-        spacing: 12px;
-        Text { text: "Bilibili 视频网址"; }
-        input := LineEdit { text <=> root.url; enabled: !root.busy; accepted => { root.play(root.url); } }
-        Text { text: root.status; wrap: word-wrap; vertical-stretch: 1; }
-        HorizontalBox {
-            alignment: end;
+    VerticalLayout {
+        padding: Theme.dialog-padding;
+        spacing: 8px;
+        Text { text: "输入链接"; color: Theme.text; font-size: Theme.font-body; height: Theme.label-height; }
+        LineEdit {
+            height: Theme.input-height;
+            font-size: Theme.font-body;
+            text <=> root.url;
+            placeholder-text: "https://www.bilibili.com/video/BV…";
+            enabled: !root.busy;
+            accepted => { root.play(root.url); }
+        }
+        // One line; the full text is in the tooltip.
+        Rectangle {
+            height: Theme.label-height;
+            ToolTipArea {
+                text: root.status;
+                Text {
+                    text: root.status;
+                    color: Theme.text-list;
+                    font-size: Theme.font-body;
+                    overflow: elide;
+                    vertical-alignment: center;
+                }
+            }
+        }
+        HorizontalLayout {
+            spacing: 6px;
+            Rectangle { horizontal-stretch: 1; }
+            Button { text: "播放"; enabled: !root.busy; clicked => { root.play(root.url); } }
             Button { text: "取消"; clicked => { root.cancel(); } }
-            Button { text: root.busy ? "解析中…" : "播放"; enabled: !root.busy; clicked => { root.play(root.url); } }
         }
     }
 }

@@ -40,9 +40,9 @@ test("public resolver and menu entry are owned by the plugin lifetime", async ()
   const command = host.command("bilibili.open");
   assert.deepEqual(command.declaration, {
     title: "Bilibili 视频…",
-    path: ["文件", "网络媒体", "Bilibili 视频…"],
-    order: 212,
-    group: "domain",
+    path: ["打开", "Bilibili 视频…"],
+    order: 112,
+    group: "open",
     radio: false,
     bindings: [],
     focus: null,
@@ -185,7 +185,7 @@ test("backend media and resolution errors remain visible", async () => {
   });
   resolving.window.emit("play", link);
   await host.settle();
-  assert.equal(resolving.window.props.status, "播放请求失败：busy");
+  assert.equal(resolving.window.props.status, "播放器忙，请稍后重试。");
   assert.equal(resolving.window.props.busy, false);
   await resolving.stop();
 });
@@ -212,5 +212,19 @@ test("cancel while the link is still being resolved closes the pending source", 
   assert.equal(closes(host).length, 1);
   assert.equal(host.source.phase, "empty");
   assert.equal(window.props.status, "正在解析视频和音频…"); // a cancel is not reported as an error
+  await stop();
+});
+
+test("long multi-line backend reasons are shown on one line", async () => {
+  const host = new TestHost();
+  host.handle("source.submit", () => ({
+    status: "failed",
+    error: { backend: `Bilibili 解析失败：line one\nline two ${"x".repeat(300)}` },
+  }));
+  const { window, stop } = await play(link, host);
+  const status = String(window.props.status);
+  assert.equal(status.includes("\n"), false);
+  assert.ok(status.startsWith("Bilibili 解析失败：line one line two"));
+  assert.equal(status.length, 160);
   await stop();
 });
