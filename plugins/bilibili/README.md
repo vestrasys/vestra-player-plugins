@@ -1,11 +1,9 @@
-# Bilibili source plugin
+# Bilibili 视频（bilibili）
 
-The menu 文件 → 网络媒体 → Bilibili 视频… opens an ordinary Slint URL window with Play, Cancel and visible errors. The plugin registers its exact Bilibili hosts with the public sourceResolvers API. The window submits the original page URL through source.submit; playlists or any other source caller can submit the same URL without plugin-specific knowledge. The resolver validates BV/av video paths and b23.tv short links, runs yt-dlp, and returns primary video plus separate audio and per-resource request headers. No webpage is passed directly to mpv, and no split audio is discarded.
+功能：为 `bilibili.com`、`www.bilibili.com`、`m.bilibili.com`、`b23.tv` 注册公共来源解析器。解析器只接受 BV/av 单视频与 b23.tv 短链，匿名运行 `yt-dlp`（不读配置、cookie 或凭据，45 秒上限），返回主视频与独立音轨及各自的请求头。任何调用者（本插件窗口、播放列表链接、通用打开）提交同站网址都走同一解析器。
 
-yt-dlp runs without user configuration, cookies, credentials or a shell; bounded 45-second timeout, output size and retries; the public resolver AbortSignal kills extraction. Shared source arbitration handles cancellation/supersession from any caller. The URL window queries the same operation ID after an uncertain submit, waits for backend source ready, exposes source errors, and uses ticket-stamped close on Cancel so newer sources survive. A 60-second loading timeout closes only its original source. Plugin teardown disposes the resolver lease. No Rust site business logic or download scope.
+入口：`文件 → 网络媒体 → Bilibili 视频…` 打开链接窗口（`dialog.slint`）：输入网址后“播放”，显示“正在解析视频和音频…”，后端真正就绪后显示“视频已就绪。”；被其它来源替换、载入失败、解析失败都显示原因。“取消”中止解析或载入，只关闭本次打开的来源，并关闭窗口。解析与载入合计 60 秒未就绪则关闭该来源并提示“媒体加载超时，请重试。”。
 
-Production package: manifest.json, dist/*.js and dialog.slint. Authoring source in the repository: main.ts, extractor.ts, playback.ts (local candidate uses src/). build.cjs uses the fixed local TypeScript toolchain. Strict checking uses the current SDK cached at /tmp/vestra-current-runtime-cache/sdk, NodeNext, ES2022 and the fixed toolchain's Node typeRoots. Host imports are type-only ../../sdk/index.ts at their installed source locations.
+限制：依赖本机 `yt-dlp`；不支持登录、会员、番剧、直播、合集；宿主当前要求主视频与音轨的请求头相同，不同时由宿主明确拒绝。插件停用时撤销解析器，已在播放的媒体继续播放。
 
-Validated by this author: strict TypeScript and 10 Node logic tests, covering site validation, split audio/headers, invalid extraction, pre-abort, stable operation recovery, backend readiness, CAS cancellation/replacement, backend errors and resolver lifecycle. real-extraction.json records the latest single public no-cookie extraction attempt separately from playback; it omits temporary signed media URLs. The initial public extraction succeeded. Slint real compiler, host trial, actual Bilibili mpv playback and audible output remain maintainer-owned checks and have not been run by this author. Both design document paths existed but were iCloud dataless (stat blocks=0); their contents were not read.
-
-Current shared mpv contract requires identical primary/audio header maps. Different maps are preserved by this plugin and rejected explicitly by the shared host rather than weakened or silently dropped.
+开发（在 `src/` 下）：`npm run plugin -- check bilibili`、`build bilibili`（生成 `dist/`，版本取自 `manifest.json`）、`test bilibili`。

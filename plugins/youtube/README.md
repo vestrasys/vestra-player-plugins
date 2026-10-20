@@ -1,25 +1,14 @@
-# YouTube plugin candidate
+# YouTube（youtube）
 
-Independent TypeScript extraction/download implementation with ordinary Slint Window. Menu: 文件 → 网络媒体 → YouTube 视频…. Supports a single HTTPS watch/shorts/live/embed/youtu.be video URL. Playlist parameters are removed; batch and authenticated/private content are outside this slice.
+功能：播放或下载单个公开 YouTube 视频（watch、shorts、live、embed、youtu.be 的 HTTPS 链接；`list` 参数被忽略，纯播放列表链接不支持）。插件注册公共来源解析器（`youtube.com`、`www.youtube.com`、`m.youtube.com`、`music.youtube.com`、`youtu.be`），任何调用方打开这些链接都由它用 yt-dlp 解析，保留分离的视频/音频与各自的请求头。
 
-Run `node build.mjs` then `node --test test.mjs`. Build typechecks against the current SDK (type-only Host import), emits only this package's JS, and copies Slint plus the production manifest to dist. Production needs no SDK JS or npm packages. The source uses ../../sdk/index.ts; the local typecheck substitutes a readable SDK path only in a disposable own-source file (VESTRA_SDK override or the current /tmp SDK cache). Toolchain overrides: VESTRA_TSC, VESTRA_TYPE_ROOTS. Node built-ins require the real trusted Node runtime.
+入口：`文件 → 网络媒体 → YouTube 视频…` 打开独立窗口（`youtube.slint`）：粘贴链接后“播放”（以公开来源状态确认就绪，最长等待 120 秒）或“下载视频…”（原生保存对话框，只接受 `.mkv`）；“取消”中止解析/载入（关闭本插件打开的媒体）或下载。
 
-Dependency setup: use the official [yt-dlp release 2026.08.19](https://github.com/yt-dlp/yt-dlp/releases/tag/2026.08.19) or the matching official PyPI source/wheel; verify official checksums/signatures when installing release assets. This plugin does not install, update, or bundle executables. Set VESTRA_YT_DLP to an explicit executable when needed; default is yt-dlp on PATH. The exact yt-dlp version is checked before work. Downloads also require ffmpeg on PATH; tested environment version 9.0.2 is recorded in dependencies.lock.json. Source is [ffmpeg.org](https://ffmpeg.org/download.html). Dependency paths and hashes in the lock describe observed installed tools, not a claim of upstream binary identity.
+下载：yt-dlp 下载音视频并由 ffmpeg 合并为 MKV，写入目标旁的私有临时目录，只有完整非空文件才改名到目标位置；失败或取消时清理临时目录，不改动已有目标文件。显示下载百分比与合并阶段。插件停用时终止正在运行的 yt-dlp 进程组。
 
-[yt-dlp licensing](https://github.com/yt-dlp/yt-dlp#licensing): source/PyPI code is Unlicense; official PyInstaller bundles include GPLv3+ code, while Unix zipimport assets have additional ISC/MIT components. FFmpeg licensing varies by build; the observed Homebrew build enables GPL/version3. No third-party executable is redistributed here; retain the chosen distribution's licenses if packaging dependencies later.
+依赖与限制：
+- 需要 yt-dlp `2026.08.19`（运行前校验版本；`VESTRA_YT_DLP` 可指定可执行文件，默认 PATH 上的 `yt-dlp`），下载另需 PATH 上的 ffmpeg。版本、来源与许可证记录在 `dependencies.lock.json`；插件不安装、不更新、不捆绑可执行文件。
+- 不使用 shell、cookies、浏览器配置或用户 yt-dlp 配置；登录、地区、付费、DRM 等错误如实显示。
+- 共享后端要求分离的视频/音频使用相同的请求头；不同时由宿主明确报错。
 
-Downloads use a native save dialog and require a .mkv target. yt-dlp fetches both tracks and ffmpeg merges/remuxes into MKV in a private sibling staging directory. Only a complete nonempty final file is renamed onto the selected destination. Failure/cancel cleans staging, preserving any pre-existing destination. Progress includes download percentage and merge stage. Cancel aborts the child process group on macOS/Linux, with forced termination fallback. No shell, cookies, browser profiles, user yt-dlp configuration, or private user data are used.
-
-Playback extraction retains separate video/audio and per-track HTTP headers. SITE-01 is now wired through the actual public sourceResolvers SDK. The resolver returns both resources, keeps original URL identity, and passes AbortSignal to extraction. Play submits the original URL to the shared source arbitrator; pending operations are queried by ID and readiness is confirmed through matching public source state. Cancel uses the original ticket stamp; unload disposes the resolver lease. Different paired header maps are explicitly rejected by the shared backend. See API_REQUESTS.md. No direct playlist dependency or site logic in Rust exists.
-
-Validation 2026-10-18:
-- First slice: strict TypeScript build passed; five logic tests passed (URL validation, track preservation, failure cleanup, complete commit/progress, pre-cancel).
-- Real installed yt-dlp reports 2026.08.19.
-- Public extraction BaW_jenozKc failed: video unavailable (extraction-smoke.log); no retry loop.
-- Public extraction jNQXAC9IVRw succeeded: Me at the zoo, separate audio, googlevideo primary URL (extraction-public-smoke.log).
-- Real download of jNQXAC9IVRw completed through this service: 474,561-byte MKV; ffprobe confirms AV1 video + Opus audio, 19.021 seconds (download-probe.json); progress for both streams and merging observed (download-smoke.log). The local acceptance media remains in /tmp and is not shipped.
-- Root independently probed the download and decoded its full video/audio tracks to null with explicit mapping (ffmpeg exit 0); video AV1 320×240 and audio Opus 48 kHz stereo. Independent decode evidence is /tmp/vestra-youtube-download-independent-decode.log (empty error log). This establishes both downloaded tracks are decodable; it does not establish mpv playback or native save interaction.
-- Native package validation, Slint rendering, GUI/save-dialog interactions, real mpv playback/audio, full cross-caller resolver routing and full host activation are not yet verified. Logic tests do not establish these outcomes.
-- Design documents in repo were iCloud dataless; bounded read attempts returned no bytes and were stopped. No old implementation/tests, temp repo, Git history, sibling plugin source, or private API copy was read.
-
-Resolver follow-up 2026-10-19 (package 0.1.1): strict build and all 10 tests passed, including original URL submission/pending→ready, same-ID timeout recovery without re-open, CAS cancellation, backend failure/replacement, and resolver lease disposal. These Host doubles validate package logic only. A single fresh public extraction of jNQXAC9IVRw succeeded: Me at the zoo, separate audio, identical video/audio header maps compatible with the current shared backend (resolver-extraction-smoke.log); no authentication bypass or retry loop. Native/GUI/audio acceptance remains with the maintainer.
+开发（在 `src/` 下）：`npm run plugin -- check youtube`、`build youtube`、`test youtube`。测试不联网、不调用真实 yt-dlp。

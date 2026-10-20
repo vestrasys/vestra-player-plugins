@@ -1,1 +1,1 @@
-{"id":"youtube","apiVersion":"vestra.experimental/0.1","entry":"main.ts","capabilities":["commands","events","ui.window","ui.dialog","playback.read","playback.control","source.resolve"]}
+{"id":"youtube","version":"0.1.1","apiVersion":"vestra.experimental/0.1","entry":"main.ts","capabilities":["commands","events","ui.window","ui.dialog","playback.read","playback.control","source.resolve"]}
