@@ -41,7 +41,12 @@ test("public resolver and menu entry are owned by the plugin lifetime", async ()
   assert.deepEqual(command.declaration, {
     title: "Bilibili 视频…",
     path: ["文件", "网络媒体", "Bilibili 视频…"],
-    shortcut: null,
+    order: 212,
+    group: "domain",
+    radio: false,
+    bindings: [],
+    focus: null,
+    repeat: false,
   });
   await command.run();
   const window = host.window("dialog");

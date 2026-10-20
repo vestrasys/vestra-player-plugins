@@ -82,7 +82,7 @@ export default async function activate(plugin: Plugin, youtube = new YouTubeServ
   window.on("download", (url: string) => (busy ? undefined : (current = run("download", url))));
   window.on("cancel", () => active?.abort());
 
-  plugin.commands.add({ id: "youtube.open", path: ["文件", "网络媒体", "YouTube 视频…"], run: () => window.show() });
+  plugin.commands.add({ id: "youtube.open", path: ["文件", "网络媒体", "YouTube 视频…"], order: 213, run: () => window.show() });
 
   // Unloading stops a running yt-dlp download (its process group) and waits for staging cleanup.
   plugin.onDispose(async () => {

@@ -119,7 +119,12 @@ test("activation registers only the public resolver and one menu entrance", asyn
   assert.deepEqual(host.command("youtube.open").declaration, {
     title: "YouTube 视频…",
     path: ["文件", "网络媒体", "YouTube 视频…"],
-    shortcut: null,
+    order: 213,
+    group: "domain",
+    radio: false,
+    bindings: [],
+    focus: null,
+    repeat: false,
   });
   const window = await openWindow(host);
   assert.deepEqual(window.callbacks.sort(), ["cancel", "download", "play"]);

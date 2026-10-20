@@ -62,6 +62,7 @@ export default async function activate(plugin: Plugin) {
   plugin.commands.add({
     id: "bilibili.open",
     path: ["文件", "网络媒体", "Bilibili 视频…"],
+    order: 212,
     run: () => {
       // A fresh window starts empty; an open one keeps what it shows.
       if (!window.opened) [url, status, busy] = ["", prompt, false];
