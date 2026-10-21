@@ -1,0 +1,128 @@
+name: Publish
+
+# Publishes the official plugin repository:
+# - a GitHub Release per new plugin version: tag <id>-v<version>, asset
+#   <id>-<version>.vxp;
+# - GitHub Pages: index.json, index.json.sig and assets/<id>/<version>/
+#   (README, changelog, icon).
+# The repository must be public: Releases downloads and Pages of a private
+# repository need authentication or a paid plan.
+#
+# Why build and signing are separate jobs (ecosystem plan 1.6 item 2):
+# - `build` runs code from plugins: npm ci (install scripts), type checks,
+#   builds and tests, and later the source builds of third-party plugins
+#   registered in registry/. It gets no secret and no token, so a malicious
+#   build script can neither read the signing key nor publish anything. Its
+#   output is data only: the unsigned index.json, the Pages assets and the
+#   new .vxp packages.
+# - `release-and-sign` holds the signing key (environment plugins-index). It
+#   never runs plugin code or npm ci: it checks out only this repository's
+#   scripts, keys/ and revoked.json, treats the build artifact as untrusted
+#   data, checks each package's sha256 and size against the index and the
+#   version history against the previously signed index, and only then
+#   creates the Releases and signs index.json.
+# - `deploy` puts the signed site on Pages (environment github-pages).
+#
+# A version whose Release already exists is never rebuilt; earlier versions
+# come from the published, signed index.json.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One publish at a time: each run builds on the index the previous run
+# published.
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      # Before any plugin code runs in this job: the only step with a token
+      # (read-only), and it reads manifest.json files only.
+      - name: Query existing releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/query-releases.mjs "$RUNNER_TEMP/releases.json"
+      - run: npm ci
+      - run: npm run check
+      - run: npm run registry
+      - run: npm test
+      # Packs (vestra-plugin pack) every plugin whose version has no Release
+      # yet; third-party source builds will run here too, each isolated.
+      - name: Build index.json and new packages
+        run: >-
+          node scripts/build-index.mjs
+          --out "$RUNNER_TEMP/publish"
+          --releases "$RUNNER_TEMP/releases.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: publish
+          path: ${{ runner.temp }}/publish
+          if-no-files-found: error
+          retention-days: 7
+
+  release-and-sign:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: plugins-index
+    permissions:
+      contents: write # gh release create
+    steps:
+      # The repository's own scripts only (plus root files such as
+      # revoked.json); no plugins/, no node_modules, no npm ci. The scripts
+      # use Node built-ins only.
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            scripts
+            keys
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: actions/download-artifact@v4
+        with:
+          name: publish
+          path: ${{ runner.temp }}/publish
+      - name: Check the artifact and create the Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/publish-releases.mjs "$RUNNER_TEMP/publish" --target "$GITHUB_SHA"
+      - name: Sign index.json
+        env:
+          VESTRA_INDEX_SIGNING_KEY: ${{ secrets.VESTRA_INDEX_SIGNING_KEY }}
+        run: node scripts/sign-index.mjs "$RUNNER_TEMP/publish/site" --public-key keys/index-signing.pub.pem
+      - name: Verify the signature
+        run: node scripts/verify-index.mjs keys/index-signing.pub.pem "$RUNNER_TEMP/publish/site"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ runner.temp }}/publish/site
+
+  deploy:
+    needs: release-and-sign
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

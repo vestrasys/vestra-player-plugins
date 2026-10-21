@@ -12,17 +12,20 @@
   },
   "scripts": {
     "check": "node scripts/plugin.mjs check --all && tsc --noEmit",
-    "format": "prettier --write \"scripts/**/*.mjs\" \".github/**/*.yml\" package.json tsconfig.json",
-    "format:check": "prettier --check \"scripts/**/*.mjs\" \".github/**/*.yml\" package.json tsconfig.json",
+    "format": "prettier --write \"scripts/**/*.mjs\" \".github/**/*.yml\" package.json tsconfig.json revoked.json",
+    "format:check": "prettier --check \"scripts/**/*.mjs\" \".github/**/*.yml\" package.json tsconfig.json revoked.json",
     "boundaries": "node scripts/check-boundaries.mjs",
     "portability": "node scripts/check-portability.mjs",
+    "registry": "node scripts/check-registry.mjs",
     "plugin": "node scripts/plugin.mjs",
     "build": "node scripts/plugin.mjs build --all",
-    "test": "node scripts/plugin.mjs test --all"
+    "test": "node scripts/plugin.mjs test --all && npm run test:scripts",
+    "test:scripts": "node --test \"scripts/tests/*.test.mjs\"",
+    "index:dry-run": "node scripts/build-index.mjs --dry-run"
   },
   "devDependencies": {
     "@types/node": "^25.0.0",
-    "@vestra-player/sdk": "^1.0.0",
+    "@vestra-player/sdk": "^1.1.1",
     "prettier": "^3.9.10",
     "typescript": "^5.9.0"
   }

@@ -1,14 +1,24 @@
-# YouTube（youtube）
+# YouTube
 
-功能：播放或下载单个公开 YouTube 视频（watch、shorts、live、embed、youtu.be 的 HTTPS 链接；`list` 参数被忽略，纯播放列表链接不支持）。插件注册公共来源解析器（`youtube.com`、`www.youtube.com`、`m.youtube.com`、`music.youtube.com`、`youtu.be`），任何调用方打开这些链接都由它用 yt-dlp 解析，保留分离的视频/音频与各自的请求头。
+在 Vestra Player 里播放或下载单个公开 YouTube 视频。
 
-入口：右键菜单 `打开 → YouTube 视频…`（`open` 组 order 111）打开「输入链接」小窗（`youtube.slint`，420×122，与 Bilibili 窗口同一规格，整改文档 §7.5 UI-DLG-02）：粘贴链接后按 Enter 或“播放”（以公开来源状态确认就绪，最长等待 120 秒），或“下载视频…”（原生保存对话框，只接受 `.mkv`）；“取消”中止解析/载入（只关闭本插件打开的媒体）或下载，并关闭窗口。状态只显示一行中文，完整文字在悬停提示里；yt-dlp 的失败原因取它最后一行 `ERROR:`。
+## 使用
 
-下载：yt-dlp 下载音视频并由 ffmpeg 合并为 MKV，写入目标旁的私有临时目录，只有完整非空文件才改名到目标位置；失败或取消时清理临时目录，不改动已有目标文件。状态行显示下载百分比与合并阶段，下方 2px 进度线。插件停用时终止正在运行的 yt-dlp 进程组。
+右键菜单 **打开 → YouTube 视频…**，粘贴链接：
 
-依赖与限制：
-- 需要 yt-dlp `2026.08.19`（运行前校验版本；`VESTRA_YT_DLP` 可指定可执行文件，默认 PATH 上的 `yt-dlp`），下载另需 PATH 上的 ffmpeg。版本、来源与许可证记录在 `dependencies.lock.json`；插件不安装、不更新、不捆绑可执行文件。
-- 不使用 shell、cookies、浏览器配置或用户 yt-dlp 配置；登录、地区、付费、DRM 等错误如实显示。
-- 共享后端要求分离的视频/音频使用相同的请求头；不同时由宿主明确报错。
+- 按 Enter 或「播放」直接播放；
+- 「下载视频…」选择保存位置，下载为 `.mkv` 文件。
 
-开发（在 `src/` 下）：`npm run plugin -- check youtube`、`build youtube`、`test youtube`。测试不联网、不调用真实 yt-dlp。
+在播放列表或「打开」里直接输入 YouTube 链接也能播放。支持 watch、shorts、live、embed 和 youtu.be 链接；链接里的播放列表参数会被忽略。
+
+## 需要
+
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) `2026.08.19`，在 PATH 上（或用环境变量 `VESTRA_YT_DLP` 指定）；
+- 下载需要 [ffmpeg](https://ffmpeg.org/)，在 PATH 上。
+
+插件不会自动安装或更新这两个程序。
+
+## 限制
+
+- 不支持登录、会员、付费、地区限制和 DRM 视频，也不读取浏览器 cookie；这些情况会显示 yt-dlp 给出的原因。
+- 不支持整个播放列表。

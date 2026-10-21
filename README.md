@@ -1,9 +1,10 @@
 # Vestra Player plugins
 
-Official [Vestra Player](https://github.com/vestrasys/vestra-player) plugins
-that are **not** bundled with the installer, and (later) the registry of
-third-party plugins for the official plugin repository. Users install these
-plugins through the plugin store. Plugins use only the public plugin API from
+The official plugin repository of
+[Vestra Player](https://github.com/vestrasys/vestra-player): the source of the
+official plugins that are **not** bundled with the installer, the registry of
+third-party plugins, and the CI that publishes them as the signed index the
+plugin store reads. Plugins use only the public plugin API from
 [`@vestra-player/sdk`](https://github.com/vestrasys/vestra-player-sdk).
 
 The built-in plugins (playback, playlist, subtitles, …) ship with the player
@@ -14,11 +15,17 @@ not here.
 ## Layout
 
 ```text
-plugins/<name>/   one plugin per directory: manifest.json, main.ts, .slint UI, tests/, README.md
-                  (youtube, bilibili)
-registry/         third-party registration files, registry/<id>.toml (not implemented yet)
-scripts/          repository scripts: plugin.mjs (runs the SDK's vestra-plugin CLI),
-                  check-boundaries.mjs, check-portability.mjs
+plugins/<name>/   official plugins (id vestra.<name>): manifest.json, main.ts, .slint UI,
+                  tests/, README.md, CHANGELOG.md (youtube, bilibili)
+registry/         third-party registrations, registry/<id>.toml (see CONTRIBUTING.md)
+revoked.json      revoked plugin versions, copied into the index
+keys/             index-signing.pub.pem, the public key of the index signature
+scripts/          plugin.mjs (runs the SDK's vestra-plugin CLI), check-boundaries.mjs,
+                  check-portability.mjs, check-registry.mjs, and the publishing scripts:
+                  query-releases.mjs, build-index.mjs, publish-releases.mjs,
+                  sign-index.mjs, verify-index.mjs, generate-signing-key.mjs
+.github/workflows ci.yml (checks), publish.yml (Releases, index, Pages),
+                  registry.yml (owner check for registry pull requests)
 ```
 
 Plugins are independent: a plugin never imports another plugin or anything
@@ -35,7 +42,7 @@ npm ci
 npm run plugin -- check youtube     # strict type check
 npm run plugin -- build youtube     # writes plugins/youtube/dist/
 npm run plugin -- test youtube      # node --test on plugins/youtube/tests/
-npm run plugin -- pack youtube      # dist/ as <id>-<version>.zip
+npm run plugin -- pack youtube      # dist/ as <id>-<version>.vxp
 ```
 
 A name is a directory under `plugins/`; `--all` runs every plugin. The whole
@@ -43,11 +50,12 @@ repository, as CI runs it:
 
 ```sh
 npm ci && npm run check && npm run format:check && npm run boundaries \
-  && npm run portability && npm run build && npm test
+  && npm run portability && npm run registry && npm run build && npm test
 ```
 
-`format:check` covers the repository's own scripts and configuration; plugin
-sources keep their authors' formatting.
+`npm test` runs the plugin tests and the tests of the repository scripts
+(`npm run test:scripts`). `format:check` covers the repository's own scripts
+and configuration; plugin sources keep their authors' formatting.
 
 ## Run a plugin in the player
 
@@ -63,10 +71,91 @@ cargo run --bin vestra-host -- --plugin ../plugins/playback \
 `--plugin` may be repeated; the player runs the plugin's `.ts` sources
 directly. The built-in `playback` plugin provides the player controls.
 
+## Publishing
+
+Every push to `main` runs [`publish.yml`](.github/workflows/publish.yml):
+
+1. **build** (no secrets, no token while plugin code runs): `npm ci`, checks,
+   tests; packs every plugin whose version has no Release yet with
+   `vestra-plugin pack`; writes the unsigned `index.json` and the store
+   assets. A version that is already released is never rebuilt; earlier
+   versions come from the published index.
+2. **release-and-sign** (environment `plugins-index`, secret
+   `VESTRA_INDEX_SIGNING_KEY`): runs no plugin code and no `npm ci`. It checks
+   the build artifact as untrusted data (each package's sha256 and size
+   against the index, the version history against the previously signed
+   index, `revoked` against `revoked.json`), creates the Releases with
+   `gh release create`, and signs `index.json`.
+3. **deploy**: publishes the signed site to GitHub Pages.
+
+Build and signing are separate jobs so that code from plugins (build
+scripts, dependencies, tests, and later third-party sources) never runs where
+the signing key is.
+
+What gets published (the repository must be **public**; Releases downloads
+and Pages of a private repository need authentication or a paid plan):
+
+| What | Where |
+| --- | --- |
+| Package | Release `<id>-v<version>`, asset `<id>-<version>.vxp`: `https://github.com/vestrasys/vestra-player-plugins/releases/download/<id>-v<version>/<id>-<version>.vxp` |
+| Index | `https://vestrasys.github.io/vestra-player-plugins/index.json` |
+| Signature | `index.json.sig` next to it: base64 Ed25519 signature over the exact bytes of `index.json`, verified with [`keys/index-signing.pub.pem`](keys/index-signing.pub.pem) |
+| Store assets | `assets/<id>/<version>/README.md`, `CHANGELOG.md`, `icon.<png\|jpg\|jpeg>` next to the index (newest version only) |
+
+### `index.json`
+
+```json
+{
+  "schema": 1,
+  "name": "Vestra Player 官方仓库",
+  "official": true,
+  "plugins": [
+    {
+      "id": "vestra.youtube",
+      "name": "YouTube", "author": "Vestra Player", "punchline": "…", "description": "…",
+      "tags": ["…"], "license": "Apache-2.0",
+      "iconUrl": null, "readmeUrl": "https://…/README.md", "changelogUrl": "https://…/CHANGELOG.md",
+      "sourceUrl": "https://github.com/vestrasys/vestra-player-plugins/tree/main/plugins/youtube",
+      "versions": [
+        { "version": "0.2.0", "apiVersion": "vestra/1", "minPlayerVersion": "0.2.0",
+          "capabilities": ["…"], "downloadUrl": "https://…/vestra.youtube-0.2.0.vxp",
+          "sha256": "…", "size": 9370, "published": "2026-10-21T…Z" }
+      ]
+    }
+  ],
+  "revoked": [],
+  "extensions": {}
+}
+```
+
+- Plugin fields come from the newest version's `manifest.json`; a field the
+  manifest leaves out is `null` (`tags`: `[]`, `name`: the id).
+- `versions` is newest first. There are no release channels and no download
+  counts (ecosystem plan 1.6 items 8 and 9).
+- `published` is when CI built the version.
+
+Try it locally (no network; writes to a temporary directory and prints the
+index):
+
+```sh
+npm run index:dry-run
+```
+
+### Revocation
+
+`revoked.json` lists versions the store must disable:
+
+```json
+[{ "id": "vestra.youtube", "versions": ">=0.2.0 <0.2.3", "reason": "…" }]
+```
+
+It is copied into the index's `revoked` unchanged on the next publish. See
+[CONTRIBUTING.md](CONTRIBUTING.md#revoking-a-version) for the range syntax.
+
 ## Contributing
 
-The submission process for third-party plugins is not written yet; see
-[CONTRIBUTING.md](CONTRIBUTING.md) (placeholder).
+Official plugin changes, third-party registrations and revocations:
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

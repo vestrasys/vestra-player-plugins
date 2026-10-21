@@ -1,1 +1,23 @@
-{"id":"youtube","version":"0.1.1","apiVersion":"vestra/1","entry":"main.ts","capabilities":["commands","events","ui.window","ui.dialog","playback.read","playback.control","source.resolve"]}
+{
+  "id": "vestra.youtube",
+  "version": "0.2.0",
+  "apiVersion": "vestra/1",
+  "entry": "main.ts",
+  "capabilities": [
+    "commands",
+    "events",
+    "ui.window",
+    "ui.dialog",
+    "playback.read",
+    "playback.control",
+    "source.resolve"
+  ],
+  "name": "YouTube",
+  "author": "Vestra Player",
+  "punchline": "粘贴链接播放或下载单个公开 YouTube 视频",
+  "description": "打开 YouTube 视频链接（watch、shorts、live、embed、youtu.be）直接播放，或下载为 MKV 文件。需要本机安装 yt-dlp，下载另需 ffmpeg。",
+  "tags": ["网络视频", "YouTube", "下载"],
+  "sourceUrl": "https://github.com/vestrasys/vestra-player-plugins/tree/main/plugins/youtube",
+  "license": "Apache-2.0",
+  "minPlayerVersion": "0.2.0"
+}

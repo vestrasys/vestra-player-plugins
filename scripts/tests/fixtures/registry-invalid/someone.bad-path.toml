@@ -1,0 +1,4 @@
+repository = "https://github.com/someone/bad-path"
+commit = "3f2a9c1d4b5e6f708192a3b4c5d6e7f8091a2b3c"
+path = "../outside"
+owners = ["someone"]

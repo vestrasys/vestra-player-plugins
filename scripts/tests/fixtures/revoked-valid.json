@@ -1,0 +1,5 @@
+[
+  { "id": "vestra.youtube", "versions": "0.2.0", "reason": "Plays the wrong stream." },
+  { "id": "someone.cool-visualizer", "versions": ">=1.0.0 <1.2.0 || 2.0.0", "reason": "Deletes files outside its data directory." },
+  { "id": "someone.broken", "versions": "*", "reason": "Withdrawn by the author." }
+]

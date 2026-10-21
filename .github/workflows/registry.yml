@@ -1,0 +1,40 @@
+name: Registry owners
+
+# The owner rule for registry/<id>.toml (CONTRIBUTING.md): a new registration
+# lists the pull request author as an owner; a change to or removal of an
+# existing one comes from one of its owners on the base branch.
+#
+# pull_request_target runs this workflow and scripts/check-registry.mjs as
+# they are on the base branch, so a pull request cannot change the check
+# that judges it. The pull request's files are read as data (git show); none
+# of its code runs, and the job has a read-only token and no secrets.
+
+on:
+  pull_request_target:
+    paths:
+      - "registry/**"
+
+permissions:
+  contents: read
+
+jobs:
+  owners:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Fetch the pull request head (as data)
+        env:
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: git fetch --no-tags "https://github.com/$GITHUB_REPOSITORY.git" "refs/pull/$NUMBER/head:refs/remotes/pr/head"
+      - name: Check registry owners
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: node scripts/check-registry.mjs --base "$BASE" --head refs/remotes/pr/head --author "$AUTHOR"

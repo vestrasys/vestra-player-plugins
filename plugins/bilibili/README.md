@@ -1,9 +1,17 @@
-# Bilibili 视频（bilibili）
+# Bilibili 视频
 
-功能：为 `bilibili.com`、`www.bilibili.com`、`m.bilibili.com`、`b23.tv` 注册公共来源解析器。解析器只接受 BV/av 单视频与 b23.tv 短链，匿名运行 `yt-dlp`（不读配置、cookie 或凭据，45 秒上限），返回主视频与独立音轨及各自的请求头。任何调用者（本插件窗口、播放列表链接、通用打开）提交同站网址都走同一解析器。
+在 Vestra Player 里播放 Bilibili 的单个视频。
 
-入口：右键菜单 `打开 → Bilibili 视频…`（`open` 组 order 112）打开「输入链接」小窗（`dialog.slint`，420×122，与 YouTube 窗口同一规格，整改文档 §7.5 UI-DLG-02）：输入网址后按 Enter 或“播放”，显示“正在解析视频和音频…”，后端真正就绪后显示“视频已就绪。”；被其它来源替换、载入失败、解析失败都显示一行中文原因（yt-dlp 的原因取它最后一行 `ERROR:`，完整文字在悬停提示里）。“取消”中止解析或载入，只关闭本次打开的来源，并关闭窗口。解析与载入合计 60 秒未就绪则关闭该来源并提示“媒体加载超时，请重试。”。
+## 使用
 
-限制：依赖本机 `yt-dlp`；不支持登录、会员、番剧、直播、合集；宿主当前要求主视频与音轨的请求头相同，不同时由宿主明确拒绝。插件停用时撤销解析器，已在播放的媒体继续播放。
+右键菜单 **打开 → Bilibili 视频…**，粘贴链接，按 Enter 或「播放」。
 
-开发（在 `src/` 下）：`npm run plugin -- check bilibili`、`build bilibili`（生成 `dist/`，版本取自 `manifest.json`）、`test bilibili`。
+在播放列表或「打开」里直接输入 Bilibili 链接也能播放。支持 BV 号、av 号的视频页和 b23.tv 短链。
+
+## 需要
+
+[yt-dlp](https://github.com/yt-dlp/yt-dlp)，在 PATH 上。插件不会自动安装或更新它。
+
+## 限制
+
+不支持登录、大会员、番剧、直播和合集。

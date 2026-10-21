@@ -29,5 +29,6 @@ jobs:
       - run: npm run format:check
       - run: npm run boundaries
       - run: npm run portability
+      - run: npm run registry
       - run: npm run build
       - run: npm test

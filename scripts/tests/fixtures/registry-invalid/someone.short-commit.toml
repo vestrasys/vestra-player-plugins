@@ -1,0 +1,3 @@
+repository = "https://github.com/someone/short-commit"
+commit = "3f2a9c1"
+owners = ["someone"]
