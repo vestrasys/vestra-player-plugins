@@ -1,0 +1,7 @@
+node_modules/
+# Plugin builds and packages: `npm run plugin -- build|pack <name>`.
+dist/
+*.vxp
+*.zip
+*.tsbuildinfo
+.DS_Store

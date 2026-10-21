@@ -1,0 +1,29 @@
+{
+  "name": "vestra-player-plugins",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vestrasys/vestra-player-plugins.git"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "check": "node scripts/plugin.mjs check --all && tsc --noEmit",
+    "format": "prettier --write \"scripts/**/*.mjs\" \".github/**/*.yml\" package.json tsconfig.json",
+    "format:check": "prettier --check \"scripts/**/*.mjs\" \".github/**/*.yml\" package.json tsconfig.json",
+    "boundaries": "node scripts/check-boundaries.mjs",
+    "portability": "node scripts/check-portability.mjs",
+    "plugin": "node scripts/plugin.mjs",
+    "build": "node scripts/plugin.mjs build --all",
+    "test": "node scripts/plugin.mjs test --all"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.0",
+    "@vestra-player/sdk": "^1.0.0",
+    "prettier": "^3.9.10",
+    "typescript": "^5.9.0"
+  }
+}
