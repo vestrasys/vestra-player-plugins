@@ -1,4 +1,4 @@
-import type { Plugin, PluginError } from "../../sdk/plugin/index.ts";
+import type { Plugin, PluginError } from "@vestra-player/sdk";
 import { normalizeYouTubeUrl, YouTubeService } from "./service.ts";
 
 const hosts = ["youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be"];

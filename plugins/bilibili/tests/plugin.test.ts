@@ -4,7 +4,7 @@ import {
   HostError,
   startPlugin,
   TestHost,
-} from "../../../sdk/plugin/testing.ts";
+} from "@vestra-player/sdk/testing";
 import activate from "../main.ts";
 
 const directory = new URL("..", import.meta.url);

@@ -1,4 +1,4 @@
-import type { Plugin, PluginError } from "../../sdk/plugin/index.ts";
+import type { Plugin, PluginError } from "@vestra-player/sdk";
 import { extractBilibili, validateUrl } from "./extractor.ts";
 
 const prompt = "输入 Bilibili 视频链接。";
