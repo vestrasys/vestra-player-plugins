@@ -23,6 +23,23 @@ async function openWindow(host: TestHost) {
 }
 const opens = (host: TestHost) =>
   host.sent("source.submit").filter((call) => (call.intent as { kind: string }).kind === "open");
+/**
+ * Retry `assertion` until it passes (or rethrow its last failure after `ms`).
+ * `host.settle()` only waits for host calls; a download also does file-system work in the
+ * plugin (staging directory, readdir/stat/rename, cleanup), which it cannot see.
+ */
+async function eventually(host: TestHost, assertion: () => void, ms = 5000) {
+  const deadline = Date.now() + ms;
+  for (;;) {
+    await host.settle();
+    try {
+      return assertion();
+    } catch (error) {
+      if (Date.now() > deadline) throw error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
 
 // ---------------------------------------------------------------- service (no host involved)
 
@@ -248,13 +265,11 @@ test("download shows progress while running and the saved file when done", async
     const window = await openWindow(host);
     host.dialogAnswers.push([join(dir, "saved.mkv")]);
     window.emit("download", watch);
-    await host.settle(20);
+    await eventually(host, () => assert.equal(window.props.status, "正在下载 50.0%"));
     assert.equal(window.props.busy, true);
     assert.equal(window.props.progress, 0.5);
-    assert.equal(window.props.status, "正在下载 50.0%");
     release();
-    await host.settle(20);
-    assert.equal(window.props.status, "已保存：saved.mkv");
+    await eventually(host, () => assert.equal(window.props.status, "已保存：saved.mkv"));
     assert.equal(window.props.progress, 1);
     assert.equal(window.props.busy, false);
     assert.equal(await readFile(join(dir, "saved.mkv"), "utf8"), "complete");
@@ -266,16 +281,18 @@ test("download shows progress while running and the saved file when done", async
 });
 
 test("cancelling the save dialog, cancelling a download, and unloading during one", async () => {
+  let started = 0;
   let aborted = 0;
-  const runner: Runner = (args, options) =>
-    args.includes("--version")
-      ? Promise.resolve("2026.08.19")
-      : new Promise((_, reject) =>
-          options?.signal?.addEventListener("abort", () => {
-            aborted++;
-            reject(new Error("Cancelled"));
-          }),
-        );
+  const runner: Runner = (args, options) => {
+    if (args.includes("--version")) return Promise.resolve("2026.08.19");
+    started++;
+    return new Promise((_, reject) =>
+      options?.signal?.addEventListener("abort", () => {
+        aborted++;
+        reject(new Error("Cancelled"));
+      }),
+    );
+  };
   const dir = await mkdtemp(join(tmpdir(), "vestra-yt-test-"));
   const { host, stop } = await start(runner);
   try {
@@ -286,16 +303,15 @@ test("cancelling the save dialog, cancelling a download, and unloading during on
     assert.equal(window.props.status, "已取消选择保存位置。");
     host.dialogAnswers.push([join(dir, "a.mkv")]);
     window.emit("download", watch);
-    await host.settle(20);
+    await eventually(host, () => assert.equal(started, 1)); // past staging: yt-dlp is running
     window.emit("cancel");
-    await host.settle(20);
-    assert.equal(aborted, 1);
+    await eventually(host, () => assert.equal(aborted, 1));
     assert.equal(host.sent("ui.close").length, 1);
     const reopened = await openWindow(host);
     assert.equal(reopened.props.busy, false);
     host.dialogAnswers.push([join(dir, "b.mkv")]);
     reopened.emit("download", watch);
-    await host.settle(20);
+    await eventually(host, () => assert.equal(started, 2));
     await stop();
     assert.equal(aborted, 2, "unloading stops the running download");
     assert.deepEqual(await readdir(dir), [], "staging is cleaned");
