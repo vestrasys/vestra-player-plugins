@@ -2,19 +2,26 @@ name: Publish
 
 # Publishes the official plugin repository:
 # - a GitHub Release per new plugin version: tag <id>-v<version>, asset
-#   <id>-<version>.vxp;
+#   <id>-<version>.vxp, with a build provenance attestation;
 # - GitHub Pages: index.json, index.json.sig and assets/<id>/<version>/
 #   (README, changelog, icon).
 # The repository must be public: Releases downloads and Pages of a private
 # repository need authentication or a paid plan.
 #
+#   plugins ─▶ static ─┬─▶ plugin × N ─┬─▶ build ─▶ release-and-sign ─┬─▶ attest
+#                      └───────────────┘                              └─▶ deploy
+#
+# First the same reusable checks as ci.yml (_static.yml, _plugin.yml for
+# every plugin), without the npm cache (a release does not trust a cache
+# that other branches could have written).
+#
 # Why build and signing are separate jobs (ecosystem plan 1.6 item 2):
-# - `build` runs code from plugins: npm ci (install scripts), type checks,
-#   builds and tests, and later the source builds of third-party plugins
-#   registered in registry/. It gets no secret and no token, so a malicious
-#   build script can neither read the signing key nor publish anything. Its
-#   output is data only: the unsigned index.json, the Pages assets and the
-#   new .vxp packages.
+# - `build` runs code from plugins: npm ci (install scripts) and the plugin
+#   builds, and later the source builds of third-party plugins registered in
+#   registry/. It gets no secret and no write token, so a malicious build
+#   script can neither read the signing key nor publish anything. Its output
+#   is data only: the unsigned index.json, the Pages assets and the new .vxp
+#   packages.
 # - `release-and-sign` holds the signing key (environment plugins-index). It
 #   never runs plugin code or npm ci: it checks out only this repository's
 #   scripts, keys/ and revoked.json, treats the build artifact as untrusted
@@ -22,6 +29,10 @@ name: Publish
 #   the index, the version history, `revoked` (append-only) and `generated`
 #   (previous + 1) against the previously signed index, and only then
 #   creates the Releases and signs index.json.
+# - `attest` signs a SLSA build provenance statement for each new .vxp
+#   (Sigstore, through the job's OIDC token). It runs no repository code;
+#   it is the only job with id-token: write and attestations: write besides
+#   deploy's Pages token.
 # - `deploy` puts the signed site on Pages (environment github-pages).
 #
 # A version whose Release already exists is never rebuilt; earlier versions
@@ -41,18 +52,56 @@ concurrency:
 permissions: {}
 
 jobs:
-  build:
+  plugins:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      plugins: ${{ steps.plugins.outputs.plugins }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      - id: plugins
+        run: node scripts/ci-plugins.mjs --all
+
+  static:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/_static.yml
+    with:
+      cache: false
+
+  plugin:
+    needs: [plugins, static]
+    strategy:
+      fail-fast: false
+      matrix:
+        plugin: ${{ fromJSON(needs.plugins.outputs.plugins) }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/_plugin.yml
+    with:
+      plugin: ${{ matrix.plugin }}
+      cache: false
+
+  build:
+    needs: [static, plugin]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
-          cache: npm
       # Before any plugin code runs in this job: the only step with a token
       # (read-only), and it reads manifest.json files only.
       - name: Query existing releases
@@ -60,9 +109,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/query-releases.mjs "$RUNNER_TEMP/releases.json"
       - run: npm ci
-      - run: npm run check
       - run: npm run registry
-      - run: npm test
       # Packs (vestra-plugin pack) every plugin whose version has no Release
       # yet; third-party source builds will run here too, each isolated.
       - name: Build index.json and new packages
@@ -70,7 +117,7 @@ jobs:
           node scripts/build-index.mjs
           --out "$RUNNER_TEMP/publish"
           --releases "$RUNNER_TEMP/releases.json"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: publish
           path: ${{ runner.temp }}/publish
@@ -81,6 +128,7 @@ jobs:
     needs: build
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     environment: plugins-index
     permissions:
       contents: write # gh release create
@@ -88,16 +136,16 @@ jobs:
       # The repository's own scripts only (plus root files such as
       # revoked.json); no plugins/, no node_modules, no npm ci. The scripts
       # use Node built-ins only.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           sparse-checkout: |
             scripts
             keys
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: publish
           path: ${{ runner.temp }}/publish
@@ -123,13 +171,39 @@ jobs:
             node scripts/verify-index.mjs "$key" "$RUNNER_TEMP/publish/site" || echo "::warning::index.json is not signed with $key"
           done
           node scripts/verify-index.mjs keys/*.pub.pem "$RUNNER_TEMP/publish/site"
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: ${{ runner.temp }}/publish/site
+
+  # The packages are the build job's artifact, the same bytes that
+  # release-and-sign checked against the index and released.
+  attest:
+    needs: release-and-sign
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      id-token: write # Sigstore signing certificate
+      attestations: write # store the attestation
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: publish
+          path: ${{ runner.temp }}/publish
+      - id: packages
+        run: |
+          shopt -s nullglob
+          packages=("$RUNNER_TEMP"/publish/releases/*.vxp)
+          echo "count=${#packages[@]}" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "${packages[@]}"
+      - if: steps.packages.outputs.count != '0'
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: ${{ runner.temp }}/publish/releases/*.vxp
 
   deploy:
     needs: release-and-sign
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -138,4 +212,4 @@ jobs:
       id-token: write
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

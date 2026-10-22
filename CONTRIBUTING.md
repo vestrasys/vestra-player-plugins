@@ -27,6 +27,30 @@ no testing channel: CI tests, user rollback and revocation are the safety net.
 - Run the checks in [README.md](README.md#build-and-test) before opening the
   pull request.
 
+## CI on pull requests
+
+Every pull request runs [`ci.yml`](.github/workflows/ci.yml)
+([README.md](README.md#ci) has the details):
+
+```text
+changes ─────────────────────┐
+                             ▼
+static ──┬──────────▶ plugin × N ──┬──▶ ci-ok
+         └──▶ index-dryrun ────────┘
+```
+
+- **static**: type check, formatting, plugin boundaries, portability,
+  registry and `revoked.json` rules, script tests, typos, actionlint, zizmor.
+- **plugin × N**: each changed plugin (all of them when shared files
+  change) is type checked, tested and packed on Ubuntu (Node 22.18 and 24),
+  Windows and macOS, and the `.vxp` is checked.
+- **index-dryrun**: builds and signs the index with a throwaway key.
+- **ci-ok** is the required check. It passes when nothing failed.
+
+Pull requests from forks get no secrets and a read-only token. A pull
+request that changes `registry/` or `revoked.json` also runs
+`registry.yml` (owner rule), which never runs the pull request's code.
+
 ## Third-party plugins (`registry/<plugin id>.toml`)
 
 The official repository builds third-party plugins from source, like

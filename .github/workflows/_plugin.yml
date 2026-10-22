@@ -1,0 +1,73 @@
+name: Plugin
+
+# Reusable (ci.yml, publish.yml, weekly.yml): one plugin's strict type
+# check, tests and package, on Ubuntu with the oldest and newest supported
+# Node and on Windows and macOS with one Node. No secrets, read-only token.
+
+on:
+  workflow_call:
+    inputs:
+      plugin:
+        description: Directory name under plugins/.
+        type: string
+        required: true
+      sdk:
+        description: >-
+          "locked" for the SDK version in package-lock.json, or an npm
+          version or tag (weekly.yml: "latest") installed over it for this
+          run only.
+        type: string
+        default: locked
+      cache:
+        description: Use the npm cache (publish.yml passes false).
+        type: boolean
+        default: true
+
+permissions: {}
+
+jobs:
+  plugin:
+    name: ${{ inputs.plugin }} (${{ matrix.os }}, node ${{ matrix.node }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        node: ["22.18", "24"]
+        include:
+          - os: windows-latest
+            node: "24"
+          - os: macos-latest
+            node: "24"
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    env:
+      PLUGIN: ${{ inputs.plugin }}
+      SDK: ${{ inputs.sdk }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: ${{ inputs.cache && 'npm' || '' }}
+      - run: npm ci
+      - name: Install @vestra-player/sdk@${{ inputs.sdk }} (not committed)
+        if: inputs.sdk != 'locked'
+        run: |
+          npm install --no-save --no-audit --no-fund "@vestra-player/sdk@$SDK"
+          npm ls @vestra-player/sdk
+      # Every command also checks manifest.json against the player's rules.
+      - name: Type check
+        run: node scripts/plugin.mjs check "$PLUGIN"
+      - name: Test
+        run: node scripts/plugin.mjs test "$PLUGIN"
+      - name: Pack
+        run: node scripts/plugin.mjs pack "$PLUGIN" --out "$RUNNER_TEMP/package"
+      - name: Check the package
+        run: node scripts/check-package.mjs "plugins/$PLUGIN" "$RUNNER_TEMP/package"

@@ -1,0 +1,64 @@
+name: Index dry run
+
+# Reusable (ci.yml): the publish build and signing flow end to end with a
+# throwaway key generated in this job: builds index.json and every package
+# (as if nothing were released and nothing published before), runs the
+# release-and-sign job's artifact check (publish-releases.mjs --dry-run),
+# signs, verifies the signature, and checks that the trusted keys in keys/
+# do NOT verify it (proof that the real key was not used). Never touches
+# the real key, Releases or Pages, and has no write permission.
+
+on:
+  workflow_call:
+    inputs:
+      cache:
+        type: boolean
+        default: true
+
+permissions: {}
+
+jobs:
+  index:
+    name: build, sign, verify (throwaway key)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: ${{ inputs.cache && 'npm' || '' }}
+      - run: npm ci
+      - name: Generate a throwaway key pair
+        run: |
+          mkdir -p "$RUNNER_TEMP/test-key/keys"
+          node scripts/generate-signing-key.mjs "$RUNNER_TEMP/test-key/private.pem" "$RUNNER_TEMP/test-key/keys/test.pub.pem"
+      - name: Build index.json and packages (dry run)
+        run: >-
+          node scripts/build-index.mjs --dry-run
+          --out "$RUNNER_TEMP/publish"
+          --keys "$RUNNER_TEMP/test-key/keys"
+      - name: Check the artifact as release-and-sign does (dry run)
+        run: |
+          mkdir "$RUNNER_TEMP/no-previous"
+          echo '{"any": false, "tags": {}}' > "$RUNNER_TEMP/no-releases.json"
+          node scripts/publish-releases.mjs "$RUNNER_TEMP/publish" --dry-run \
+            --keys "$RUNNER_TEMP/test-key/keys" \
+            --previous "$RUNNER_TEMP/no-previous" \
+            --releases "$RUNNER_TEMP/no-releases.json"
+      - name: Sign with the throwaway key
+        run: |
+          VESTRA_INDEX_SIGNING_KEY="$(cat "$RUNNER_TEMP/test-key/private.pem")" \
+            node scripts/sign-index.mjs "$RUNNER_TEMP/publish/site" --public-key "$RUNNER_TEMP/test-key/keys/test.pub.pem"
+      - name: Verify
+        run: |
+          node scripts/verify-index.mjs "$RUNNER_TEMP/test-key/keys/test.pub.pem" "$RUNNER_TEMP/publish/site"
+          if node scripts/verify-index.mjs keys/*.pub.pem "$RUNNER_TEMP/publish/site"; then
+            echo "::error::a trusted key in keys/ verifies the dry-run index"
+            exit 1
+          fi
+          ls -l "$RUNNER_TEMP/publish/releases"

@@ -22,11 +22,14 @@ revoked.json      revoked plugin versions, copied into the index
 keys/             the trusted public keys of the index signature (every *.pub.pem;
                   normally just index-signing.pub.pem)
 scripts/          plugin.mjs (runs the SDK's vestra-plugin CLI), check-boundaries.mjs,
-                  check-portability.mjs, check-registry.mjs, and the publishing scripts:
+                  check-portability.mjs, check-registry.mjs, the CI helpers
+                  ci-plugins.mjs and check-package.mjs, and the publishing scripts:
                   query-releases.mjs, build-index.mjs, publish-releases.mjs,
                   sign-index.mjs, verify-index.mjs, generate-signing-key.mjs
 .github/workflows ci.yml (checks), publish.yml (Releases, index, Pages),
-                  registry.yml (owner check for registry pull requests)
+                  weekly.yml (plugins against the latest SDK), registry.yml
+                  (owner check for registry pull requests), and the reusable
+                  _static.yml, _plugin.yml, _index-dryrun.yml (see "CI")
 ```
 
 Plugins are independent: a plugin never imports another plugin or anything
@@ -47,12 +50,18 @@ npm run plugin -- pack youtube      # dist/ as <id>-<version>.vxp
 ```
 
 A name is a directory under `plugins/`; `--all` runs every plugin. The whole
-repository, as CI runs it:
+repository, as CI runs it (see [CI](#ci)):
 
 ```sh
 npm ci && npm run check && npm run format:check && npm run boundaries \
   && npm run portability && npm run registry && npm run build && npm test
 ```
+
+CI also runs [typos](https://github.com/crate-ci/typos),
+[actionlint](https://github.com/rhysd/actionlint) and
+[zizmor](https://docs.zizmor.sh/) (configuration in `.github/zizmor.yml`);
+with those installed, `typos && actionlint && zizmor .github/workflows` runs
+the same checks locally.
 
 `npm test` runs the plugin tests and the tests of the repository scripts
 (`npm run test:scripts`). `format:check` covers the repository's own scripts
@@ -72,12 +81,70 @@ cargo run --bin vestra-host -- --plugin ../plugins/playback \
 `--plugin` may be repeated; the player runs the plugin's `.ts` sources
 directly. The built-in `playback` plugin provides the player controls.
 
+## CI
+
+The entry workflows only orchestrate; each check is written once, in a
+reusable workflow:
+
+- [`_static.yml`](.github/workflows/_static.yml) (Ubuntu): `tsc` over the
+  repository, prettier, `boundaries`, `portability`, `registry` (with
+  `revoked.json` append-only against the pull request's base or the commit
+  before the push), the script tests, typos, actionlint and zizmor.
+- [`_plugin.yml`](.github/workflows/_plugin.yml), one plugin: strict type
+  check, tests, `vestra-plugin pack` (every CLI command validates
+  `manifest.json`), then `scripts/check-package.mjs` reads the `.vxp` and
+  checks its manifest and files. Ubuntu with Node 22.18 and 24, Windows and
+  macOS with Node 24.
+- [`_index-dryrun.yml`](.github/workflows/_index-dryrun.yml): the publish
+  flow end to end with a key generated in the job: `build-index.mjs` packs
+  every plugin, `publish-releases.mjs --dry-run` checks the artifact as the
+  signing job does, then sign, verify, and check that the real keys in
+  `keys/` do **not** verify it. The real signing key is never involved.
+
+[`ci.yml`](.github/workflows/ci.yml) runs on every branch push, pull request
+and manual run:
+
+```text
+changes ─────────────────────┐
+                             ▼
+static ──┬──────────▶ plugin × N ──┬──▶ ci-ok
+         └──▶ index-dryrun ────────┘
+```
+
+`changes` (`scripts/ci-plugins.mjs`) lists the plugins with changed files,
+or every plugin on `main`, on a manual run, for a new branch, and when a
+shared file (package.json, the lock file, tsconfig.json, the plugin CLI
+wrapper, the plugin workflows) changed. `ci-ok` is the one check to require
+in branch protection: it fails when any job failed or was cancelled; a
+skipped job (no plugin changed) counts as passed.
+
+[`weekly.yml`](.github/workflows/weekly.yml) (Mondays and on demand) runs
+`_plugin.yml` for every plugin with `@vestra-player/sdk@latest` installed
+over the locked version in the job (never committed), to find SDK changes
+that break a plugin early.
+
+Hardening: every workflow has `permissions: {}` at the top and grants the
+minimum per job; actions are pinned by commit SHA with the version in a
+comment; every job has a timeout; publish.yml uses no npm cache. Pull
+requests from forks run `ci.yml` without secrets (`pull_request`).
+[`registry.yml`](.github/workflows/registry.yml) is the one
+`pull_request_target` workflow: it runs the base branch's script, reads the
+pull request's files as data (`git show`) and never checks out or runs its
+code.
+
 ## Publishing
 
 Every push to `main` runs [`publish.yml`](.github/workflows/publish.yml):
 
-1. **build** (no secrets, no token while plugin code runs): `npm ci`, checks,
-   tests; packs every plugin whose version has no Release yet with
+```text
+plugins ──▶ static ──┬──▶ plugin × N ──┬──▶ build ──▶ release-and-sign ──┬──▶ attest
+                     └─────────────────┘                                 └──▶ deploy
+```
+
+0. **plugins, static, plugin × N**: the same reusable checks as `ci.yml`,
+   for every plugin, without the npm cache. Nothing is built for release
+   unless they pass.
+1. **build** (no secrets, no token while plugin code runs): `npm ci`, packs every plugin whose version has no Release yet with
    `vestra-plugin pack`; writes the unsigned `index.json` and the store
    assets. A version that is already released is never rebuilt; earlier
    versions come from the published index.
@@ -90,7 +157,12 @@ Every push to `main` runs [`publish.yml`](.github/workflows/publish.yml):
    index; `revoked` against `revoked.json`; nothing on the site but
    `index.json` and the assets it references), creates the Releases with
    `gh release create`, and signs `index.json`.
-3. **deploy**: publishes the signed site to GitHub Pages.
+3. **attest** (`id-token: write`, `attestations: write`, this job only; runs
+   no repository code): a SLSA build provenance attestation
+   (`actions/attest-build-provenance`) for each new `.vxp`, the same bytes
+   that release-and-sign checked and released. Verify one with
+   `gh attestation verify <file>.vxp --repo vestrasys/vestra-player-plugins`.
+4. **deploy**: publishes the signed site to GitHub Pages.
 
 Build and signing are separate jobs so that code from plugins (build
 scripts, dependencies, tests, and later third-party sources) never runs where

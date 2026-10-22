@@ -1,0 +1,14 @@
+# zizmor configuration (run by .github/workflows/_static.yml).
+rules:
+  # The "$/..." self-repository form for local reusable workflows is not
+  # understood by actionlint 1.7.12 yet; the workspace-relative "./..." form
+  # is used until it is (no step in these workflows writes into
+  # .github/workflows before a `uses:`).
+  self-repository:
+    disable: true
+  # _plugin.yml installs @vestra-player/sdk@<inputs.sdk> over the locked
+  # version only when asked (weekly.yml: latest); that is the purpose of the
+  # weekly run. The default ("locked") uses package-lock.json only.
+  adhoc-packages:
+    ignore:
+      - _plugin.yml

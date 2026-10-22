@@ -1,51 +1,96 @@
 name: CI
 
+# Orchestration only; the checks are in the reusable _*.yml workflows.
+#
+#   changes ─────────────────────┐
+#                                ▼
+#   static ──┬──────────▶ plugin × N ──┬──▶ ci-ok
+#            └──▶ index-dryrun ────────┘
+#
+# `ci-ok` is the one required check: it fails when any job failed or was
+# cancelled; a skipped job (no plugin changed) counts as passed. Pull
+# requests from forks run here without secrets (pull_request, never
+# pull_request_target).
+
 on:
   push:
-    branches: [main]
+    branches: ["**"]
   pull_request:
+  workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  # Keep every run on main; newer pushes replace older runs elsewhere.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  test:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      plugins: ${{ steps.plugins.outputs.plugins }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      # Every plugin on a manual run and on main; otherwise those changed
+      # against the pull request's base or the commit before the push.
+      - id: plugins
+        env:
+          ALL: ${{ github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [[ "$ALL" == true ]]; then
+            node scripts/ci-plugins.mjs --all
+          else
+            node scripts/ci-plugins.mjs --base "$BASE"
+          fi
+
+  static:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/_static.yml
+
+  plugin:
+    needs: [changes, static]
+    if: needs.changes.outputs.plugins != '[]'
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        node: ["22.18", "24"]
-    runs-on: ${{ matrix.os }}
+        plugin: ${{ fromJSON(needs.changes.outputs.plugins) }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/_plugin.yml
+    with:
+      plugin: ${{ matrix.plugin }}
+
+  index-dryrun:
+    needs: static
+    permissions:
+      contents: read
+    uses: ./.github/workflows/_index-dryrun.yml
+
+  ci-ok:
+    if: always()
+    needs: [changes, static, plugin, index-dryrun]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
     steps:
-      - uses: actions/checkout@v4
-        with:
-          # The base commit's revoked.json for the append-only check below.
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node }}
-          cache: npm
-      - run: npm ci
-      # Type checks every plugin (a plugin with its own package.json gets its
-      # dependencies from its lock file), then the whole repository at once.
-      - run: npm run check
-      - run: npm run format:check
-      - run: npm run boundaries
-      - run: npm run portability
-      # Registry format, revoked.json, and revoked.json append-only against
-      # the pull request's base (or the commit before a push; none for a new
-      # branch). The authoritative append-only check is in publish.yml
-      # (release-and-sign, against the signed index) and registry.yml (base
-      # branch's script); this one reports it early.
-      - name: npm run registry
-        shell: bash
-        env:
-          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+      - env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
-          if [[ -z "$BASE" || "$BASE" =~ ^0+$ ]]; then
-            npm run registry
-          else
-            npm run registry -- --revoked-base "$BASE"
-          fi
-      - run: npm run build
-      - run: npm test
+          echo "results: $RESULTS"
+          for result in $RESULTS; do
+            if [[ "$result" == failure || "$result" == cancelled ]]; then
+              exit 1
+            fi
+          done

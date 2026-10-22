@@ -1,0 +1,47 @@
+name: Weekly
+
+# Every plugin against the latest published @vestra-player/sdk (installed
+# in the job over the locked version, never committed), to catch an SDK
+# change that breaks a plugin before a plugin release needs it.
+
+on:
+  schedule:
+    - cron: "17 4 * * 1" # Mondays 04:17 UTC
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: weekly
+  cancel-in-progress: true
+
+jobs:
+  plugins:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      plugins: ${{ steps.plugins.outputs.plugins }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      - id: plugins
+        run: node scripts/ci-plugins.mjs --all
+
+  plugin:
+    needs: plugins
+    strategy:
+      fail-fast: false
+      matrix:
+        plugin: ${{ fromJSON(needs.plugins.outputs.plugins) }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/_plugin.yml
+    with:
+      plugin: ${{ matrix.plugin }}
+      sdk: latest

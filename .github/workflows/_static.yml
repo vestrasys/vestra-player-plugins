@@ -1,0 +1,91 @@
+name: Static checks
+
+# Reusable (ci.yml, publish.yml). Everything that does not need a plugin
+# build, on one Ubuntu runner; the plugin matrix starts only when this
+# passes. No secrets, read-only token.
+
+on:
+  workflow_call:
+    inputs:
+      cache:
+        description: Use the npm cache (publish.yml passes false).
+        type: boolean
+        default: true
+
+permissions: {}
+
+jobs:
+  repository:
+    name: repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The base commit's revoked.json for the append-only check below.
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: ${{ inputs.cache && 'npm' || '' }}
+      - run: npm ci
+      # The whole repository at once; each plugin's own strict check runs in
+      # _plugin.yml.
+      - name: tsc
+        run: npx tsc --noEmit
+      - run: npm run format:check
+      - run: npm run boundaries
+      - run: npm run portability
+      # Registry format, revoked.json, and revoked.json append-only against
+      # the pull request's base (or the commit before a push; none for a new
+      # branch or a manual run). The authoritative append-only checks are in
+      # publish.yml (release-and-sign, against the signed index) and
+      # registry.yml (the base branch's script); this one reports it early.
+      - name: npm run registry
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [[ -z "$BASE" || "$BASE" =~ ^0+$ ]] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            npm run registry
+          else
+            npm run registry -- --revoked-base "$BASE"
+          fi
+      # Tests of the repository scripts: index build, signing, registry.
+      - run: npm run test:scripts
+
+  typos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: crate-ci/typos@7f9d0819ca1c008ade73f4b41fa9d258d48f605b # v1.51.1
+
+  workflows:
+    name: actionlint + zizmor
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The image includes shellcheck for the run: scripts.
+      - name: actionlint
+        uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 # 1.7.12
+        with:
+          args: -color
+      - name: zizmor
+        uses: zizmorcore/zizmor-action@85b2b9fb8e3325e7a23d7d0a9d7ba5ae0f999e3e # v0.7.1
+        with:
+          # Print the findings and fail on them; no code scanning upload
+          # (that would need security-events: write).
+          advanced-security: false
+          persona: regular
