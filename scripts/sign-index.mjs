@@ -8,7 +8,7 @@
  *     node scripts/sign-index.mjs <dir> [--public-key <pem file>]... [--append]
  *
  * VESTRA_INDEX_SIGNING_KEY is required; VESTRA_INDEX_SIGNING_KEY_NEXT is the
- * second key during a key rotation (README.md, "Key rotation"; empty counts
+ * second key during a key rotation (CONTRIBUTING.md, "Key rotation"; empty counts
  * as unset). With --public-key (repeatable), refuses to sign unless every
  * signing key belongs to one of those public keys (CI passes keys/*.pub.pem,
  * the keys the player and the store embed). --append keeps the signatures

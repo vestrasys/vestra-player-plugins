@@ -11,7 +11,7 @@
  *   Pages    <pages>/index.json, <pages>/index.json.sig
  *            <pages>/assets/<id>/<version>/README.md | CHANGELOG.md | icon.<png|jpg|jpeg>
  *
- * index.json (README.md, "index.json"): `generated` is a sequence number,
+ * index.json (CONTRIBUTING.md, "index.json"): `generated` is a sequence number,
  * the previous signed index's + 1 on every publish (1 for the first, and
  * when the previous index has none); each store asset carries its sha256 and
  * size; everything is covered by the signature.
