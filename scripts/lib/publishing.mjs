@@ -10,6 +10,11 @@
  *            https://github.com/<repo>/releases/download/<id>-v<version>/<id>-<version>.vxp
  *   Pages    <pages>/index.json, <pages>/index.json.sig
  *            <pages>/assets/<id>/<version>/README.md | CHANGELOG.md | icon.<png|jpg|jpeg>
+ *
+ * index.json (README.md, "index.json"): `generated` is a sequence number,
+ * the previous signed index's + 1 on every publish (1 for the first, and
+ * when the previous index has none); each store asset carries its sha256 and
+ * size; everything is covered by the signature.
  */
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
@@ -40,10 +45,34 @@ export function settings({ repo, pagesUrl } = {}) {
   return { repo: repository, pagesUrl: base };
 }
 
+/**
+ * `generated` of the index that follows `previous` (null: first publish).
+ * An index from before `generated` existed counts as 0.
+ */
+export const nextGenerated = (previous) => (previous?.generated ?? 0) + 1;
+
 export const sha256 = (bytes) =>
   createHash("sha256").update(bytes).digest("hex");
 
 // ---------------------------------------------------------------- index shape
+
+/**
+ * The store assets of a plugin, published next to the index (newest version
+ * only). Each has `<name>Url`, `<name>Sha256` and `<name>Size` in the plugin
+ * entry: all three null when the plugin has no such file. `limit` is what
+ * the store reads at most (store-design §3.2), so a bigger file fails the
+ * build instead of failing in every store.
+ */
+export const ASSETS = [
+  { name: "icon", limit: 512 * 1024 },
+  { name: "readme", limit: 256 * 1024 },
+  { name: "changelog", limit: 256 * 1024 },
+];
+const ASSET_KEYS = ASSETS.flatMap(({ name }) => [
+  `${name}Url`,
+  `${name}Sha256`,
+  `${name}Size`,
+]);
 
 const PLUGIN_KEYS = [
   "id",
@@ -53,9 +82,7 @@ const PLUGIN_KEYS = [
   "description",
   "tags",
   "license",
-  "iconUrl",
-  "readmeUrl",
-  "changelogUrl",
+  ...ASSET_KEYS,
   "sourceUrl",
   "versions",
 ];
@@ -71,6 +98,7 @@ const VERSION_KEYS = [
 ];
 const TOP_KEYS = [
   "schema",
+  "generated",
   "name",
   "official",
   "plugins",
@@ -87,8 +115,15 @@ const https = (value) => {
 };
 const optionalString = (value) => value === null || typeof value === "string";
 
-/** Structural problems with an index object (empty: valid). */
-export function indexProblems(index) {
+/**
+ * Structural problems with an index object (empty: valid).
+ *
+ * `legacy: true` accepts an index written before `generated` and the asset
+ * hashes existed (only for reading the previously published index); when
+ * present they are still checked. Everything this repository writes and
+ * signs has them.
+ */
+export function indexProblems(index, { legacy = false } = {}) {
   const problems = [];
   if (!index || typeof index !== "object" || Array.isArray(index))
     return ["index must be an object"];
@@ -99,6 +134,11 @@ export function indexProblems(index) {
   keys(index, TOP_KEYS, "index");
   if (index.schema !== INDEX_SCHEMA)
     problems.push(`schema must be ${INDEX_SCHEMA}`);
+  if (
+    !(legacy && index.generated === undefined) &&
+    (!Number.isSafeInteger(index.generated) || index.generated < 1)
+  )
+    problems.push("generated must be a positive integer");
   if (typeof index.name !== "string" || !index.name)
     problems.push("name must be a string");
   if (typeof index.official !== "boolean")
@@ -139,6 +179,23 @@ export function indexProblems(index) {
     for (const key of ["iconUrl", "readmeUrl", "changelogUrl", "sourceUrl"])
       if (plugin[key] !== null && !https(plugin[key]))
         problems.push(`${at}: ${key} must be an https: URL or null`);
+    for (const { name, limit } of ASSETS) {
+      const url = plugin[`${name}Url`];
+      const hash = plugin[`${name}Sha256`];
+      const size = plugin[`${name}Size`];
+      if (legacy && hash === undefined && size === undefined) continue;
+      if (url === null || url === undefined) {
+        if (hash !== null || size !== null)
+          problems.push(
+            `${at}: ${name}Sha256 and ${name}Size must be null without ${name}Url`,
+          );
+        continue;
+      }
+      if (typeof hash !== "string" || !/^[0-9a-f]{64}$/.test(hash))
+        problems.push(`${at}: ${name}Sha256 must be 64 lowercase hex digits`);
+      if (!Number.isSafeInteger(size) || size < 0 || size > limit)
+        problems.push(`${at}: ${name}Size must be an integer 0–${limit}`);
+    }
     if (!Array.isArray(plugin.versions) || !plugin.versions.length)
       return problems.push(`${at}: versions must be a non-empty array`);
     const seen = new Set();
@@ -211,13 +268,16 @@ async function readFrom(source, name) {
 
 /**
  * The index published before this run, read from `source` (the Pages base
- * URL or a local directory) and checked against the repository's public key.
+ * URL or a local directory) and checked against the trusted public keys
+ * (`publicKeys`: one key or an array; any signature by any of them is
+ * enough). An index from before `generated` and the asset hashes is
+ * accepted (`indexProblems` legacy mode).
  * Returns null only when there is no index.json yet *and* nothing has been
  * released (`anyRelease()` is false): the first publish. A missing index
  * after releases exist, a missing or bad signature, or an invalid index is an
  * error, so a broken Pages site never silently drops the version history.
  */
-export async function loadPrevious(source, publicKey, anyRelease) {
+export async function loadPrevious(source, publicKeys, anyRelease) {
   const bytes = await readFrom(source, "index.json");
   if (!bytes) {
     if (await anyRelease())
@@ -229,12 +289,12 @@ export async function loadPrevious(source, publicKey, anyRelease) {
   const signature = await readFrom(source, "index.json.sig");
   if (!signature)
     throw new Error(`${source}: index.json has no index.json.sig`);
-  if (!verifyIndex(bytes, signature.toString("utf8"), publicKey))
+  if (!verifyIndex(bytes, signature.toString("utf8"), publicKeys))
     throw new Error(
-      `${source}: index.json.sig does not verify with keys/index-signing.pub.pem`,
+      `${source}: index.json.sig does not verify with the keys in keys/`,
     );
   const index = JSON.parse(bytes.toString("utf8"));
-  const problems = indexProblems(index);
+  const problems = indexProblems(index, { legacy: true });
   if (problems.length)
     throw new Error(
       `${source}: previous index.json is invalid:\n  ${problems.join("\n  ")}`,

@@ -18,8 +18,9 @@ name: Publish
 # - `release-and-sign` holds the signing key (environment plugins-index). It
 #   never runs plugin code or npm ci: it checks out only this repository's
 #   scripts, keys/ and revoked.json, treats the build artifact as untrusted
-#   data, checks each package's sha256 and size against the index and the
-#   version history against the previously signed index, and only then
+#   data, checks each package's and store asset's sha256 and size against
+#   the index, the version history, `revoked` (append-only) and `generated`
+#   (previous + 1) against the previously signed index, and only then
 #   creates the Releases and signs index.json.
 # - `deploy` puts the signed site on Pages (environment github-pages).
 #
@@ -104,12 +105,24 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/publish-releases.mjs "$RUNNER_TEMP/publish" --target "$GITHUB_SHA"
+      # One signature per key: VESTRA_INDEX_SIGNING_KEY, plus
+      # VESTRA_INDEX_SIGNING_KEY_NEXT during a key rotation (README.md, "Key
+      # rotation"; an unset secret is empty and ignored). Each key must belong
+      # to one of keys/*.pub.pem.
       - name: Sign index.json
         env:
           VESTRA_INDEX_SIGNING_KEY: ${{ secrets.VESTRA_INDEX_SIGNING_KEY }}
-        run: node scripts/sign-index.mjs "$RUNNER_TEMP/publish/site" --public-key keys/index-signing.pub.pem
+          VESTRA_INDEX_SIGNING_KEY_NEXT: ${{ secrets.VESTRA_INDEX_SIGNING_KEY_NEXT }}
+        run: |
+          keys=()
+          for key in keys/*.pub.pem; do keys+=(--public-key "$key"); done
+          node scripts/sign-index.mjs "$RUNNER_TEMP/publish/site" "${keys[@]}"
       - name: Verify the signature
-        run: node scripts/verify-index.mjs keys/index-signing.pub.pem "$RUNNER_TEMP/publish/site"
+        run: |
+          for key in keys/*.pub.pem; do
+            node scripts/verify-index.mjs "$key" "$RUNNER_TEMP/publish/site" || echo "::warning::index.json is not signed with $key"
+          done
+          node scripts/verify-index.mjs keys/*.pub.pem "$RUNNER_TEMP/publish/site"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: ${{ runner.temp }}/publish/site

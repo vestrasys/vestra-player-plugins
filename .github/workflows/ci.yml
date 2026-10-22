@@ -18,6 +18,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The base commit's revoked.json for the append-only check below.
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
@@ -29,6 +32,20 @@ jobs:
       - run: npm run format:check
       - run: npm run boundaries
       - run: npm run portability
-      - run: npm run registry
+      # Registry format, revoked.json, and revoked.json append-only against
+      # the pull request's base (or the commit before a push; none for a new
+      # branch). The authoritative append-only check is in publish.yml
+      # (release-and-sign, against the signed index) and registry.yml (base
+      # branch's script); this one reports it early.
+      - name: npm run registry
+        shell: bash
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [[ -z "$BASE" || "$BASE" =~ ^0+$ ]]; then
+            npm run registry
+          else
+            npm run registry -- --revoked-base "$BASE"
+          fi
       - run: npm run build
       - run: npm test

@@ -5,13 +5,15 @@
  *
  *   node scripts/build-index.mjs --out <dir> [--repo owner/name] [--pages-url <url>]
  *                                [--previous <url|dir>] [--releases <releases.json>]
+ *                                [--keys <dir>]
  *   node scripts/build-index.mjs --dry-run [--out <dir>] [...]
  *
  * --repo       default GITHUB_REPOSITORY, else package.json's repository
  * --pages-url  default https://<owner>.github.io/<name>/
  * --previous   where the published index.json and index.json.sig are; default
- *              the Pages URL. Its signature is checked with
- *              keys/index-signing.pub.pem.
+ *              the Pages URL. Its signature is checked with the trusted keys.
+ * --keys       the directory of trusted public keys (every *.pub.pem); default
+ *              keys/. For local runs with a test key; CI uses the default.
  * --releases   answer "is this tag released?" from the file that
  *              scripts/query-releases.mjs writes, instead of asking the GitHub
  *              API (which uses GH_TOKEN or GITHUB_TOKEN when set). CI uses
@@ -34,7 +36,7 @@ import {
   serializeIndex,
   settings,
 } from "./lib/publishing.mjs";
-import { publicKeyFromPem } from "./lib/signing.mjs";
+import { readTrustedKeys } from "./lib/signing.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const { values } = parseArgs({
@@ -44,6 +46,7 @@ const { values } = parseArgs({
     "pages-url": { type: "string" },
     previous: { type: "string" },
     releases: { type: "string" },
+    keys: { type: "string" },
     "dry-run": { type: "boolean", default: false },
   },
 });
@@ -78,11 +81,11 @@ try {
   const previousSource = values.previous ?? (dryRun ? null : pagesUrl);
   if (dryRun && previousSource?.startsWith("https://"))
     throw new Error("--dry-run reads --previous only from a local directory");
-  const publicKey = publicKeyFromPem(
-    await readFile(join(root, "keys/index-signing.pub.pem"), "utf8"),
-  );
+  const publicKeys = (
+    await readTrustedKeys(values.keys ?? join(root, "keys"))
+  ).map(({ key }) => key);
   const previous = previousSource
-    ? await loadPrevious(previousSource, publicKey, () => provider.any())
+    ? await loadPrevious(previousSource, publicKeys, () => provider.any())
     : null;
   console.log(
     previous
@@ -100,7 +103,7 @@ try {
   });
   await writeFile(join(out, "site/index.json"), serializeIndex(index));
   console.log(
-    `wrote ${join(out, "site/index.json")}; ${packed.length} new package(s) in ${join(out, "releases")}`,
+    `wrote ${join(out, "site/index.json")} (generated ${index.generated}); ${packed.length} new package(s) in ${join(out, "releases")}`,
   );
   if (dryRun) process.stdout.write(serializeIndex(index));
 } catch (error) {

@@ -100,8 +100,13 @@ const check = (out, index, options = {}) =>
 test("first publish: packs the plugin and describes it", async () => {
   const { out, index, packed } = await build(await repository());
   const bytes = Buffer.from("package vestra.demo@1.1.0");
+  const asset = (text) => [sha256(Buffer.from(text)), Buffer.byteLength(text)];
+  const [iconSha256, iconSize] = asset("png");
+  const [readmeSha256, readmeSize] = asset("# 演示\n");
+  const [changelogSha256, changelogSize] = asset("# 更新日志\n");
   assert.deepEqual(index, {
     schema: 1,
+    generated: 1,
     name: "Vestra Player 官方仓库",
     official: true,
     plugins: [
@@ -114,8 +119,14 @@ test("first publish: packs the plugin and describes it", async () => {
         tags: ["演示"],
         license: "Apache-2.0",
         iconUrl: `${pagesUrl}assets/vestra.demo/1.1.0/icon.png`,
+        iconSha256,
+        iconSize,
         readmeUrl: `${pagesUrl}assets/vestra.demo/1.1.0/README.md`,
+        readmeSha256,
+        readmeSize,
         changelogUrl: `${pagesUrl}assets/vestra.demo/1.1.0/CHANGELOG.md`,
+        changelogSha256,
+        changelogSize,
         sourceUrl: `https://github.com/${repo}/tree/main/plugins/demo`,
         versions: [
           {
@@ -191,7 +202,8 @@ test("a released version is not rebuilt", async () => {
   const first = await build(await repository());
   const again = await build(await repository(), { previous: first.index });
   assert.equal(again.packed.length, 0);
-  assert.deepEqual(again.index, first.index);
+  assert.equal(again.index.generated, 2);
+  assert.deepEqual({ ...again.index, generated: 1 }, first.index);
   const result = await check(again.out, again.index, { previous: first.index });
   assert.deepEqual(result, { problems: [], create: [] });
 });
@@ -334,6 +346,37 @@ test("the previous index must be signed; it may be missing only before any relea
   const no = async () => false;
   const yes = async () => true;
   assert.deepEqual(await loadPrevious(site, publicKey, no), index);
+  const next = generateKeyPairSync("ed25519");
+  assert.deepEqual(
+    await loadPrevious(site, [next.publicKey, publicKey], no),
+    index,
+    "any trusted key will do",
+  );
+  const both = join(work, "published-both");
+  await mkdir(both);
+  await writeFile(join(both, "index.json"), bytes);
+  await writeFile(
+    join(both, "index.json.sig"),
+    `${signIndex(bytes, next.privateKey)}\n${signIndex(bytes, privateKey)}`,
+  );
+  assert.deepEqual(await loadPrevious(both, publicKey, no), index);
+  assert.deepEqual(await loadPrevious(both, next.publicKey, no), index);
+
+  const legacy = join(work, "published-legacy");
+  await mkdir(legacy);
+  const legacyBytes = await readFile(
+    join(import.meta.dirname, "fixtures/index-legacy.json"),
+  );
+  await writeFile(join(legacy, "index.json"), legacyBytes);
+  await writeFile(
+    join(legacy, "index.json.sig"),
+    signIndex(legacyBytes, privateKey),
+  );
+  assert.equal(
+    (await loadPrevious(legacy, publicKey, no)).generated,
+    undefined,
+    "an index from before generated and the asset hashes is still read",
+  );
 
   const other = generateKeyPairSync("ed25519");
   await assert.rejects(
@@ -364,4 +407,172 @@ test("the previous index must be signed; it may be missing only before any relea
   await mkdir(empty);
   assert.equal(await loadPrevious(empty, publicKey, no), null);
   await assert.rejects(loadPrevious(empty, publicKey, yes), /releases exist/);
+});
+
+test("generated: 1 on the first publish, previous + 1 after, 1 after a legacy index", async () => {
+  const first = await build(await repository({ version: "1.0.0" }));
+  assert.equal(first.index.generated, 1);
+  const second = await build(await repository({ version: "1.1.0" }), {
+    previous: first.index,
+  });
+  assert.equal(second.index.generated, 2);
+  const third = await build(await repository({ version: "1.1.0" }), {
+    previous: second.index,
+  });
+  assert.equal(third.index.generated, 3);
+
+  // An index published before `generated` existed (fixture: the shape of
+  // the index on main before this change).
+  const legacy = JSON.parse(
+    await readFile(
+      join(import.meta.dirname, "fixtures/index-legacy.json"),
+      "utf8",
+    ),
+  );
+  const after = await build(await repository({ version: "1.1.0" }), {
+    previous: legacy,
+  });
+  assert.equal(after.index.generated, 1);
+  assert.deepEqual(
+    after.index.plugins[0].versions.map((entry) => entry.version),
+    ["1.1.0", "1.0.0"],
+  );
+  const { problems } = await check(after.out, after.index, {
+    previous: legacy,
+    revoked: legacy.revoked,
+    releases: releases.fixture({ "vestra.demo-v1.0.0": { published: NOW } }),
+  });
+  assert.deepEqual(problems, []);
+});
+
+test("revoked.json is append-only: the build stops when it drops or changes a published entry", async () => {
+  const one = { id: "vestra.demo", versions: "1.0.0", reason: "崩溃" };
+  const two = { id: "vestra.demo", versions: "1.0.1", reason: "也崩溃" };
+  const first = await build(await repository({ revoked: [one] }));
+  const appended = await build(await repository({ revoked: [one, two] }), {
+    previous: first.index,
+  });
+  assert.deepEqual(appended.index.revoked, [one, two]);
+  await assert.rejects(
+    build(await repository({ revoked: [] }), { previous: appended.index }),
+    /revoked\[0\] \(vestra\.demo 1\.0\.0\) from the published index was removed/,
+  );
+  await assert.rejects(
+    build(await repository({ revoked: [{ ...one, reason: "改了" }, two] }), {
+      previous: appended.index,
+    }),
+    /revoked\[0\] .* differs from the published index/,
+  );
+  await assert.rejects(
+    build(await repository({ revoked: [two, one] }), {
+      previous: appended.index,
+    }),
+    /differs/,
+    "reordering counts as a change",
+  );
+});
+
+test("a store asset over the store's limit stops the build", async () => {
+  const root = await repository();
+  await writeFile(
+    join(root, "plugins/demo/README.md"),
+    "x".repeat(256 * 1024 + 1),
+  );
+  await assert.rejects(build(root), /README\.md: 262145 bytes/);
+});
+
+test("the signing job checks generated, revoked and the store assets", async () => {
+  const one = { id: "vestra.demo", versions: "1.0.0", reason: "崩溃" };
+  const first = await build(
+    await repository({ version: "1.0.0", revoked: [one] }),
+  );
+  const previous = first.index;
+  const released = releases.fixture({
+    "vestra.demo-v1.0.0": { published: NOW },
+  });
+  const fresh = async () => {
+    const second = await build(
+      await repository({ version: "1.1.0", revoked: [one] }),
+      { previous },
+    );
+    return { ...second, index: structuredClone(second.index) };
+  };
+  const problemsOf = async ({ out, index }, revoked = [one]) =>
+    (await check(out, index, { previous, revoked, releases: released }))
+      .problems;
+  const expectProblem = async (built, pattern, revoked) =>
+    assert.match((await problemsOf(built, revoked)).join("\n"), pattern);
+
+  let built = await fresh();
+  assert.deepEqual(await problemsOf(built), []);
+
+  // generated must be exactly previous + 1.
+  for (const generated of [1, 3, 0]) {
+    built = await fresh();
+    built.index.generated = generated;
+    await expectProblem(built, /generated/);
+  }
+  built = await fresh();
+  delete built.index.generated;
+  await expectProblem(built, /generated must be a positive integer/);
+
+  // revoked: an entry of the signed index removed or changed, even when
+  // revoked.json says the same (a merged change to revoked.json).
+  built = await fresh();
+  built.index.revoked = [];
+  await expectProblem(built, /revoked\[0\] .* was removed/, []);
+  built = await fresh();
+  built.index.revoked = [{ ...one, versions: "*" }];
+  await expectProblem(
+    built,
+    /revoked\[0\] .* differs from the previously signed index/,
+    built.index.revoked,
+  );
+
+  // Store assets: the site file and the index must agree.
+  built = await fresh();
+  await writeFile(
+    join(built.out, "site/assets/vestra.demo/1.1.0/README.md"),
+    "# 被换掉的说明\n",
+  );
+  await expectProblem(
+    built,
+    /site\/assets\/vestra\.demo\/1\.1\.0\/README\.md does not match readmeSha256\/readmeSize/,
+  );
+  built = await fresh();
+  built.index.plugins[0].iconSha256 = "d".repeat(64);
+  await expectProblem(built, /does not match iconSha256\/iconSize/);
+  built = await fresh();
+  built.index.plugins[0].changelogSize += 1;
+  await expectProblem(built, /does not match changelogSha256\/changelogSize/);
+  built = await fresh();
+  delete built.index.plugins[0].readmeSha256;
+  await expectProblem(built, /readmeSha256 must be 64 lowercase hex digits/);
+  built = await fresh();
+  built.index.plugins[0].iconUrl = null;
+  await expectProblem(
+    built,
+    /iconSha256 and iconSize must be null without iconUrl/,
+  );
+  built = await fresh();
+  built.index.plugins[0].readmeUrl = `${pagesUrl}assets/vestra.demo/1.1.0/./README.md`;
+  await expectProblem(built, /readmeUrl must be under/);
+
+  // Nothing on Pages but index.json and the referenced assets.
+  built = await fresh();
+  await writeFile(
+    join(built.out, "site/assets/vestra.demo/1.1.0/login.html"),
+    "<form>",
+  );
+  await expectProblem(
+    built,
+    /site\/assets\/vestra\.demo\/1\.1\.0\/login\.html: unexpected file/,
+  );
+  built = await fresh();
+  await mkdir(join(built.out, "site/assets/vestra.demo/0.9.0"));
+  await writeFile(
+    join(built.out, "site/assets/vestra.demo/0.9.0/README.md"),
+    "old",
+  );
+  await expectProblem(built, /0\.9\.0\/README\.md: unexpected file/);
 });

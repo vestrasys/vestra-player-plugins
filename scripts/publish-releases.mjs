@@ -6,10 +6,12 @@
  *
  *   node scripts/publish-releases.mjs <artifact dir> [--repo owner/name] [--pages-url <url>]
  *                                     [--previous <url|dir>] [--releases <releases.json>]
- *                                     [--target <commit>] [--dry-run]
+ *                                     [--target <commit>] [--keys <dir>] [--dry-run]
  *
  * <artifact dir> holds site/ and releases/ from scripts/build-index.mjs.
- * --dry-run checks and prints the Releases it would create. `gh` needs
+ * --dry-run checks and prints the Releases it would create. --keys is the
+ * directory of trusted public keys for the previous index (default keys/;
+ * for local runs with a test key). `gh` needs
  * GH_TOKEN with contents: write. Runs no plugin code and needs no npm
  * packages: Node built-ins and the files in scripts/, keys/ and revoked.json.
  */
@@ -25,7 +27,7 @@ import {
   settings,
 } from "./lib/publishing.mjs";
 import { checkArtifact } from "./lib/release.mjs";
-import { publicKeyFromPem } from "./lib/signing.mjs";
+import { readTrustedKeys } from "./lib/signing.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 
@@ -38,6 +40,7 @@ try {
       previous: { type: "string" },
       releases: { type: "string" },
       target: { type: "string" },
+      keys: { type: "string" },
       "dry-run": { type: "boolean", default: false },
     },
   });
@@ -53,11 +56,11 @@ try {
   const provider = values.releases
     ? await releasesFromFile(values.releases)
     : releases.github(repo, process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN);
-  const publicKey = publicKeyFromPem(
-    await readFile(join(root, "keys/index-signing.pub.pem"), "utf8"),
-  );
+  const publicKeys = (
+    await readTrustedKeys(values.keys ?? join(root, "keys"))
+  ).map(({ key }) => key);
   const previousSource = values.previous ?? pagesUrl;
-  const previous = await loadPrevious(previousSource, publicKey, () =>
+  const previous = await loadPrevious(previousSource, publicKeys, () =>
     provider.any(),
   );
   const index = JSON.parse(
@@ -79,7 +82,7 @@ try {
       `the build artifact is rejected:\n  ${problems.join("\n  ")}`,
     );
   console.log(
-    `artifact OK; previous index: ${previous ? "signed, history unchanged" : "none (first publish)"}`,
+    `artifact OK (generated ${index.generated}); previous index: ${previous ? `signed, generated ${previous.generated ?? "none"}, history and revoked unchanged` : "none (first publish)"}`,
   );
 
   for (const item of create) {

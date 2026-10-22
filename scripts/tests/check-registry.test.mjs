@@ -118,3 +118,66 @@ test("owner rule in pull requests", async () => {
   );
   assert.match(check(invalid, badRevoked, "erin").stderr, /versions/);
 });
+
+test("revoked.json is append-only against the base", async () => {
+  const pr = check;
+  const plain = (base) =>
+    spawnSync(
+      process.execPath,
+      [
+        join(root, "scripts/check-registry.mjs"),
+        ...(base ? ["--revoked-base", base] : []),
+      ],
+      { cwd: root, encoding: "utf8" },
+    );
+  const one = { id: "vestra.demo", versions: "1.0.0", reason: "崩溃" };
+  const two = { id: "vestra.demo", versions: "<0.9.0", reason: "旧版" };
+  const revoked = (list) => ({ "revoked.json": `${JSON.stringify(list)}\n` });
+
+  // A clean tree: no registrations, an empty plugins/.
+  await commit(
+    Object.fromEntries(
+      git("ls-files", "registry")
+        .split("\n")
+        .filter(Boolean)
+        .map((path) => [path, null]),
+    ),
+    "clear registry",
+  );
+  await mkdir(join(root, "plugins"), { recursive: true });
+  await mkdir(join(root, "registry"), { recursive: true });
+
+  const base = await commit(revoked([one]), "revoke one");
+  const appended = await commit(revoked([one, two]), "revoke two");
+  assert.equal(pr(base, appended, "erin").status, 0);
+  assert.equal(plain(base).status, 0, plain(base).stderr);
+
+  const removed = await commit(revoked([two]), "drop one");
+  let result = pr(appended, removed, "erin");
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /revoked\[0\] \(vestra\.demo 1\.0\.0\) differs from the base branch/,
+  );
+  result = plain(appended);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /revoked\[0\] .* differs/);
+  assert.match(
+    result.stderr,
+    /revoked\[1\] \(vestra\.demo <0\.9\.0\) .* was removed/,
+  );
+  assert.equal(plain().status, 0, "without a base only the format is checked");
+
+  const changed = await commit(
+    revoked([one, { ...two, reason: "改了理由" }]),
+    "change a reason",
+  );
+  assert.match(pr(appended, changed, "erin").stderr, /revoked\[1\] .* differs/);
+
+  const deleted = await commit({ "revoked.json": null }, "delete the file");
+  assert.match(pr(appended, deleted, "erin").stderr, /was removed/);
+
+  result = plain("0123456789abcdef0123456789abcdef01234567");
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /not a commit in this clone/);
+});

@@ -7,7 +7,16 @@
  * `versions` uses the range grammar in semver.mjs (an exact version is a
  * range too). The store disables an installed version that matches and tells
  * the user why.
+ *
+ * The list is append-only: once an entry is published, it stays, unchanged
+ * and at the same position; new entries go at the end. The store treats an
+ * index that lacks a revocation it has seen as a replayed old index
+ * (store-design §3.4), so dropping an entry would make every store reject
+ * the official index. `revokedAppendProblems` enforces this in CI against
+ * the base branch's revoked.json and in the release-and-sign job against the
+ * previously signed index.
  */
+import { isDeepStrictEqual } from "node:util";
 import { idProblems } from "./registry.mjs";
 import { parseRange } from "./semver.mjs";
 
@@ -41,6 +50,28 @@ export function revokedProblems(list) {
     )
       problems.push(
         `${at}: reason must be 1–${MAX_REASON} characters of text (newlines allowed)`,
+      );
+  });
+  return problems;
+}
+
+/**
+ * Problems when `after` is not `before` with entries appended (empty: fine).
+ * `before` is what was published (or the base branch's list), `where` names
+ * it in the messages.
+ */
+export function revokedAppendProblems(before, after, where) {
+  const problems = [];
+  const old = Array.isArray(before) ? before : [];
+  const now = Array.isArray(after) ? after : [];
+  old.forEach((entry, index) => {
+    if (index >= now.length)
+      problems.push(
+        `revoked[${index}] (${entry?.id} ${entry?.versions}) from ${where} was removed; revoked.json is append-only`,
+      );
+    else if (!isDeepStrictEqual(now[index], entry))
+      problems.push(
+        `revoked[${index}] (${entry?.id} ${entry?.versions}) differs from ${where}; published entries never change, add new ones at the end`,
       );
   });
   return problems;

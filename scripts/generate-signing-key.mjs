@@ -8,7 +8,9 @@
  * its directory must already exist and must not be inside this repository.
  * Existing files are not overwritten. The public key (SPKI PEM) goes to
  * keys/index-signing.pub.pem; the private key becomes the
- * VESTRA_INDEX_SIGNING_KEY secret of the `plugins-index` environment.
+ * VESTRA_INDEX_SIGNING_KEY secret of the `plugins-index` environment. For a
+ * key rotation (README.md, "Key rotation") the new pair goes to
+ * keys/index-signing-next.pub.pem and VESTRA_INDEX_SIGNING_KEY_NEXT.
  */
 import { createHash, generateKeyPairSync } from "node:crypto";
 import { writeFile } from "node:fs/promises";

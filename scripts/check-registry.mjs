@@ -4,8 +4,14 @@
  * registry.mjs and scripts/lib/revoked.mjs), and that no registration takes
  * an official plugin's id.
  *
- *   node scripts/check-registry.mjs
+ *   node scripts/check-registry.mjs [--revoked-base <git ref>]
  *   node scripts/check-registry.mjs --base <git ref> --head <git ref> --author <GitHub login>
+ *
+ * revoked.json is append-only (scripts/lib/revoked.mjs): with
+ * --revoked-base, the working tree's revoked.json must keep every entry of
+ * that commit's revoked.json unchanged and in place (CI passes the pull
+ * request's base, or the commit before a push). The pull request form checks
+ * the same between --base and --head.
  *
  * The second form is the pull request check: it reads registry/ from the
  * `--head` commit as data (git show; nothing from the pull request runs) and
@@ -28,7 +34,7 @@ import {
   readRegistry,
   validateRegistration,
 } from "./lib/registry.mjs";
-import { revokedProblems } from "./lib/revoked.mjs";
+import { revokedAppendProblems, revokedProblems } from "./lib/revoked.mjs";
 import { plugins } from "./plugins.mjs";
 
 const root = resolve(import.meta.dirname, "..");
@@ -37,18 +43,34 @@ const { values } = parseArgs({
     base: { type: "string" },
     head: { type: "string" },
     author: { type: "string" },
+    "revoked-base": { type: "string" },
   },
 });
 
 const git = (...args) => {
   const result = spawnSync("git", args, { cwd: root, encoding: "utf8" });
-  if (result.status !== 0 && !["show", "ls-tree"].includes(args[0]))
+  if (
+    result.status !== 0 &&
+    !["show", "ls-tree", "rev-parse"].includes(args[0])
+  )
     throw new Error(`git ${args.join(" ")}: ${result.stderr.trim()}`);
   return result;
 };
 const show = (ref, path) => {
   const result = git("show", `${ref}:${path}`);
   return result.status === 0 ? result.stdout : null;
+};
+/** revoked.json at `ref` (a missing file is an empty list). */
+const revokedAt = (ref) => {
+  if (git("rev-parse", "--verify", "--quiet", `${ref}^{commit}`).status !== 0)
+    throw new Error(`${ref}: not a commit in this clone (fetch it first)`);
+  const text = show(ref, "revoked.json");
+  if (text === null) return [];
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    throw new Error(`revoked.json at ${ref}: ${error.message}`);
+  }
 };
 
 const problems = [];
@@ -73,13 +95,22 @@ try {
       const result = await readRegistry(directory);
       problems.push(...result.problems);
       const revoked = show(head, "revoked.json");
+      let headRevoked = [];
       if (revoked !== null) {
         try {
-          problems.push(...revokedProblems(JSON.parse(revoked)));
+          headRevoked = JSON.parse(revoked);
+          problems.push(...revokedProblems(headRevoked));
         } catch (error) {
           problems.push(`revoked.json: ${error.message}`);
         }
       }
+      problems.push(
+        ...revokedAppendProblems(
+          revokedAt(base),
+          headRevoked,
+          `the base branch (${base})`,
+        ),
+      );
 
       const changed = git(
         "diff",
@@ -112,7 +143,15 @@ try {
     }
   } else {
     try {
-      await readRevoked(join(root, "revoked.json"));
+      const revoked = await readRevoked(join(root, "revoked.json"));
+      if (values["revoked-base"])
+        problems.push(
+          ...revokedAppendProblems(
+            revokedAt(values["revoked-base"]),
+            revoked,
+            values["revoked-base"],
+          ),
+        );
     } catch (error) {
       problems.push(error.message);
     }
@@ -137,7 +176,7 @@ try {
           `registry/${entry.id}.toml: the id belongs to an official plugin`,
         );
     console.log(
-      `${entries.length} third-party registration(s), ${official.size} official plugin(s), revoked.json checked`,
+      `${entries.length} third-party registration(s), ${official.size} official plugin(s), revoked.json checked${values["revoked-base"] ? ` (append-only against ${values["revoked-base"]})` : ""}`,
     );
   }
 } catch (error) {

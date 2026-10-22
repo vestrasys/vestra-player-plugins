@@ -19,7 +19,8 @@ plugins/<name>/   official plugins (id vestra.<name>): manifest.json, main.ts, .
                   tests/, README.md, CHANGELOG.md (youtube, bilibili)
 registry/         third-party registrations, registry/<id>.toml (see CONTRIBUTING.md)
 revoked.json      revoked plugin versions, copied into the index
-keys/             index-signing.pub.pem, the public key of the index signature
+keys/             the trusted public keys of the index signature (every *.pub.pem;
+                  normally just index-signing.pub.pem)
 scripts/          plugin.mjs (runs the SDK's vestra-plugin CLI), check-boundaries.mjs,
                   check-portability.mjs, check-registry.mjs, and the publishing scripts:
                   query-releases.mjs, build-index.mjs, publish-releases.mjs,
@@ -81,10 +82,13 @@ Every push to `main` runs [`publish.yml`](.github/workflows/publish.yml):
    assets. A version that is already released is never rebuilt; earlier
    versions come from the published index.
 2. **release-and-sign** (environment `plugins-index`, secret
-   `VESTRA_INDEX_SIGNING_KEY`): runs no plugin code and no `npm ci`. It checks
-   the build artifact as untrusted data (each package's sha256 and size
-   against the index, the version history against the previously signed
-   index, `revoked` against `revoked.json`), creates the Releases with
+   `VESTRA_INDEX_SIGNING_KEY`, plus `VESTRA_INDEX_SIGNING_KEY_NEXT` during a
+   [key rotation](#key-rotation)): runs no plugin code and no `npm ci`. It
+   checks the build artifact as untrusted data (each package's and store
+   asset's sha256 and size against the index; the version history, `revoked`
+   (append-only) and `generated` (previous + 1) against the previously signed
+   index; `revoked` against `revoked.json`; nothing on the site but
+   `index.json` and the assets it references), creates the Releases with
    `gh release create`, and signs `index.json`.
 3. **deploy**: publishes the signed site to GitHub Pages.
 
@@ -99,7 +103,7 @@ and Pages of a private repository need authentication or a paid plan):
 | --- | --- |
 | Package | Release `<id>-v<version>`, asset `<id>-<version>.vxp`: `https://github.com/vestrasys/vestra-player-plugins/releases/download/<id>-v<version>/<id>-<version>.vxp` |
 | Index | `https://vestrasys.github.io/vestra-player-plugins/index.json` |
-| Signature | `index.json.sig` next to it: base64 Ed25519 signature over the exact bytes of `index.json`, verified with [`keys/index-signing.pub.pem`](keys/index-signing.pub.pem) |
+| Signature | `index.json.sig` next to it: one or more base64 Ed25519 signatures over the exact bytes of `index.json`, one per line (no final line break); valid when any of them verifies with a trusted key, [`keys/index-signing.pub.pem`](keys/index-signing.pub.pem) |
 | Store assets | `assets/<id>/<version>/README.md`, `CHANGELOG.md`, `icon.<png\|jpg\|jpeg>` next to the index (newest version only) |
 
 ### `index.json`
@@ -107,6 +111,7 @@ and Pages of a private repository need authentication or a paid plan):
 ```json
 {
   "schema": 1,
+  "generated": 7,
   "name": "Vestra Player 官方仓库",
   "official": true,
   "plugins": [
@@ -114,7 +119,9 @@ and Pages of a private repository need authentication or a paid plan):
       "id": "vestra.youtube",
       "name": "YouTube", "author": "Vestra Player", "punchline": "…", "description": "…",
       "tags": ["…"], "license": "Apache-2.0",
-      "iconUrl": null, "readmeUrl": "https://…/README.md", "changelogUrl": "https://…/CHANGELOG.md",
+      "iconUrl": null, "iconSha256": null, "iconSize": null,
+      "readmeUrl": "https://…/README.md", "readmeSha256": "…", "readmeSize": 812,
+      "changelogUrl": "https://…/CHANGELOG.md", "changelogSha256": "…", "changelogSize": 240,
       "sourceUrl": "https://github.com/vestrasys/vestra-player-plugins/tree/main/plugins/youtube",
       "versions": [
         { "version": "0.2.0", "apiVersion": "vestra/1", "minPlayerVersion": "0.2.0",
@@ -133,6 +140,28 @@ and Pages of a private repository need authentication or a paid plan):
 - `versions` is newest first. There are no release channels and no download
   counts (ecosystem plan 1.6 items 8 and 9).
 - `published` is when CI built the version.
+- `generated` is a sequence number: the previously signed index's
+  `generated` + 1 on every publish (1 on the first publish, and when the
+  previous index predates the field). `release-and-sign` refuses any other
+  value. It is not a date and may skip numbers from a client's point of view
+  (a client does not see every publish). **Clients** remember the highest
+  `generated` they have accepted from this repository and reject a signed
+  index whose `generated` is lower (a replayed old index); an index without
+  `generated` counts as 0, so once a client has seen one with the field it
+  rejects any without it. The same value again is fine (an unchanged index
+  fetched twice).
+- Each store asset has `<asset>Url`, `<asset>Sha256` (lowercase hex sha256 of
+  the file) and `<asset>Size` (bytes) for `icon`, `readme` and `changelog`;
+  all three are `null` when the plugin has no such file. They follow the
+  flat `sha256`/`size` pair of a version entry. The signature covers them, so
+  a client that checks the downloaded file against them gets the same
+  guarantee for README, changelog and icon as for the package. Limits (the
+  store's read limits; the build fails above them): icon 512 KiB, README and
+  changelog 256 KiB each.
+- Compatibility: `generated` and the asset fields were added within
+  `schema` 1. Clients ignore unknown keys (the store does), so older clients
+  read the new index unchanged; this repository's own scripts still read an
+  index from before them as the previous index.
 
 Try it locally (no network; writes to a temporary directory and prints the
 index):
@@ -149,8 +178,51 @@ npm run index:dry-run
 [{ "id": "vestra.youtube", "versions": ">=0.2.0 <0.2.3", "reason": "…" }]
 ```
 
-It is copied into the index's `revoked` unchanged on the next publish. See
+It is copied into the index's `revoked` unchanged on the next publish. It is
+**append-only**: published entries are never removed, changed or reordered
+(CI and the signing job refuse), because the store treats an index that lacks
+a revocation it has seen as a replayed old index. See
 [CONTRIBUTING.md](CONTRIBUTING.md#revoking-a-version) for the range syntax.
+
+### Key rotation
+
+The trusted public keys are every `keys/*.pub.pem`: they check the
+previously published index and the signing keys (`sign-index` refuses a
+private key that matches none of them). `index.json.sig` carries one
+signature per signing key, and a client accepts the index when any signature
+verifies with any key it trusts. That makes a planned rotation possible
+without a flag day:
+
+1. **New key, dual signing.** `node scripts/generate-signing-key.mjs
+   <private file outside the repository> keys/index-signing-next.pub.pem`.
+   Commit the public key; put the private key into the secret
+   `VESTRA_INDEX_SIGNING_KEY_NEXT` of the `plugins-index` environment (then
+   delete the file). From the next publish on, `index.json.sig` has two
+   lines: old key, new key.
+2. **Players learn the new key.** A player release embeds both public keys
+   in the store (`src/plugins/store/keys/`). Old players keep verifying the
+   old key's signature, new ones either.
+3. **Drop the old key** once the players that only know the old key are no
+   longer supported: move the new private key into
+   `VESTRA_INDEX_SIGNING_KEY`, delete `VESTRA_INDEX_SIGNING_KEY_NEXT`,
+   replace `keys/index-signing.pub.pem` with the new public key and delete
+   `keys/index-signing-next.pub.pem`, in one commit. The previous index on
+   Pages is signed with both keys, so it still verifies.
+4. A later player release removes the old key from the store.
+
+If the old private key leaked, skip the waiting: set the new key as
+`VESTRA_INDEX_SIGNING_KEY` right away (no `_NEXT`), ship a player that trusts
+only the new key, and keep the old public key in `keys/` until the first
+index signed with the new key is live (the build checks the previous index
+with `keys/`), then remove it. Players that only trust the old key cannot
+tell an attacker's index signed with the leaked key from ours; see the
+store design §6.3.
+
+Check a published or local index with any set of keys:
+
+```sh
+node scripts/verify-index.mjs keys/*.pub.pem https://vestrasys.github.io/vestra-player-plugins/
+```
 
 ## Contributing
 

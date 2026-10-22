@@ -12,6 +12,10 @@
  * A released version is never rebuilt. Earlier versions come from the
  * previous index, so the history survives each Pages deployment.
  *
+ * `generated` is the previous index's + 1; the build stops when revoked.json
+ * drops or changes an entry of the previous index (append-only). Each store
+ * asset's sha256 and size go into the index next to its URL.
+ *
  * Output:
  *   <out>/site/index.json                         unsigned
  *   <out>/site/assets/<id>/<version>/...          README.md, CHANGELOG.md, icon.<ext>
@@ -19,22 +23,31 @@
  */
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { copyFile, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+import {
+  copyFile,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join, resolve } from "node:path";
 import { plugins as pluginNames } from "../plugins.mjs";
 import {
+  ASSETS,
   assetDigest,
   assetOf,
   downloadUrlOf,
   INDEX_NAME,
   INDEX_SCHEMA,
   indexProblems,
+  nextGenerated,
   sha256,
   tagOf,
 } from "./publishing.mjs";
 import { OFFICIAL_PREFIX, readRegistry } from "./registry.mjs";
-import { revokedProblems } from "./revoked.mjs";
+import { revokedAppendProblems, revokedProblems } from "./revoked.mjs";
 import { compareVersions, isVersion } from "./semver.mjs";
 
 const repositoryRoot = resolve(import.meta.dirname, "../..");
@@ -130,6 +143,12 @@ export async function buildIndex({
   log = console.log,
 }) {
   const revoked = await readRevoked(join(root, "revoked.json"));
+  const appended = revokedAppendProblems(
+    previous?.revoked,
+    revoked,
+    "the published index",
+  );
+  if (appended.length) throw new Error(appended.join("\n"));
   const registry = await readRegistry(join(root, "registry"));
   if (registry.problems.length) throw new Error(registry.problems.join("\n"));
   if (registry.entries.length)
@@ -208,18 +227,32 @@ export async function buildIndex({
       versions.sort((a, b) => compareVersions(b.version, a.version));
 
       // Display fields and assets follow the newest version in the repository.
-      const urls = { iconUrl: null, readmeUrl: null, changelogUrl: null };
+      const urls = {};
+      for (const { name } of ASSETS)
+        Object.assign(urls, {
+          [`${name}Url`]: null,
+          [`${name}Sha256`]: null,
+          [`${name}Size`]: null,
+        });
       for (const [field, path, published] of displayFiles(
         directory,
         manifest,
       )) {
+        const bytes = await readFile(join(directory, path));
+        const { limit } = ASSETS.find((asset) => asset.name === field);
+        if (bytes.length > limit)
+          throw new Error(
+            `plugins/${name}/${path}: ${bytes.length} bytes, the store reads at most ${limit}`,
+          );
         const target = join(site, "assets", id, version);
         await mkdir(target, { recursive: true });
-        await copyFile(join(directory, path), join(target, published));
+        await writeFile(join(target, published), bytes);
         urls[`${field}Url`] = new URL(
           `assets/${id}/${version}/${published}`,
           pagesUrl,
         ).href;
+        urls[`${field}Sha256`] = sha256(bytes);
+        urls[`${field}Size`] = bytes.length;
       }
       plugins.push({
         id,
@@ -247,6 +280,7 @@ export async function buildIndex({
   plugins.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const index = {
     schema: INDEX_SCHEMA,
+    generated: nextGenerated(previous),
     name: INDEX_NAME,
     official: true,
     plugins,

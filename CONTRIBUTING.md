@@ -117,6 +117,15 @@ request:
   `>`, `>=`, `=` joined by spaces (all must hold), alternatives joined by
   `||`, or `*` for every version. Examples: `<1.2.3`, `>=1.0.0 <1.2.0`,
   `0.1.0 || >=0.3.0 <0.3.2`. No `^`, `~`, `x` or hyphen ranges.
+- **Append-only.** Add new entries at the end. Never remove, edit or
+  reorder an entry once it is on `main`: the store remembers every
+  revocation it has seen and rejects an index that lacks one as a replayed
+  old index, so a dropped entry would make every store ignore the official
+  index. A wrong entry stays; publish a fixed version (and, if the range was
+  too wide, say so in the plugin's changelog). CI (`npm run registry` against
+  the pull request's base, and the `Registry owners` check from the base
+  branch's script) and the signing job (against the previously signed index)
+  refuse a change that breaks this.
 - The entry is copied into the index's `revoked` unchanged on the next
   publish. The store disables an installed version that matches and tells
   the user why; the package stays downloadable for the record.
@@ -127,8 +136,9 @@ request:
 
 The index is signed in the `release-and-sign` job of
 [`publish.yml`](.github/workflows/publish.yml) with an Ed25519 key held in the
-`VESTRA_INDEX_SIGNING_KEY` secret of the `plugins-index` environment. The
-public key is [`keys/index-signing.pub.pem`](keys/index-signing.pub.pem); the
+`VESTRA_INDEX_SIGNING_KEY` secret of the `plugins-index` environment (and a
+second one in `VESTRA_INDEX_SIGNING_KEY_NEXT` during a rotation). The public
+key is [`keys/index-signing.pub.pem`](keys/index-signing.pub.pem); the
 player and the store plugin embed it, so replacing the key needs a player
-release. `node scripts/generate-signing-key.mjs <private> <public>` makes a
+release ([key rotation](README.md#key-rotation)). `node scripts/generate-signing-key.mjs <private> <public>` makes a
 new pair (the private key file gets mode 600 and is never printed).

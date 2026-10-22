@@ -2,7 +2,8 @@ name: Registry owners
 
 # The owner rule for registry/<id>.toml (CONTRIBUTING.md): a new registration
 # lists the pull request author as an owner; a change to or removal of an
-# existing one comes from one of its owners on the base branch.
+# existing one comes from one of its owners on the base branch. Also checks
+# that revoked.json is append-only against the base branch.
 #
 # pull_request_target runs this workflow and scripts/check-registry.mjs as
 # they are on the base branch, so a pull request cannot change the check
@@ -13,6 +14,7 @@ on:
   pull_request_target:
     paths:
       - "registry/**"
+      - "revoked.json"
 
 permissions:
   contents: read
@@ -33,7 +35,7 @@ jobs:
         env:
           NUMBER: ${{ github.event.pull_request.number }}
         run: git fetch --no-tags "https://github.com/$GITHUB_REPOSITORY.git" "refs/pull/$NUMBER/head:refs/remotes/pr/head"
-      - name: Check registry owners
+      - name: Check registry owners and revoked.json
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
           AUTHOR: ${{ github.event.pull_request.user.login }}
