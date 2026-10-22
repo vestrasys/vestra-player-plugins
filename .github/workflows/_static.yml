@@ -89,3 +89,5 @@ jobs:
           # (that would need security-events: write).
           advanced-security: false
           persona: regular
+          # The zizmor release itself, not the action's default "latest".
+          version: 1.31.1

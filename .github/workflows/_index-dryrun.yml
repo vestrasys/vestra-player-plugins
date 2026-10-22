@@ -57,6 +57,7 @@ jobs:
       - name: Verify
         run: |
           node scripts/verify-index.mjs "$RUNNER_TEMP/test-key/keys/test.pub.pem" "$RUNNER_TEMP/publish/site"
+          echo "Expected next: the trusted keys in keys/ reject the dry-run index."
           if node scripts/verify-index.mjs keys/*.pub.pem "$RUNNER_TEMP/publish/site"; then
             echo "::error::a trusted key in keys/ verifies the dry-run index"
             exit 1
