@@ -154,7 +154,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/publish-releases.mjs "$RUNNER_TEMP/publish" --target "$GITHUB_SHA"
       # One signature per key: VESTRA_INDEX_SIGNING_KEY, plus
-      # VESTRA_INDEX_SIGNING_KEY_NEXT during a key rotation (README.md, "Key
+      # VESTRA_INDEX_SIGNING_KEY_NEXT during a key rotation (CONTRIBUTING.md, "Key
       # rotation"; an unset secret is empty and ignored). Each key must belong
       # to one of keys/*.pub.pem.
       - name: Sign index.json

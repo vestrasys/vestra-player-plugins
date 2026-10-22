@@ -3,7 +3,7 @@
  * signature file index.json.sig next to it holds one or more base64
  * signatures (64 bytes each), one per line, no final line break. It is
  * accepted when any signature verifies with any trusted public key; during a
- * key rotation the index carries one signature per key (README.md, "Key
+ * key rotation the index carries one signature per key (CONTRIBUTING.md, "Key
  * rotation"). Node's built-in crypto only.
  */
 import { createPrivateKey, createPublicKey, sign, verify } from "node:crypto";
