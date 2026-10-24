@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 /**
- * Checks registry/*.toml and revoked.json (format and rules: scripts/lib/
+ * Checks the ids and owners of the plugins in plugins/ (plugins/owners.toml),
+ * registry/*.toml and revoked.json (format and rules: scripts/lib/
  * registry.mjs and scripts/lib/revoked.mjs), and that no registration takes
- * an official plugin's id.
+ * the id of a plugin in plugins/. `vestra.` ids belong to the player's
+ * built-in plugins and are rejected everywhere.
  *
  *   node scripts/check-registry.mjs [--revoked-base <git ref>]
  *   node scripts/check-registry.mjs --base <git ref> --head <git ref> --author <GitHub login>
@@ -23,19 +25,18 @@
  * judges it.
  */
 import { spawnSync } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { readRevoked } from "./lib/build.mjs";
 import {
-  OFFICIAL_PREFIX,
   ownerProblems,
+  readHostedPlugins,
   readRegistry,
   validateRegistration,
 } from "./lib/registry.mjs";
 import { revokedAppendProblems, revokedProblems } from "./lib/revoked.mjs";
-import { plugins } from "./plugins.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const { values } = parseArgs({
@@ -159,24 +160,18 @@ try {
       join(root, "registry"),
     );
     problems.push(...registryProblems);
-    const official = new Set();
-    for (const name of await plugins(join(root, "plugins"))) {
-      const { id } = JSON.parse(
-        await readFile(join(root, "plugins", name, "manifest.json"), "utf8"),
-      );
-      if (typeof id !== "string" || !id.startsWith(OFFICIAL_PREFIX))
-        problems.push(
-          `plugins/${name}: an official plugin's id must start with ${OFFICIAL_PREFIX}`,
-        );
-      official.add(String(id).toLowerCase());
-    }
+    const hosted = await readHostedPlugins(root);
+    problems.push(...hosted.problems);
+    const ids = new Map(
+      hosted.plugins.map(({ id, name }) => [id.toLowerCase(), name]),
+    );
     for (const entry of entries)
-      if (official.has(entry.id.toLowerCase()))
+      if (ids.has(entry.id.toLowerCase()))
         problems.push(
-          `registry/${entry.id}.toml: the id belongs to an official plugin`,
+          `registry/${entry.id}.toml: the id belongs to plugins/${ids.get(entry.id.toLowerCase())}`,
         );
     console.log(
-      `${entries.length} third-party registration(s), ${official.size} official plugin(s), revoked.json checked${values["revoked-base"] ? ` (append-only against ${values["revoked-base"]})` : ""}`,
+      `${hosted.plugins.length} hosted plugin(s) in plugins/, ${entries.length} registration(s), revoked.json checked${values["revoked-base"] ? ` (append-only against ${values["revoked-base"]})` : ""}`,
     );
   }
 } catch (error) {

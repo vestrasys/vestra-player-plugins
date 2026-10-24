@@ -4,16 +4,16 @@
   "official": true,
   "plugins": [
     {
-      "id": "vestra.demo",
+      "id": "someone.demo",
       "name": "演示",
-      "author": "Vestra Player",
+      "author": "someone",
       "punchline": "一句话",
       "description": null,
       "tags": ["演示"],
       "license": "Apache-2.0",
       "iconUrl": null,
-      "readmeUrl": "https://vestrasys.github.io/vestra-player-plugins/assets/vestra.demo/1.0.0/README.md",
-      "changelogUrl": "https://vestrasys.github.io/vestra-player-plugins/assets/vestra.demo/1.0.0/CHANGELOG.md",
+      "readmeUrl": "https://vestrasys.github.io/vestra-player-plugins/assets/someone.demo/1.0.0/README.md",
+      "changelogUrl": "https://vestrasys.github.io/vestra-player-plugins/assets/someone.demo/1.0.0/CHANGELOG.md",
       "sourceUrl": "https://github.com/vestrasys/vestra-player-plugins/tree/main/plugins/demo",
       "versions": [
         {
@@ -21,7 +21,7 @@
           "apiVersion": "vestra/1",
           "minPlayerVersion": "0.2.0",
           "capabilities": ["commands"],
-          "downloadUrl": "https://github.com/vestrasys/vestra-player-plugins/releases/download/vestra.demo-v1.0.0/vestra.demo-1.0.0.vxp",
+          "downloadUrl": "https://github.com/vestrasys/vestra-player-plugins/releases/download/someone.demo-v1.0.0/someone.demo-1.0.0.vxp",
           "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
           "size": 9370,
           "published": "2026-10-21T12:00:00.000Z"

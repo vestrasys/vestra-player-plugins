@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Records which official plugin versions are already released, for
+ * Records which versions of the plugins in plugins/ are already released, for
  * build-index.mjs --releases. CI runs it before `npm ci`, so the token it
  * uses is never in the environment of a step that runs plugin code.
  *

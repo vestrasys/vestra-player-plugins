@@ -1,0 +1,6 @@
+# The owner of each plugin in plugins/: the GitHub user or organization that
+# maintains it. The plugin's id must be <owner>.<directory>. "vestra" is
+# reserved for the player's built-in plugins. See CONTRIBUTING.md.
+
+bilibili = "zysilm"
+youtube = "zysilm"

@@ -1,9 +1,24 @@
 # Contributing and maintaining
 
-This repository publishes the official Vestra Player plugin index. It
-accepts three kinds of change, each through a pull request to `main`:
+This repository publishes the official Vestra Player plugin index. Every
+plugin in it is a **third-party** plugin. Vestra Player has three kinds:
 
-- changes to an official plugin in `plugins/` (below);
+- **Official plugins** are the player's built-in plugins. They live in the
+  [player repository](https://github.com/vestrasys/vestra-player/tree/main/src/plugins),
+  ship with the player and are not in this repository or its index. Only
+  they use the `vestra.` id prefix.
+- **Hosted third-party plugins** have their source in `plugins/` here. They
+  get stricter review: every change is a pull request to this repository and
+  runs its full CI (type checks, tests on macOS, Windows and Linux,
+  boundaries, portability).
+- **Registered third-party plugins** stay in their author's repository and
+  are registered in `registry/`; CI is to build them from source (not
+  implemented yet).
+
+The repository accepts three kinds of change, each through a pull request
+to `main`:
+
+- changes to a hosted plugin in `plugins/` (below);
 - a third-party plugin registration in `registry/<plugin id>.toml`: the
   step-by-step guide is [Contributing a plugin](README.md#contributing-a-plugin)
   in the README;
@@ -15,10 +30,23 @@ testing channel: CI tests, user rollback and revocation are the safety net.
 This file holds the rules in full and the maintainer details: layout, CI,
 the publish pipeline, the index format and the signing key.
 
-## Official plugins (`plugins/<name>/`)
+## Hosted third-party plugins (`plugins/<name>/`)
 
-- The id is `vestra.<name>`. `vestra.` is reserved for the plugins in this
-  directory.
+- Every hosted plugin has an **owner**: the GitHub user or organization that
+  maintains it, recorded in [`plugins/owners.toml`](plugins/owners.toml) as
+  `<name> = "<owner>"` (`youtube = "zysilm"`). The owner is the plugin's
+  author (the manifest's `author`); a maintainer reviews every change. A new
+  hosted plugin, or a change of owner, needs a maintainer's agreement.
+- The id is `<owner>.<name>`, where `<name>` is the directory name
+  (`plugins/youtube/` owned by `zysilm` is `zysilm.youtube`); the owner is
+  compared without case. This is the same `<github-owner>.<name>` rule as
+  for registrations, with the owner from `plugins/owners.toml` instead of
+  the source repository.
+- `vestra.` is reserved for the player's built-in plugins: neither an id
+  nor an owner here may use it. `npm run registry` and the publish build
+  enforce these rules.
+- A changed id is a new plugin to the store: the old id's history is not
+  carried over. Bump the version (minor) and say so in the changelog.
 - A plugin directory holds `manifest.json`, its sources (`.ts`, `.slint`),
   `tests/`, a short user-facing `README.md` (what it does, how to use it,
   requirements, limits; shown in the store) and `CHANGELOG.md`.
@@ -35,8 +63,9 @@ the publish pipeline, the index format and the signing key.
 ## Layout
 
 ```text
-plugins/<name>/   official plugins (id vestra.<name>): manifest.json, main.ts, .slint UI,
-                  tests/, README.md, CHANGELOG.md (youtube, bilibili)
+plugins/<name>/   hosted third-party plugins (id <owner>.<name>): manifest.json, main.ts,
+                  .slint UI, tests/, README.md, CHANGELOG.md (youtube, bilibili)
+plugins/owners.toml  the owner of each hosted plugin
 registry/         third-party registrations, registry/<id>.toml (see the README)
 revoked.json      revoked plugin versions, copied into the index
 keys/             the trusted public keys of the index signature (every *.pub.pem;
@@ -152,7 +181,7 @@ requests from forks run `ci.yml` without secrets (`pull_request`).
 pull request's files as data (`git show`) and never checks out or runs its
 code.
 
-## Third-party registrations: ids and owners
+## Registered third-party plugins: ids and owners
 
 The registration file, its keys and the pull request flow are in the
 [README](README.md#contributing-a-plugin). The rules behind them:
@@ -169,11 +198,13 @@ The registration file, its keys and the pull request flow are in the
   organization that owns `repository` (compared without case). For
   `https://github.com/someone/cool-visualizer`, the id must start with
   `someone.`. Letters, digits, `.`, `-` and `_` only.
-- `vestra.` is reserved for the official plugins, and an id cannot repeat an
-  existing one (even with different case).
-- The player does not treat ids specially: being official comes from where a
-  plugin is installed from, not from its id. The prefix rule only keeps ids
-  unique in this repository.
+- `vestra.` is reserved for the player's built-in (official) plugins, and
+  an id cannot repeat an existing one, a hosted plugin's included (even with
+  different case).
+- Only the player's built-ins are official. Every plugin in this
+  repository's index, hosted or registered, is a third-party plugin; the
+  index's `official: true` marks the repository the player trusts by
+  default, not its plugins.
 
 ### Owners
 
@@ -200,7 +231,8 @@ request:
 ]
 ```
 
-- `id`: the plugin id. `reason`: 1–500 characters, shown to users.
+- `id`: the plugin id (not a `vestra.` id: the built-ins are not in this
+  index). `reason`: 1–500 characters, shown to users.
 - `versions`: an exact version (`1.2.0`) or a range: comparators `<`, `<=`,
   `>`, `>=`, `=` joined by spaces (all must hold), alternatives joined by
   `||`, or `*` for every version. Examples: `<1.2.3`, `>=1.0.0 <1.2.0`,
@@ -217,8 +249,8 @@ request:
 - The entry is copied into the index's `revoked` unchanged on the next
   publish. The store disables an installed version that matches and tells
   the user why; the package stays downloadable for the record.
-- Owners of a third-party plugin can ask for a revocation; maintainers can
-  revoke any version.
+- Owners of a plugin (hosted or registered) can ask for a revocation;
+  maintainers can revoke any version.
 
 ## Publishing
 
@@ -276,16 +308,16 @@ and Pages of a private repository need authentication or a paid plan):
   "official": true,
   "plugins": [
     {
-      "id": "vestra.youtube",
-      "name": "YouTube", "author": "Vestra Player", "punchline": "…", "description": "…",
+      "id": "zysilm.youtube",
+      "name": "YouTube", "author": "zysilm", "punchline": "…", "description": "…",
       "tags": ["…"], "license": "Apache-2.0",
       "iconUrl": null, "iconSha256": null, "iconSize": null,
       "readmeUrl": "https://…/README.md", "readmeSha256": "…", "readmeSize": 812,
       "changelogUrl": "https://…/CHANGELOG.md", "changelogSha256": "…", "changelogSize": 240,
       "sourceUrl": "https://github.com/vestrasys/vestra-player-plugins/tree/main/plugins/youtube",
       "versions": [
-        { "version": "0.2.0", "apiVersion": "vestra/1", "minPlayerVersion": "0.2.0",
-          "capabilities": ["…"], "downloadUrl": "https://…/vestra.youtube-0.2.0.vxp",
+        { "version": "0.3.0", "apiVersion": "vestra/1", "minPlayerVersion": "0.2.0",
+          "capabilities": ["…"], "downloadUrl": "https://…/zysilm.youtube-0.3.0.vxp",
           "sha256": "…", "size": 9370, "published": "2026-10-21T…Z" }
       ]
     }
@@ -297,6 +329,11 @@ and Pages of a private repository need authentication or a paid plan):
 
 - Plugin fields come from the newest version's `manifest.json`; a field the
   manifest leaves out is `null` (`tags`: `[]`, `name`: the id).
+- A plugin no longer in `plugins/` (removed, or renamed to a new id) is
+  dropped from the next index; its Releases stay. A renamed plugin starts a
+  new version history under its new id. (When youtube and bilibili moved
+  from `vestra.*` to `zysilm.*`, the old entries were dropped this way;
+  `revoked.json` needed no entry, since the player had not been released.)
 - `versions` is newest first. There are no release channels and no download
   counts (ecosystem plan 1.6 items 8 and 9).
 - `published` is when CI built the version.

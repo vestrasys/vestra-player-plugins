@@ -1,6 +1,6 @@
 <p align="center"><img src="https://raw.githubusercontent.com/vestrasys/vestra-player-plugins/main/.github/assets/logo.png" width="96" height="96" alt="Vestra Player logo"></p>
 <h1 align="center">Vestra Player Plugins</h1>
-<p align="center"><b>The official plugin repository of Vestra Player: plugin sources, third-party registrations and the signed index the in-player store reads.</b></p>
+<p align="center"><b>The official plugin repository of Vestra Player: third-party plugins hosted here, third-party registrations and the signed index the in-player store reads.</b></p>
 <p align="center">
   <a href="https://github.com/vestrasys/vestra-player-plugins/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/vestrasys/vestra-player-plugins/ci.yml?branch=main&label=CI&logo=github" alt="CI"></a>
   <a href="https://github.com/vestrasys/vestra-player-plugins/actions/workflows/publish.yml"><img src="https://img.shields.io/github/actions/workflow/status/vestrasys/vestra-player-plugins/publish.yml?branch=main&label=publish&logo=github" alt="Publish"></a>
@@ -17,16 +17,26 @@
 
 ## What's here
 
-| Plugin | Id | What it does |
-| --- | --- | --- |
-| [YouTube](plugins/youtube) | `vestra.youtube` | Plays a public YouTube video from its link, or downloads it as MKV (needs yt-dlp; ffmpeg for downloads). |
-| [Bilibili](plugins/bilibili) | `vestra.bilibili` | Plays a Bilibili video from its link: BV or av number, or a b23.tv short link (needs yt-dlp). |
+Vestra Player has three kinds of plugins:
 
-Every merge to `main` publishes the signed index at **https://vestrasys.github.io/vestra-player-plugins/index.json**, which the player's store reads. The plugins that ship with the player (playback, playlist, subtitles, …) live in the [player repository](https://github.com/vestrasys/vestra-player/tree/main/src/plugins), not here.
+| Kind | Where | Id | Review |
+| --- | --- | --- | --- |
+| **Official** | built into the player ([player repository](https://github.com/vestrasys/vestra-player/tree/main/src/plugins): playback, playlist, subtitles, …); not in this repository | `vestra.<name>` (reserved for them) | the player's own |
+| **Hosted third-party** | source in this repository, [`plugins/`](plugins) | `<github-owner>.<name>` | stricter: every change is a pull request here, checked by this repository's full CI |
+| **Registered third-party** | source in the author's repository, registered in [`registry/`](registry) and built from source (not implemented yet, see below) | `<github-owner>.<name>` | a maintainer reviews the source at the registered commit |
+
+Every plugin in this repository is a third-party plugin: being hosted here means stricter review, not that the plugin is official. The hosted plugins today:
+
+| Plugin | Id | Owner | What it does |
+| --- | --- | --- | --- |
+| [YouTube](plugins/youtube) | `zysilm.youtube` | [zysilm](https://github.com/zysilm) | Plays a public YouTube video from its link, or downloads it as MKV (needs yt-dlp; ffmpeg for downloads). |
+| [Bilibili](plugins/bilibili) | `zysilm.bilibili` | [zysilm](https://github.com/zysilm) | Plays a Bilibili video from its link: BV or av number, or a b23.tv short link (needs yt-dlp). |
+
+Every merge to `main` publishes the signed index at **https://vestrasys.github.io/vestra-player-plugins/index.json**, which the player's store reads. It lists the third-party plugins of this repository; the official plugins ship with the player and are not in it.
 
 ## Contributing a plugin
 
-Third-party plugins are **built from source** (as on Flathub): you register your public repository and a commit, CI builds the package, a maintainer reviews the source, and the merge publishes it.
+There are two ways in. Most plugins should be **registered**: they are **built from source** (as on Flathub): you register your public repository and a commit, CI builds the package, a maintainer reviews the source, and the merge publishes it. The steps below describe that path. A plugin can instead be **hosted** in [`plugins/`](plugins) when the maintainers agree to it (open an issue first); it then follows the stricter rules in [CONTRIBUTING.md](CONTRIBUTING.md#hosted-third-party-plugins-pluginsname).
 
 > [!IMPORTANT]
 > **Status today.** The registration format, the id rule and the owner check are final and enforced by CI. Building third-party plugins from source is **not implemented yet**: the publish job refuses to run while any `registry/*.toml` exists, so registrations cannot be merged until it lands. Steps 1–4 below are ready to use now; steps 5–6 describe the flow as it will work.
@@ -49,12 +59,12 @@ npx vestra-plugin pack     # build dist/ and pack <id>-<version>.vxp
 
 ### 2. Meet the requirements
 
-- **Id** `<github-owner>.<name>`: the owner is the GitHub user or organization that owns your source repository (compared without case); letters, digits, `.`, `-`, `_`. `vestra.` is reserved for the plugins in this repository.
+- **Id** `<github-owner>.<name>`: the owner is the GitHub user or organization that owns your source repository (compared without case); letters, digits, `.`, `-`, `_`. `vestra.` is reserved for the player's built-in (official) plugins and is rejected everywhere in this repository.
 - **A valid manifest**: `vestra-plugin check` and `pack` pass. Fill in the display fields the store shows: `name`, `author`, `punchline`, `description`, `tags`, `license`, `sourceUrl`, optionally `icon`, and `minPlayerVersion` if you need a newer player.
 - **`README.md` and `CHANGELOG.md`** next to the manifest (at most 256 KiB each): the store shows both on the plugin's page.
 - **Tests** under `tests/` that pass with `vestra-plugin test`.
 - **Only the capabilities you use.** The store lists them on the plugin's page. They limit the player API only, not file or network access, which is why every plugin's source is reviewed.
-- **macOS and Windows.** Prefer player capabilities and plain Node over system commands (the official plugins are checked with `npm run portability`).
+- **macOS and Windows.** Prefer player capabilities and plain Node over system commands (the hosted plugins are checked with `npm run portability`).
 - **Public source** under a license that allows us to build and distribute it.
 
 ### 3. Publish your source
@@ -101,7 +111,7 @@ Title it `Add someone.cool-visualizer` (or `Update someone.cool-visualizer to 1.
 
 There are no beta channels and no download counts: a merge is a release, and CI, user rollback and revocation are the safety net.
 
-## Developing the official plugins
+## Developing the hosted plugins
 
 Node.js 22.18 or later. A name is a directory under `plugins/`; `--all` runs every plugin.
 
@@ -112,7 +122,7 @@ npm ci && npm run check && npm run format:check && npm run boundaries \
   && npm run portability && npm run registry && npm run build && npm test   # all of CI
 ```
 
-Every change that should reach users bumps `version` and adds a `CHANGELOG.md` entry. Rules, CI and the publish pipeline: [CONTRIBUTING.md](CONTRIBUTING.md).
+Every change that should reach users bumps `version` and adds a `CHANGELOG.md` entry. Each plugin's owner is in [`plugins/owners.toml`](plugins/owners.toml). Rules, CI and the publish pipeline: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Security and signing
 
@@ -120,4 +130,4 @@ Every change that should reach users bumps `version` and adds a `CHANGELOG.md` e
 
 ## License
 
-The repository and the official plugins are [Apache-2.0](LICENSE). Third-party plugins keep their own licenses.
+The repository, including the plugins in `plugins/`, is [Apache-2.0](LICENSE). Registered plugins keep their own licenses.

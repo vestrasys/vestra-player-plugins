@@ -1,6 +1,6 @@
 ## What this changes
 
-<!-- One of: an official plugin, a third-party registration, a revocation.
+<!-- One of: a hosted plugin (plugins/), a third-party registration, a revocation.
      Title: "Add <id>", "Update <id> to <version>", or a short summary. -->
 
 ## Checklist
@@ -16,8 +16,9 @@ Third-party registration (`registry/<id>.toml`), see [Contributing a plugin](htt
 - [ ] I am listed in `owners` (new registration) or already an owner (change)
 - [ ] `npm run registry` passes
 
-Official plugin (`plugins/<name>/`):
+Hosted third-party plugin (`plugins/<name>/`), see [CONTRIBUTING.md](https://github.com/vestrasys/vestra-player-plugins/blob/main/CONTRIBUTING.md#hosted-third-party-plugins-pluginsname):
 
+- [ ] the id is `<owner>.<name>` with the owner from `plugins/owners.toml` (never `vestra.`)
 - [ ] `version` in `manifest.json` bumped and a `CHANGELOG.md` entry added
 - [ ] `npm run check`, `npm run boundaries`, `npm run portability`, `npm test` pass
 

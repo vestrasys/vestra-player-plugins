@@ -5,7 +5,8 @@
  *   [{ "id": "<plugin id>", "versions": "<range>", "reason": "<text>" }]
  *
  * `versions` uses the range grammar in semver.mjs (an exact version is a
- * range too). The store disables an installed version that matches and tells
+ * range too). `vestra.` ids (the player's built-in plugins, which this
+ * index does not publish) are rejected. The store disables an installed version that matches and tells
  * the user why.
  *
  * The list is append-only: once an entry is published, it stays, unchanged
@@ -17,7 +18,7 @@
  * previously signed index.
  */
 import { isDeepStrictEqual } from "node:util";
-import { idProblems } from "./registry.mjs";
+import { idProblems, RESERVED_PREFIX } from "./registry.mjs";
 import { parseRange } from "./semver.mjs";
 
 const KEYS = ["id", "versions", "reason"];
@@ -37,6 +38,13 @@ export function revokedProblems(list) {
       if (!KEYS.includes(key)) problems.push(`${at}: unknown key "${key}"`);
     for (const problem of idProblems(item.id))
       problems.push(`${at}: ${problem}`);
+    if (
+      typeof item.id === "string" &&
+      item.id.toLowerCase().startsWith(RESERVED_PREFIX)
+    )
+      problems.push(
+        `${at}: "${RESERVED_PREFIX}" ids are the player's built-in plugins, which this index does not publish`,
+      );
     try {
       parseRange(item.versions);
     } catch (error) {

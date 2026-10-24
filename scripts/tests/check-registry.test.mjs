@@ -130,8 +130,8 @@ test("revoked.json is append-only against the base", async () => {
       ],
       { cwd: root, encoding: "utf8" },
     );
-  const one = { id: "vestra.demo", versions: "1.0.0", reason: "崩溃" };
-  const two = { id: "vestra.demo", versions: "<0.9.0", reason: "旧版" };
+  const one = { id: "someone.demo", versions: "1.0.0", reason: "崩溃" };
+  const two = { id: "someone.demo", versions: "<0.9.0", reason: "旧版" };
   const revoked = (list) => ({ "revoked.json": `${JSON.stringify(list)}\n` });
 
   // A clean tree: no registrations, an empty plugins/.
@@ -157,14 +157,14 @@ test("revoked.json is append-only against the base", async () => {
   assert.equal(result.status, 1);
   assert.match(
     result.stderr,
-    /revoked\[0\] \(vestra\.demo 1\.0\.0\) differs from the base branch/,
+    /revoked\[0\] \(someone\.demo 1\.0\.0\) differs from the base branch/,
   );
   result = plain(appended);
   assert.equal(result.status, 1);
   assert.match(result.stderr, /revoked\[0\] .* differs/);
   assert.match(
     result.stderr,
-    /revoked\[1\] \(vestra\.demo <0\.9\.0\) .* was removed/,
+    /revoked\[1\] \(someone\.demo <0\.9\.0\) .* was removed/,
   );
   assert.equal(plain().status, 0, "without a base only the format is checked");
 
@@ -180,4 +180,53 @@ test("revoked.json is append-only against the base", async () => {
   result = plain("0123456789abcdef0123456789abcdef01234567");
   assert.equal(result.status, 1);
   assert.match(result.stderr, /not a commit in this clone/);
+});
+
+test("plugins/: owner and id rules, and registrations cannot take their ids", async () => {
+  const plain = () =>
+    spawnSync(process.execPath, [join(root, "scripts/check-registry.mjs")], {
+      cwd: root,
+      encoding: "utf8",
+    });
+  const plugin = async (id, owners) => {
+    await rm(join(root, "plugins"), { recursive: true, force: true });
+    await rm(join(root, "registry"), { recursive: true, force: true });
+    await mkdir(join(root, "plugins/demo"), { recursive: true });
+    await mkdir(join(root, "registry"), { recursive: true });
+    await writeFile(
+      join(root, "plugins/demo/manifest.json"),
+      JSON.stringify({ id, version: "1.0.0" }),
+    );
+    await writeFile(join(root, "plugins/owners.toml"), owners);
+    await writeFile(join(root, "revoked.json"), "[]\n");
+  };
+
+  await plugin("zysilm.demo", 'demo = "zysilm"\n');
+  let result = plain();
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /1 hosted plugin\(s\) in plugins\//);
+
+  await writeFile(
+    join(root, "registry/zysilm.demo.toml"),
+    registration("zysilm", ["zysilm"]),
+  );
+  result = plain();
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /registry\/zysilm\.demo\.toml: the id belongs to plugins\/demo/,
+  );
+
+  await plugin("vestra.demo", 'demo = "zysilm"\n');
+  result = plain();
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /plugins\/demo: the "vestra\." prefix is reserved for the player's built-in plugins/,
+  );
+
+  await plugin("zysilm.demo", "");
+  result = plain();
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /plugins\/demo: no owner/);
 });

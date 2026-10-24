@@ -2,8 +2,9 @@
  * Builds the unsigned index.json and its Pages assets (the build job; see
  * scripts/build-index.mjs for the command line).
  *
- * For every official plugin in plugins/ (id `vestra.<name>`), the version in
- * its manifest is:
+ * For every plugin hosted in plugins/ (id `<owner>.<name>`, owner from
+ * plugins/owners.toml; see scripts/lib/registry.mjs), the version in its
+ * manifest is:
  * - kept as published when the previous index already lists it;
  * - recovered from its GitHub Release when the release exists but the index
  *   does not list it (an earlier run released it and then failed to sign);
@@ -33,7 +34,6 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join, resolve } from "node:path";
-import { plugins as pluginNames } from "../plugins.mjs";
 import {
   ASSETS,
   assetDigest,
@@ -46,7 +46,7 @@ import {
   sha256,
   tagOf,
 } from "./publishing.mjs";
-import { OFFICIAL_PREFIX, readRegistry } from "./registry.mjs";
+import { readHostedPlugins, readRegistry } from "./registry.mjs";
 import { revokedAppendProblems, revokedProblems } from "./revoked.mjs";
 import { compareVersions, isVersion } from "./semver.mjs";
 
@@ -151,6 +151,8 @@ export async function buildIndex({
   if (appended.length) throw new Error(appended.join("\n"));
   const registry = await readRegistry(join(root, "registry"));
   if (registry.problems.length) throw new Error(registry.problems.join("\n"));
+  const hosted = await readHostedPlugins(root);
+  if (hosted.problems.length) throw new Error(hosted.problems.join("\n"));
   if (registry.entries.length)
     // Third-party plugins are built from their registered source in this job
     // (no secrets), each in isolation; not implemented yet (CONTRIBUTING.md).
@@ -168,20 +170,9 @@ export async function buildIndex({
   const packed = [];
   const ids = new Set(registry.entries.map((entry) => entry.id.toLowerCase()));
   try {
-    for (const name of await pluginNames(join(root, "plugins"))) {
+    for (const { name, id, manifest } of hosted.plugins) {
       const directory = join(root, "plugins", name);
-      const manifest = JSON.parse(
-        await readFile(join(directory, "manifest.json"), "utf8"),
-      );
-      const { id, version } = manifest;
-      if (
-        typeof id !== "string" ||
-        !id.startsWith(OFFICIAL_PREFIX) ||
-        id.length === OFFICIAL_PREFIX.length
-      )
-        throw new Error(
-          `plugins/${name}: an official plugin's id must be ${OFFICIAL_PREFIX}<name>, not ${JSON.stringify(id)}`,
-        );
+      const { version } = manifest;
       if (!isVersion(version))
         throw new Error(`plugins/${name}: version must be MAJOR.MINOR.PATCH`);
       if (ids.has(id.toLowerCase()))

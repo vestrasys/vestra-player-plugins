@@ -1,6 +1,6 @@
 {
-  "id": "vestra.youtube",
-  "version": "0.2.0",
+  "id": "zysilm.youtube",
+  "version": "0.3.0",
   "apiVersion": "vestra/1",
   "entry": "main.ts",
   "capabilities": [
@@ -13,7 +13,7 @@
     "source.resolve"
   ],
   "name": "YouTube",
-  "author": "Vestra Player",
+  "author": "zysilm",
   "punchline": "粘贴链接播放或下载单个公开 YouTube 视频",
   "description": "打开 YouTube 视频链接（watch、shorts、live、embed、youtu.be）直接播放，或下载为 MKV 文件。需要本机安装 yt-dlp，下载另需 ffmpeg。",
   "tags": ["网络视频", "YouTube", "下载"],
