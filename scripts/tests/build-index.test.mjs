@@ -25,10 +25,11 @@ before(async () => {
 });
 after(() => rm(work, { recursive: true, force: true }));
 
-/** A repository root with one official plugin at `version`. */
+/** A repository root with one plugin, plugins/demo (owner someone), at `version`. */
 async function repository({
   version = "1.1.0",
-  id = "vestra.demo",
+  id = "someone.demo",
+  owners = 'demo = "someone"\n',
   revoked = [],
   registry = {},
 } = {}) {
@@ -44,7 +45,7 @@ async function repository({
       entry: "main.ts",
       capabilities: ["commands"],
       name: "演示",
-      author: "Vestra Player",
+      author: "someone",
       punchline: "一句话",
       tags: ["演示"],
       icon: "assets/logo.PNG",
@@ -52,6 +53,7 @@ async function repository({
       minPlayerVersion: "0.2.0",
     }),
   );
+  await writeFile(join(root, "plugins/owners.toml"), owners);
   await writeFile(join(plugin, "README.md"), "# 演示\n");
   await writeFile(join(plugin, "CHANGELOG.md"), "# 更新日志\n");
   await writeFile(join(plugin, "assets/logo.PNG"), "png");
@@ -99,7 +101,7 @@ const check = (out, index, options = {}) =>
 
 test("first publish: packs the plugin and describes it", async () => {
   const { out, index, packed } = await build(await repository());
-  const bytes = Buffer.from("package vestra.demo@1.1.0");
+  const bytes = Buffer.from("package someone.demo@1.1.0");
   const asset = (text) => [sha256(Buffer.from(text)), Buffer.byteLength(text)];
   const [iconSha256, iconSize] = asset("png");
   const [readmeSha256, readmeSize] = asset("# 演示\n");
@@ -111,20 +113,20 @@ test("first publish: packs the plugin and describes it", async () => {
     official: true,
     plugins: [
       {
-        id: "vestra.demo",
+        id: "someone.demo",
         name: "演示",
-        author: "Vestra Player",
+        author: "someone",
         punchline: "一句话",
         description: null,
         tags: ["演示"],
         license: "Apache-2.0",
-        iconUrl: `${pagesUrl}assets/vestra.demo/1.1.0/icon.png`,
+        iconUrl: `${pagesUrl}assets/someone.demo/1.1.0/icon.png`,
         iconSha256,
         iconSize,
-        readmeUrl: `${pagesUrl}assets/vestra.demo/1.1.0/README.md`,
+        readmeUrl: `${pagesUrl}assets/someone.demo/1.1.0/README.md`,
         readmeSha256,
         readmeSize,
-        changelogUrl: `${pagesUrl}assets/vestra.demo/1.1.0/CHANGELOG.md`,
+        changelogUrl: `${pagesUrl}assets/someone.demo/1.1.0/CHANGELOG.md`,
         changelogSha256,
         changelogSize,
         sourceUrl: `https://github.com/${repo}/tree/main/plugins/demo`,
@@ -134,7 +136,7 @@ test("first publish: packs the plugin and describes it", async () => {
             apiVersion: "vestra/1",
             minPlayerVersion: "0.2.0",
             capabilities: ["commands"],
-            downloadUrl: `https://github.com/${repo}/releases/download/vestra.demo-v1.1.0/vestra.demo-1.1.0.vxp`,
+            downloadUrl: `https://github.com/${repo}/releases/download/someone.demo-v1.1.0/someone.demo-1.1.0.vxp`,
             sha256: sha256(bytes),
             size: bytes.length,
             published: NOW,
@@ -147,18 +149,21 @@ test("first publish: packs the plugin and describes it", async () => {
   });
   assert.equal(packed.length, 1);
   assert.equal(
-    await readFile(join(out, "releases/vestra.demo-1.1.0.vxp"), "utf8"),
+    await readFile(join(out, "releases/someone.demo-1.1.0.vxp"), "utf8"),
     bytes.toString(),
   );
   assert.equal(
     await readFile(
-      join(out, "site/assets/vestra.demo/1.1.0/README.md"),
+      join(out, "site/assets/someone.demo/1.1.0/README.md"),
       "utf8",
     ),
     "# 演示\n",
   );
   assert.equal(
-    await readFile(join(out, "site/assets/vestra.demo/1.1.0/icon.png"), "utf8"),
+    await readFile(
+      join(out, "site/assets/someone.demo/1.1.0/icon.png"),
+      "utf8",
+    ),
     "png",
   );
   assert.ok(
@@ -170,7 +175,7 @@ test("first publish: packs the plugin and describes it", async () => {
   assert.deepEqual(problems, []);
   assert.deepEqual(
     create.map((item) => item.tag),
-    ["vestra.demo-v1.1.0"],
+    ["someone.demo-v1.1.0"],
   );
 });
 
@@ -189,7 +194,7 @@ test("a new version keeps the earlier versions from the signed index", async () 
   );
   const { problems, create } = await check(second.out, second.index, {
     previous: first.index,
-    releases: releases.fixture({ "vestra.demo-v1.0.0": { published: NOW } }),
+    releases: releases.fixture({ "someone.demo-v1.0.0": { published: NOW } }),
   });
   assert.deepEqual(problems, []);
   assert.deepEqual(
@@ -210,7 +215,7 @@ test("a released version is not rebuilt", async () => {
 
 test("a release missing from the index (signing failed) is recovered, not rebuilt", async () => {
   const released = {
-    "vestra.demo-v1.1.0": {
+    "someone.demo-v1.1.0": {
       published: "2026-10-20T08:00:00Z",
       size: 7,
       sha256: "a".repeat(64),
@@ -230,8 +235,8 @@ test("a release missing from the index (signing failed) is recovered, not rebuil
   });
   assert.deepEqual(result, { problems: [], create: [] });
   const wrong = {
-    "vestra.demo-v1.1.0": {
-      ...released["vestra.demo-v1.1.0"],
+    "someone.demo-v1.1.0": {
+      ...released["someone.demo-v1.1.0"],
       sha256: "b".repeat(64),
     },
   };
@@ -244,7 +249,7 @@ test("a release missing from the index (signing failed) is recovered, not rebuil
 });
 
 test("revoked.json is copied unchanged; an invalid one stops the build", async () => {
-  const revoked = [{ id: "vestra.demo", versions: "<1.1.0", reason: "崩溃" }];
+  const revoked = [{ id: "someone.demo", versions: "<1.1.0", reason: "崩溃" }];
   const { index, out } = await build(await repository({ revoked }));
   assert.deepEqual(index.revoked, revoked);
   assert.deepEqual((await check(out, index, { revoked })).problems, []);
@@ -262,14 +267,22 @@ test("revoked.json is copied unchanged; an invalid one stops the build", async (
   );
 });
 
-test("official ids need the vestra. prefix; registry entries are not built yet", async () => {
+test("plugins/ ids are <owner>.<name>, never vestra.; registry entries are not built yet", async () => {
   await assert.rejects(
     build(await repository({ id: "demo" })),
-    /vestra\.<name>/,
+    /id must be <owner>\.<directory>, here someone\.demo/,
   );
   await assert.rejects(
-    build(await repository({ id: "someone.demo" })),
-    /vestra\.<name>/,
+    build(await repository({ id: "vestra.demo" })),
+    /reserved for the player's built-in plugins/,
+  );
+  await assert.rejects(
+    build(await repository({ id: "vestra.demo", owners: 'demo = "vestra"\n' })),
+    /"vestra" is reserved/,
+  );
+  await assert.rejects(
+    build(await repository({ owners: "" })),
+    /plugins\/demo: no owner/,
   );
   const registration = `repository = "https://github.com/someone/x"\ncommit = "${"a".repeat(40)}"\nowners = ["someone"]\n`;
   await assert.rejects(
@@ -292,7 +305,7 @@ test("the signing job rejects a tampered artifact", async () => {
   };
   const previous = first.index;
   const released = releases.fixture({
-    "vestra.demo-v1.0.0": { published: NOW },
+    "someone.demo-v1.0.0": { published: NOW },
   });
   const expectProblem = async ({ out, index }, pattern) => {
     const { problems } = await check(out, index, {
@@ -303,7 +316,7 @@ test("the signing job rejects a tampered artifact", async () => {
   };
 
   let built = await fresh();
-  await writeFile(join(built.out, "releases/vestra.demo-1.1.0.vxp"), "evil");
+  await writeFile(join(built.out, "releases/someone.demo-1.1.0.vxp"), "evil");
   await expectProblem(built, /does not match the index sha256/);
 
   built = await fresh();
@@ -440,14 +453,55 @@ test("generated: 1 on the first publish, previous + 1 after, 1 after a legacy in
   const { problems } = await check(after.out, after.index, {
     previous: legacy,
     revoked: legacy.revoked,
-    releases: releases.fixture({ "vestra.demo-v1.0.0": { published: NOW } }),
+    releases: releases.fixture({ "someone.demo-v1.0.0": { published: NOW } }),
   });
   assert.deepEqual(problems, []);
 });
 
+test("a renamed plugin: the old id leaves the index, the new id starts a fresh history", async () => {
+  // The previously signed index has the plugin under its old id (as
+  // vestra.youtube became zysilm.youtube); the repository now has only the
+  // new id.
+  const old = await build(await repository({ version: "1.0.0" }));
+  const previous = structuredClone(old.index);
+  previous.plugins[0].id = "vestra.demo";
+  for (const entry of previous.plugins[0].versions)
+    entry.downloadUrl = entry.downloadUrl.replaceAll(
+      "someone.demo",
+      "vestra.demo",
+    );
+  const logged = [];
+  const renamed = await build(await repository({ version: "1.1.0" }), {
+    previous,
+    log: (line) => logged.push(line),
+  });
+  assert.deepEqual(
+    renamed.index.plugins.map(({ id, versions }) => [
+      id,
+      versions.map((entry) => entry.version),
+    ]),
+    [["someone.demo", ["1.1.0"]]],
+  );
+  assert.equal(renamed.index.generated, previous.generated + 1);
+  assert.ok(
+    logged.includes(
+      "vestra.demo: no longer in the repository, dropped from the index",
+    ),
+  );
+  const { problems, create } = await check(renamed.out, renamed.index, {
+    previous,
+    releases: releases.fixture({ "vestra.demo-v1.0.0": { published: NOW } }),
+  });
+  assert.deepEqual(problems, []);
+  assert.deepEqual(
+    create.map((item) => item.tag),
+    ["someone.demo-v1.1.0"],
+  );
+});
+
 test("revoked.json is append-only: the build stops when it drops or changes a published entry", async () => {
-  const one = { id: "vestra.demo", versions: "1.0.0", reason: "崩溃" };
-  const two = { id: "vestra.demo", versions: "1.0.1", reason: "也崩溃" };
+  const one = { id: "someone.demo", versions: "1.0.0", reason: "崩溃" };
+  const two = { id: "someone.demo", versions: "1.0.1", reason: "也崩溃" };
   const first = await build(await repository({ revoked: [one] }));
   const appended = await build(await repository({ revoked: [one, two] }), {
     previous: first.index,
@@ -455,7 +509,7 @@ test("revoked.json is append-only: the build stops when it drops or changes a pu
   assert.deepEqual(appended.index.revoked, [one, two]);
   await assert.rejects(
     build(await repository({ revoked: [] }), { previous: appended.index }),
-    /revoked\[0\] \(vestra\.demo 1\.0\.0\) from the published index was removed/,
+    /revoked\[0\] \(someone\.demo 1\.0\.0\) from the published index was removed/,
   );
   await assert.rejects(
     build(await repository({ revoked: [{ ...one, reason: "改了" }, two] }), {
@@ -482,13 +536,13 @@ test("a store asset over the store's limit stops the build", async () => {
 });
 
 test("the signing job checks generated, revoked and the store assets", async () => {
-  const one = { id: "vestra.demo", versions: "1.0.0", reason: "崩溃" };
+  const one = { id: "someone.demo", versions: "1.0.0", reason: "崩溃" };
   const first = await build(
     await repository({ version: "1.0.0", revoked: [one] }),
   );
   const previous = first.index;
   const released = releases.fixture({
-    "vestra.demo-v1.0.0": { published: NOW },
+    "someone.demo-v1.0.0": { published: NOW },
   });
   const fresh = async () => {
     const second = await build(
@@ -532,12 +586,12 @@ test("the signing job checks generated, revoked and the store assets", async () 
   // Store assets: the site file and the index must agree.
   built = await fresh();
   await writeFile(
-    join(built.out, "site/assets/vestra.demo/1.1.0/README.md"),
+    join(built.out, "site/assets/someone.demo/1.1.0/README.md"),
     "# 被换掉的说明\n",
   );
   await expectProblem(
     built,
-    /site\/assets\/vestra\.demo\/1\.1\.0\/README\.md does not match readmeSha256\/readmeSize/,
+    /site\/assets\/someone\.demo\/1\.1\.0\/README\.md does not match readmeSha256\/readmeSize/,
   );
   built = await fresh();
   built.index.plugins[0].iconSha256 = "d".repeat(64);
@@ -555,23 +609,23 @@ test("the signing job checks generated, revoked and the store assets", async () 
     /iconSha256 and iconSize must be null without iconUrl/,
   );
   built = await fresh();
-  built.index.plugins[0].readmeUrl = `${pagesUrl}assets/vestra.demo/1.1.0/./README.md`;
+  built.index.plugins[0].readmeUrl = `${pagesUrl}assets/someone.demo/1.1.0/./README.md`;
   await expectProblem(built, /readmeUrl must be under/);
 
   // Nothing on Pages but index.json and the referenced assets.
   built = await fresh();
   await writeFile(
-    join(built.out, "site/assets/vestra.demo/1.1.0/login.html"),
+    join(built.out, "site/assets/someone.demo/1.1.0/login.html"),
     "<form>",
   );
   await expectProblem(
     built,
-    /site\/assets\/vestra\.demo\/1\.1\.0\/login\.html: unexpected file/,
+    /site\/assets\/someone\.demo\/1\.1\.0\/login\.html: unexpected file/,
   );
   built = await fresh();
-  await mkdir(join(built.out, "site/assets/vestra.demo/0.9.0"));
+  await mkdir(join(built.out, "site/assets/someone.demo/0.9.0"));
   await writeFile(
-    join(built.out, "site/assets/vestra.demo/0.9.0/README.md"),
+    join(built.out, "site/assets/someone.demo/0.9.0/README.md"),
     "old",
   );
   await expectProblem(built, /0\.9\.0\/README\.md: unexpected file/);

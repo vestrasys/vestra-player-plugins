@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import {
   ownerProblems,
+  readHostedPlugins,
   readRegistry,
   validateRegistration,
 } from "../lib/registry.mjs";
@@ -60,7 +62,7 @@ test("invalid registrations name the broken rule", async () => {
   const expected = {
     "someone.wrong-owner":
       /prefix "someone" must be the repository owner "someoneelse"/,
-    "vestra.fake": /reserved for the official plugins/,
+    "vestra.fake": /reserved for the player's built-in plugins/,
     noprefix: /<GitHub owner>\.<plugin name>/,
     "someone.channel": /channel is not used/,
     "someone.short-commit": /40-digit/,
@@ -179,4 +181,87 @@ test("revoked.json format", async () => {
   assert.match(problems.join("\n"), /\[0\]: reason must be/);
   assert.match(problems.join("\n"), /\[1\]: unknown key "extra"/);
   assert.match(problems.join("\n"), /\[2\] must be an object/);
+  assert.match(
+    revokedProblems([
+      { id: "Vestra.audio", versions: "*", reason: "x" },
+    ]).join(),
+    /\[0\]: "vestra\." ids are the player's built-in plugins/,
+  );
+});
+
+/** A scratch repository root with plugins/<name>/manifest.json files. */
+async function hosted(manifests, owners) {
+  const root = await mkdtemp(join(tmpdir(), "vestra-hosted-"));
+  for (const [name, id] of Object.entries(manifests)) {
+    await mkdir(join(root, "plugins", name), { recursive: true });
+    await writeFile(
+      join(root, "plugins", name, "manifest.json"),
+      JSON.stringify({ id, version: "1.0.0" }),
+    );
+  }
+  if (owners !== null)
+    await writeFile(join(root, "plugins/owners.toml"), owners);
+  try {
+    return await readHostedPlugins(root);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+}
+
+test("plugins/: the id is <owner>.<directory>, owner from plugins/owners.toml", async () => {
+  const ok = await hosted(
+    { youtube: "zysilm.youtube", tools: "some-org.tools" },
+    '# c\nyoutube = "zysilm"\ntools = "Some-Org"\n',
+  );
+  assert.deepEqual(ok.problems, []);
+  assert.deepEqual(
+    ok.plugins.map(({ name, id, owner }) => [name, id, owner]),
+    [
+      ["tools", "some-org.tools", "Some-Org"],
+      ["youtube", "zysilm.youtube", "zysilm"],
+    ],
+  );
+
+  const expect = async (manifests, owners, pattern) => {
+    const { plugins, problems } = await hosted(manifests, owners);
+    assert.match(problems.join("\n"), pattern);
+    assert.equal(plugins.length, 0);
+  };
+  // vestra. is the player's built-ins only, also with the owner on file.
+  await expect(
+    { youtube: "vestra.youtube" },
+    'youtube = "zysilm"\n',
+    /plugins\/youtube: the "vestra\." prefix is reserved for the player's built-in plugins; the id must be zysilm\.youtube/,
+  );
+  await expect(
+    { youtube: "vestra.youtube" },
+    'youtube = "Vestra"\n',
+    /plugins\/owners\.toml: youtube: "vestra" is reserved/,
+  );
+  await expect(
+    { youtube: "someone.youtube" },
+    'youtube = "zysilm"\n',
+    /id must be <owner>\.<directory>, here zysilm\.youtube, not "someone\.youtube"/,
+  );
+  await expect(
+    { youtube: "zysilm.yt" },
+    'youtube = "zysilm"\n',
+    /here zysilm\.youtube/,
+  );
+  await expect(
+    { youtube: "youtube" },
+    'youtube = "zysilm"\n',
+    /here zysilm\.youtube/,
+  );
+  await expect({ youtube: "zysilm.youtube" }, null, /no owner; add youtube = /);
+  await expect(
+    { youtube: "zysilm.youtube" },
+    'youtube = ["zysilm"]\n',
+    /youtube must be one GitHub user or organization/,
+  );
+  const stray = await hosted(
+    { youtube: "zysilm.youtube" },
+    'youtube = "zysilm"\nbilibili = "zysilm"\n',
+  );
+  assert.match(stray.problems.join(), /bilibili is not a plugin directory/);
 });

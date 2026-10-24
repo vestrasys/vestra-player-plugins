@@ -1,6 +1,7 @@
 name: Publish
 
-# Publishes the official plugin repository:
+# Publishes the official plugin repository (its plugins are third-party:
+# hosted in plugins/, later also registered in registry/):
 # - a GitHub Release per new plugin version: tag <id>-v<version>, asset
 #   <id>-<version>.vxp, with a build provenance attestation;
 # - GitHub Pages: index.json, index.json.sig and assets/<id>/<version>/

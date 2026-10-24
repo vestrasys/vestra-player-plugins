@@ -1,6 +1,6 @@
 {
-  "id": "vestra.bilibili",
-  "version": "0.2.0",
+  "id": "zysilm.bilibili",
+  "version": "0.3.0",
   "apiVersion": "vestra/1",
   "entry": "main.ts",
   "capabilities": [
@@ -11,7 +11,7 @@
     "playback.control"
   ],
   "name": "Bilibili 视频",
-  "author": "Vestra Player",
+  "author": "zysilm",
   "punchline": "粘贴链接播放 Bilibili 单个视频",
   "description": "打开 Bilibili 视频链接（BV 号、av 号、b23.tv 短链）直接播放。需要本机安装 yt-dlp。",
   "tags": ["网络视频", "Bilibili"],
