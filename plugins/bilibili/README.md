@@ -1,17 +1,20 @@
-# Bilibili 视频
+# VestraBili
 
-在 Vestra Player 里播放 Bilibili 的单个视频。
+Plays a single Bilibili video in Vestra Player.
 
-## 使用
+## Usage
 
-右键菜单 **打开 → Bilibili 视频…**，粘贴链接，按 Enter 或「播放」。
+Right-click menu **Open → VestraBili…**, paste a link, then press Enter or **Play**.
 
-在播放列表或「打开」里直接输入 Bilibili 链接也能播放。支持 BV 号、av 号的视频页和 b23.tv 短链。
+Typing a Bilibili link into the playlist or **Open** also plays it. Supported links: video pages by BV or av number, and b23.tv short links.
 
-## 需要
+The plugin follows the player's interface language (English and Simplified Chinese).
 
-[yt-dlp](https://github.com/yt-dlp/yt-dlp)，在 PATH 上。插件不会自动安装或更新它。
+## Requirements
 
-## 限制
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) on the PATH. The plugin does not install or update it.
+- Vestra Player 0.4.3 or later.
 
-不支持登录、大会员、番剧、直播和合集。
+## Limits
+
+Videos that need a sign-in or a premium membership, bangumi (anime and series), live streams and collections are not supported.

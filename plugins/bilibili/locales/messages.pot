@@ -1,0 +1,146 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: zysilm.bilibili 0.3.1\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#. the plugin's name (a brand); usually kept as it is.
+#: dialog.slint:8 manifest.json
+msgid "VestraBili"
+msgstr ""
+
+#: dialog.slint:13 main.ts:16
+msgid "Enter a Bilibili video link."
+msgstr ""
+
+#: dialog.slint:20
+msgid "Enter a link"
+msgstr ""
+
+#: dialog.slint:46
+msgid "Play"
+msgstr ""
+
+#: dialog.slint:47
+msgid "Cancel"
+msgstr ""
+
+#: extractor.ts:13
+msgid "Enter a valid Bilibili video URL."
+msgstr ""
+
+#: extractor.ts:14
+msgid "Only Bilibili HTTP(S) video links are supported."
+msgstr ""
+
+#: extractor.ts:18
+msgid "Enter a bilibili.com/video/… or b23.tv/… video link."
+msgstr ""
+
+#: extractor.ts:31
+msgid "The extracted result has no media address."
+msgstr ""
+
+#: extractor.ts:33
+msgid "The extracted result contains an invalid media address."
+msgstr ""
+
+#: extractor.ts:38
+msgid "The extracted result contains invalid request headers."
+msgstr ""
+
+#: extractor.ts:50
+msgid "The extracted result has no video track."
+msgstr ""
+
+#: extractor.ts:54
+msgid "The extracted result lacks the separate audio track, so it can't play completely."
+msgstr ""
+
+#: extractor.ts:56
+msgid "Can't tell whether the video contains audio."
+msgstr ""
+
+#: extractor.ts:58
+msgid "The extracted result has no complete video with audio."
+msgstr ""
+
+#: extractor.ts:71
+msgid "Resolution cancelled."
+msgstr ""
+
+#: extractor.ts:72
+msgid "Bilibili resolution failed: {}"
+msgstr ""
+
+#: extractor.ts:73
+msgid "Bilibili resolution failed: timed out."
+msgstr ""
+
+#: extractor.ts:74
+msgid "Bilibili resolution failed: yt-dlp was not found."
+msgstr ""
+
+#: extractor.ts:75
+msgid "Bilibili resolution failed: yt-dlp failed."
+msgstr ""
+
+#: extractor.ts:83
+msgid "yt-dlp returned invalid JSON."
+msgstr ""
+
+#: extractor.ts:84
+msgid "yt-dlp returned invalid video information."
+msgstr ""
+
+#: main.ts:44
+msgid "Timed out loading the media. Try again."
+msgstr ""
+
+#: main.ts:47
+msgid "Another source replaced the playback request."
+msgstr ""
+
+#: main.ts:49
+msgid "The playback request has ended."
+msgstr ""
+
+#: main.ts:54
+msgid "The player is busy. Try again later."
+msgstr ""
+
+#: main.ts:57
+msgid "The player can't open this link."
+msgstr ""
+
+#: main.ts:60
+msgid "The playback request failed."
+msgstr ""
+
+#: main.ts:74
+msgid "Resolving the video and audio…"
+msgstr ""
+
+#: main.ts:77
+msgid "The video is ready."
+msgstr ""
+
+#: main.ts:96
+msgid "VestraBili…"
+msgstr ""
+
+#: manifest.json
+msgid "Paste a link to play a single Bilibili video"
+msgstr ""
+
+#: manifest.json
+msgid "Plays Bilibili video links (BV number, av number, b23.tv short link) directly. Needs yt-dlp installed on this computer."
+msgstr ""
+
+#: manifest.json
+msgid "online video"
+msgstr ""
+
+#: manifest.json
+msgid "Bilibili"
+msgstr ""

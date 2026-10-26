@@ -30,7 +30,7 @@ Every plugin in this repository is a third-party plugin: being hosted here means
 | Plugin | Id | Owner | What it does |
 | --- | --- | --- | --- |
 | [VestraTube](plugins/youtube) | `zysilm.youtube` | [zysilm](https://github.com/zysilm) | Plays a public YouTube video from its link, or downloads it as MKV (needs yt-dlp; ffmpeg for downloads). |
-| [Bilibili](plugins/bilibili) | `zysilm.bilibili` | [zysilm](https://github.com/zysilm) | Plays a Bilibili video from its link: BV or av number, or a b23.tv short link (needs yt-dlp). |
+| [VestraBili](plugins/bilibili) | `zysilm.bilibili` | [zysilm](https://github.com/zysilm) | Plays a Bilibili video from its link: BV or av number, or a b23.tv short link (needs yt-dlp). |
 
 Every merge to `main` publishes the signed index at **https://vestrasys.github.io/vestra-player-plugins/index.json**, which the player's store reads. It lists the third-party plugins of this repository; the official plugins ship with the player and are not in it.
 
