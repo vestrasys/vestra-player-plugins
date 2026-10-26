@@ -1,15 +1,16 @@
-// 「输入链接」小窗（ui-alignment §7.5 UI-DLG-02）：与 Bilibili 窗口同一规格、同一尺寸。
+// The "Enter a link" window (ui-alignment §7.5 UI-DLG-02): the same layout and size as the Bilibili window.
 import { LineEdit } from "std-widgets.slint";
 import { Theme } from "@vestra/theme.slint";
 import { Button, ToolTipArea } from "@vestra/widgets.slint";
 
 export component YouTubeWindow inherits Window {
-    title: "YouTube 视频";
+    // TRANSLATORS: the plugin's name (a brand); usually kept as it is.
+    title: @tr("VestraTube");
     width: 420px;
     height: 122px;
     background: Theme.bg-panel;
     in-out property <string> url: "";
-    in-out property <string> status: "粘贴 YouTube 视频链接以播放或下载。";
+    in-out property <string> status: @tr("Paste a YouTube video link to play or download it.");
     in-out property <bool> busy: false;
     in-out property <float> progress: 0;
     callback play(string);
@@ -18,12 +19,12 @@ export component YouTubeWindow inherits Window {
     VerticalLayout {
         padding: Theme.dialog-padding;
         spacing: 8px;
-        Text { text: "输入链接"; color: Theme.text; font-size: Theme.font-body; height: Theme.label-height; }
+        Text { text: @tr("Enter a link"); color: Theme.text; font-size: Theme.font-body; height: Theme.label-height; }
         LineEdit {
             height: Theme.input-height;
             font-size: Theme.font-body;
             text <=> root.url;
-            placeholder-text: "https://www.youtube.com/watch?v=…";
+            placeholder-text: "https://www.youtube.com/watch?v=…"; // i18n-ignore: an example link, not words
             enabled: !root.busy;
             accepted => { root.play(root.url); }
         }
@@ -53,10 +54,10 @@ export component YouTubeWindow inherits Window {
         }
         HorizontalLayout {
             spacing: 6px;
-            Button { text: "下载视频…"; enabled: !root.busy; clicked => { root.download(root.url); } }
+            Button { text: @tr("Download Video…"); enabled: !root.busy; clicked => { root.download(root.url); } }
             Rectangle { horizontal-stretch: 1; }
-            Button { text: "播放"; enabled: !root.busy; clicked => { root.play(root.url); } }
-            Button { text: "取消"; clicked => { root.cancel(); } }
+            Button { text: @tr("Play"); enabled: !root.busy; clicked => { root.play(root.url); } }
+            Button { text: @tr("Cancel"); clicked => { root.cancel(); } }
         }
     }
 }
