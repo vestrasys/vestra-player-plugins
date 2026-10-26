@@ -1,6 +1,6 @@
 {
   "id": "zysilm.youtube",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "apiVersion": "vestra/1",
   "entry": "main.ts",
   "capabilities": [
@@ -12,12 +12,12 @@
     "playback.control",
     "source.resolve"
   ],
-  "name": "YouTube",
+  "name": "VestraTube",
   "author": "zysilm",
-  "punchline": "粘贴链接播放或下载单个公开 YouTube 视频",
-  "description": "打开 YouTube 视频链接（watch、shorts、live、embed、youtu.be）直接播放，或下载为 MKV 文件。需要本机安装 yt-dlp，下载另需 ffmpeg。",
-  "tags": ["网络视频", "YouTube", "下载"],
+  "punchline": "Paste a link to play or download a single public YouTube video",
+  "description": "Plays YouTube video links (watch, shorts, live, embed, youtu.be) directly, or downloads them as MKV files. Needs yt-dlp installed on this computer, and ffmpeg for downloads.",
+  "tags": ["online video", "YouTube", "download"],
   "sourceUrl": "https://github.com/vestrasys/vestra-player-plugins/tree/main/plugins/youtube",
   "license": "Apache-2.0",
-  "minPlayerVersion": "0.2.0"
+  "minPlayerVersion": "0.4.3"
 }

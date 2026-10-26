@@ -1,0 +1,195 @@
+msgid ""
+msgstr ""
+"Language: zh-Hans\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#: main.ts:20 youtube.slint:13
+msgid "Paste a YouTube video link to play or download it."
+msgstr "粘贴 YouTube 视频链接以播放或下载。"
+
+#: main.ts:32
+msgid "Playback failed: {}"
+msgstr "播放失败：{}"
+
+#: main.ts:34
+msgid "The player is busy. Try again later."
+msgstr "播放器忙，请稍后重试。"
+
+#: main.ts:37
+msgid "The player can't open this link."
+msgstr "播放器无法打开这个链接。"
+
+#: main.ts:40
+msgid "The playback request failed."
+msgstr "播放请求失败。"
+
+#: main.ts:52
+msgid "Resolving and loading the video and audio…"
+msgstr "正在解析并加载视频与音频…"
+
+#: main.ts:55
+msgid "Timed out waiting for the video to be ready."
+msgstr "等待视频就绪超时。"
+
+#: main.ts:63
+msgid "Another source replaced the playback request."
+msgstr "播放请求已被其他来源替换。"
+
+#: main.ts:64
+msgid "The playback request has ended."
+msgstr "播放请求已结束。"
+
+#: main.ts:68
+msgid "The video failed to load."
+msgstr "视频载入失败。"
+
+#: main.ts:75
+msgid "The video is ready."
+msgstr "视频已就绪。"
+
+#: main.ts:80
+msgid "Save YouTube Video"
+msgstr "保存 YouTube 视频"
+
+#: main.ts:82
+msgid "No save location was chosen."
+msgstr "已取消选择保存位置。"
+
+#: main.ts:92
+msgid "Saved: {}"
+msgstr "已保存：{}"
+
+#: main.ts:105
+msgid "Cancelled."
+msgstr "已取消。"
+
+#: main.ts:127
+msgid "VestraTube…"
+msgstr "VestraTube…"
+
+#. the plugin's name (a brand); usually kept as it is.
+#: manifest.json youtube.slint:8
+msgid "VestraTube"
+msgstr "VestraTube"
+
+#: manifest.json
+msgid "Paste a link to play or download a single public YouTube video"
+msgstr "粘贴链接播放或下载单个公开 YouTube 视频"
+
+#: manifest.json
+msgid "Plays YouTube video links (watch, shorts, live, embed, youtu.be) directly, or downloads them as MKV files. Needs yt-dlp installed on this computer, and ffmpeg for downloads."
+msgstr "打开 YouTube 视频链接（watch、shorts、live、embed、youtu.be）直接播放，或下载为 MKV 文件。需要本机安装 yt-dlp，下载另需 ffmpeg。"
+
+#: manifest.json
+msgid "online video"
+msgstr "网络视频"
+
+#: manifest.json
+msgid "YouTube"
+msgstr "YouTube"
+
+#: manifest.json
+msgid "download"
+msgstr "下载"
+
+#: service.ts:25
+msgid "Enter the full link of a YouTube video."
+msgstr "请输入完整的 YouTube 视频链接。"
+
+#: service.ts:26
+msgid "Only HTTPS YouTube video links are supported."
+msgstr "仅支持 HTTPS 的 YouTube 视频链接。"
+
+#: service.ts:34
+msgid "Enter the link of a single YouTube video (watch, shorts, live or youtu.be)."
+msgstr "请输入单个 YouTube 视频链接（watch、shorts、live 或 youtu.be）。"
+
+#: service.ts:49
+msgid "yt-dlp timed out. Try again later."
+msgstr "yt-dlp 超时，请稍后重试。"
+
+#: service.ts:52
+msgid "yt-dlp's output exceeded the limit."
+msgstr "yt-dlp 输出超出上限。"
+
+#: service.ts:58
+msgid "Can't run yt-dlp. Install the required version as the instructions describe."
+msgstr "无法运行 yt-dlp，请按说明安装指定版本。"
+
+#: service.ts:64
+msgid "yt-dlp failed: {}"
+msgstr "yt-dlp 出错：{}"
+
+#: service.ts:64
+msgid "yt-dlp failed: exit code {}"
+msgstr "yt-dlp 出错：退出码 {}"
+
+#: service.ts:73
+msgid "The resolved video has no media address."
+msgstr "解析结果没有媒体地址。"
+
+#: service.ts:75
+msgid "The resolved video uses an unsupported media protocol."
+msgstr "解析结果的媒体协议不受支持。"
+
+#: service.ts:86
+msgid "yt-dlp returned invalid video information."
+msgstr "yt-dlp 返回了无效的视频信息。"
+
+#: service.ts:91
+msgid "No complete video and audio streams were found."
+msgstr "没有找到完整的视频和音频流。"
+
+#: service.ts:104
+msgid "yt-dlp {} is required; the installed version is {}."
+msgstr "需要 yt-dlp {}，当前为 {}。"
+
+#: service.ts:104
+msgid "yt-dlp {} is required; the installed version is unknown."
+msgstr "需要 yt-dlp {}，当前为未知版本。"
+
+#: service.ts:111
+msgid "yt-dlp returned invalid JSON."
+msgstr "yt-dlp 返回了无效的 JSON。"
+
+#: service.ts:117
+msgid "Choose a .mkv file to save to."
+msgstr "请选择 .mkv 保存位置。"
+
+#: service.ts:123
+msgid "Downloading the video and audio…"
+msgstr "正在下载视频和音频…"
+
+#: service.ts:128
+msgid "Downloading {}%"
+msgstr "正在下载 {}%"
+
+#: service.ts:129
+msgid "Merging the video and audio…"
+msgstr "正在合并视频和音频…"
+
+#: service.ts:134
+msgid "The download finished without a complete MKV file."
+msgstr "下载结束，但没有得到完整的 MKV 文件。"
+
+#: service.ts:136
+msgid "The downloaded file is empty."
+msgstr "下载的文件为空。"
+
+#: youtube.slint:22
+msgid "Enter a link"
+msgstr "输入链接"
+
+#: youtube.slint:57
+msgid "Download Video…"
+msgstr "下载视频…"
+
+#: youtube.slint:59
+msgid "Play"
+msgstr "播放"
+
+#: youtube.slint:60
+msgid "Cancel"
+msgstr "取消"

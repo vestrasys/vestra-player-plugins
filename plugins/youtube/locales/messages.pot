@@ -1,0 +1,194 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: zysilm.youtube 0.3.1\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: main.ts:20 youtube.slint:13
+msgid "Paste a YouTube video link to play or download it."
+msgstr ""
+
+#: main.ts:32
+msgid "Playback failed: {}"
+msgstr ""
+
+#: main.ts:34
+msgid "The player is busy. Try again later."
+msgstr ""
+
+#: main.ts:37
+msgid "The player can't open this link."
+msgstr ""
+
+#: main.ts:40
+msgid "The playback request failed."
+msgstr ""
+
+#: main.ts:52
+msgid "Resolving and loading the video and audio…"
+msgstr ""
+
+#: main.ts:55
+msgid "Timed out waiting for the video to be ready."
+msgstr ""
+
+#: main.ts:63
+msgid "Another source replaced the playback request."
+msgstr ""
+
+#: main.ts:64
+msgid "The playback request has ended."
+msgstr ""
+
+#: main.ts:68
+msgid "The video failed to load."
+msgstr ""
+
+#: main.ts:75
+msgid "The video is ready."
+msgstr ""
+
+#: main.ts:80
+msgid "Save YouTube Video"
+msgstr ""
+
+#: main.ts:82
+msgid "No save location was chosen."
+msgstr ""
+
+#: main.ts:92
+msgid "Saved: {}"
+msgstr ""
+
+#: main.ts:105
+msgid "Cancelled."
+msgstr ""
+
+#: main.ts:127
+msgid "VestraTube…"
+msgstr ""
+
+#. the plugin's name (a brand); usually kept as it is.
+#: manifest.json youtube.slint:8
+msgid "VestraTube"
+msgstr ""
+
+#: manifest.json
+msgid "Paste a link to play or download a single public YouTube video"
+msgstr ""
+
+#: manifest.json
+msgid "Plays YouTube video links (watch, shorts, live, embed, youtu.be) directly, or downloads them as MKV files. Needs yt-dlp installed on this computer, and ffmpeg for downloads."
+msgstr ""
+
+#: manifest.json
+msgid "online video"
+msgstr ""
+
+#: manifest.json
+msgid "YouTube"
+msgstr ""
+
+#: manifest.json
+msgid "download"
+msgstr ""
+
+#: service.ts:25
+msgid "Enter the full link of a YouTube video."
+msgstr ""
+
+#: service.ts:26
+msgid "Only HTTPS YouTube video links are supported."
+msgstr ""
+
+#: service.ts:34
+msgid "Enter the link of a single YouTube video (watch, shorts, live or youtu.be)."
+msgstr ""
+
+#: service.ts:49
+msgid "yt-dlp timed out. Try again later."
+msgstr ""
+
+#: service.ts:52
+msgid "yt-dlp's output exceeded the limit."
+msgstr ""
+
+#: service.ts:58
+msgid "Can't run yt-dlp. Install the required version as the instructions describe."
+msgstr ""
+
+#: service.ts:64
+msgid "yt-dlp failed: {}"
+msgstr ""
+
+#: service.ts:64
+msgid "yt-dlp failed: exit code {}"
+msgstr ""
+
+#: service.ts:73
+msgid "The resolved video has no media address."
+msgstr ""
+
+#: service.ts:75
+msgid "The resolved video uses an unsupported media protocol."
+msgstr ""
+
+#: service.ts:86
+msgid "yt-dlp returned invalid video information."
+msgstr ""
+
+#: service.ts:91
+msgid "No complete video and audio streams were found."
+msgstr ""
+
+#: service.ts:104
+msgid "yt-dlp {} is required; the installed version is {}."
+msgstr ""
+
+#: service.ts:104
+msgid "yt-dlp {} is required; the installed version is unknown."
+msgstr ""
+
+#: service.ts:111
+msgid "yt-dlp returned invalid JSON."
+msgstr ""
+
+#: service.ts:117
+msgid "Choose a .mkv file to save to."
+msgstr ""
+
+#: service.ts:123
+msgid "Downloading the video and audio…"
+msgstr ""
+
+#: service.ts:128
+msgid "Downloading {}%"
+msgstr ""
+
+#: service.ts:129
+msgid "Merging the video and audio…"
+msgstr ""
+
+#: service.ts:134
+msgid "The download finished without a complete MKV file."
+msgstr ""
+
+#: service.ts:136
+msgid "The downloaded file is empty."
+msgstr ""
+
+#: youtube.slint:22
+msgid "Enter a link"
+msgstr ""
+
+#: youtube.slint:57
+msgid "Download Video…"
+msgstr ""
+
+#: youtube.slint:59
+msgid "Play"
+msgstr ""
+
+#: youtube.slint:60
+msgid "Cancel"
+msgstr ""

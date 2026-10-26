@@ -1,15 +1,21 @@
-# 更新日志
+# Changelog
+
+## 0.3.1
+
+- Renamed to **VestraTube** (menu **Open → VestraTube…**, window title, store listing). The id stays `zysilm.youtube`, so this is an update of the same plugin. Features are unchanged.
+- English is now the source language: menus, the window, messages and the store texts are in English, with a Simplified Chinese translation (`locales/zh-Hans.po`) that shows the same Chinese texts as before; the player picks the interface language.
+- Needs Vestra Player 0.4.3 or later (translated plugin texts).
 
 ## 0.3.0
 
-- 插件 id 改为 `zysilm.youtube`，作者 zysilm。这是托管在 Vestra Player 插件仓库里的第三方插件，不是官方插件；功能不变。
-- 旧 id `vestra.youtube` 不再发布，已安装的旧版需要卸载后重新安装。
+- The plugin id is now `zysilm.youtube`, author zysilm. It is a third-party plugin hosted in the Vestra Player plugin repository, not an official plugin; features are unchanged.
+- The old id `vestra.youtube` is no longer published; an installed old version must be uninstalled and the new one installed.
 
 ## 0.2.0
 
-- 插件 id 改为 `vestra.youtube`，从 Vestra Player 插件仓库安装。
-- 需要 Vestra Player 0.2.0 或更新。
+- The plugin id is now `vestra.youtube`, installed from the Vestra Player plugin repository.
+- Needs Vestra Player 0.2.0 or later.
 
 ## 0.1.1
 
-- 首个版本：粘贴链接播放或下载单个公开 YouTube 视频。
+- First release: paste a link to play or download a single public YouTube video.

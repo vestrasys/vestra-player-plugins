@@ -1,24 +1,27 @@
-# YouTube
+# VestraTube
 
-在 Vestra Player 里播放或下载单个公开 YouTube 视频。
+Plays or downloads a single public YouTube video in Vestra Player.
 
-## 使用
+## Usage
 
-右键菜单 **打开 → YouTube 视频…**，粘贴链接：
+Right-click menu **Open → VestraTube…**, then paste a link:
 
-- 按 Enter 或「播放」直接播放；
-- 「下载视频…」选择保存位置，下载为 `.mkv` 文件。
+- press Enter or **Play** to play it directly;
+- **Download Video…** asks where to save it and downloads it as an `.mkv` file.
 
-在播放列表或「打开」里直接输入 YouTube 链接也能播放。支持 watch、shorts、live、embed 和 youtu.be 链接；链接里的播放列表参数会被忽略。
+Typing a YouTube link into the playlist or **Open** also plays it. Supported links: watch, shorts, live, embed and youtu.be; a playlist parameter in the link is ignored.
 
-## 需要
+The plugin follows the player's interface language (English and Simplified Chinese).
 
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp) `2026.08.19`，在 PATH 上（或用环境变量 `VESTRA_YT_DLP` 指定）；
-- 下载需要 [ffmpeg](https://ffmpeg.org/)，在 PATH 上。
+## Requirements
 
-插件不会自动安装或更新这两个程序。
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) `2026.08.19` on the PATH (or set the environment variable `VESTRA_YT_DLP` to it);
+- downloads also need [ffmpeg](https://ffmpeg.org/) on the PATH;
+- Vestra Player 0.4.3 or later.
 
-## 限制
+The plugin does not install or update either program.
 
-- 不支持登录、会员、付费、地区限制和 DRM 视频，也不读取浏览器 cookie；这些情况会显示 yt-dlp 给出的原因。
-- 不支持整个播放列表。
+## Limits
+
+- Videos that need a sign-in, membership or payment, region-locked videos and DRM videos are not supported, and browser cookies are never read; in these cases the window shows the reason yt-dlp gives.
+- Whole playlists are not supported.
