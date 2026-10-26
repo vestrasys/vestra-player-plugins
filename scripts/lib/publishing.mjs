@@ -14,7 +14,9 @@
  * index.json (CONTRIBUTING.md, "index.json"): `generated` is a sequence number,
  * the previous signed index's + 1 on every publish (1 for the first, and
  * when the previous index has none); each store asset carries its sha256 and
- * size; everything is covered by the signature.
+ * size; a plugin's optional `translations` holds its display fields in
+ * the languages its package translates them to; everything is covered by
+ * the signature.
  */
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
@@ -84,8 +86,23 @@ const PLUGIN_KEYS = [
   "license",
   ...ASSET_KEYS,
   "sourceUrl",
+  "translations",
   "versions",
 ];
+
+/**
+ * The display fields a plugin entry's optional `translations` carries per
+ * language: `{ "<lang>": { name?, punchline?, description?, tags? } }`,
+ * read from the compiled catalogs of the newest version's package
+ * (dist/locales/<lang>.json; scripts/lib/build.mjs). A field is there only
+ * when that catalog translates it, a language only when it translates one
+ * of them, and `translations` only when some language does. `tags` holds
+ * one entry per tag of the plugin, in order, an untranslated tag in English
+ * (as the player shows it). English is the entry's own fields, never a key.
+ */
+export const TRANSLATED_FIELDS = ["name", "punchline", "description", "tags"];
+/** A translation language: a player locale tag (`zh-Hans`, `de`), not `en`. */
+export const LANGUAGE = /^(?!en$)[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
 const VERSION_KEYS = [
   "version",
   "apiVersion",
@@ -114,6 +131,54 @@ const https = (value) => {
   }
 };
 const optionalString = (value) => value === null || typeof value === "string";
+
+const isObject = (value) =>
+  !!value && typeof value === "object" && !Array.isArray(value);
+
+/** Problems with a plugin entry's optional `translations`. */
+function translationProblems(plugin, at) {
+  const { translations } = plugin;
+  if (translations === undefined) return [];
+  const where = `${at}.translations`;
+  if (!isObject(translations)) return [`${where} must be an object`];
+  if (!Object.keys(translations).length)
+    return [`${where} must not be empty (leave it out instead)`];
+  const problems = [];
+  for (const [language, fields] of Object.entries(translations)) {
+    const here = `${where}["${language}"]`;
+    if (!LANGUAGE.test(language))
+      problems.push(`${where}: "${language}" is not a translation language`);
+    if (!isObject(fields)) {
+      problems.push(`${here} must be an object`);
+      continue;
+    }
+    if (!Object.keys(fields).length)
+      problems.push(`${here} must not be empty (leave the language out)`);
+    for (const key of Object.keys(fields))
+      if (!TRANSLATED_FIELDS.includes(key))
+        problems.push(`${here}: unknown key "${key}"`);
+    for (const key of ["name", "punchline", "description"]) {
+      if (fields[key] === undefined) continue;
+      if (typeof fields[key] !== "string" || !fields[key])
+        problems.push(`${here}: ${key} must be a non-empty string`);
+      else if (typeof plugin[key] !== "string")
+        problems.push(`${here}: ${key} translates a field the plugin lacks`);
+    }
+    if (fields.tags === undefined) continue;
+    if (
+      !Array.isArray(fields.tags) ||
+      fields.tags.some((tag) => typeof tag !== "string" || !tag)
+    )
+      problems.push(`${here}: tags must be an array of non-empty strings`);
+    else if (
+      !Array.isArray(plugin.tags) ||
+      !plugin.tags.length ||
+      fields.tags.length !== plugin.tags.length
+    )
+      problems.push(`${here}: tags must have one entry per tag of the plugin`);
+  }
+  return problems;
+}
 
 /**
  * Structural problems with an index object (empty: valid).
@@ -176,6 +241,7 @@ export function indexProblems(index, { legacy = false } = {}) {
       plugin.tags.some((tag) => typeof tag !== "string")
     )
       problems.push(`${at}: tags must be an array of strings`);
+    problems.push(...translationProblems(plugin, at));
     for (const key of ["iconUrl", "readmeUrl", "changelogUrl", "sourceUrl"])
       if (plugin[key] !== null && !https(plugin[key]))
         problems.push(`${at}: ${key} must be an https: URL or null`);

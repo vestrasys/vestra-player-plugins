@@ -10,12 +10,19 @@
  *   does not list it (an earlier run released it and then failed to sign);
  * - otherwise packed with `vestra-plugin pack` into <out>/releases/ for the
  *   release-and-sign job to release.
- * A released version is never rebuilt. Earlier versions come from the
+ * A released version is never released again. Earlier versions come from the
  * previous index, so the history survives each Pages deployment.
  *
  * `generated` is the previous index's + 1; the build stops when revoked.json
  * drops or changes an entry of the previous index (append-only). Each store
  * asset's sha256 and size go into the index next to its URL.
+ *
+ * `translations` (scripts/lib/publishing.mjs, TRANSLATED_FIELDS) comes from
+ * the compiled catalogs `vestra-plugin pack` writes into the package,
+ * plugins/<name>/dist/locales/<lang>.json, like the English display fields
+ * from the plugin's source in the repository: a version that is released
+ * already is packed again into a scratch directory for them and not
+ * released a second time.
  *
  * Output:
  *   <out>/site/index.json                         unsigned
@@ -28,6 +35,7 @@ import {
   copyFile,
   mkdir,
   mkdtemp,
+  readdir,
   readFile,
   rm,
   writeFile,
@@ -42,6 +50,7 @@ import {
   INDEX_NAME,
   INDEX_SCHEMA,
   indexProblems,
+  LANGUAGE,
   nextGenerated,
   sha256,
   tagOf,
@@ -71,6 +80,56 @@ export async function packWithSdk(directory, id, version, outDirectory) {
   if (!existsSync(file))
     throw new Error(`${directory}: pack did not write ${assetOf(id, version)}`);
   return file;
+}
+
+/**
+ * The `translations` of a plugin entry from the package the SDK built in
+ * `directory` (dist/locales/<lang>.json, `{ "language", "messages" }`, as
+ * `vestra-plugin build` compiles locales/<lang>.po). The manifest's display
+ * fields are catalog entries without context whose msgid is the English
+ * text (`vestra-plugin i18n extract`); a plural entry's first form counts,
+ * as in the player. Undefined when no language translates any of them.
+ */
+export async function readTranslations(directory, manifest) {
+  const locales = join(directory, "dist", "locales");
+  let names;
+  try {
+    names = (await readdir(locales)).filter((name) => name.endsWith(".json"));
+  } catch (error) {
+    if (error.code === "ENOENT") return undefined;
+    throw error;
+  }
+  const translations = {};
+  for (const name of names.sort()) {
+    const language = name.slice(0, -".json".length);
+    if (!LANGUAGE.test(language)) continue;
+    const file = join(locales, name);
+    let messages;
+    try {
+      ({ messages } = JSON.parse(await readFile(file, "utf8")));
+    } catch (error) {
+      throw new Error(`${file}: ${error.message}`);
+    }
+    if (!messages || typeof messages !== "object" || Array.isArray(messages))
+      throw new Error(`${file}: no "messages" object`);
+    const lookup = (text) => {
+      if (typeof text !== "string" || !text || !Object.hasOwn(messages, text))
+        return undefined;
+      const message = messages[text];
+      const one = Array.isArray(message) ? message[0] : message;
+      return typeof one === "string" && one ? one : undefined;
+    };
+    const fields = {};
+    for (const key of ["name", "punchline", "description"]) {
+      const text = lookup(manifest[key]);
+      if (text !== undefined) fields[key] = text;
+    }
+    const tags = manifest.tags ?? [];
+    if (tags.some((tag) => lookup(tag) !== undefined))
+      fields.tags = tags.map((tag) => lookup(tag) ?? tag);
+    if (Object.keys(fields).length) translations[language] = fields;
+  }
+  return Object.keys(translations).length ? translations : undefined;
 }
 
 /** revoked.json, validated; an absent file is an empty list. */
@@ -181,6 +240,7 @@ export async function buildIndex({
 
       const earlier = previous?.plugins.find((plugin) => plugin.id === id);
       const versions = (earlier?.versions ?? []).map((entry) => ({ ...entry }));
+      let built = false;
       if (versions.some((entry) => entry.version === version)) {
         log(`${id} ${version}: published, kept`);
       } else {
@@ -203,6 +263,7 @@ export async function buildIndex({
           packed.push({ id, version, file: join(releasesDirectory, asset) });
           log(`${id} ${version}: packed ${asset} (${bytes.length} bytes)`);
           entry = { sha256: sha256(bytes), size: bytes.length, published: now };
+          built = true;
         }
         versions.push({
           version,
@@ -216,6 +277,12 @@ export async function buildIndex({
         });
       }
       versions.sort((a, b) => compareVersions(b.version, a.version));
+
+      // The translated display fields, from the same source as the English
+      // ones below: the package just packed, or (released before) the same
+      // source packed again into the scratch directory, never released.
+      if (!built) await pack(directory, id, version, scratch);
+      const translations = await readTranslations(directory, manifest);
 
       // Display fields and assets follow the newest version in the repository.
       const urls = {};
@@ -257,6 +324,7 @@ export async function buildIndex({
         sourceUrl:
           manifest.sourceUrl ??
           `https://github.com/${repo}/tree/main/plugins/${name}`,
+        ...(translations ? { translations } : {}),
         versions,
       });
     }

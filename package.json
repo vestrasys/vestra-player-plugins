@@ -8,7 +8,7 @@
     "url": "git+https://github.com/vestrasys/vestra-player-plugins.git"
   },
   "engines": {
-    "node": ">=22.18"
+    "node": ">=26"
   },
   "scripts": {
     "check": "node scripts/plugin.mjs check --all && tsc --noEmit",
@@ -24,8 +24,8 @@
     "index:dry-run": "node scripts/build-index.mjs --dry-run"
   },
   "devDependencies": {
-    "@types/node": "^25.0.0",
-    "@vestra-player/sdk": "^1.5.0",
+    "@types/node": "^26.0.0",
+    "@vestra-player/sdk": "^1.5.18",
     "prettier": "^3.9.10",
     "typescript": "^5.9.0"
   }
