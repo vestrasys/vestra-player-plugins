@@ -53,6 +53,10 @@ the publish pipeline, the index format and the signing key.
 - The manifest carries the display fields (`name`, `author`, `punchline`,
   `description`, `tags`, optionally `icon`, `sourceUrl`, `license`) and
   `minPlayerVersion` when the plugin needs API newer than player 0.1.
+  Translations of `name`, `punchline`, `description` and `tags` go into the
+  plugin's `locales/<lang>.po` (`npx vestra-plugin i18n extract`, SDK
+  1.5.13 or later); the store then lists the plugin in those languages
+  (the index's [`translations`](#indexjson)).
 - **Every change that should reach users bumps `version`** in
   `manifest.json` and adds a `CHANGELOG.md` entry. A version is released
   once: once `<id>-v<version>` exists, CI never rebuilds it, so a change
@@ -88,7 +92,7 @@ enforces this.
 
 ## Build and test
 
-Node 22.18 or later.
+Node 26 or later (`@vestra-player/sdk` 1.5 requires it; the player ships Node 26).
 
 ```sh
 npm ci
@@ -142,8 +146,9 @@ reusable workflow:
 - [`_plugin.yml`](.github/workflows/_plugin.yml), one plugin: strict type
   check, tests, `vestra-plugin pack` (every CLI command validates
   `manifest.json`), then `scripts/check-package.mjs` reads the `.vxp` and
-  checks its manifest and files. Ubuntu with Node 22.18 and 24, Windows and
-  macOS with Node 24.
+  checks its manifest and files. Ubuntu, Windows and macOS, each with
+  Node 26 (the Node the player ships; the SDK's `engines` is `>=26`). Every
+  other job runs Node 26 too.
 - [`_index-dryrun.yml`](.github/workflows/_index-dryrun.yml): the publish
   flow end to end with a key generated in the job: `build-index.mjs` packs
   every plugin, `publish-releases.mjs --dry-run` checks the artifact as the
@@ -266,8 +271,10 @@ plugins ──▶ static ──┬──▶ plugin × N ──┬──▶ build
    unless they pass.
 1. **build** (no secrets, no token while plugin code runs): `npm ci`, packs every plugin whose version has no Release yet with
    `vestra-plugin pack`; writes the unsigned `index.json` and the store
-   assets. A version that is already released is never rebuilt; earlier
-   versions come from the published index.
+   assets. A version that is already released is never released again (it
+   is packed once more into a scratch directory only to read its
+   translations for `index.json`); earlier versions come from the published
+   index.
 2. **release-and-sign** (environment `plugins-index`, secret
    `VESTRA_INDEX_SIGNING_KEY`, plus `VESTRA_INDEX_SIGNING_KEY_NEXT` during a
    [key rotation](#key-rotation)): runs no plugin code and no `npm ci`. It
@@ -309,12 +316,16 @@ and Pages of a private repository need authentication or a paid plan):
   "plugins": [
     {
       "id": "zysilm.youtube",
-      "name": "YouTube", "author": "zysilm", "punchline": "…", "description": "…",
-      "tags": ["…"], "license": "Apache-2.0",
+      "name": "VestraTube", "author": "zysilm", "punchline": "…", "description": "…",
+      "tags": ["online video", "YouTube", "download"], "license": "Apache-2.0",
       "iconUrl": null, "iconSha256": null, "iconSize": null,
       "readmeUrl": "https://…/README.md", "readmeSha256": "…", "readmeSize": 812,
       "changelogUrl": "https://…/CHANGELOG.md", "changelogSha256": "…", "changelogSize": 240,
       "sourceUrl": "https://github.com/vestrasys/vestra-player-plugins/tree/main/plugins/youtube",
+      "translations": {
+        "zh-Hans": { "name": "VestraTube", "punchline": "…", "description": "…",
+                     "tags": ["网络视频", "YouTube", "下载"] }
+      },
       "versions": [
         { "version": "0.3.0", "apiVersion": "vestra/1", "minPlayerVersion": "0.2.0",
           "capabilities": ["…"], "downloadUrl": "https://…/zysilm.youtube-0.3.0.vxp",
@@ -355,10 +366,27 @@ and Pages of a private repository need authentication or a paid plan):
   guarantee for README, changelog and icon as for the package. Limits (the
   store's read limits; the build fails above them): icon 512 KiB, README and
   changelog 256 KiB each.
-- Compatibility: `generated` and the asset fields were added within
-  `schema` 1. Clients ignore unknown keys (the store does), so older clients
-  read the new index unchanged; this repository's own scripts still read an
-  index from before them as the previous index.
+- `translations` (optional) holds the display fields `name`, `punchline`,
+  `description` and `tags` in other languages, keyed by the player's
+  language tag (`zh-Hans`, `ja`, `ko`, `de`, `fr`, `es`; never `en`, which
+  is the entry's own fields). They come from the plugin's catalogs: the
+  SDK's `vestra-plugin i18n extract` puts the manifest's display fields into
+  `locales/messages.pot` (msgid = the English text, no context),
+  `vestra-plugin pack` compiles each `locales/<lang>.po` into
+  `dist/locales/<lang>.json`, and the build reads those from the package of
+  the newest version, like the English fields from the plugin's source. A
+  field is present only when that language translates it, a language only
+  when it translates at least one field, and `translations` only when some
+  language does. `tags` then has one entry per tag of the plugin, in the
+  same order, with an untranslated tag in English (the way the player shows
+  them). A store shows `translations[<interface language>].<field>` when
+  present and the English field otherwise. The signature covers it, and
+  `indexProblems` (`scripts/lib/publishing.mjs`) checks its shape in the
+  build and the signing job.
+- Compatibility: `generated`, the asset fields and `translations` were added
+  within `schema` 1. Clients ignore unknown keys (the store does), so older
+  clients read the new index unchanged; this repository's own scripts still
+  read an index from before them as the previous index.
 
 Try it locally (no network; writes to a temporary directory and prints the
 index):

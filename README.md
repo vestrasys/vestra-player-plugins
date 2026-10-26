@@ -29,7 +29,7 @@ Every plugin in this repository is a third-party plugin: being hosted here means
 
 | Plugin | Id | Owner | What it does |
 | --- | --- | --- | --- |
-| [YouTube](plugins/youtube) | `zysilm.youtube` | [zysilm](https://github.com/zysilm) | Plays a public YouTube video from its link, or downloads it as MKV (needs yt-dlp; ffmpeg for downloads). |
+| [VestraTube](plugins/youtube) | `zysilm.youtube` | [zysilm](https://github.com/zysilm) | Plays a public YouTube video from its link, or downloads it as MKV (needs yt-dlp; ffmpeg for downloads). |
 | [Bilibili](plugins/bilibili) | `zysilm.bilibili` | [zysilm](https://github.com/zysilm) | Plays a Bilibili video from its link: BV or av number, or a b23.tv short link (needs yt-dlp). |
 
 Every merge to `main` publishes the signed index at **https://vestrasys.github.io/vestra-player-plugins/index.json**, which the player's store reads. It lists the third-party plugins of this repository; the official plugins ship with the player and are not in it.
@@ -60,7 +60,7 @@ npx vestra-plugin pack     # build dist/ and pack <id>-<version>.vxp
 ### 2. Meet the requirements
 
 - **Id** `<github-owner>.<name>`: the owner is the GitHub user or organization that owns your source repository (compared without case); letters, digits, `.`, `-`, `_`. `vestra.` is reserved for the player's built-in (official) plugins and is rejected everywhere in this repository.
-- **A valid manifest**: `vestra-plugin check` and `pack` pass. Fill in the display fields the store shows: `name`, `author`, `punchline`, `description`, `tags`, `license`, `sourceUrl`, optionally `icon`, and `minPlayerVersion` if you need a newer player.
+- **A valid manifest**: `vestra-plugin check` and `pack` pass. Fill in the display fields the store shows: `name`, `author`, `punchline`, `description`, `tags`, `license`, `sourceUrl`, optionally `icon`, and `minPlayerVersion` if you need a newer player. Translate them with the rest of your plugin (`npx vestra-plugin i18n extract`, then `locales/<lang>.po`) and the store lists your plugin in those languages too.
 - **`README.md` and `CHANGELOG.md`** next to the manifest (at most 256 KiB each): the store shows both on the plugin's page.
 - **Tests** under `tests/` that pass with `vestra-plugin test`.
 - **Only the capabilities you use.** The store lists them on the plugin's page. They limit the player API only, not file or network access, which is why every plugin's source is reviewed.
@@ -113,7 +113,7 @@ There are no beta channels and no download counts: a merge is a release, and CI,
 
 ## Developing the hosted plugins
 
-Node.js 22.18 or later. A name is a directory under `plugins/`; `--all` runs every plugin.
+Node.js 26 or later (the SDK requires it). A name is a directory under `plugins/`; `--all` runs every plugin.
 
 ```sh
 npm ci

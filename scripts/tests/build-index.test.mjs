@@ -1,18 +1,27 @@
 import assert from "node:assert/strict";
 import { generateKeyPairSync } from "node:crypto";
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  cp,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { buildIndex } from "../lib/build.mjs";
 import {
+  indexProblems,
   loadPrevious,
   releases,
   serializeIndex,
   sha256,
 } from "../lib/publishing.mjs";
 import { checkArtifact } from "../lib/release.mjs";
-import { signIndex } from "../lib/signing.mjs";
+import { signIndex, verifyIndex } from "../lib/signing.mjs";
 
 const repo = "vestrasys/vestra-player-plugins";
 const pagesUrl = "https://vestrasys.github.io/vestra-player-plugins/";
@@ -629,4 +638,159 @@ test("the signing job checks generated, revoked and the store assets", async () 
     "old",
   );
   await expectProblem(built, /0\.9\.0\/README\.md: unexpected file/);
+});
+
+/** A pack that also writes dist/locales/<lang>.json as `vestra-plugin pack` compiles them. */
+const packWithCatalogs =
+  (catalogs, calls = []) =>
+  async (directory, ...rest) => {
+    calls.push(directory);
+    await rm(join(directory, "dist"), { recursive: true, force: true });
+    await mkdir(join(directory, "dist/locales"), { recursive: true });
+    for (const [language, messages] of Object.entries(catalogs))
+      await writeFile(
+        join(directory, "dist/locales", `${language}.json`),
+        `${JSON.stringify({ language, messages })}\n`,
+      );
+    return fakePack(directory, ...rest);
+  };
+
+/** The demo plugin with English display fields (repository() writes Chinese ones). */
+async function englishRepository(options) {
+  const root = await repository(options);
+  const file = join(root, "plugins/demo/manifest.json");
+  const manifest = JSON.parse(await readFile(file, "utf8"));
+  Object.assign(manifest, {
+    name: "Demo",
+    punchline: "One line",
+    description: "Longer text.",
+    tags: ["online video", "download"],
+  });
+  await writeFile(file, JSON.stringify(manifest));
+  return root;
+}
+
+const CATALOGS = {
+  "zh-Hans": {
+    Demo: "演示",
+    "One line": "一句话",
+    "Longer text.": "更长的说明。",
+    "online video": "网络视频",
+    download: "下载",
+    "Open…": "打开…",
+  },
+  // Only one tag: the other stays English, and only tags are listed.
+  de: { download: "Herunterladen" },
+  // A plural's first form counts, as in the player.
+  fr: { Demo: ["Démo", "Démos"] },
+  // Translates nothing of the manifest: the language is left out.
+  ja: { "Open…": "開く…" },
+  // Context-qualified entries are not manifest fields.
+  ko: { "menu\u0004Demo": "데모" },
+};
+
+test("translations: the manifest fields each packed catalog translates", async () => {
+  const { index, out } = await build(await englishRepository(), {
+    pack: packWithCatalogs({ ...CATALOGS, en: { Demo: "Demo!" } }),
+  });
+  const [plugin] = index.plugins;
+  assert.deepEqual(plugin.translations, {
+    de: { tags: ["online video", "Herunterladen"] },
+    fr: { name: "Démo" },
+    "zh-Hans": {
+      name: "演示",
+      punchline: "一句话",
+      description: "更长的说明。",
+      tags: ["网络视频", "下载"],
+    },
+  });
+  assert.deepEqual(Object.keys(plugin).slice(-2), ["translations", "versions"]);
+  assert.equal(plugin.name, "Demo", "the English fields are unchanged");
+  assert.deepEqual((await check(out, index)).problems, []);
+});
+
+test("translations: left out without catalogs or without a translated field", async () => {
+  for (const catalogs of [{}, { ja: { "Open…": "開く…" } }]) {
+    const { index } = await build(await englishRepository(), {
+      pack: packWithCatalogs(catalogs),
+    });
+    assert.ok(!("translations" in index.plugins[0]));
+  }
+  const { index } = await build(await englishRepository());
+  assert.ok(!("translations" in index.plugins[0]), "no dist/locales at all");
+});
+
+test("translations: a released version is packed again for them, not released again", async () => {
+  const first = await build(await englishRepository());
+  assert.ok(!("translations" in first.index.plugins[0]));
+  const calls = [];
+  const again = await build(await englishRepository(), {
+    previous: first.index,
+    pack: packWithCatalogs({ "zh-Hans": { Demo: "演示" } }, calls),
+  });
+  assert.equal(calls.length, 1);
+  assert.equal(again.packed.length, 0);
+  assert.deepEqual(await readdir(join(again.out, "releases")), []);
+  assert.deepEqual(again.index.plugins[0].translations, {
+    "zh-Hans": { name: "演示" },
+  });
+  assert.deepEqual(
+    again.index.plugins[0].versions,
+    first.index.plugins[0].versions,
+  );
+  const result = await check(again.out, again.index, {
+    previous: first.index,
+  });
+  assert.deepEqual(result, { problems: [], create: [] });
+});
+
+test("translations: a broken catalog stops the build", async () => {
+  const root = await englishRepository();
+  const pack = async (directory, ...rest) => {
+    await mkdir(join(directory, "dist/locales"), { recursive: true });
+    await writeFile(join(directory, "dist/locales/de.json"), "{");
+    return fakePack(directory, ...rest);
+  };
+  await assert.rejects(build(root, { pack }), /de\.json/);
+});
+
+test("translations: the index check and the signing job reject a malformed field", async () => {
+  const { index, out } = await build(await englishRepository(), {
+    pack: packWithCatalogs(CATALOGS),
+  });
+  const cases = [
+    [{}, /translations must not be empty/],
+    [[], /translations must be an object/],
+    [{ en: { name: "x" } }, /"en" is not a translation language/],
+    [{ "zh-Hans": {} }, /must not be empty \(leave the language out\)/],
+    [{ "zh-Hans": { name: "" } }, /name must be a non-empty string/],
+    [{ "zh-Hans": { readme: "x" } }, /unknown key "readme"/],
+    [{ "zh-Hans": { tags: ["一"] } }, /one entry per tag/],
+    [{ "zh-Hans": { tags: "一" } }, /tags must be an array/],
+  ];
+  for (const [translations, pattern] of cases) {
+    const bad = structuredClone(index);
+    bad.plugins[0].translations = translations;
+    assert.match(indexProblems(bad).join("\n"), pattern);
+    assert.match((await check(out, bad)).problems.join("\n"), pattern);
+  }
+  const lacking = structuredClone(index);
+  lacking.plugins[0].description = null;
+  assert.match(
+    indexProblems(lacking).join("\n"),
+    /description translates a field the plugin lacks/,
+  );
+});
+
+test("translations are covered by the signature", async () => {
+  const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+  const { index } = await build(await englishRepository(), {
+    pack: packWithCatalogs(CATALOGS),
+  });
+  const bytes = serializeIndex(index);
+  const signature = signIndex(bytes, privateKey);
+  assert.ok(verifyIndex(bytes, signature, publicKey));
+  const changed = structuredClone(index);
+  changed.plugins[0].translations["zh-Hans"].name = "假的";
+  assert.ok(!verifyIndex(serializeIndex(changed), signature, publicKey));
 });
