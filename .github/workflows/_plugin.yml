@@ -59,6 +59,11 @@ jobs:
         run: |
           npm install --no-save --no-audit --no-fund "@vestra-player/sdk@$SDK"
           npm ls @vestra-player/sdk
+      # The plugin's own npm dependencies, if any: lockfile required,
+      # npm ci --ignore-scripts, no native code, allowed licenses
+      # (scripts/lib/dependencies.mjs). scripts/plugin.mjs repeats the checks.
+      - name: Plugin npm dependencies
+        run: node scripts/plugin-deps.mjs install "$PLUGIN"
       # Every command also checks manifest.json against the player's rules.
       - name: Type check
         run: node scripts/plugin.mjs check "$PLUGIN"

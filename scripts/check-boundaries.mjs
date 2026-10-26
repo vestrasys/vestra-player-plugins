@@ -1,11 +1,15 @@
 import { readdir, readFile } from "node:fs/promises";
+import { builtinModules } from "node:module";
 import { resolve, dirname, extname, relative, sep } from "node:path";
 import ts from "typescript";
 // Plugins are independent: a plugin never imports another plugin's files or
 // anything else outside its own directory. They reach the SDK only through
 // the package's public entries: the types (`@vestra-player/sdk`) and, in
 // tests, the test host. `/runtime` is the player's own and deep paths are not
-// part of the package interface.
+// part of the package interface. Any other package must be a Node built-in
+// or one of the plugin's own `dependencies` (plugins/<name>/package.json),
+// so that nothing from the repository's own node_modules (build tools) is
+// bundled into a package.
 const source = resolve(import.meta.dirname, "..");
 const SDK = "@vestra-player/sdk";
 const PUBLIC = new Set([SDK]);
@@ -37,6 +41,14 @@ function inside(path, root) {
   for (const item of packages.filter((item) => item.isDirectory())) {
     const own = resolve(root, item.name);
     const tests = resolve(own, "tests");
+    let dependencies = {};
+    try {
+      dependencies =
+        JSON.parse(await readFile(resolve(own, "package.json"), "utf8"))
+          .dependencies ?? {};
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
     for (const path of await files(own)) {
       const parsed = ts.createSourceFile(
         path,
@@ -69,6 +81,19 @@ function inside(path, root) {
           if (!allowed.has(target))
             throw new Error(
               `${relative(source, path)} imports ${target}; plugins use ${[...allowed].join(" or ")}`,
+            );
+        } else {
+          const parts = target.split("/");
+          const name = target.startsWith("@")
+            ? parts.slice(0, 2).join("/")
+            : parts[0];
+          if (
+            !target.startsWith("node:") &&
+            !builtinModules.includes(name) &&
+            !Object.hasOwn(dependencies, name)
+          )
+            throw new Error(
+              `${relative(source, path)} imports ${target}, which is not in the plugin's own package.json dependencies`,
             );
         }
       }

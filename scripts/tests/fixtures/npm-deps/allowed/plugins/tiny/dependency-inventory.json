@@ -1,0 +1,10 @@
+[
+  {
+    "name": "escape-string-regexp",
+    "version": "5.0.0",
+    "license": "MIT",
+    "licenseFiles": [
+      "license"
+    ]
+  }
+]

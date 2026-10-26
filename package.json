@@ -18,6 +18,7 @@
     "portability": "node scripts/check-portability.mjs",
     "registry": "node scripts/check-registry.mjs",
     "plugin": "node scripts/plugin.mjs",
+    "deps": "node scripts/plugin-deps.mjs",
     "build": "node scripts/plugin.mjs build --all",
     "test": "node scripts/plugin.mjs test --all && npm run test:scripts",
     "test:scripts": "node --test \"scripts/tests/*.test.mjs\"",
@@ -26,6 +27,7 @@
   "devDependencies": {
     "@types/node": "^26.0.0",
     "@vestra-player/sdk": "^1.5.18",
+    "esbuild": "0.25.12",
     "prettier": "^3.9.10",
     "typescript": "^5.9.0"
   }

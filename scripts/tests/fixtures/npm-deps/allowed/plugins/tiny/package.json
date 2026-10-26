@@ -1,0 +1,12 @@
+{
+  "name": "fixture-tiny",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "escape-string-regexp": "5.0.0"
+  },
+  "vestra": {
+    "bundle": true,
+    "assets": ["licenses"]
+  }
+}

@@ -10,8 +10,8 @@
  * --all     every directory under plugins/ with a manifest.json
  * --base    the plugins with a changed file between <commit> and HEAD, or
  *           every plugin when a shared file changed (package.json, the lock
- *           file, tsconfig.json, the plugin CLI wrapper, the plugin
- *           workflows). A missing, all-zero or unknown base (a new branch,
+ *           file, tsconfig.json, the plugin CLI wrapper, the npm
+ *           dependency rules, the plugin workflows). A missing, all-zero or unknown base (a new branch,
  *           a force push) means every plugin. Removed plugins are not listed.
  */
 import { spawnSync } from "node:child_process";
@@ -27,6 +27,8 @@ const SHARED = [
   "tsconfig.json",
   "scripts/plugin.mjs",
   "scripts/plugins.mjs",
+  "scripts/plugin-deps.mjs",
+  "scripts/lib/dependencies.mjs",
   "scripts/ci-plugins.mjs",
   "scripts/check-package.mjs",
   ".github/workflows/ci.yml",

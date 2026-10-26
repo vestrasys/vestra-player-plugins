@@ -32,6 +32,10 @@ jobs:
           node-version: "26"
           cache: ${{ inputs.cache && 'npm' || '' }}
       - run: npm ci
+      # Each plugin's own npm dependencies (lockfile, --ignore-scripts, the
+      # rules in scripts/lib/dependencies.mjs), so that tsc resolves them.
+      - name: Plugin npm dependencies
+        run: node scripts/plugin-deps.mjs install --all
       # The whole repository at once; each plugin's own strict check runs in
       # _plugin.yml.
       - name: tsc

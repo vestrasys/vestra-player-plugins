@@ -122,6 +122,8 @@ npm ci && npm run check && npm run format:check && npm run boundaries \
   && npm run portability && npm run registry && npm run build && npm test   # all of CI
 ```
 
+A hosted plugin may bundle npm packages (its own `package.json` and `package-lock.json`, `"vestra": { "bundle": true, "assets": ["licenses"] }`): permissive licenses only, no native code, no install scripts, license texts shipped in the package, and a size limit. The rules and the commands are in [CONTRIBUTING.md](CONTRIBUTING.md#npm-dependencies).
+
 Every change that should reach users bumps `version` and adds a `CHANGELOG.md` entry. Each plugin's owner is in [`plugins/owners.toml`](plugins/owners.toml). Rules, CI and the publish pipeline: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Security and signing

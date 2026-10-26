@@ -1,0 +1,13 @@
+{
+  "id": "someone.copyleft",
+  "version": "1.0.0",
+  "apiVersion": "vestra/1",
+  "entry": "main.ts",
+  "capabilities": [],
+  "name": "Fixture copyleft",
+  "author": "someone",
+  "punchline": "A test fixture with an npm dependency",
+  "description": "Depends on chessground from npm; used by the repository's script tests.",
+  "tags": ["test"],
+  "license": "Apache-2.0"
+}
