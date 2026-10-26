@@ -1,0 +1,35 @@
+[
+  {
+    "name": "@bufbuild/protobuf",
+    "version": "2.16.0",
+    "license": "(Apache-2.0 AND BSD-3-Clause)",
+    "licenseFiles": [
+      "LICENSE",
+      "LICENSE-BSD-3-Clause"
+    ]
+  },
+  {
+    "name": "fflate",
+    "version": "0.8.3",
+    "license": "MIT",
+    "licenseFiles": [
+      "LICENSE"
+    ]
+  },
+  {
+    "name": "meriyah",
+    "version": "7.4.1",
+    "license": "ISC",
+    "licenseFiles": [
+      "LICENSE.md"
+    ]
+  },
+  {
+    "name": "youtubei.js",
+    "version": "18.3.0",
+    "license": "MIT",
+    "licenseFiles": [
+      "LICENSE"
+    ]
+  }
+]

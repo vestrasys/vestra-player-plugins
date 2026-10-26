@@ -1,23 +1,25 @@
 {
   "id": "zysilm.youtube",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "apiVersion": "vestra/1",
   "entry": "main.ts",
   "capabilities": [
     "commands",
     "events",
     "ui.window",
+    "ui.mount",
     "ui.dialog",
+    "ui.osd",
     "playback.read",
     "playback.control",
     "source.resolve"
   ],
   "name": "VestraTube",
   "author": "zysilm",
-  "punchline": "Paste a link to play or download a single public YouTube video",
-  "description": "Plays YouTube video links (watch, shorts, live, embed, youtu.be) directly, or downloads them as MKV files. Needs yt-dlp installed on this computer, and ffmpeg for downloads.",
+  "punchline": "Search YouTube in the sidebar and play videos right away",
+  "description": "A YouTube sidebar for Vestra Player: search, see thumbnails, titles, durations and channels, and play a video with a double-click. Download videos as MKV files, or play and download a single video from its link. No sign-in and nothing to install: the YouTube part uses the bundled open-source library youtubei.js, downloads use the player's own ffmpeg.",
   "tags": ["online video", "YouTube", "download"],
   "sourceUrl": "https://github.com/vestrasys/vestra-player-plugins/tree/main/plugins/youtube",
   "license": "Apache-2.0",
-  "minPlayerVersion": "0.4.3"
+  "minPlayerVersion": "0.5.1"
 }
