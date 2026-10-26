@@ -13,6 +13,10 @@
  * A released version is never released again. Earlier versions come from the
  * previous index, so the history survives each Pages deployment.
  *
+ * A plugin with npm dependencies must pass scripts/lib/dependencies.mjs: the
+ * static rules here, and the installed rules and size limits in the pack
+ * (scripts/plugin.mjs).
+ *
  * `generated` is the previous index's + 1; the build stops when revoked.json
  * drops or changes an entry of the previous index (append-only). Each store
  * asset's sha256 and size go into the index next to its URL.
@@ -55,6 +59,7 @@ import {
   sha256,
   tagOf,
 } from "./publishing.mjs";
+import { dependencyProblems } from "./dependencies.mjs";
 import { readHostedPlugins, readRegistry } from "./registry.mjs";
 import { revokedAppendProblems, revokedProblems } from "./revoked.mjs";
 import { compareVersions, isVersion } from "./semver.mjs";
@@ -212,6 +217,17 @@ export async function buildIndex({
   if (registry.problems.length) throw new Error(registry.problems.join("\n"));
   const hosted = await readHostedPlugins(root);
   if (hosted.problems.length) throw new Error(hosted.problems.join("\n"));
+  // The npm dependency rules before anything is installed or packed; the
+  // pack (scripts/plugin.mjs) installs and applies the rest.
+  const dependencies = [];
+  for (const { name } of hosted.plugins)
+    dependencies.push(
+      ...(await dependencyProblems(
+        join(root, "plugins", name),
+        `plugins/${name}`,
+      )),
+    );
+  if (dependencies.length) throw new Error(dependencies.join("\n"));
   if (registry.entries.length)
     // Third-party plugins are built from their registered source in this job
     // (no secrets), each in isolation; not implemented yet (CONTRIBUTING.md).

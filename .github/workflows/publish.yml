@@ -17,9 +17,10 @@ name: Publish
 # that other branches could have written).
 #
 # Why build and signing are separate jobs (ecosystem plan 1.6 item 2):
-# - `build` runs code from plugins: npm ci (install scripts) and the plugin
-#   builds, and later the source builds of third-party plugins registered in
-#   registry/. It gets no secret and no write token, so a malicious build
+# - `build` runs code from plugins: npm ci, the plugin builds (a plugin's
+#   own npm dependencies install with --ignore-scripts and are bundled; see
+#   scripts/lib/dependencies.mjs), and later the source builds of
+#   third-party plugins registered in registry/. It gets no secret and no write token, so a malicious build
 #   script can neither read the signing key nor publish anything. Its output
 #   is data only: the unsigned index.json, the Pages assets and the new .vxp
 #   packages.
@@ -111,8 +112,10 @@ jobs:
         run: node scripts/query-releases.mjs "$RUNNER_TEMP/releases.json"
       - run: npm ci
       - run: npm run registry
-      # Packs (vestra-plugin pack) every plugin whose version has no Release
-      # yet; third-party source builds will run here too, each isolated.
+      # Packs every plugin whose version has no Release yet with
+      # scripts/plugin.mjs pack (a plugin's npm dependencies are checked,
+      # installed with --ignore-scripts and checked again first);
+      # third-party source builds will run here too, each isolated.
       - name: Build index.json and new packages
         run: >-
           node scripts/build-index.mjs

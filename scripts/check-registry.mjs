@@ -15,6 +15,11 @@
  * request's base, or the commit before a push). The pull request form checks
  * the same between --base and --head.
  *
+ * The first form also applies the static npm dependency rules to every
+ * hosted plugin with a package.json (lockfile, sources, licenses, inventory;
+ * scripts/lib/dependencies.mjs). The installed rules (native code, license
+ * texts) run where the dependencies are installed: scripts/plugin.mjs.
+ *
  * The second form is the pull request check: it reads registry/ from the
  * `--head` commit as data (git show; nothing from the pull request runs) and
  * applies the owner rule against `--base`. A registration added by the pull
@@ -30,6 +35,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { readRevoked } from "./lib/build.mjs";
+import { dependencyProblems } from "./lib/dependencies.mjs";
 import {
   ownerProblems,
   readHostedPlugins,
@@ -162,6 +168,13 @@ try {
     problems.push(...registryProblems);
     const hosted = await readHostedPlugins(root);
     problems.push(...hosted.problems);
+    for (const { name } of hosted.plugins)
+      problems.push(
+        ...(await dependencyProblems(
+          join(root, "plugins", name),
+          `plugins/${name}`,
+        )),
+      );
     const ids = new Map(
       hosted.plugins.map(({ id, name }) => [id.toLowerCase(), name]),
     );
@@ -171,7 +184,7 @@ try {
           `registry/${entry.id}.toml: the id belongs to plugins/${ids.get(entry.id.toLowerCase())}`,
         );
     console.log(
-      `${hosted.plugins.length} hosted plugin(s) in plugins/, ${entries.length} registration(s), revoked.json checked${values["revoked-base"] ? ` (append-only against ${values["revoked-base"]})` : ""}`,
+      `${hosted.plugins.length} hosted plugin(s) in plugins/, ${entries.length} registration(s), revoked.json and npm dependencies checked${values["revoked-base"] ? ` (append-only against ${values["revoked-base"]})` : ""}`,
     );
   }
 } catch (error) {

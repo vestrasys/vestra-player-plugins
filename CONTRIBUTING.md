@@ -49,7 +49,9 @@ the publish pipeline, the index format and the signing key.
   carried over. Bump the version (minor) and say so in the changelog.
 - A plugin directory holds `manifest.json`, its sources (`.ts`, `.slint`),
   `tests/`, a short user-facing `README.md` (what it does, how to use it,
-  requirements, limits; shown in the store) and `CHANGELOG.md`.
+  requirements, limits; shown in the store) and `CHANGELOG.md`. A plugin
+  with npm dependencies also has `package.json`, `package-lock.json`,
+  `dependency-inventory.json` and `licenses/` ([npm dependencies](#npm-dependencies)).
 - The manifest carries the display fields (`name`, `author`, `punchline`,
   `description`, `tags`, optionally `icon`, `sourceUrl`, `license`) and
   `minPlayerVersion` when the plugin needs API newer than player 0.1.
@@ -64,6 +66,52 @@ the publish pipeline, the index format and the signing key.
 - Run the checks in [Build and test](#build-and-test) before opening the
   pull request.
 
+### npm dependencies
+
+A hosted plugin may use packages from npm. They are bundled into the
+plugin's entry file by the SDK (`vestra-plugin build` runs esbuild), so the
+`.vxp` has no `node_modules` and users install nothing. This repository
+signs the index users trust, so every dependency is held to these rules
+(`scripts/lib/dependencies.mjs`):
+
+| Rule | Checked by |
+| --- | --- |
+| `plugins/<name>/package.json` has only `name`, `version`, `private`, `type`, `description`, `license`, `dependencies`, `scripts`, `vestra`: no `devDependencies` (esbuild, TypeScript and the SDK come from the repository root), no optional, peer or bundled dependencies, `overrides` or `workspaces`, no install lifecycle scripts (`preinstall`, `install`, `postinstall`, `prepare`, …) | `registry`, `build` |
+| `"vestra": { "bundle": true, "assets": ["licenses"] }`: the dependencies are bundled (`external` is not allowed), `licenses/` is packed as it is (the SDK otherwise leaves out `*.md`, such as `LICENSE.md`), and `vestra.assets` never ships `node_modules` | `registry`, `build` |
+| `package-lock.json` is committed (lockfileVersion 2 or 3) and matches `package.json`; installs are `npm ci --ignore-scripts`, so no install script ever runs | `registry`, `build` |
+| Every locked package comes from `https://registry.npmjs.org/` with a sha512 `integrity`: no git, file, link or URL sources | `registry`, `build` |
+| **No native code.** A locked package must not have an install script (`hasInstallScript`, which npm also sets for `binding.gyp`) or an `os`/`cpu`/`libc` restriction (prebuilt binaries), and must not be optional. After the install, no package may contain `binding.gyp`, `.node`, `.dll`, `.dylib`, `.so`, `.exe`, `.a`, `.lib`, `.o` or `.obj` files, declare `gypfile` or an install script in its own `package.json` (the lockfile is the author's file and is checked against what was installed) | `registry`, `build`; the package check refuses such files in the `.vxp` too |
+| **Licenses.** Every locked package's license (the SPDX expression in the lockfile, which must equal the package's own `package.json`) is satisfied by the allowlist: `MIT`, `MIT-0`, `ISC`, `0BSD`, `BSD-2-Clause`, `BSD-3-Clause`, `Apache-2.0`, `Zlib`, `BlueOak-1.0.0`, `BSL-1.0`, `CC0-1.0`, `Unlicense` (`A OR B` needs one side, `A AND B` both). GPL, AGPL, LGPL, MPL and anything unlisted are refused; adding a license to the list needs a maintainer's review | `registry`, `build` |
+| **License texts ship in the package.** `dependency-inventory.json` lists every locked package (`name`, `version`, `license`, `licenseFiles`), and `licenses/<name>/` (a scoped `@scope/pkg` as `@scope__pkg`) holds its `LICENSE*`/`LICENCE*`/`COPYING*`/`NOTICE*` files byte for byte as the package ships them. For a package that ships none, put its license text from its source repository into `licenses/<name>/LICENSE` yourself; the reviewer checks it | `registry` (inventory against the lockfile), `build` (against the installed files), the package check (inside the `.vxp`) |
+| **Size.** A package (every plugin's, with or without dependencies) is at most 4 MiB as a `.vxp` and 16 MiB unpacked | `build`, `pack`, the package check |
+| Code imports only Node built-ins, the SDK, its own files and the packages in its own `dependencies` (nothing from the repository's `node_modules`) | `boundaries` |
+
+Adding or updating a dependency:
+
+```sh
+cd plugins/<name>
+npm install --ignore-scripts --save-exact <package>@<version>   # writes package.json and package-lock.json
+cd ../..
+npm run deps -- licenses <name> --write   # npm ci --ignore-scripts, then dependency-inventory.json and licenses/
+npm run registry && npm run plugin -- pack <name>
+```
+
+with `"vestra": { "bundle": true, "assets": ["licenses"] }` in the plugin's
+`package.json`. Commit
+`package.json`, `package-lock.json`, `dependency-inventory.json` and
+`licenses/` (never `node_modules/`). `npm run plugin -- <command>` and
+`npm run deps -- install <name|--all>` install a plugin's dependencies when
+its `package.json` or lockfile changed and apply every rule first; the SDK
+CLI itself runs with `npm_config_ignore_scripts=true`. A reviewer reads the
+lockfile diff of a pull request like code: new packages, their maintainers
+and what they do.
+
+Test fixtures for these rules (an MIT dependency that is accepted, a GPL one
+and a native one that are refused) are in
+`scripts/tests/fixtures/npm-deps/`, exercised by
+`scripts/tests/dependencies.test.mjs` through build, pack, the package
+check and the index build; those tests download from the npm registry.
+
 ## Layout
 
 ```text
@@ -74,7 +122,8 @@ registry/         third-party registrations, registry/<id>.toml (see the README)
 revoked.json      revoked plugin versions, copied into the index
 keys/             the trusted public keys of the index signature (every *.pub.pem;
                   normally just index-signing.pub.pem)
-scripts/          plugin.mjs (runs the SDK's vestra-plugin CLI), check-boundaries.mjs,
+scripts/          plugin.mjs (runs the SDK's vestra-plugin CLI), plugin-deps.mjs and
+                  lib/dependencies.mjs (npm dependencies of plugins), check-boundaries.mjs,
                   check-portability.mjs, check-registry.mjs, the CI helpers
                   ci-plugins.mjs and check-package.mjs, and the publishing scripts:
                   query-releases.mjs, build-index.mjs, publish-releases.mjs,
@@ -139,14 +188,16 @@ directly. The built-in `playback` plugin provides the player controls.
 The entry workflows only orchestrate; each check is written once, in a
 reusable workflow:
 
-- [`_static.yml`](.github/workflows/_static.yml) (Ubuntu): `tsc` over the
+- [`_static.yml`](.github/workflows/_static.yml) (Ubuntu): the plugins' npm
+  dependencies (`plugin-deps.mjs install --all`), `tsc` over the
   repository, prettier, `boundaries`, `portability`, `registry` (with
   `revoked.json` append-only against the pull request's base or the commit
   before the push), the script tests, typos, actionlint and zizmor.
-- [`_plugin.yml`](.github/workflows/_plugin.yml), one plugin: strict type
-  check, tests, `vestra-plugin pack` (every CLI command validates
-  `manifest.json`), then `scripts/check-package.mjs` reads the `.vxp` and
-  checks its manifest and files. Ubuntu, Windows and macOS, each with
+- [`_plugin.yml`](.github/workflows/_plugin.yml), one plugin: its npm
+  dependencies ([rules](#npm-dependencies)), strict type check, tests,
+  `vestra-plugin pack` (every CLI command validates `manifest.json`), then
+  `scripts/check-package.mjs` reads the `.vxp` and checks its manifest,
+  files, size, and the license files of its dependencies. Ubuntu, Windows and macOS, each with
   Node 26 (the Node the player ships; the SDK's `engines` is `>=26`). Every
   other job runs Node 26 too.
 - [`_index-dryrun.yml`](.github/workflows/_index-dryrun.yml): the publish
@@ -168,7 +219,7 @@ static ──┬──────────▶ plugin × N ──┬──▶
 `changes` (`scripts/ci-plugins.mjs`) lists the plugins with changed files,
 or every plugin on `main`, on a manual run, for a new branch, and when a
 shared file (package.json, the lock file, tsconfig.json, the plugin CLI
-wrapper, the plugin workflows) changed. `ci-ok` is the one check to require
+wrapper, the npm dependency rules, the plugin workflows) changed. `ci-ok` is the one check to require
 in branch protection: it fails when any job failed or was cancelled; a
 skipped job (no plugin changed) counts as passed.
 

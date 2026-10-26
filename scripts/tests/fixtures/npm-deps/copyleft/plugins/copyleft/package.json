@@ -1,0 +1,12 @@
+{
+  "name": "fixture-copyleft",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "chessground": "9.2.1"
+  },
+  "vestra": {
+    "bundle": true,
+    "assets": ["licenses"]
+  }
+}

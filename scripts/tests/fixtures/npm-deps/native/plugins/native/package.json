@@ -1,0 +1,12 @@
+{
+  "name": "fixture-native",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "bufferutil": "4.0.9"
+  },
+  "vestra": {
+    "bundle": true,
+    "assets": ["licenses"]
+  }
+}
