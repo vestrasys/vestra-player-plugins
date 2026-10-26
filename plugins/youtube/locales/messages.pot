@@ -1,84 +1,136 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: zysilm.youtube 0.3.1\n"
+"Project-Id-Version: zysilm.youtube 0.4.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: main.ts:20 youtube.slint:13
-msgid "Paste a YouTube video link to play or download it."
+#: download.ts:33
+msgid "Choose a .mkv file to save to."
 msgstr ""
 
-#: main.ts:32
-msgid "Playback failed: {}"
+#: download.ts:34
+msgid "Live videos can't be downloaded."
 msgstr ""
 
-#: main.ts:34
-msgid "The player is busy. Try again later."
+#: download.ts:48
+msgid "Downloading {} MB…"
 msgstr ""
 
-#: main.ts:37
-msgid "The player can't open this link."
+#: download.ts:49
+msgid "Downloading {}%"
 msgstr ""
 
-#: main.ts:40
-msgid "The playback request failed."
+#: download.ts:52
+msgid "Downloading the video and audio…"
 msgstr ""
 
-#: main.ts:52
-msgid "Resolving and loading the video and audio…"
+#: download.ts:59
+msgid "Merging the video and audio…"
 msgstr ""
 
-#: main.ts:55
-msgid "Timed out waiting for the video to be ready."
+#: download.ts:72
+msgid "ffmpeg was not found. Downloads use the ffmpeg that comes with Vestra Player."
 msgstr ""
 
-#: main.ts:63
-msgid "Another source replaced the playback request."
+#: download.ts:73
+msgid "ffmpeg could not merge the video and audio: {}"
 msgstr ""
 
-#: main.ts:64
-msgid "The playback request has ended."
+#: download.ts:82
+msgid "The download finished without a complete MKV file."
+msgstr ""
+
+#: download.ts:115
+msgid "YouTube refused the download (HTTP {})."
 msgstr ""
 
 #: main.ts:68
-msgid "The video failed to load."
+msgid "Playback failed: {}"
 msgstr ""
 
-#: main.ts:75
-msgid "The video is ready."
+#: main.ts:70
+msgid "The player is busy. Try again later."
 msgstr ""
 
-#: main.ts:80
-msgid "Save YouTube Video"
+#: main.ts:73
+msgid "The player can't open this link."
 msgstr ""
 
-#: main.ts:82
-msgid "No save location was chosen."
+#: main.ts:76
+msgid "The playback request failed."
+msgstr ""
+
+#: main.ts:84
+msgid "Timed out waiting for the video to be ready."
 msgstr ""
 
 #: main.ts:92
+msgid "Another source replaced the playback request."
+msgstr ""
+
+#: main.ts:93
+msgid "The playback request has ended."
+msgstr ""
+
+#: main.ts:97
+msgid "The video failed to load."
+msgstr ""
+
+#: main.ts:132
+msgid "Save YouTube Video"
+msgstr ""
+
+#: main.ts:146
+msgid "Resolving the video…"
+msgstr ""
+
+#: main.ts:165 youtube.slint:13
+msgid "Paste a YouTube video link to play or download it."
+msgstr ""
+
+#: main.ts:178
+msgid "Resolving and loading the video and audio…"
+msgstr ""
+
+#: main.ts:180
+msgid "The video is ready."
+msgstr ""
+
+#: main.ts:182
+msgid "A download is already running."
+msgstr ""
+
+#: main.ts:187
+msgid "No save location was chosen."
+msgstr ""
+
+#: main.ts:190 main.ts:230
 msgid "Saved: {}"
 msgstr ""
 
-#: main.ts:105
+#: main.ts:195
 msgid "Cancelled."
 msgstr ""
 
-#: main.ts:127
-msgid "VestraTube…"
+#: main.ts:234
+msgid "Download cancelled."
 msgstr ""
 
 #. the plugin's name (a brand); usually kept as it is.
-#: manifest.json youtube.slint:8
+#: main.ts:251 manifest.json panel.ts:51 youtube.slint:8
 msgid "VestraTube"
 msgstr ""
 
-#: manifest.json
-msgid "Paste a link to play or download a single public YouTube video"
+#: main.ts:258
+msgid "YouTube Link…"
 msgstr ""
 
 #: manifest.json
-msgid "Plays YouTube video links (watch, shorts, live, embed, youtu.be) directly, or downloads them as MKV files. Needs yt-dlp installed on this computer, and ffmpeg for downloads."
+msgid "Search YouTube in the sidebar and play videos right away"
+msgstr ""
+
+#: manifest.json
+msgid "A YouTube sidebar for Vestra Player: search, see thumbnails, titles, durations and channels, and play a video with a double-click. Download videos as MKV files, or play and download a single video from its link. No sign-in and nothing to install: the YouTube part uses the bundled open-source library youtubei.js, downloads use the player's own ffmpeg."
 msgstr ""
 
 #: manifest.json
@@ -93,88 +145,56 @@ msgstr ""
 msgid "download"
 msgstr ""
 
-#: service.ts:25
-msgid "Enter the full link of a YouTube video."
+#: panel.ts:64
+msgid "Search YouTube to find videos."
 msgstr ""
 
-#: service.ts:26
-msgid "Only HTTPS YouTube video links are supported."
+#: panel.ts:66
+msgid "Searching…"
 msgstr ""
 
-#: service.ts:34
-msgid "Enter the link of a single YouTube video (watch, shorts, live or youtu.be)."
+#: panel.ts:68
+msgid "No videos found."
 msgstr ""
 
-#: service.ts:49
-msgid "yt-dlp timed out. Try again later."
+#: panel.ts:164 youtube.ts:231
+msgid "No network connection."
 msgstr ""
 
-#: service.ts:52
-msgid "yt-dlp's output exceeded the limit."
+#: panel.ts:237 youtube.slint:59
+msgid "Play"
 msgstr ""
 
-#: service.ts:58
-msgid "Can't run yt-dlp. Install the required version as the instructions describe."
+#: panel.ts:245 sidebar.slint:325
+msgid "Download…"
 msgstr ""
 
-#: service.ts:64
-msgid "yt-dlp failed: {}"
+#: panel.ts:254 sidebar.slint:319
+msgid "Cancel Download"
 msgstr ""
 
-#: service.ts:64
-msgid "yt-dlp failed: exit code {}"
+#: sidebar.slint:117
+msgid "Search YouTube"
 msgstr ""
 
-#: service.ts:73
-msgid "The resolved video has no media address."
+#: sidebar.slint:186
+msgid "LIVE"
 msgstr ""
 
-#: service.ts:75
-msgid "The resolved video uses an unsupported media protocol."
+#: sidebar.slint:258
+msgid "Retry"
 msgstr ""
 
-#: service.ts:86
-msgid "yt-dlp returned invalid video information."
+#: sidebar.slint:272
+msgid "Loading…"
 msgstr ""
 
-#: service.ts:91
-msgid "No complete video and audio streams were found."
+#: sidebar.slint:272
+msgid "More results"
 msgstr ""
 
-#: service.ts:104
-msgid "yt-dlp {} is required; the installed version is {}."
-msgstr ""
-
-#: service.ts:104
-msgid "yt-dlp {} is required; the installed version is unknown."
-msgstr ""
-
-#: service.ts:111
-msgid "yt-dlp returned invalid JSON."
-msgstr ""
-
-#: service.ts:117
-msgid "Choose a .mkv file to save to."
-msgstr ""
-
-#: service.ts:123
-msgid "Downloading the video and audio…"
-msgstr ""
-
-#: service.ts:128
-msgid "Downloading {}%"
-msgstr ""
-
-#: service.ts:129
-msgid "Merging the video and audio…"
-msgstr ""
-
-#: service.ts:134
-msgid "The download finished without a complete MKV file."
-msgstr ""
-
-#: service.ts:136
-msgid "The downloaded file is empty."
+#: sidebar.slint:311
+msgid "Open URL…"
 msgstr ""
 
 #: youtube.slint:22
@@ -185,10 +205,46 @@ msgstr ""
 msgid "Download Video…"
 msgstr ""
 
-#: youtube.slint:59
-msgid "Play"
-msgstr ""
-
 #: youtube.slint:60
 msgid "Cancel"
+msgstr ""
+
+#: youtube.ts:102
+msgid "Enter the full link of a YouTube video."
+msgstr ""
+
+#: youtube.ts:105
+msgid "Only HTTPS YouTube video links are supported."
+msgstr ""
+
+#: youtube.ts:107
+msgid "Enter the link of a single YouTube video (watch, shorts, live or youtu.be)."
+msgstr ""
+
+#: youtube.ts:246 youtube.ts:257
+msgid "YouTube search failed: {}"
+msgstr ""
+
+#: youtube.ts:318
+msgid "YouTube refused this video's streams. Try again later."
+msgstr ""
+
+#: youtube.ts:321
+msgid "VestraTube could not read this video: {}. A newer version of the plugin may fix it."
+msgstr ""
+
+#: youtube.ts:323
+msgid "This video has no stream the player can play."
+msgstr ""
+
+#: youtube.ts:329
+msgid "YouTube asked to confirm you're not a bot. This network is flagged; try another network."
+msgstr ""
+
+#: youtube.ts:330
+msgid "YouTube: {}"
+msgstr ""
+
+#: youtube.ts:330
+msgid "YouTube can't play this video ({})."
 msgstr ""

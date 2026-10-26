@@ -5,82 +5,134 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: main.ts:20 youtube.slint:13
-msgid "Paste a YouTube video link to play or download it."
-msgstr "粘贴 YouTube 视频链接以播放或下载。"
+#: download.ts:33
+msgid "Choose a .mkv file to save to."
+msgstr "请选择 .mkv 保存位置。"
 
-#: main.ts:32
+#: download.ts:34
+msgid "Live videos can't be downloaded."
+msgstr "直播视频无法下载。"
+
+#: download.ts:48
+msgid "Downloading {} MB…"
+msgstr "正在下载 {} MB…"
+
+#: download.ts:49
+msgid "Downloading {}%"
+msgstr "正在下载 {}%"
+
+#: download.ts:52
+msgid "Downloading the video and audio…"
+msgstr "正在下载视频和音频…"
+
+#: download.ts:59
+msgid "Merging the video and audio…"
+msgstr "正在合并视频和音频…"
+
+#: download.ts:72
+msgid "ffmpeg was not found. Downloads use the ffmpeg that comes with Vestra Player."
+msgstr "找不到 ffmpeg。下载使用 Vestra Player 自带的 ffmpeg。"
+
+#: download.ts:73
+msgid "ffmpeg could not merge the video and audio: {}"
+msgstr "ffmpeg 无法合并视频和音频：{}"
+
+#: download.ts:82
+msgid "The download finished without a complete MKV file."
+msgstr "下载结束，但没有得到完整的 MKV 文件。"
+
+#: download.ts:115
+msgid "YouTube refused the download (HTTP {})."
+msgstr "YouTube 拒绝了下载（HTTP {}）。"
+
+#: main.ts:68
 msgid "Playback failed: {}"
 msgstr "播放失败：{}"
 
-#: main.ts:34
+#: main.ts:70
 msgid "The player is busy. Try again later."
 msgstr "播放器忙，请稍后重试。"
 
-#: main.ts:37
+#: main.ts:73
 msgid "The player can't open this link."
 msgstr "播放器无法打开这个链接。"
 
-#: main.ts:40
+#: main.ts:76
 msgid "The playback request failed."
 msgstr "播放请求失败。"
 
-#: main.ts:52
-msgid "Resolving and loading the video and audio…"
-msgstr "正在解析并加载视频与音频…"
-
-#: main.ts:55
+#: main.ts:84
 msgid "Timed out waiting for the video to be ready."
 msgstr "等待视频就绪超时。"
 
-#: main.ts:63
+#: main.ts:92
 msgid "Another source replaced the playback request."
 msgstr "播放请求已被其他来源替换。"
 
-#: main.ts:64
+#: main.ts:93
 msgid "The playback request has ended."
 msgstr "播放请求已结束。"
 
-#: main.ts:68
+#: main.ts:97
 msgid "The video failed to load."
 msgstr "视频载入失败。"
 
-#: main.ts:75
-msgid "The video is ready."
-msgstr "视频已就绪。"
-
-#: main.ts:80
+#: main.ts:132
 msgid "Save YouTube Video"
 msgstr "保存 YouTube 视频"
 
-#: main.ts:82
+#: main.ts:146
+msgid "Resolving the video…"
+msgstr "正在解析视频…"
+
+#: main.ts:165 youtube.slint:13
+msgid "Paste a YouTube video link to play or download it."
+msgstr "粘贴 YouTube 视频链接以播放或下载。"
+
+#: main.ts:178
+msgid "Resolving and loading the video and audio…"
+msgstr "正在解析并加载视频与音频…"
+
+#: main.ts:180
+msgid "The video is ready."
+msgstr "视频已就绪。"
+
+#: main.ts:182
+msgid "A download is already running."
+msgstr "已有一个下载正在进行。"
+
+#: main.ts:187
 msgid "No save location was chosen."
 msgstr "已取消选择保存位置。"
 
-#: main.ts:92
+#: main.ts:190 main.ts:230
 msgid "Saved: {}"
 msgstr "已保存：{}"
 
-#: main.ts:105
+#: main.ts:195
 msgid "Cancelled."
 msgstr "已取消。"
 
-#: main.ts:127
-msgid "VestraTube…"
-msgstr "VestraTube…"
+#: main.ts:234
+msgid "Download cancelled."
+msgstr "已取消下载。"
 
 #. the plugin's name (a brand); usually kept as it is.
-#: manifest.json youtube.slint:8
+#: main.ts:251 manifest.json panel.ts:51 youtube.slint:8
 msgid "VestraTube"
 msgstr "VestraTube"
 
-#: manifest.json
-msgid "Paste a link to play or download a single public YouTube video"
-msgstr "粘贴链接播放或下载单个公开 YouTube 视频"
+#: main.ts:258
+msgid "YouTube Link…"
+msgstr "YouTube 链接…"
 
 #: manifest.json
-msgid "Plays YouTube video links (watch, shorts, live, embed, youtu.be) directly, or downloads them as MKV files. Needs yt-dlp installed on this computer, and ffmpeg for downloads."
-msgstr "打开 YouTube 视频链接（watch、shorts、live、embed、youtu.be）直接播放，或下载为 MKV 文件。需要本机安装 yt-dlp，下载另需 ffmpeg。"
+msgid "Search YouTube in the sidebar and play videos right away"
+msgstr "在侧栏搜索 YouTube，即点即播"
+
+#: manifest.json
+msgid "A YouTube sidebar for Vestra Player: search, see thumbnails, titles, durations and channels, and play a video with a double-click. Download videos as MKV files, or play and download a single video from its link. No sign-in and nothing to install: the YouTube part uses the bundled open-source library youtubei.js, downloads use the player's own ffmpeg."
+msgstr "Vestra Player 的 YouTube 侧栏：搜索视频，查看缩略图、标题、时长和频道，双击即可播放。可将视频下载为 MKV 文件，也可以通过链接播放或下载单个视频。无需登录、无需安装任何程序：YouTube 部分使用内置的开源库 youtubei.js，下载使用播放器自带的 ffmpeg。"
 
 #: manifest.json
 msgid "online video"
@@ -94,89 +146,57 @@ msgstr "YouTube"
 msgid "download"
 msgstr "下载"
 
-#: service.ts:25
-msgid "Enter the full link of a YouTube video."
-msgstr "请输入完整的 YouTube 视频链接。"
+#: panel.ts:64
+msgid "Search YouTube to find videos."
+msgstr "搜索 YouTube 以查找视频。"
 
-#: service.ts:26
-msgid "Only HTTPS YouTube video links are supported."
-msgstr "仅支持 HTTPS 的 YouTube 视频链接。"
+#: panel.ts:66
+msgid "Searching…"
+msgstr "正在搜索…"
 
-#: service.ts:34
-msgid "Enter the link of a single YouTube video (watch, shorts, live or youtu.be)."
-msgstr "请输入单个 YouTube 视频链接（watch、shorts、live 或 youtu.be）。"
+#: panel.ts:68
+msgid "No videos found."
+msgstr "没有找到视频。"
 
-#: service.ts:49
-msgid "yt-dlp timed out. Try again later."
-msgstr "yt-dlp 超时，请稍后重试。"
+#: panel.ts:164 youtube.ts:231
+msgid "No network connection."
+msgstr "无网络连接。"
 
-#: service.ts:52
-msgid "yt-dlp's output exceeded the limit."
-msgstr "yt-dlp 输出超出上限。"
+#: panel.ts:237 youtube.slint:59
+msgid "Play"
+msgstr "播放"
 
-#: service.ts:58
-msgid "Can't run yt-dlp. Install the required version as the instructions describe."
-msgstr "无法运行 yt-dlp，请按说明安装指定版本。"
+#: panel.ts:245 sidebar.slint:325
+msgid "Download…"
+msgstr "下载…"
 
-#: service.ts:64
-msgid "yt-dlp failed: {}"
-msgstr "yt-dlp 出错：{}"
+#: panel.ts:254 sidebar.slint:319
+msgid "Cancel Download"
+msgstr "取消下载"
 
-#: service.ts:64
-msgid "yt-dlp failed: exit code {}"
-msgstr "yt-dlp 出错：退出码 {}"
+#: sidebar.slint:117
+msgid "Search YouTube"
+msgstr "搜索 YouTube"
 
-#: service.ts:73
-msgid "The resolved video has no media address."
-msgstr "解析结果没有媒体地址。"
+#: sidebar.slint:186
+msgid "LIVE"
+msgstr "直播"
 
-#: service.ts:75
-msgid "The resolved video uses an unsupported media protocol."
-msgstr "解析结果的媒体协议不受支持。"
+#: sidebar.slint:258
+msgid "Retry"
+msgstr "重试"
 
-#: service.ts:86
-msgid "yt-dlp returned invalid video information."
-msgstr "yt-dlp 返回了无效的视频信息。"
+#: sidebar.slint:272
+msgid "Loading…"
+msgstr "正在加载…"
 
-#: service.ts:91
-msgid "No complete video and audio streams were found."
-msgstr "没有找到完整的视频和音频流。"
+#: sidebar.slint:272
+msgid "More results"
+msgstr "更多结果"
 
-#: service.ts:104
-msgid "yt-dlp {} is required; the installed version is {}."
-msgstr "需要 yt-dlp {}，当前为 {}。"
-
-#: service.ts:104
-msgid "yt-dlp {} is required; the installed version is unknown."
-msgstr "需要 yt-dlp {}，当前为未知版本。"
-
-#: service.ts:111
-msgid "yt-dlp returned invalid JSON."
-msgstr "yt-dlp 返回了无效的 JSON。"
-
-#: service.ts:117
-msgid "Choose a .mkv file to save to."
-msgstr "请选择 .mkv 保存位置。"
-
-#: service.ts:123
-msgid "Downloading the video and audio…"
-msgstr "正在下载视频和音频…"
-
-#: service.ts:128
-msgid "Downloading {}%"
-msgstr "正在下载 {}%"
-
-#: service.ts:129
-msgid "Merging the video and audio…"
-msgstr "正在合并视频和音频…"
-
-#: service.ts:134
-msgid "The download finished without a complete MKV file."
-msgstr "下载结束，但没有得到完整的 MKV 文件。"
-
-#: service.ts:136
-msgid "The downloaded file is empty."
-msgstr "下载的文件为空。"
+#: sidebar.slint:311
+msgid "Open URL…"
+msgstr "打开链接…"
 
 #: youtube.slint:22
 msgid "Enter a link"
@@ -186,10 +206,46 @@ msgstr "输入链接"
 msgid "Download Video…"
 msgstr "下载视频…"
 
-#: youtube.slint:59
-msgid "Play"
-msgstr "播放"
-
 #: youtube.slint:60
 msgid "Cancel"
 msgstr "取消"
+
+#: youtube.ts:102
+msgid "Enter the full link of a YouTube video."
+msgstr "请输入完整的 YouTube 视频链接。"
+
+#: youtube.ts:105
+msgid "Only HTTPS YouTube video links are supported."
+msgstr "仅支持 HTTPS 的 YouTube 视频链接。"
+
+#: youtube.ts:107
+msgid "Enter the link of a single YouTube video (watch, shorts, live or youtu.be)."
+msgstr "请输入单个 YouTube 视频链接（watch、shorts、live 或 youtu.be）。"
+
+#: youtube.ts:246 youtube.ts:257
+msgid "YouTube search failed: {}"
+msgstr "YouTube 搜索失败：{}"
+
+#: youtube.ts:318
+msgid "YouTube refused this video's streams. Try again later."
+msgstr "YouTube 拒绝提供这个视频的流，请稍后再试。"
+
+#: youtube.ts:321
+msgid "VestraTube could not read this video: {}. A newer version of the plugin may fix it."
+msgstr "VestraTube 无法读取这个视频：{}。插件的新版本可能会修复。"
+
+#: youtube.ts:323
+msgid "This video has no stream the player can play."
+msgstr "这个视频没有播放器能播放的流。"
+
+#: youtube.ts:329
+msgid "YouTube asked to confirm you're not a bot. This network is flagged; try another network."
+msgstr "YouTube 要求确认你不是机器人。当前网络被标记，请换一个网络。"
+
+#: youtube.ts:330
+msgid "YouTube: {}"
+msgstr "YouTube：{}"
+
+#: youtube.ts:330
+msgid "YouTube can't play this video ({})."
+msgstr "YouTube 无法播放这个视频（{}）。"

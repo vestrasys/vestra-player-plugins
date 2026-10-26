@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0
+
+- **A YouTube sidebar.** **Open → VestraTube** shows a sidebar tab with a search box and the results: thumbnail, title, duration and channel. Double-click (or Enter) plays a video; **More results** loads the next page; right-click offers Play and Download….
+- **No more yt-dlp.** Playback and downloads use the open-source library youtubei.js (MIT), bundled in the plugin: the VISIONOS client first (direct stream links, 1080p H.264 with separate audio), other clients as fallbacks. Downloads fetch the video and audio and merge them with the player's own ffmpeg into MKV. Nothing to install.
+- The link window stays: **Open URL…** in the sidebar's bottom bar, or **Open → YouTube Link…** (it was **Open → VestraTube…**). Download… in the bottom bar saves the selected video; Cancel Download stops it.
+- Clear messages for no network, YouTube's bot check, videos YouTube will not play (with its reason), and library errors.
+- Needs Vestra Player 0.5.1 or later (images in list rows). New capabilities: `ui.mount` (the sidebar) and `ui.osd` (messages).
+
 ## 0.3.1
 
 - Renamed to **VestraTube** (menu **Open → VestraTube…**, window title, store listing). The id stays `zysilm.youtube`, so this is an update of the same plugin. Features are unchanged.
