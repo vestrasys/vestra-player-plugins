@@ -10,19 +10,19 @@ msgstr ""
 msgid "VestraBili"
 msgstr "VestraBili"
 
-#: dialog.slint:13 main.ts:16
+#: dialog.slint:13 main.ts:43
 msgid "Enter a Bilibili video link."
 msgstr "输入 Bilibili 视频链接。"
 
-#: dialog.slint:20
+#: dialog.slint:22
 msgid "Enter a link"
 msgstr "输入链接"
 
-#: dialog.slint:46
+#: dialog.slint:55
 msgid "Play"
 msgstr "播放"
 
-#: dialog.slint:47
+#: dialog.slint:56 main.ts:68
 msgid "Cancel"
 msgstr "取消"
 
@@ -38,95 +38,147 @@ msgstr "仅支持 Bilibili HTTP(S) 视频链接。"
 msgid "Enter a bilibili.com/video/… or b23.tv/… video link."
 msgstr "请输入 bilibili.com/video/… 或 b23.tv/… 视频链接。"
 
-#: extractor.ts:31
-msgid "The extracted result has no media address."
-msgstr "提取结果没有媒体地址。"
+#: extractor.ts:35
+msgid "Bilibili refused this video in your region, or it was removed."
+msgstr "Bilibili 在你所在的地区拒绝提供此视频，或视频已被删除。"
 
-#: extractor.ts:33
-msgid "The extracted result contains an invalid media address."
-msgstr "提取结果包含无效媒体地址。"
+#: extractor.ts:37
+msgid "Bilibili is limiting requests right now. Try again later."
+msgstr "Bilibili 当前限制了请求，请稍后重试。"
 
-#: extractor.ts:38
-msgid "The extracted result contains invalid request headers."
-msgstr "提取结果包含无效请求头。"
+#: extractor.ts:39
+msgid "This video needs a sign-in or a membership, which VestraBili doesn't support."
+msgstr "此视频需要登录或会员，VestraBili 不支持。"
 
-#: extractor.ts:50
-msgid "The extracted result has no video track."
-msgstr "提取结果没有视频轨道。"
-
-#: extractor.ts:54
-msgid "The extracted result lacks the separate audio track, so it can't play completely."
-msgstr "提取结果缺少独立音轨，无法完整播放。"
-
-#: extractor.ts:56
-msgid "Can't tell whether the video contains audio."
-msgstr "无法确认视频是否包含音频。"
-
-#: extractor.ts:58
-msgid "The extracted result has no complete video with audio."
-msgstr "提取结果没有包含音频的完整视频。"
-
-#: extractor.ts:71
-msgid "Resolution cancelled."
-msgstr "已取消解析。"
-
-#: extractor.ts:72
+#: extractor.ts:40
 msgid "Bilibili resolution failed: {}"
 msgstr "Bilibili 解析失败：{}"
 
-#: extractor.ts:73
+#: extractor.ts:45
+msgid "The extracted result has no media address."
+msgstr "提取结果没有媒体地址。"
+
+#: extractor.ts:47
+msgid "The extracted result contains an invalid media address."
+msgstr "提取结果包含无效媒体地址。"
+
+#: extractor.ts:52
+msgid "The extracted result contains invalid request headers."
+msgstr "提取结果包含无效请求头。"
+
+#: extractor.ts:64
+msgid "The extracted result has no video track."
+msgstr "提取结果没有视频轨道。"
+
+#: extractor.ts:68
+msgid "The extracted result lacks the separate audio track, so it can't play completely."
+msgstr "提取结果缺少独立音轨，无法完整播放。"
+
+#: extractor.ts:70
+msgid "Can't tell whether the video contains audio."
+msgstr "无法确认视频是否包含音频。"
+
+#: extractor.ts:72
+msgid "The extracted result has no complete video with audio."
+msgstr "提取结果没有包含音频的完整视频。"
+
+#: extractor.ts:86
+msgid "Resolution cancelled."
+msgstr "已取消解析。"
+
+#: extractor.ts:89
 msgid "Bilibili resolution failed: timed out."
 msgstr "Bilibili 解析失败：超时。"
 
-#: extractor.ts:74
+#: extractor.ts:90
 msgid "Bilibili resolution failed: yt-dlp was not found."
 msgstr "Bilibili 解析失败：找不到 yt-dlp。"
 
-#: extractor.ts:75
+#: extractor.ts:91
+msgid "Bilibili resolution failed: yt-dlp couldn't run. Security software may have blocked it."
+msgstr "Bilibili 解析失败：yt-dlp 无法运行，可能被安全软件拦截。"
+
+#: extractor.ts:92
 msgid "Bilibili resolution failed: yt-dlp failed."
 msgstr "Bilibili 解析失败：yt-dlp 出错。"
 
-#: extractor.ts:83
+#: extractor.ts:100
 msgid "yt-dlp returned invalid JSON."
 msgstr "yt-dlp 返回了无效的 JSON。"
 
-#: extractor.ts:84
+#: extractor.ts:101
 msgid "yt-dlp returned invalid video information."
 msgstr "yt-dlp 返回了无效的视频信息。"
 
-#: main.ts:44
+#: main.ts:63
+msgid "Download yt-dlp to play Bilibili links?"
+msgstr "下载 yt-dlp 以播放 Bilibili 链接？"
+
+#: main.ts:65
+msgid "VestraBili plays Bilibili links with yt-dlp, a free open-source tool. It downloads it once (about {} MB) from the yt-dlp project's official GitHub releases, checks it against the project's signed checksums, and keeps it up to date. yt-dlp is in the public domain (Unlicense) and is not part of VestraBili."
+msgstr "VestraBili 使用免费开源工具 yt-dlp 播放 Bilibili 链接。它会从 yt-dlp 项目在 GitHub 上的官方发布页下载一次（约 {} MB），用项目签名的校验和核对文件，并自动保持更新。yt-dlp 属于公有领域（Unlicense），不是 VestraBili 的一部分。"
+
+#: main.ts:67
+msgid "Download"
+msgstr "下载"
+
+#: main.ts:72
+msgid "Another dialog is open. Close it and try again."
+msgstr "另一个对话框正在打开，请关闭后重试。"
+
+#: main.ts:73
+msgid "VestraBili can't ask to download yt-dlp here. Install yt-dlp and put it on the PATH."
+msgstr "VestraBili 无法在这里询问是否下载 yt-dlp。请自行安装 yt-dlp 并加入 PATH。"
+
+#: main.ts:79
+msgid "yt-dlp is ready."
+msgstr "yt-dlp 已就绪。"
+
+#: main.ts:91 main.ts:98
+msgid "Downloading yt-dlp… {} MB"
+msgstr "正在下载 yt-dlp… {} MB"
+
+#: main.ts:91 main.ts:98
+msgid "Downloading yt-dlp… {}%"
+msgstr "正在下载 yt-dlp… {}%"
+
+#: main.ts:137
+msgid "VestraBili is still getting yt-dlp ready. Open the link again when it's done."
+msgstr "VestraBili 仍在准备 yt-dlp，完成后请重新打开链接。"
+
+#: main.ts:171
 msgid "Timed out loading the media. Try again."
 msgstr "媒体加载超时，请重试。"
 
-#: main.ts:47
+#: main.ts:174
 msgid "Another source replaced the playback request."
 msgstr "播放请求已被其他来源替换。"
 
-#: main.ts:49
+#: main.ts:176
 msgid "The playback request has ended."
 msgstr "播放请求已结束。"
 
-#: main.ts:54
+#: main.ts:181
 msgid "The player is busy. Try again later."
 msgstr "播放器忙，请稍后重试。"
 
-#: main.ts:57
+#: main.ts:184
 msgid "The player can't open this link."
 msgstr "播放器无法打开这个链接。"
 
-#: main.ts:60
+#: main.ts:187
 msgid "The playback request failed."
 msgstr "播放请求失败。"
 
-#: main.ts:74
+#: main.ts:203 main.ts:208
 msgid "Resolving the video and audio…"
 msgstr "正在解析视频和音频…"
 
-#: main.ts:77
+#: main.ts:211
 msgid "The video is ready."
 msgstr "视频已就绪。"
 
-#: main.ts:96
+#: main.ts:238
 msgid "VestraBili…"
 msgstr "VestraBili…"
 
@@ -135,8 +187,8 @@ msgid "Paste a link to play a single Bilibili video"
 msgstr "粘贴链接播放 Bilibili 单个视频"
 
 #: manifest.json
-msgid "Plays Bilibili video links (BV number, av number, b23.tv short link) directly. Needs yt-dlp installed on this computer."
-msgstr "打开 Bilibili 视频链接（BV 号、av 号、b23.tv 短链）直接播放。需要本机安装 yt-dlp。"
+msgid "Plays Bilibili video links (BV number, av number, b23.tv short link) directly. On first use it asks to download the open-source tool yt-dlp from its official GitHub releases, verifies it, and keeps it up to date."
+msgstr "打开 Bilibili 视频链接（BV 号、av 号、b23.tv 短链）直接播放。首次使用时会征得同意，从官方 GitHub 发布页下载开源工具 yt-dlp，校验后使用并自动保持更新。"
 
 #: manifest.json
 msgid "online video"
@@ -145,3 +197,83 @@ msgstr "网络视频"
 #: manifest.json
 msgid "Bilibili"
 msgstr "Bilibili"
+
+#: ytdlp.ts:168
+msgid "VESTRA_YTDLP names a file that does not exist: {}"
+msgstr "VESTRA_YTDLP 指定的文件不存在：{}"
+
+#: ytdlp.ts:174
+msgid "yt-dlp has no ready-made build for this system ({}). Install yt-dlp and put it on the PATH."
+msgstr "yt-dlp 没有适用于此系统的现成版本（{}）。请自行安装 yt-dlp 并加入 PATH。"
+
+#: ytdlp.ts:177 ytdlp.ts:185
+msgid "VestraBili needs yt-dlp to play Bilibili links. Open → VestraBili… downloads it."
+msgstr "VestraBili 需要 yt-dlp 才能播放 Bilibili 链接。可在“打开 → VestraBili…”中下载。"
+
+#: ytdlp.ts:184
+msgid "VestraBili needs yt-dlp to play Bilibili links. Press Play to download it."
+msgstr "VestraBili 需要 yt-dlp 才能播放 Bilibili 链接。按“播放”下载。"
+
+#: ytdlp.ts:274
+msgid "Can't download yt-dlp: GitHub gave an unexpected answer."
+msgstr "无法下载 yt-dlp：GitHub 返回了意外的响应。"
+
+#: ytdlp.ts:285
+msgid "Can't download yt-dlp: GitHub is limiting downloads right now. Try again later."
+msgstr "无法下载 yt-dlp：GitHub 当前限制了下载，请稍后重试。"
+
+#: ytdlp.ts:292
+msgid "Can't download yt-dlp: the download was redirected somewhere other than GitHub."
+msgstr "无法下载 yt-dlp：下载被重定向到了 GitHub 以外的地址。"
+
+#: ytdlp.ts:296
+msgid "Can't download yt-dlp: GitHub answered HTTP {}."
+msgstr "无法下载 yt-dlp：GitHub 返回 HTTP {}。"
+
+#: ytdlp.ts:304
+msgid "Can't download yt-dlp: the connection stalled. Try again later."
+msgstr "无法下载 yt-dlp：连接停滞，请稍后重试。"
+
+#: ytdlp.ts:305 ytdlp.ts:395
+msgid "The yt-dlp download was cancelled."
+msgstr "已取消下载 yt-dlp。"
+
+#: ytdlp.ts:307
+msgid "Can't download yt-dlp: GitHub can't be reached. Check the internet connection or proxy."
+msgstr "无法下载 yt-dlp：无法连接 GitHub。请检查网络连接或代理。"
+
+#: ytdlp.ts:318
+msgid "Can't download yt-dlp: the file is larger than expected."
+msgstr "无法下载 yt-dlp：文件大于预期。"
+
+#: ytdlp.ts:353
+msgid "yt-dlp's latest release ({}) is older than the one VestraBili expects, so it wasn't downloaded. Try again later."
+msgstr "yt-dlp 的最新发布（{}）比 VestraBili 预期的旧，因此没有下载。请稍后重试。"
+
+#: ytdlp.ts:356
+msgid "yt-dlp's release isn't signed by the yt-dlp project's key, so it wasn't downloaded. Update VestraBili or try again later."
+msgstr "yt-dlp 的发布未经 yt-dlp 项目密钥签名，因此没有下载。请更新 VestraBili 或稍后重试。"
+
+#: ytdlp.ts:358
+msgid "Can't download yt-dlp: this release doesn't list {}."
+msgstr "无法下载 yt-dlp：此发布未列出 {}。"
+
+#: ytdlp.ts:388
+msgid "The downloaded yt-dlp did not match its published checksum and was discarded. Try again."
+msgstr "下载的 yt-dlp 与公布的校验和不符，已丢弃。请重试。"
+
+#: ytdlp.ts:396
+msgid "yt-dlp was downloaded but couldn't run. Security software may have blocked or removed it."
+msgstr "yt-dlp 已下载但无法运行，可能被安全软件拦截或删除。"
+
+#: ytdlp.ts:399
+msgid "The downloaded yt-dlp reports version {} instead of {}, so it was discarded."
+msgstr "下载的 yt-dlp 报告的版本是 {} 而不是 {}，已丢弃。"
+
+#: ytdlp.ts:416
+msgid "Can't save yt-dlp: the disk is full."
+msgstr "无法保存 yt-dlp：磁盘已满。"
+
+#: ytdlp.ts:417
+msgid "Can't save yt-dlp: {}."
+msgstr "无法保存 yt-dlp：{}。"

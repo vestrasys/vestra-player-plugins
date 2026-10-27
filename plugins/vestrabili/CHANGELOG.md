@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.0
+
+- yt-dlp no longer has to be installed by hand. On first use VestraBili asks whether to download it; with your consent it fetches the standalone build from the yt-dlp project's official GitHub releases, verifies the release's signed checksums (yt-dlp's OpenPGP key is pinned in the plugin) and the file's SHA-256, and refuses anything that does not verify. It is kept in the plugin's data directory and updated at most once a day, or when a link fails in a way a newer yt-dlp may fix.
+- Download progress shows in the VestraBili window, or on the video for links opened from the playlist. Offline, GitHub rate limits, a full disk, a blocked or removed yt-dlp and a cancelled download each get their own message.
+- A yt-dlp of your own is still used: `VESTRA_YTDLP`, or `yt-dlp` on the PATH when VestraBili has not downloaded one.
+- A video Bilibili refuses in your region (or removed), Bilibili's request limit and sign-in-only videos now get a short sentence of our own; yt-dlp's full words are in the status line's tooltip and the plugin log. A long status no longer runs past the window: it ends with an ellipsis, and the tooltip has the whole text.
+- New capabilities: confirmation dialogs (the download question) and messages on the video (download progress).
+- New plugin icon.
+- yt-dlp is in the public domain (Unlicense) and is not redistributed with VestraBili.
+
 ## 0.4.0
 
 - The id is now `zysilm.vestrabili`, matching the plugin name. The store lists it as a new plugin; uninstall the old VestraBili (`zysilm.bilibili`) and install this one. Features are unchanged.

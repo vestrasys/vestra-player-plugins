@@ -12,6 +12,8 @@ export component BilibiliWindow inherits Window {
     in-out property <string> url;
     in-out property <string> status: @tr("Enter a Bilibili video link.");
     in-out property <bool> busy: false;
+    // yt-dlp's own words for a failure: shown in the status tooltip only.
+    in-out property <string> detail;
     callback play(string);
     callback cancel();
     VerticalLayout {
@@ -26,12 +28,19 @@ export component BilibiliWindow inherits Window {
             enabled: !root.busy;
             accepted => { root.play(root.url); }
         }
-        // One line; the full text is in the tooltip.
+        // One line, cut with an ellipsis at the window's width; the full text (and yt-dlp's
+        // own words for a failure) is in the tooltip. The Text is as wide as the line: at its
+        // natural width a long text was centred and cut on both sides.
         Rectangle {
             height: Theme.label-height;
             ToolTipArea {
-                text: root.status;
+                width: 100%;
+                height: 100%;
+                text: root.detail == "" ? root.status : root.status + "\n" + root.detail;
                 Text {
+                    width: 100%;
+                    height: 100%;
+                    horizontal-alignment: left;
                     text: root.status;
                     color: Theme.text-list;
                     font-size: Theme.font-body;
