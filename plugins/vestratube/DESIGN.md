@@ -1,7 +1,7 @@
 # VestraTube 0.4.0: a YouTube sidebar without yt-dlp (proposal)
 
 Plugin proposal in the format of the community workflow §2.1. Author: the
-`zysilm.youtube` plugin author, 2026-10-26. Inputs: the research report
+`zysilm.vestratube` plugin author (then `zysilm.youtube`), 2026-10-26. Inputs: the research report
 `doc/process/rounds/2026-10-online-video-research.md` in the player
 repository and the user's ruling at its end. Status: implemented as the
 first vertical slice in 0.4.0; the GUI acceptance (§6) is the coordinator's.
@@ -298,8 +298,8 @@ and nested `ImageRef` values directly, with no local type bridge.
 
 ```text
 Requesting plugin / code location
-  zysilm.youtube 0.4.0, plugins/youtube/main.ts (the resolver). The same
-  applies to zysilm.bilibili (Bilibili's URLs expire after 2 hours).
+  zysilm.vestratube (then zysilm.youtube 0.4.0), plugins/vestratube/main.ts (the resolver). The same
+  applies to zysilm.vestrabili (Bilibili's URLs expire after 2 hours).
 
 User action and expected result
   The user plays a YouTube video, pauses it for longer than the stream URL
@@ -341,7 +341,7 @@ Whether it breaks an existing contract, and which plugins it affects
   Additive (a new behaviour for a failure that today ends playback; an
   optional field). It changes what happens after a stream error, so the
   maintainer should decide whether it counts as "a change to existing
-  behaviour" (§1.6 rule 2). Affected: zysilm.youtube, zysilm.bilibili; no
+  behaviour" (§1.6 rule 2). Affected: zysilm.vestratube, zysilm.vestrabili; no
   built-in plugin uses web resolvers.
 
 Minimal acceptance scenario

@@ -1,6 +1,6 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: zysilm.bilibili 0.3.1\n"
+"Project-Id-Version: zysilm.vestrabili 0.4.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 

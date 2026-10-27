@@ -27,7 +27,7 @@ import { isVersion } from "./semver.mjs";
 import { verifyIndex } from "./signing.mjs";
 
 export const INDEX_SCHEMA = 1;
-export const INDEX_NAME = "Vestra Player 官方仓库";
+export const INDEX_NAME = "Vestra Player official repository";
 
 export const tagOf = (id, version) => `${id}-v${version}`;
 export const assetOf = (id, version) => `${id}-${version}.vxp`;

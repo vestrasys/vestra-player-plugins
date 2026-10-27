@@ -1,6 +1,6 @@
 {
-  "id": "zysilm.youtube",
-  "version": "0.4.2",
+  "id": "zysilm.vestratube",
+  "version": "0.5.0",
   "apiVersion": "vestra/1",
   "entry": "main.ts",
   "capabilities": [
@@ -19,7 +19,7 @@
   "punchline": "Search YouTube in the sidebar and play videos right away",
   "description": "A YouTube sidebar for Vestra Player: search, see thumbnails, titles, durations and channels, and play a video with a double-click. Download videos as MKV files, or play and download a single video from its link. No sign-in and nothing to install: the YouTube part uses the bundled open-source library youtubei.js, downloads use the player's own ffmpeg.",
   "tags": ["online video", "YouTube", "download"],
-  "sourceUrl": "https://github.com/vestrasys/vestra-player-plugins/tree/main/plugins/youtube",
+  "sourceUrl": "https://github.com/vestrasys/vestra-player-plugins/tree/main/plugins/vestratube",
   "license": "Apache-2.0",
   "minPlayerVersion": "0.5.1"
 }

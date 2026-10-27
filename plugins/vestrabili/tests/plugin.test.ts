@@ -130,8 +130,8 @@ test("the manifest's display texts are English with a Simplified Chinese transla
   );
   assert.equal(
     manifest.id,
-    "zysilm.bilibili",
-    "the id stays: the store and existing installs know the plugin by it",
+    "zysilm.vestrabili",
+    "the id matches the plugin name",
   );
   assert.equal(manifest.name, "VestraBili");
   assert.equal(manifest.minPlayerVersion, "0.4.3");

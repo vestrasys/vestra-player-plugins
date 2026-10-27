@@ -34,11 +34,11 @@ the publish pipeline, the index format and the signing key.
 
 - Every hosted plugin has an **owner**: the GitHub user or organization that
   maintains it, recorded in [`plugins/owners.toml`](plugins/owners.toml) as
-  `<name> = "<owner>"` (`youtube = "zysilm"`). The owner is the plugin's
+  `<name> = "<owner>"` (`vestratube = "zysilm"`). The owner is the plugin's
   author (the manifest's `author`); a maintainer reviews every change. A new
   hosted plugin, or a change of owner, needs a maintainer's agreement.
 - The id is `<owner>.<name>`, where `<name>` is the directory name
-  (`plugins/youtube/` owned by `zysilm` is `zysilm.youtube`); the owner is
+  (`plugins/vestratube/` owned by `zysilm` is `zysilm.vestratube`); the owner is
   compared without case. This is the same `<github-owner>.<name>` rule as
   for registrations, with the owner from `plugins/owners.toml` instead of
   the source repository.
@@ -116,7 +116,7 @@ check and the index build; those tests download from the npm registry.
 
 ```text
 plugins/<name>/   hosted third-party plugins (id <owner>.<name>): manifest.json, main.ts,
-                  .slint UI, tests/, README.md, CHANGELOG.md (youtube, bilibili)
+                  .slint UI, tests/, README.md, CHANGELOG.md (vestratube, vestrabili)
 plugins/owners.toml  the owner of each hosted plugin
 registry/         third-party registrations, registry/<id>.toml (see the README)
 revoked.json      revoked plugin versions, copied into the index
@@ -145,10 +145,10 @@ Node 26 or later (`@vestra-player/sdk` 1.5 requires it; the player ships Node 26
 
 ```sh
 npm ci
-npm run plugin -- check youtube     # strict type check
-npm run plugin -- build youtube     # writes plugins/youtube/dist/
-npm run plugin -- test youtube      # node --test on plugins/youtube/tests/
-npm run plugin -- pack youtube      # dist/ as <id>-<version>.vxp
+npm run plugin -- check vestratube  # strict type check
+npm run plugin -- build vestratube  # writes plugins/vestratube/dist/
+npm run plugin -- test vestratube   # node --test on plugins/vestratube/tests/
+npm run plugin -- pack vestratube   # dist/ as <id>-<version>.vxp
 ```
 
 A name is a directory under `plugins/`; `--all` runs every plugin. The whole
@@ -177,7 +177,7 @@ as `vestra-player-plugins`:
 
 ```sh
 cargo run --bin vestra-host -- --plugin ../plugins/playback \
-  --plugin ../../../vestra-player-plugins/plugins/youtube
+  --plugin ../../../vestra-player-plugins/plugins/vestratube
 ```
 
 `--plugin` may be repeated; the player runs the plugin's `.ts` sources
@@ -362,24 +362,24 @@ and Pages of a private repository need authentication or a paid plan):
 {
   "schema": 1,
   "generated": 7,
-  "name": "Vestra Player 官方仓库",
+  "name": "Vestra Player official repository",
   "official": true,
   "plugins": [
     {
-      "id": "zysilm.youtube",
+      "id": "zysilm.vestratube",
       "name": "VestraTube", "author": "zysilm", "punchline": "…", "description": "…",
       "tags": ["online video", "YouTube", "download"], "license": "Apache-2.0",
       "iconUrl": null, "iconSha256": null, "iconSize": null,
       "readmeUrl": "https://…/README.md", "readmeSha256": "…", "readmeSize": 812,
       "changelogUrl": "https://…/CHANGELOG.md", "changelogSha256": "…", "changelogSize": 240,
-      "sourceUrl": "https://github.com/vestrasys/vestra-player-plugins/tree/main/plugins/youtube",
+      "sourceUrl": "https://github.com/vestrasys/vestra-player-plugins/tree/main/plugins/vestratube",
       "translations": {
         "zh-Hans": { "name": "VestraTube", "punchline": "…", "description": "…",
                      "tags": ["网络视频", "YouTube", "下载"] }
       },
       "versions": [
         { "version": "0.3.0", "apiVersion": "vestra/1", "minPlayerVersion": "0.2.0",
-          "capabilities": ["…"], "downloadUrl": "https://…/zysilm.youtube-0.3.0.vxp",
+          "capabilities": ["…"], "downloadUrl": "https://…/zysilm.vestratube-0.3.0.vxp",
           "sha256": "…", "size": 9370, "published": "2026-10-21T…Z" }
       ]
     }
@@ -394,8 +394,10 @@ and Pages of a private repository need authentication or a paid plan):
 - A plugin no longer in `plugins/` (removed, or renamed to a new id) is
   dropped from the next index; its Releases stay. A renamed plugin starts a
   new version history under its new id. (When youtube and bilibili moved
-  from `vestra.*` to `zysilm.*`, the old entries were dropped this way;
-  `revoked.json` needed no entry, since the player had not been released.)
+  from `vestra.*` to `zysilm.*`, and again when they became
+  `zysilm.vestratube` and `zysilm.vestrabili`, the old entries were dropped
+  this way; `revoked.json` needed no entry, since the player had not been
+  released.)
 - `versions` is newest first. There are no release channels and no download
   counts (ecosystem plan 1.6 items 8 and 9).
 - `published` is when CI built the version.

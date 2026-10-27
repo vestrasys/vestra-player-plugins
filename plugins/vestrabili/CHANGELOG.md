@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0
+
+- The id is now `zysilm.vestrabili`, matching the plugin name. The store lists it as a new plugin; uninstall the old VestraBili (`zysilm.bilibili`) and install this one. Features are unchanged.
+
 ## 0.3.1
 
 - Renamed to **VestraBili** (menu **Open → VestraBili…**, window title, store listing). The id stays `zysilm.bilibili`, so this is an update of the same plugin. Features are unchanged.

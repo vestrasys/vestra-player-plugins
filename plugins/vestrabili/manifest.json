@@ -1,6 +1,6 @@
 {
-  "id": "zysilm.bilibili",
-  "version": "0.3.1",
+  "id": "zysilm.vestrabili",
+  "version": "0.4.0",
   "apiVersion": "vestra/1",
   "entry": "main.ts",
   "capabilities": [
@@ -15,7 +15,7 @@
   "punchline": "Paste a link to play a single Bilibili video",
   "description": "Plays Bilibili video links (BV number, av number, b23.tv short link) directly. Needs yt-dlp installed on this computer.",
   "tags": ["online video", "Bilibili"],
-  "sourceUrl": "https://github.com/vestrasys/vestra-player-plugins/tree/main/plugins/bilibili",
+  "sourceUrl": "https://github.com/vestrasys/vestra-player-plugins/tree/main/plugins/vestrabili",
   "license": "Apache-2.0",
   "minPlayerVersion": "0.4.3"
 }
