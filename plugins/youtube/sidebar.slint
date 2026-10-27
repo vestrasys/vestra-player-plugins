@@ -55,6 +55,11 @@ export global TubeBridge {
     in property <string> progress-text;
     // Each increment scrolls the list back to the top (a new search).
     in property <int> scroll-top;
+    // Where a newly made list starts (logical px). The player makes the panel anew each time it
+    // shows (its tab, the sidebar shown again or detached, the main window rebuilt when any
+    // plugin mounts or unmounts a panel), so the plugin keeps the list's scroll (`scrolled`)
+    // and the new list opens where the user left it.
+    in property <float> show-y;
     callback query-changed(string);
     callback search(string);
     callback retry();
@@ -62,6 +67,8 @@ export global TubeBridge {
     // has or is loading.
     callback more(int);
     callback retry-more();
+    // (how far the list is scrolled, logical px)
+    callback scrolled(float);
     callback select(string);
     // (rows to move the selection by)
     callback select-step(int);
@@ -198,7 +205,11 @@ export component TubeSidebar inherits Rectangle {
                 list := ScrollView {
                     width: 100%;
                     height: 100%;
-                    changed content-y => { root.more-if-near-end(); }
+                    init => { self.content-y = -TubeBridge.show-y * 1px; }
+                    changed content-y => {
+                        TubeBridge.scrolled(-self.content-y / 1px);
+                        root.more-if-near-end();
+                    }
                     changed visible-height => { root.more-if-near-end(); }
                     VerticalLayout {
                         alignment: start;
