@@ -449,7 +449,8 @@ test("the manifest's display texts are English with a Simplified Chinese transla
   const manifest = JSON.parse(await readFile(new URL("manifest.json", directory), "utf8"));
   assert.equal(manifest.id, "zysilm.vestratube", "the id matches the plugin name");
   assert.equal(manifest.name, "VestraTube");
-  assert.equal(manifest.version, "0.5.0");
+  assert.equal(manifest.version, "0.5.1");
+  assert.equal(manifest.icon, "assets/icon.png", "store icon");
   assert.equal(manifest.minPlayerVersion, "0.5.1", "images in rows");
   assert.ok(manifest.capabilities.includes("ui.mount"));
   for (const value of [manifest.name, manifest.punchline, manifest.description, ...manifest.tags])

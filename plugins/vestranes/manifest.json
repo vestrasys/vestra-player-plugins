@@ -1,6 +1,6 @@
 {
   "id": "zysilm.vestranes",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "apiVersion": "vestra/1",
   "entry": "main.ts",
   "capabilities": [
@@ -18,5 +18,6 @@
   "tags": ["Games", "Emulator"],
   "sourceUrl": "https://github.com/vestrasys/vestra-player-plugins/tree/main/plugins/vestranes",
   "license": "Apache-2.0",
+  "icon": "assets/icon.png",
   "minPlayerVersion": "0.5.8"
 }
