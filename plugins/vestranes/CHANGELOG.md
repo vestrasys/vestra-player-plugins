@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1
+
+- Store icon.
+
 ## 0.4.0
 
 - **VestraNES, a third-party plugin.** The NES emulator that was built into the player (`vestra.nes`, "NES Emulator", up to 0.3.2) is now VestraNES, id `zysilm.vestranes`, author zysilm, installed from the Plugin Store. It is a new plugin to the store: nothing carries over from the built-in one.

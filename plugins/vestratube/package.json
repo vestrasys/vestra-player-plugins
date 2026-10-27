@@ -1,6 +1,6 @@
 {
   "name": "zysilm-vestratube",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "type": "module",
   "description": "VestraTube, a Vestra Player plugin: npm dependencies bundled into the package",

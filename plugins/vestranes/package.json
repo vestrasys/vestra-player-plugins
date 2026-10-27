@@ -1,6 +1,6 @@
 {
   "name": "zysilm-vestranes",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "type": "module",
   "description": "VestraNES, a Vestra Player plugin: npm dependencies bundled into the package",

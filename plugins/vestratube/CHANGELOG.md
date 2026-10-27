@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.1
+
+- **Store icon.** VestraTube now has its own icon in the plugin store.
+
 ## 0.5.0
 
 - **The id is now `zysilm.vestratube`**, matching the plugin's name (it was `zysilm.youtube`). The store lists it as a new plugin: install VestraTube 0.5.0 and uninstall the old VestraTube. Features are unchanged.
