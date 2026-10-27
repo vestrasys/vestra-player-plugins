@@ -6,7 +6,10 @@ import {
   startPlugin,
   TestHost,
 } from "@vestra-player/sdk/testing";
-import activate from "../main.ts";
+import { vestrabili } from "../main.ts";
+
+/** The plugin with yt-dlp already there (`VESTRA_YTDLP`: any existing file; these tests never run it). */
+const activate = vestrabili({ ytdlp: { env: { VESTRA_YTDLP: process.execPath } } });
 
 const directory = new URL("..", import.meta.url);
 const link = "https://www.bilibili.com/video/BV1xx411c7mD";
@@ -66,6 +69,7 @@ test("public resolver and menu entry are owned by the plugin lifetime", async ()
     url: "",
     status: "输入 Bilibili 视频链接。",
     busy: false,
+    detail: "",
   });
   await stop();
   assert.equal(host.resolvers.size, 0);
@@ -157,7 +161,7 @@ test("the manifest's display texts are English with a Simplified Chinese transla
   );
   assert.equal(
     host.translate(manifest.description),
-    "打开 Bilibili 视频链接（BV 号、av 号、b23.tv 短链）直接播放。需要本机安装 yt-dlp。",
+    "打开 Bilibili 视频链接（BV 号、av 号、b23.tv 短链）直接播放。首次使用时会征得同意，从官方 GitHub 发布页下载开源工具 yt-dlp，校验后使用并自动保持更新。",
   );
   assert.deepEqual(
     manifest.tags.map((tag: string) => host.translate(tag)),

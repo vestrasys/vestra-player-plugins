@@ -1,6 +1,6 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: zysilm.vestrabili 0.4.0\n"
+"Project-Id-Version: zysilm.vestrabili 0.5.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
@@ -9,19 +9,19 @@ msgstr ""
 msgid "VestraBili"
 msgstr ""
 
-#: dialog.slint:13 main.ts:16
+#: dialog.slint:13 main.ts:43
 msgid "Enter a Bilibili video link."
 msgstr ""
 
-#: dialog.slint:20
+#: dialog.slint:22
 msgid "Enter a link"
 msgstr ""
 
-#: dialog.slint:46
+#: dialog.slint:55
 msgid "Play"
 msgstr ""
 
-#: dialog.slint:47
+#: dialog.slint:56 main.ts:68
 msgid "Cancel"
 msgstr ""
 
@@ -37,95 +37,147 @@ msgstr ""
 msgid "Enter a bilibili.com/video/… or b23.tv/… video link."
 msgstr ""
 
-#: extractor.ts:31
-msgid "The extracted result has no media address."
+#: extractor.ts:35
+msgid "Bilibili refused this video in your region, or it was removed."
 msgstr ""
 
-#: extractor.ts:33
-msgid "The extracted result contains an invalid media address."
+#: extractor.ts:37
+msgid "Bilibili is limiting requests right now. Try again later."
 msgstr ""
 
-#: extractor.ts:38
-msgid "The extracted result contains invalid request headers."
+#: extractor.ts:39
+msgid "This video needs a sign-in or a membership, which VestraBili doesn't support."
 msgstr ""
 
-#: extractor.ts:50
-msgid "The extracted result has no video track."
-msgstr ""
-
-#: extractor.ts:54
-msgid "The extracted result lacks the separate audio track, so it can't play completely."
-msgstr ""
-
-#: extractor.ts:56
-msgid "Can't tell whether the video contains audio."
-msgstr ""
-
-#: extractor.ts:58
-msgid "The extracted result has no complete video with audio."
-msgstr ""
-
-#: extractor.ts:71
-msgid "Resolution cancelled."
-msgstr ""
-
-#: extractor.ts:72
+#: extractor.ts:40
 msgid "Bilibili resolution failed: {}"
 msgstr ""
 
-#: extractor.ts:73
+#: extractor.ts:45
+msgid "The extracted result has no media address."
+msgstr ""
+
+#: extractor.ts:47
+msgid "The extracted result contains an invalid media address."
+msgstr ""
+
+#: extractor.ts:52
+msgid "The extracted result contains invalid request headers."
+msgstr ""
+
+#: extractor.ts:64
+msgid "The extracted result has no video track."
+msgstr ""
+
+#: extractor.ts:68
+msgid "The extracted result lacks the separate audio track, so it can't play completely."
+msgstr ""
+
+#: extractor.ts:70
+msgid "Can't tell whether the video contains audio."
+msgstr ""
+
+#: extractor.ts:72
+msgid "The extracted result has no complete video with audio."
+msgstr ""
+
+#: extractor.ts:86
+msgid "Resolution cancelled."
+msgstr ""
+
+#: extractor.ts:89
 msgid "Bilibili resolution failed: timed out."
 msgstr ""
 
-#: extractor.ts:74
+#: extractor.ts:90
 msgid "Bilibili resolution failed: yt-dlp was not found."
 msgstr ""
 
-#: extractor.ts:75
+#: extractor.ts:91
+msgid "Bilibili resolution failed: yt-dlp couldn't run. Security software may have blocked it."
+msgstr ""
+
+#: extractor.ts:92
 msgid "Bilibili resolution failed: yt-dlp failed."
 msgstr ""
 
-#: extractor.ts:83
+#: extractor.ts:100
 msgid "yt-dlp returned invalid JSON."
 msgstr ""
 
-#: extractor.ts:84
+#: extractor.ts:101
 msgid "yt-dlp returned invalid video information."
 msgstr ""
 
-#: main.ts:44
+#: main.ts:63
+msgid "Download yt-dlp to play Bilibili links?"
+msgstr ""
+
+#: main.ts:65
+msgid "VestraBili plays Bilibili links with yt-dlp, a free open-source tool. It downloads it once (about {} MB) from the yt-dlp project's official GitHub releases, checks it against the project's signed checksums, and keeps it up to date. yt-dlp is in the public domain (Unlicense) and is not part of VestraBili."
+msgstr ""
+
+#: main.ts:67
+msgid "Download"
+msgstr ""
+
+#: main.ts:72
+msgid "Another dialog is open. Close it and try again."
+msgstr ""
+
+#: main.ts:73
+msgid "VestraBili can't ask to download yt-dlp here. Install yt-dlp and put it on the PATH."
+msgstr ""
+
+#: main.ts:79
+msgid "yt-dlp is ready."
+msgstr ""
+
+#: main.ts:91 main.ts:98
+msgid "Downloading yt-dlp… {} MB"
+msgstr ""
+
+#: main.ts:91 main.ts:98
+msgid "Downloading yt-dlp… {}%"
+msgstr ""
+
+#: main.ts:137
+msgid "VestraBili is still getting yt-dlp ready. Open the link again when it's done."
+msgstr ""
+
+#: main.ts:171
 msgid "Timed out loading the media. Try again."
 msgstr ""
 
-#: main.ts:47
+#: main.ts:174
 msgid "Another source replaced the playback request."
 msgstr ""
 
-#: main.ts:49
+#: main.ts:176
 msgid "The playback request has ended."
 msgstr ""
 
-#: main.ts:54
+#: main.ts:181
 msgid "The player is busy. Try again later."
 msgstr ""
 
-#: main.ts:57
+#: main.ts:184
 msgid "The player can't open this link."
 msgstr ""
 
-#: main.ts:60
+#: main.ts:187
 msgid "The playback request failed."
 msgstr ""
 
-#: main.ts:74
+#: main.ts:203 main.ts:208
 msgid "Resolving the video and audio…"
 msgstr ""
 
-#: main.ts:77
+#: main.ts:211
 msgid "The video is ready."
 msgstr ""
 
-#: main.ts:96
+#: main.ts:238
 msgid "VestraBili…"
 msgstr ""
 
@@ -134,7 +186,7 @@ msgid "Paste a link to play a single Bilibili video"
 msgstr ""
 
 #: manifest.json
-msgid "Plays Bilibili video links (BV number, av number, b23.tv short link) directly. Needs yt-dlp installed on this computer."
+msgid "Plays Bilibili video links (BV number, av number, b23.tv short link) directly. On first use it asks to download the open-source tool yt-dlp from its official GitHub releases, verifies it, and keeps it up to date."
 msgstr ""
 
 #: manifest.json
@@ -143,4 +195,84 @@ msgstr ""
 
 #: manifest.json
 msgid "Bilibili"
+msgstr ""
+
+#: ytdlp.ts:168
+msgid "VESTRA_YTDLP names a file that does not exist: {}"
+msgstr ""
+
+#: ytdlp.ts:174
+msgid "yt-dlp has no ready-made build for this system ({}). Install yt-dlp and put it on the PATH."
+msgstr ""
+
+#: ytdlp.ts:177 ytdlp.ts:185
+msgid "VestraBili needs yt-dlp to play Bilibili links. Open → VestraBili… downloads it."
+msgstr ""
+
+#: ytdlp.ts:184
+msgid "VestraBili needs yt-dlp to play Bilibili links. Press Play to download it."
+msgstr ""
+
+#: ytdlp.ts:274
+msgid "Can't download yt-dlp: GitHub gave an unexpected answer."
+msgstr ""
+
+#: ytdlp.ts:285
+msgid "Can't download yt-dlp: GitHub is limiting downloads right now. Try again later."
+msgstr ""
+
+#: ytdlp.ts:292
+msgid "Can't download yt-dlp: the download was redirected somewhere other than GitHub."
+msgstr ""
+
+#: ytdlp.ts:296
+msgid "Can't download yt-dlp: GitHub answered HTTP {}."
+msgstr ""
+
+#: ytdlp.ts:304
+msgid "Can't download yt-dlp: the connection stalled. Try again later."
+msgstr ""
+
+#: ytdlp.ts:305 ytdlp.ts:395
+msgid "The yt-dlp download was cancelled."
+msgstr ""
+
+#: ytdlp.ts:307
+msgid "Can't download yt-dlp: GitHub can't be reached. Check the internet connection or proxy."
+msgstr ""
+
+#: ytdlp.ts:318
+msgid "Can't download yt-dlp: the file is larger than expected."
+msgstr ""
+
+#: ytdlp.ts:353
+msgid "yt-dlp's latest release ({}) is older than the one VestraBili expects, so it wasn't downloaded. Try again later."
+msgstr ""
+
+#: ytdlp.ts:356
+msgid "yt-dlp's release isn't signed by the yt-dlp project's key, so it wasn't downloaded. Update VestraBili or try again later."
+msgstr ""
+
+#: ytdlp.ts:358
+msgid "Can't download yt-dlp: this release doesn't list {}."
+msgstr ""
+
+#: ytdlp.ts:388
+msgid "The downloaded yt-dlp did not match its published checksum and was discarded. Try again."
+msgstr ""
+
+#: ytdlp.ts:396
+msgid "yt-dlp was downloaded but couldn't run. Security software may have blocked or removed it."
+msgstr ""
+
+#: ytdlp.ts:399
+msgid "The downloaded yt-dlp reports version {} instead of {}, so it was discarded."
+msgstr ""
+
+#: ytdlp.ts:416
+msgid "Can't save yt-dlp: the disk is full."
+msgstr ""
+
+#: ytdlp.ts:417
+msgid "Can't save yt-dlp: {}."
 msgstr ""

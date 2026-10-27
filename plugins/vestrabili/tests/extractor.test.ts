@@ -4,6 +4,7 @@ import type { TextError } from "@vestra-player/sdk";
 import { startPlugin } from "@vestra-player/sdk/testing";
 import {
   decodeMetadata,
+  explain,
   extractBilibili,
   matchesUrl,
   reason,
@@ -116,4 +117,19 @@ test("yt-dlp failures are reduced to one line of its own reason", () => {
   assert.equal(reason("WARNING: a\nERROR: [BiliBili] BV1xx411c7mD: HTTP Error 412: Precondition Failed\n"), "HTTP Error 412: Precondition Failed");
   assert.equal(reason(""), "");
   assert.equal(reason("y".repeat(500)).length, 160);
+});
+
+test("known yt-dlp reasons get our own sentence; the raw reason is kept", () => {
+  const geo = "This video may be deleted or geo-restricted. You might want to try a VPN or a proxy server (with --proxy)";
+  const cases: [string, string][] = [
+    [geo, "Bilibili 在你所在的地区拒绝提供此视频，或视频已被删除。"],
+    ["HTTP Error 412: Precondition Failed", "Bilibili 当前限制了请求，请稍后重试。"],
+    ["This video is only available for registered users. Use --cookies to sign in", "此视频需要登录或会员，VestraBili 不支持。"],
+    ["Something new", "Bilibili 解析失败：Something new"],
+  ];
+  for (const [why, expected] of cases) {
+    const error = explain(why, zh.error);
+    assert.equal(shown(error), expected);
+    assert.equal(error.reason, why);
+  }
 });

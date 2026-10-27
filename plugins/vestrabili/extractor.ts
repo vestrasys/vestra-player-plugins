@@ -26,6 +26,20 @@ export function reason(stderr: string): string {
   const text = line.replace(/^ERROR:\s*/, '').replace(/^\[[^\]]+\]\s*[\w-]+:\s*/, '');
   return text.length > 160 ? `${text.slice(0, 159)}…` : text;
 }
+/**
+ * yt-dlp's reason as one of our sentences where we know what it means (its own
+ * words stay in `reason`, for the log, the details tooltip and the update check).
+ */
+export function explain(why: string, error: Fail): Error & { reason: string } {
+  const text = /geo.?restrict|not available in your (country|region)|may be deleted|has been removed|no longer available/i.test(why)
+    ? error('Bilibili refused this video in your region, or it was removed.')
+    : /HTTP Error 412|HTTP Error 429|too many requests/i.test(why)
+      ? error('Bilibili is limiting requests right now. Try again later.')
+      : /log ?in|sign ?in|cookies|premium|members? only|paid/i.test(why)
+        ? error("This video needs a sign-in or a membership, which VestraBili doesn't support.")
+        : error('Bilibili resolution failed: {}', [why]);
+  return Object.assign(text, { reason: why });
+}
 export function matchesUrl(input: string, error: Fail): boolean { try { validateUrl(input, error); return true; } catch { return false; } }
 function resource(format: Format, fallback: unknown, error: Fail): Resource {
   if (typeof format.url !== 'string') throw error('The extracted result has no media address.');
@@ -60,18 +74,21 @@ export function decodeMetadata(originalUrl: string, info: Metadata, error: Fail)
   }
   return { originalUrl, ...(typeof info.title === 'string' ? { title: info.title } : {}), media, ...(audio ? { audio } : {}) };
 }
-export async function extractBilibili(input: string, error: Fail, signal?: AbortSignal): Promise<ResolvedBilibili> {
+/** Resolve a link with yt-dlp (`program`: its path; default `yt-dlp` on the PATH). */
+export async function extractBilibili(input: string, error: Fail, signal?: AbortSignal, program = 'yt-dlp'): Promise<ResolvedBilibili> {
   const originalUrl = validateUrl(input, error);
   signal?.throwIfAborted();
   const output = await new Promise<string>((resolve, reject) => {
-    execFile('yt-dlp', ['--ignore-config', '--no-playlist', '--skip-download', '--dump-single-json', '--no-warnings', '--socket-timeout', '12', '--retries', '0', '--extractor-retries', '0', '--format', 'bestvideo+bestaudio/best', '--', originalUrl], { signal, timeout: 45000, maxBuffer: 12 * 1024 * 1024, encoding: 'utf8' }, (failure, stdout, stderr) => {
+    execFile(program, ['--ignore-config', '--no-playlist', '--skip-download', '--dump-single-json', '--no-warnings', '--socket-timeout', '12', '--retries', '0', '--extractor-retries', '0', '--format', 'bestvideo+bestaudio/best', '--', originalUrl], { signal, timeout: 45000, maxBuffer: 12 * 1024 * 1024, encoding: 'utf8', windowsHide: true }, (failure, stdout, stderr) => {
       if (failure) {
         // One whole sentence per reason; yt-dlp's own reason is data.
         const why = reason(stderr);
         reject(signal?.aborted ? error('Resolution cancelled.')
-          : why ? error('Bilibili resolution failed: {}', [why])
+          // `reason`: yt-dlp's own words, to tell whether a newer yt-dlp may help.
+          : why ? explain(why, error)
           : failure.killed ? error('Bilibili resolution failed: timed out.')
           : (failure as { code?: unknown }).code === 'ENOENT' ? error('Bilibili resolution failed: yt-dlp was not found.')
+          : ['EACCES', 'EPERM'].includes((failure as { code?: unknown }).code as string) ? error("Bilibili resolution failed: yt-dlp couldn't run. Security software may have blocked it.")
           : error('Bilibili resolution failed: yt-dlp failed.'));
         return;
       }

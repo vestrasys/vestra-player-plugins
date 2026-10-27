@@ -1,0 +1,50 @@
+/**
+ * yt-dlp 2026.10.26's real `SHA2-256SUMS` (its lines, each ending in a
+ * line feed, so checkout line endings cannot change it) and
+ * `SHA2-256SUMS.sig` (hex).
+ */
+export const SUMS = Buffer.from(
+  [
+    "e51e69e89489f199530f13d32a4342da3ddb2cf34842f364603a066db05afbf3  yt-dlp",
+    "f5389d3698ecde4ef06f4e6b1ce0294fe9ac1396228c8990b8d3416d6d177a7d  yt-dlp.exe",
+    "21f942d258d25cc4e60b4982a25c423460f0bebb835f38e6dfd1fcb140087f95  yt-dlp.tar.gz",
+    "0066dbac3c124028e2dcae2a197fccee33cd91f456313d24f7af89fd54590e98  yt-dlp_arm64.exe",
+    "767ba9dce7052aa196f8b12652f433d76de128ba168966fa84b6394d5e6c6795  yt-dlp_linux",
+    "f34053415136e55073dd64ba5326d161ecc23ce0e98c081d8752867b37809450  yt-dlp_linux.zip",
+    "e87e9533e89fe5889abaa21f5114dfe7756d6aa6219b83551add04d48b18e483  yt-dlp_linux_aarch64",
+    "74708e707e8fa8177c8347e58152337edf320149cd7b225defd453f7cde47822  yt-dlp_linux_aarch64.zip",
+    "ec828c26c6da7898b279da2cad3dca434ebec7f8f18ae7b6420027f3aa037bf2  yt-dlp_linux_armv7l.zip",
+    "0f922c15ccc0b83eefa1c8bc9104e434318c4bf16e408e1ee93b7745a6efe0aa  yt-dlp_macos",
+    "20d98fa608998eff87d1d35a6e9fb65e4b874639a6cc89addc19da3becde3ef1  yt-dlp_macos.zip",
+    "e97a4dd919221d233e7720e18fa3f66db60fbd1d8c0846bf6deb8e88e04475a8  yt-dlp_musllinux",
+    "c3a67f7c14d4cbf876e7801039237fc16b929a629c72f9c785ec3fdc8aa40748  yt-dlp_musllinux.zip",
+    "ea97b8564667f3cabc334c3216526de39bc684e99815ecf07b6642f4cba8af4d  yt-dlp_musllinux_aarch64",
+    "1648beeb7b0c78b471654262697066c016783d33813659367a5c274828ba3240  yt-dlp_musllinux_aarch64.zip",
+    "fd51b212cf8380c7a52ee08c0d6be7f3c59b2f2c832eaf7b45acfae6eab57419  yt-dlp_win.zip",
+    "5eaa4c61f3c09189f3a551bf1855c13aad61fb865cc33f06012a6c2dbe287a45  yt-dlp_win_arm64.zip",
+    "e2898afd51c029d23c58de60cd8446b110dd3aa121b3e4149bafcee3356c59c0  yt-dlp_win_x86.zip",
+    "c0407c66361f50a99e10949ae882ea2ad7de9086b75d226d8fd88da4f74828fa  yt-dlp_x86.exe",
+  ]
+    .map((line) => `${line}
+`)
+    .join(""),
+);
+export const SIGNATURE = Buffer.from(
+  '8902330400010a001d162104ac0cbbe6848d6a873464af4e57cf65933b5a758105026adf' +
+  'd329000a091057cf65933b5a75816b8110008bcf1fd3b113014188cc7fe27e064b31d61c' +
+  '41abcca41c391ac6c28b83acecadbe309359809d52a5361afea419d063d2f910ac79b38f' +
+  '71b0724c0b7d3928e737b6732553db97c07f162a034560689dded9dc9bd9a23536f17bfa' +
+  '75dd181afeecc34a4d8add51ae8fbdaadc50d626e2365a991f28fc047c8034ebd234d44b' +
+  '26e5660e45d68ab990c008c79d39a72b741c83674e9ae42be435ff5db78dab3c7172aa61' +
+  '50eeeea628f295f3ad550c8aa18f75cdee359345c4e07d5efa3767f0eb99119870da1fd4' +
+  '124f445f910d9fa8c0a8e3cdddcd2ddf7bd4819a985258839d8a20482d884dbf2d6ecc5d' +
+  '3119d01b91e8b982c754ae7a68f0a5931e6c9bff3dd57a70630db117c448aaa0c4b7dc9f' +
+  'f95d316dddab2413af8d098f309ea22d46da048e38d1545a24377964490c00677e3bcc71' +
+  '310fb17ff4af3e914cf32b4083193e07beb14d8bffd99f4588c0b4f00bb4897904689ef6' +
+  'c2cfe2d0bcb9e41bd9f1b6ce377c8cae4eb8586dc91e8428d3117ed4ad58b968e95f191e' +
+  'b2c78b963e9f3dc3657002a32b69b3295e4441ef993dd0b35b2e3e04cded4326f2ad4907' +
+  '6109099c251a7756b6fee7e99d9172d6c166fd233ea3bd527f7a8b605cff04fe915529c2' +
+  '84de43beec4dfa13d97cbe1daae6f15085d9000631b7576cb36361a8173b05d85b7ad270' +
+  '9adfdfa08f0d2c088a629e83e5186fd7385d6a342d6be06517bf',
+  "hex",
+);
