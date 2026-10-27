@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.0
+
+- **The id is now `zysilm.vestratube`**, matching the plugin's name (it was `zysilm.youtube`). The store lists it as a new plugin: install VestraTube 0.5.0 and uninstall the old VestraTube. Features are unchanged.
+
 ## 0.4.2
 
 - **The results keep their scroll position.** Switching to another sidebar tab and back, hiding and showing the sidebar, detaching it, or the player rebuilding its main window (when any plugin adds or removes a panel, for example a built-in plugin restarting) used to put the list back at the top. The list now opens where you left it, with the same row selected. A new search still starts at the top.

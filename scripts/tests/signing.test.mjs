@@ -17,7 +17,7 @@ const scripts = join(import.meta.dirname, "..");
 const index = {
   schema: 1,
   generated: 1,
-  name: "Vestra Player 官方仓库",
+  name: "Vestra Player official repository",
   official: true,
   plugins: [],
   revoked: [],

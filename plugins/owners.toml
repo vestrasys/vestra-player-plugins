@@ -2,5 +2,5 @@
 # maintains it. The plugin's id must be <owner>.<directory>. "vestra" is
 # reserved for the player's built-in plugins. See CONTRIBUTING.md.
 
-bilibili = "zysilm"
-youtube = "zysilm"
+vestrabili = "zysilm"
+vestratube = "zysilm"

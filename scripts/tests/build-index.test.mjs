@@ -118,7 +118,7 @@ test("first publish: packs the plugin and describes it", async () => {
   assert.deepEqual(index, {
     schema: 1,
     generated: 1,
-    name: "Vestra Player 官方仓库",
+    name: "Vestra Player official repository",
     official: true,
     plugins: [
       {
@@ -469,8 +469,8 @@ test("generated: 1 on the first publish, previous + 1 after, 1 after a legacy in
 
 test("a renamed plugin: the old id leaves the index, the new id starts a fresh history", async () => {
   // The previously signed index has the plugin under its old id (as
-  // vestra.youtube became zysilm.youtube); the repository now has only the
-  // new id.
+  // vestra.youtube became zysilm.youtube, then zysilm.vestratube); the
+  // repository now has only the new id.
   const old = await build(await repository({ version: "1.0.0" }));
   const previous = structuredClone(old.index);
   previous.plugins[0].id = "vestra.demo";

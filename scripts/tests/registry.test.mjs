@@ -210,15 +210,15 @@ async function hosted(manifests, owners) {
 
 test("plugins/: the id is <owner>.<directory>, owner from plugins/owners.toml", async () => {
   const ok = await hosted(
-    { youtube: "zysilm.youtube", tools: "some-org.tools" },
-    '# c\nyoutube = "zysilm"\ntools = "Some-Org"\n',
+    { vestratube: "zysilm.vestratube", tools: "some-org.tools" },
+    '# c\nvestratube = "zysilm"\ntools = "Some-Org"\n',
   );
   assert.deepEqual(ok.problems, []);
   assert.deepEqual(
     ok.plugins.map(({ name, id, owner }) => [name, id, owner]),
     [
       ["tools", "some-org.tools", "Some-Org"],
-      ["youtube", "zysilm.youtube", "zysilm"],
+      ["vestratube", "zysilm.vestratube", "zysilm"],
     ],
   );
 
@@ -229,39 +229,44 @@ test("plugins/: the id is <owner>.<directory>, owner from plugins/owners.toml", 
   };
   // vestra. is the player's built-ins only, also with the owner on file.
   await expect(
-    { youtube: "vestra.youtube" },
-    'youtube = "zysilm"\n',
-    /plugins\/youtube: the "vestra\." prefix is reserved for the player's built-in plugins; the id must be zysilm\.youtube/,
+    { vestratube: "vestra.vestratube" },
+    'vestratube = "zysilm"\n',
+    /plugins\/vestratube: the "vestra\." prefix is reserved for the player's built-in plugins; the id must be zysilm\.vestratube/,
   );
   await expect(
-    { youtube: "vestra.youtube" },
-    'youtube = "Vestra"\n',
-    /plugins\/owners\.toml: youtube: "vestra" is reserved/,
+    { vestratube: "vestra.vestratube" },
+    'vestratube = "Vestra"\n',
+    /plugins\/owners\.toml: vestratube: "vestra" is reserved/,
   );
   await expect(
-    { youtube: "someone.youtube" },
-    'youtube = "zysilm"\n',
-    /id must be <owner>\.<directory>, here zysilm\.youtube, not "someone\.youtube"/,
+    { vestratube: "someone.vestratube" },
+    'vestratube = "zysilm"\n',
+    /id must be <owner>\.<directory>, here zysilm\.vestratube, not "someone\.vestratube"/,
   );
   await expect(
-    { youtube: "zysilm.yt" },
-    'youtube = "zysilm"\n',
-    /here zysilm\.youtube/,
+    // The old id kept after the directory was renamed.
+    { vestratube: "zysilm.youtube" },
+    'vestratube = "zysilm"\n',
+    /here zysilm\.vestratube/,
   );
   await expect(
-    { youtube: "youtube" },
-    'youtube = "zysilm"\n',
-    /here zysilm\.youtube/,
+    { vestratube: "vestratube" },
+    'vestratube = "zysilm"\n',
+    /here zysilm\.vestratube/,
   );
-  await expect({ youtube: "zysilm.youtube" }, null, /no owner; add youtube = /);
   await expect(
-    { youtube: "zysilm.youtube" },
-    'youtube = ["zysilm"]\n',
-    /youtube must be one GitHub user or organization/,
+    { vestratube: "zysilm.vestratube" },
+    null,
+    /no owner; add vestratube = /,
+  );
+  await expect(
+    { vestratube: "zysilm.vestratube" },
+    'vestratube = ["zysilm"]\n',
+    /vestratube must be one GitHub user or organization/,
   );
   const stray = await hosted(
-    { youtube: "zysilm.youtube" },
-    'youtube = "zysilm"\nbilibili = "zysilm"\n',
+    { vestratube: "zysilm.vestratube" },
+    'vestratube = "zysilm"\nvestrabili = "zysilm"\n',
   );
-  assert.match(stray.problems.join(), /bilibili is not a plugin directory/);
+  assert.match(stray.problems.join(), /vestrabili is not a plugin directory/);
 });
