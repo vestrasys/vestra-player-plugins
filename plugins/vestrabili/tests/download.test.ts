@@ -81,13 +81,21 @@ test("after consent the window shows the download, then plays", async () => {
   host.dialogAnswers.push({ confirmed: true, checked: false });
   await host.command("bilibili.open").run();
   const window = host.window("dialog");
-  let midway: unknown;
-  fake.midway = () => (midway = window.props.status);
+  // Hold the download halfway: the window must show its progress meanwhile.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  let halfway = false;
+  fake.midway = () => {
+    halfway = true;
+    return held;
+  };
   window.emit("play", link);
+  await until(host, () => halfway && /^正在下载 yt-dlp… \d+%$/.test(String(window.props.status)));
+  assert.equal(opens(host).length, 0, "nothing opens before yt-dlp is installed");
+  release();
   await until(host, () => opens(host).length === 1);
   assert.equal(host.confirmTexts[0]!.message, "下载 yt-dlp 以播放 Bilibili 链接？");
   assert.match(host.confirmTexts[0]!.detail!, /约 42 MB/);
-  assert.match(String(midway), /^正在下载 yt-dlp… \d+%$/);
   assert.equal(window.props.status, "正在解析视频和音频…");
   assert.deepEqual(await readFile(installed), BINARY);
   assert.equal(runs.length, 1);

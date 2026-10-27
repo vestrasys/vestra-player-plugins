@@ -62,8 +62,11 @@ export interface FakeGitHub {
   status?: number;
   /** Fail every request as an unreachable network does. */
   offline?: boolean;
-  /** Called before the asset's body ends (to cancel in the middle). */
-  midway?: () => void;
+  /**
+   * Called when half of the asset has been sent; the rest waits until the
+   * returned promise settles (to look at the progress, or to cancel, in the middle).
+   */
+  midway?: () => void | Promise<void>;
   /** Where followed redirects end (default: GitHub's release storage). */
   redirectTo?: string;
   /** Never answer (until the request is aborted). */
@@ -109,7 +112,7 @@ export function github(asset: string, release: Release): FakeGitHub {
           async pull(controller) {
             controller.enqueue(half);
             await new Promise((resolve) => setTimeout(resolve, 5));
-            fake.midway?.();
+            await fake.midway?.();
             await new Promise((resolve) => setTimeout(resolve, 5));
             if (signal?.aborted) return controller.error(signal.reason);
             if (fake.release.truncated) return controller.error(new TypeError("terminated"));
