@@ -116,7 +116,7 @@ check and the index build; those tests download from the npm registry.
 
 ```text
 plugins/<name>/   hosted third-party plugins (id <owner>.<name>): manifest.json, main.ts,
-                  .slint UI, tests/, README.md, CHANGELOG.md (vestratube, vestrabili)
+                  .slint UI, tests/, README.md, CHANGELOG.md (vestratube, vestrabili, vestranes)
 plugins/owners.toml  the owner of each hosted plugin
 registry/         third-party registrations, registry/<id>.toml (see the README)
 revoked.json      revoked plugin versions, copied into the index
