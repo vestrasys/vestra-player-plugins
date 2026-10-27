@@ -9,7 +9,7 @@ import type { TextError } from "@vestra-player/sdk";
 import activate, { fileNameFor } from "../main.ts";
 import { CHUNK_BYTES, downloadMedia } from "../download.ts";
 import { evaluate } from "../evaluator.ts";
-import { MAX_ROWS, PLACEHOLDER, THUMB_SIDE } from "../panel.ts";
+import { MAX_EMPTY_PAGES, MAX_ROWS, PLACEHOLDER, THUMB_SIDE } from "../panel.ts";
 import type { Fetcher, TubeFactory, TubeFormat, TubeInfo, TubeSearch } from "../youtube.ts";
 import {
   formatDuration,
@@ -680,6 +680,52 @@ test("infinite scroll: one load per page, rows above stay as they are, ↓ on th
     panel.emit("select-step", 1);
     await eventually(host, () => assert.equal(rows(host).length, 6));
     assert.equal(panel.props["can-more"], false, "no more results");
+  } finally {
+    await stop();
+  }
+});
+
+test("pages that add no row end the search after a few, instead of a request loop", async () => {
+  const { host, tube, stop } = await start({ thumbs: [] });
+  try {
+    // Every continuation repeats the known videos (or has only cards toVideo drops) and still
+    // offers a next page, as YouTube does for some searches.
+    let continuations = 0;
+    const repeat = (): TubeSearch =>
+      page([1, 2], () => {
+        continuations++;
+        return repeat();
+      });
+    tube.results = repeat;
+    await searchFor(host);
+    const panel = host.mounted();
+    // The view asks again whenever the row count stays and loading ends (changed more-ready).
+    for (let i = 0; i < 10 && panel.props["can-more"]; i++) {
+      panel.emit("more", rows(host).length);
+      await eventually(host, () => assert.equal(panel.props["loading-more"], false));
+    }
+    await host.settle();
+    assert.equal(continuations, MAX_EMPTY_PAGES, "a few empty pages, then the search ends");
+    assert.equal(panel.props["can-more"], false);
+    assert.equal(panel.props["more-error"], "", "not a failure: the list just ends");
+    assert.equal(rows(host).length, 2);
+    // A page that adds rows resets the count: 2 empty, 1 full, then up to 3 empty again.
+    let n = 0;
+    continuations = 0;
+    const mixed = (): TubeSearch =>
+      page(++n === 3 || n === 6 ? [n + 100] : [1], () => {
+        continuations++;
+        return mixed();
+      });
+    tube.results = mixed;
+    panel.emit("search", "mixed");
+    await eventually(host, () => assert.equal(rows(host).length, 1));
+    for (let i = 0; i < 20 && panel.props["can-more"]; i++) {
+      panel.emit("more", rows(host).length);
+      await eventually(host, () => assert.equal(panel.props["loading-more"], false));
+    }
+    assert.equal(rows(host).length, 1 + 2, "pages 3 and 6 added a row; then 7, 8, 9 were empty");
+    assert.equal(continuations, 8, "pages 2 to 9");
   } finally {
     await stop();
   }

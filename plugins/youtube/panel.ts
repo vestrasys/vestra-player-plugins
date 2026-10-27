@@ -26,6 +26,13 @@ export type PanelActions = {
 type Entry = { video: Video; thumb: ImageRef };
 type Phase = "start" | "searching" | "results" | "empty" | "failed";
 
+/**
+ * Continuation pages that add no row (every video known, or only shorts, channel and
+ * playlist cards) are followed this many times in a row before the search is treated as
+ * ended. Without a limit the view, seeing the row count unchanged, asks again at once:
+ * a request loop with nothing on screen while YouTube keeps answering such pages.
+ */
+export const MAX_EMPTY_PAGES = 3;
 /** A hidden row past the results (`rows` always has MAX_ROWS entries). */
 const BLANK_ROW = { key: "", title: "", channel: "", duration: "", live: false, failed: false };
 
@@ -42,6 +49,8 @@ export function mountPanel(plugin: Plugin, youtube: YouTube, actions: PanelActio
   let selected: string | null = null;
   const failed = new Set<string>();
   let more: Page["more"] = null;
+  /** Consecutive continuation pages that added no row (reset by a page that did). */
+  let emptyPages = 0;
   let loadingMore = false;
   /** Why the last page failed to load; automatic loading waits for Retry meanwhile. */
   let moreError: TextValue | null = null;
@@ -135,6 +144,7 @@ export function mountPanel(plugin: Plugin, youtube: YouTube, actions: PanelActio
 
   function addPage(page: Page, scope: Scope) {
     const known = new Set(entries.map((entry) => entry.video.id));
+    const before = entries.length;
     for (const video of page.videos) {
       if (entries.length >= MAX_ROWS) break;
       if (known.has(video.id)) continue;
@@ -153,7 +163,8 @@ export function mountPanel(plugin: Plugin, youtube: YouTube, actions: PanelActio
           () => {}, // the placeholder stays
         );
     }
-    more = entries.length < MAX_ROWS ? page.more : null;
+    emptyPages = entries.length > before ? 0 : emptyPages + 1;
+    more = entries.length < MAX_ROWS && emptyPages < MAX_EMPTY_PAGES ? page.more : null;
   }
 
   async function search(input: string) {
@@ -163,6 +174,7 @@ export function mountPanel(plugin: Plugin, youtube: YouTube, actions: PanelActio
     entries = [];
     selected = null;
     more = null;
+    emptyPages = 0;
     loadingMore = false;
     moreError = null;
     scrollTop++;

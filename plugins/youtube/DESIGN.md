@@ -167,6 +167,7 @@ the player's 32 MB per-view image budget.
 | Offline | `fetch` fails (`TypeError`, `ENOTFOUND`, `ECONNREFUSED`, `ECONNRESET`, `ETIMEDOUT`, `EAI_AGAIN`) | "No network connection." + Retry |
 | Library error | anything else the library throws | "YouTube search failed: {reason}" + Retry |
 | Loading the next page | a continuation is running | "Loading…" at the end of the list |
+| Next page adds no row (all known, or only shorts/channel/playlist cards) | the continuation answers but `count` stays | the view asks again at once (its row count did not grow); after 3 such pages in a row the search is treated as ended: no error, no Retry, nothing more to load. Otherwise this is a request loop with no feedback (independent review of 0.4.1) |
 | Next page fails | the continuation throws | the rows stay; at the end of the list the reason ("No network connection." or the library's) + Retry; no automatic retry until Retry |
 
 **A search** cancels the previous one: a newer search number discards the
