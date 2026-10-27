@@ -1,6 +1,6 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: zysilm.youtube 0.4.0\n"
+"Project-Id-Version: zysilm.youtube 0.4.1\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
@@ -28,19 +28,19 @@ msgstr ""
 msgid "Merging the video and audio…"
 msgstr ""
 
-#: download.ts:72
+#: download.ts:73
 msgid "ffmpeg was not found. Downloads use the ffmpeg that comes with Vestra Player."
 msgstr ""
 
-#: download.ts:73
+#: download.ts:74
 msgid "ffmpeg could not merge the video and audio: {}"
 msgstr ""
 
-#: download.ts:82
+#: download.ts:83
 msgid "The download finished without a complete MKV file."
 msgstr ""
 
-#: download.ts:115
+#: download.ts:116
 msgid "YouTube refused the download (HTTP {})."
 msgstr ""
 
@@ -84,44 +84,44 @@ msgstr ""
 msgid "Resolving the video…"
 msgstr ""
 
-#: main.ts:165 youtube.slint:13
+#: main.ts:166 youtube.slint:13
 msgid "Paste a YouTube video link to play or download it."
 msgstr ""
 
-#: main.ts:178
+#: main.ts:179
 msgid "Resolving and loading the video and audio…"
 msgstr ""
 
-#: main.ts:180
+#: main.ts:181
 msgid "The video is ready."
 msgstr ""
 
-#: main.ts:182
+#: main.ts:183
 msgid "A download is already running."
 msgstr ""
 
-#: main.ts:187
+#: main.ts:188
 msgid "No save location was chosen."
 msgstr ""
 
-#: main.ts:190 main.ts:230
+#: main.ts:191 main.ts:231
 msgid "Saved: {}"
 msgstr ""
 
-#: main.ts:195
+#: main.ts:196
 msgid "Cancelled."
 msgstr ""
 
-#: main.ts:234
+#: main.ts:235
 msgid "Download cancelled."
 msgstr ""
 
 #. the plugin's name (a brand); usually kept as it is.
-#: main.ts:251 manifest.json panel.ts:51 youtube.slint:8
+#: main.ts:252 manifest.json panel.ts:55 youtube.slint:8
 msgid "VestraTube"
 msgstr ""
 
-#: main.ts:258
+#: main.ts:259
 msgid "YouTube Link…"
 msgstr ""
 
@@ -145,55 +145,51 @@ msgstr ""
 msgid "download"
 msgstr ""
 
-#: panel.ts:64
-msgid "Search YouTube to find videos."
+#: panel.ts:70
+msgid "Search and press Enter"
 msgstr ""
 
-#: panel.ts:66
+#: panel.ts:72
 msgid "Searching…"
 msgstr ""
 
-#: panel.ts:68
+#: panel.ts:74
 msgid "No videos found."
 msgstr ""
 
-#: panel.ts:164 youtube.ts:231
+#: panel.ts:187 panel.ts:210 youtube.ts:235
 msgid "No network connection."
 msgstr ""
 
-#: panel.ts:237 youtube.slint:59
+#: panel.ts:273 youtube.slint:59
 msgid "Play"
 msgstr ""
 
-#: panel.ts:245 sidebar.slint:325
+#: panel.ts:281 sidebar.slint:382
 msgid "Download…"
 msgstr ""
 
-#: panel.ts:254 sidebar.slint:319
+#: panel.ts:290 sidebar.slint:376
 msgid "Cancel Download"
 msgstr ""
 
-#: sidebar.slint:117
+#: sidebar.slint:165
 msgid "Search YouTube"
 msgstr ""
 
-#: sidebar.slint:186
+#: sidebar.slint:243
 msgid "LIVE"
 msgstr ""
 
-#: sidebar.slint:258
-msgid "Retry"
-msgstr ""
-
-#: sidebar.slint:272
+#: sidebar.slint:303
 msgid "Loading…"
 msgstr ""
 
-#: sidebar.slint:272
-msgid "More results"
+#: sidebar.slint:310 sidebar.slint:332
+msgid "Retry"
 msgstr ""
 
-#: sidebar.slint:311
+#: sidebar.slint:368
 msgid "Open URL…"
 msgstr ""
 
@@ -209,42 +205,42 @@ msgstr ""
 msgid "Cancel"
 msgstr ""
 
-#: youtube.ts:102
+#: youtube.ts:106
 msgid "Enter the full link of a YouTube video."
 msgstr ""
 
-#: youtube.ts:105
+#: youtube.ts:109
 msgid "Only HTTPS YouTube video links are supported."
 msgstr ""
 
-#: youtube.ts:107
+#: youtube.ts:111
 msgid "Enter the link of a single YouTube video (watch, shorts, live or youtu.be)."
 msgstr ""
 
-#: youtube.ts:246 youtube.ts:257
+#: youtube.ts:250 youtube.ts:261
 msgid "YouTube search failed: {}"
 msgstr ""
 
-#: youtube.ts:318
+#: youtube.ts:322
 msgid "YouTube refused this video's streams. Try again later."
 msgstr ""
 
-#: youtube.ts:321
+#: youtube.ts:325
 msgid "VestraTube could not read this video: {}. A newer version of the plugin may fix it."
 msgstr ""
 
-#: youtube.ts:323
+#: youtube.ts:329
 msgid "This video has no stream the player can play."
 msgstr ""
 
-#: youtube.ts:329
+#: youtube.ts:335
 msgid "YouTube asked to confirm you're not a bot. This network is flagged; try another network."
 msgstr ""
 
-#: youtube.ts:330
+#: youtube.ts:336
 msgid "YouTube: {}"
 msgstr ""
 
-#: youtube.ts:330
+#: youtube.ts:336
 msgid "YouTube can't play this video ({})."
 msgstr ""

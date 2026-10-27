@@ -26,7 +26,10 @@ export type PanelActions = {
 type Entry = { video: Video; thumb: ImageRef };
 type Phase = "start" | "searching" | "results" | "empty" | "failed";
 
-/** The sidebar panel: search, rows with thumbnails, More results, and the bottom bar. */
+/** A hidden row past the results (`rows` always has MAX_ROWS entries). */
+const BLANK_ROW = { key: "", title: "", channel: "", duration: "", live: false, failed: false };
+
+/** The sidebar panel: search, rows with thumbnails (more as the list nears its end), and the bottom bar. */
 export function mountPanel(plugin: Plugin, youtube: YouTube, actions: PanelActions) {
   const { text } = plugin.i18n;
   const placeholder = plugin.ui.image(PLACEHOLDER);
@@ -40,6 +43,8 @@ export function mountPanel(plugin: Plugin, youtube: YouTube, actions: PanelActio
   const failed = new Set<string>();
   let more: Page["more"] = null;
   let loadingMore = false;
+  /** Why the last page failed to load; automatic loading waits for Retry meanwhile. */
+  let moreError: TextValue | null = null;
   let scrollTop = 0;
   /** A newer search makes older answers stale (youtubei.js cannot abort a request). */
   let generation = 0;
@@ -60,7 +65,9 @@ export function mountPanel(plugin: Plugin, youtube: YouTube, actions: PanelActio
   function message(): TextValue {
     switch (phase) {
       case "start":
-        return text("Search YouTube to find videos.");
+        // No feed before a search: logged out, YouTube's home feed is empty ("history is off")
+        // and its trending and explore pages are gone (DESIGN.md §1, non-goals).
+        return text("Search and press Enter");
       case "searching":
         return text("Searching…");
       case "empty":
@@ -76,23 +83,33 @@ export function mountPanel(plugin: Plugin, youtube: YouTube, actions: PanelActio
     const current = videoIdOf(plugin.player.state.source);
     const job = actions.downloading;
     return {
-      // One image per row (SDK 1.5.19, player 0.5.1: an ImageRef at any depth).
-      rows: entries.map(({ video, thumb }) => ({
-        key: video.id,
-        title: video.title,
-        channel: video.channel,
-        duration: formatDuration(video.seconds),
-        live: video.live,
-        thumb,
-        selected: video.id === selected,
-        playing: video.id === current,
-        failed: failed.has(video.id),
-      })),
+      // Plain values only, and always MAX_ROWS of them, so the player updates a changed row in
+      // place and never rebuilds the row elements under the pointer (a rebuilt row loses a
+      // double-click in progress): it replaces a model that holds images or changes length.
+      // A new page fills blank rows. The thumbnails, the selection and the playing video live
+      // in properties of their own.
+      rows: Array.from({ length: MAX_ROWS }, (_, index) => {
+        const video = entries[index]?.video;
+        if (!video) return BLANK_ROW;
+        return {
+          key: video.id,
+          title: video.title,
+          channel: video.channel,
+          duration: formatDuration(video.seconds),
+          live: video.live,
+          failed: failed.has(video.id),
+        };
+      }),
+      count: entries.length,
+      thumbs: entries.map(({ thumb }) => thumb),
+      selectedIndex: entries.findIndex((entry) => entry.video.id === selected),
+      playingKey: current ?? "",
       query,
       message: message(),
       canRetry: phase === "failed",
-      canMore: more !== null && !loadingMore,
+      canMore: more !== null && !loadingMore && moreError === null,
       loadingMore,
+      moreError: moreError ?? "",
       canDownload: selected !== null && !job.running,
       downloading: job.running,
       progress: job.fraction ?? -1,
@@ -147,6 +164,7 @@ export function mountPanel(plugin: Plugin, youtube: YouTube, actions: PanelActio
     selected = null;
     more = null;
     loadingMore = false;
+    moreError = null;
     scrollTop++;
     const scope = freshImages();
     if (!term) {
@@ -170,19 +188,26 @@ export function mountPanel(plugin: Plugin, youtube: YouTube, actions: PanelActio
     }
   }
 
-  async function loadMore() {
+  /**
+   * The next page, once: `seen` is the number of rows the view had when it asked (scrolling
+   * near the end, ↓ on the last row), so a request for a page already added is ignored, and
+   * one already loading is not asked for again.
+   */
+  async function loadMore(seen = entries.length) {
     const next = more;
     const scope = images;
-    if (!next || !scope || loadingMore) return;
+    if (!next || !scope || loadingMore || seen !== entries.length) return;
     const mine = generation;
     loadingMore = true;
+    moreError = null;
     plugin.update();
     try {
       const page = await next();
       if (mine !== generation) return;
       addPage(page, scope);
     } catch (error) {
-      if (mine === generation) show(reason(error));
+      if (mine !== generation) return;
+      moreError = isOffline(error) ? text("No network connection.") : reason(error);
     } finally {
       if (mine === generation) loadingMore = false;
     }
@@ -208,11 +233,14 @@ export function mountPanel(plugin: Plugin, youtube: YouTube, actions: PanelActio
     }
   }
 
-  function step(by: number) {
-    if (!entries.length) return;
+  function step(by: number): Promise<void> | undefined {
+    if (!entries.length) return undefined;
     const at = entries.findIndex((entry) => entry.video.id === selected);
     const next = at < 0 ? (by > 0 ? 0 : entries.length - 1) : Math.max(0, Math.min(entries.length - 1, at + by));
     selected = entries[next]!.video.id;
+    // ↓ onto the last row loads the next page, as scrolling there does.
+    if (by > 0 && next === entries.length - 1 && moreError === null) return loadMore();
+    return undefined;
   }
 
   panel.on("query-changed", (value: string) => {
@@ -222,7 +250,11 @@ export function mountPanel(plugin: Plugin, youtube: YouTube, actions: PanelActio
   });
   panel.on("search", (value: string) => search(value));
   panel.on("retry", () => search(searched));
-  panel.on("more", () => loadMore());
+  panel.on("more", (seen: number) => loadMore(seen));
+  panel.on("retry-more", () => {
+    moreError = null;
+    return loadMore();
+  });
   panel.on("select", (key: string) => {
     if (entries.some((entry) => entry.video.id === key)) selected = key;
   });

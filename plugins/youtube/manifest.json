@@ -1,6 +1,6 @@
 {
   "id": "zysilm.youtube",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "apiVersion": "vestra/1",
   "entry": "main.ts",
   "capabilities": [

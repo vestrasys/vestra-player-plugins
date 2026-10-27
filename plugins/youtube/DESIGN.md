@@ -30,9 +30,21 @@ ships Node and ffmpeg.
 
 **Non-goals.** Signing in, cookies, comments, subscriptions, a home feed or
 trending (YouTube retired trending in 2025, and the logged-out home feed is
-not reliable), playlists and channels as lists, subtitles from YouTube,
+not reliable; see "Nothing before a search" below), playlists and channels as lists, subtitles from YouTube,
 qualities above 1080p, and an extractor of our own: if YouTube breaks the
 library, we wait for the library's fix and ship it (user ruling).
+
+**Nothing before a search (0.4.1).** The panel shows one hint line until
+the user searches, and asks YouTube nothing. Measured with youtubei.js
+18.3.0, logged out, 2026-10-26: `getHomeFeed()` answers a `RichGrid` with
+0 videos and a `FeedNudge` "Your YouTube history is off"; `/browse`
+`FEtrending` and `FEexplore` answer HTTP 400; the library has no
+`getTrending` any more; `getGuide()` lists only Home, Subscriptions, You,
+History, Music, Movies & TV and Live. YouTube's own topic channels (Live,
+News, Sports) still list videos, but the library parses their pages only
+partly (no title, tabs "N/A") and their content is regional and editorial,
+so none of these is a reliable logged-out feed. A local history of searches
+or plays was considered and left out (user ruling, 2026-10-26).
 
 **Preconditions, independent of other plugins.** Vestra Player 0.5.1 or
 later (images in list rows), a network connection, and for downloads the
@@ -45,7 +57,7 @@ playlist or any other plugin is loaded; it shares the sidebar as a tab.
 | --- | --- | --- | --- | --- | --- |
 | Show the VestraTube panel | **Open ▸ VestraTube** | the sidebar's tab strip (when there are several tabs) | shows the sidebar and makes its tab current | always | `panel.state` |
 | Search | — | the panel's search box, Enter | runs | text not empty | the plugin's search state |
-| More results | — | **More results** under the list | runs | the search has a continuation | the search's continuation |
+| Next page (0.4.1) | — | scrolling to within one screen of the list's end; ↓ onto the last row; **Retry** at the end after a failure | runs | the search has a continuation, none is loading, the last one did not fail | the search's continuation |
 | Play a result | — | double-click a row; Enter on the selected row (panel key); right-click ▸ **Play** | runs (`player.open` of the watch URL) | a row is selected | `player.state` |
 | Download a result | — | right-click ▸ **Download…**; the bottom bar's **Download…** | opens the save dialog, then runs | a row is selected and no download runs | the plugin's download state |
 | Cancel the download | — | the bottom bar's **Cancel Download**; right-click ▸ **Cancel Download** | runs | a download runs | the plugin's download state |
@@ -77,20 +89,47 @@ and the player remembers the sidebar's visibility.
 │ └─────────┘                         │  (1 line, dim). Selection: Theme.selected-bg;
 │ …                                   │  the playing video: Theme.playing + 2px bar;
 │                                     │  a failed one: the `failed` icon.
-│            More results             │  while the search has a continuation
+│              Loading…               │  at the end while the next page loads
+│     No network connection. [Retry]  │  …or why it failed (0.4.1: no More results button)
 ├─────────────────────────────────────┤
 │ ════════════════════                │  2 px progress line while downloading
 │ [Open URL…]           [Download…]   │  bottom bar, 35 px
 └─────────────────────────────────────┘
 ```
 
-- **Control order (Tab):** search box, list, More results, Open URL…,
+- **Control order (Tab):** search box, list, Retry (after a failed page), Open URL…,
   Download….
 - **Keys:** in the search box Enter searches and Esc clears it; in the list
   ↑/↓ move the selection and Enter plays (a `focus: "panel"` binding, as the
   playlist's).
-- **Mouse:** click selects; double-click plays; right-click selects and
-  opens the menu (Play, Download… or Cancel Download).
+- **Mouse:** click selects; double-click plays, anywhere on the row;
+  right-click selects and opens the menu (Play, Download… or Cancel
+  Download). The rows have no tooltip: while the player's tooltip popup is
+  open it takes the next press to close itself, which ate the first click
+  of a double-click (0.4.0). A title longer than two lines is elided.
+- **Rows are updated in place (0.4.1).** The `rows` property holds only
+  plain values (key, title, channel, duration, live, failed). The
+  thumbnails are a parallel `thumbs` list, and the selection and the
+  playing video are the keys `selected-key` and `playing-key`. The player
+  updates a model of plain rows row by row, but replaces a model that holds
+  images as a whole, which rebuilt every row element on each click (the
+  selection) and each arriving thumbnail; a rebuilt row loses the
+  double-click in progress (Slint counts clicks per element).
+- **Infinite scroll (0.4.1).** The list asks for the next page (`more(count)`) when the
+  part below the visible rows is less than one screen high: on every scroll, resize and
+  new page, so a list shorter than two screens fills itself. ↓ onto the last row asks
+  too. The plugin loads a page once: it ignores a request while one runs and a request
+  whose `count` is not the current row count (a page already added). A failed page
+  stops automatic loading and shows the reason with Retry at the end. The
+  **More results** button of 0.4.0 is gone: Retry covers the failure, and at the
+  last page there is nothing to offer. Because the player replaces a model whose
+  length changes, `rows` always holds 200 entries (the first `count` shown, the
+  rest blank and 0 px high), and the list is a ScrollView rather than a ListView
+  (whose height estimate does not suit hidden rows); 200 small rows are cheap.
+- **Search box:** `Theme.font-tab`, the size of the result titles (0.4.0
+  used the smaller `font-body`); its text selection uses the std-widgets
+  `Palette.selection-background` and `selection-foreground`, as the
+  std-widgets LineEdit does, legible in both palettes.
 - **Focus:** while the search box has focus the panel asks the player to
   keep it up (`setInteraction({ focused: true })`), so it does not hide in
   fullscreen while the user types.
@@ -121,13 +160,14 @@ the player's 32 MB per-view image budget.
 
 | State | Detection | Shown |
 | --- | --- | --- |
-| Nothing searched yet | start | "Search YouTube to find videos." |
+| Nothing searched yet | start (no request to YouTube) | "Search and press Enter" |
 | Searching | a search is running | "Searching…" (the old rows are cleared at once) |
 | Results | ≥ 1 video | the rows |
 | Empty | 0 videos | "No videos found." |
 | Offline | `fetch` fails (`TypeError`, `ENOTFOUND`, `ECONNREFUSED`, `ECONNRESET`, `ETIMEDOUT`, `EAI_AGAIN`) | "No network connection." + Retry |
 | Library error | anything else the library throws | "YouTube search failed: {reason}" + Retry |
-| More results fails | the continuation throws | the rows stay; OSD with the reason |
+| Loading the next page | a continuation is running | "Loading…" at the end of the list |
+| Next page fails | the continuation throws | the rows stay; at the end of the list the reason ("No network connection." or the library's) + Retry; no automatic retry until Retry |
 
 **A search** cancels the previous one: a newer search number discards the
 older answer (youtubei.js takes no `AbortSignal`). Searching again with the
@@ -313,7 +353,7 @@ resolves new URLs.
 | --- | --- | --- |
 | Open ▸ VestraTube | the sidebar shows the VestraTube tab with the empty-state line | GUI screenshot (coordinator); test: `panel.show` |
 | Type "big buck bunny", Enter | "Searching…", then rows with thumbnails, titles, durations, channels | GUI; test: mocked youtubei.js → rows, `host.images` |
-| More results | more rows appended; the list keeps its scroll | GUI; test: continuation |
+| Scroll the results down with the wheel | near the end "Loading…", then more rows; the list keeps its scroll and the rows above are not rebuilt; at 200 rows or the last page, nothing more | GUI; tests: continuation, one load per page, rows in place |
 | Double-click a row | the video plays (1080p H.264 + audio), the row turns to the playing colour | GUI; test: `source.submit` of the watch URL, resolver output |
 | Pull the network, search | "No network connection." + Retry; Retry after reconnecting works | test (fetch failure), GUI |
 | A video that cannot play (age-restricted, private) | OSD with YouTube's reason; the row shows the failed icon | test (playability), GUI |
