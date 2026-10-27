@@ -1,0 +1,8 @@
+# Terms from YouTube used in the VestraTube plugin and its tests.
+[default.extend-identifiers]
+# A video id used as a test fixture.
+BaW_jenozKc = "BaW_jenozKc"
+
+[default.extend-words]
+# The content-length field of a YouTube stream format.
+clen = "clen"
