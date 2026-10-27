@@ -55,6 +55,8 @@ export function mountPanel(plugin: Plugin, youtube: YouTube, actions: PanelActio
   /** Why the last page failed to load; automatic loading waits for Retry meanwhile. */
   let moreError: TextValue | null = null;
   let scrollTop = 0;
+  /** How far the list is scrolled (logical px): a newly made list starts there (`show-y`). */
+  let scrollY = 0;
   /** A newer search makes older answers stale (youtubei.js cannot abort a request). */
   let generation = 0;
   /** The thumbnails of the current search; replaced (and released) by the next one. */
@@ -124,6 +126,7 @@ export function mountPanel(plugin: Plugin, youtube: YouTube, actions: PanelActio
       progress: job.fraction ?? -1,
       progressText: job.message,
       scrollTop,
+      showY: scrollY,
     };
   });
 
@@ -178,6 +181,8 @@ export function mountPanel(plugin: Plugin, youtube: YouTube, actions: PanelActio
     loadingMore = false;
     moreError = null;
     scrollTop++;
+    // Also while the panel is hidden: the next list it makes starts at the top.
+    scrollY = 0;
     const scope = freshImages();
     if (!term) {
       phase = "start";
@@ -263,6 +268,11 @@ export function mountPanel(plugin: Plugin, youtube: YouTube, actions: PanelActio
   panel.on("search", (value: string) => search(value));
   panel.on("retry", () => search(searched));
   panel.on("more", (seen: number) => loadMore(seen));
+  // Kept for the next list the player makes (the view reports every scroll, also the reset of
+  // a new search, and its own clamping).
+  panel.on("scrolled", (y: number) => {
+    if (Number.isFinite(y)) scrollY = Math.max(0, y);
+  });
   panel.on("retry-more", () => {
     moreError = null;
     return loadMore();

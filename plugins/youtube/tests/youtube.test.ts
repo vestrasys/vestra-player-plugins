@@ -449,7 +449,7 @@ test("the manifest's display texts are English with a Simplified Chinese transla
   const manifest = JSON.parse(await readFile(new URL("manifest.json", directory), "utf8"));
   assert.equal(manifest.id, "zysilm.youtube", "the id stays: the store and existing installs know the plugin by it");
   assert.equal(manifest.name, "VestraTube");
-  assert.equal(manifest.version, "0.4.1");
+  assert.equal(manifest.version, "0.4.2");
   assert.equal(manifest.minPlayerVersion, "0.5.1", "images in rows");
   assert.ok(manifest.capabilities.includes("ui.mount"));
   for (const value of [manifest.name, manifest.punchline, manifest.description, ...manifest.tags])
@@ -606,6 +606,33 @@ test("a newer search wins over an older answer", async () => {
       rows(host).map((row) => row.key),
       [vid(2)],
     );
+  } finally {
+    await stop();
+  }
+});
+
+test("the list's scroll and selection are kept for the next list the player makes; a new search starts at the top", async () => {
+  const { host, tube, stop } = await start({ thumbs: [] });
+  try {
+    tube.results = () => page([1, 2, 3, 4]);
+    await searchFor(host);
+    const panel = host.mounted();
+    assert.equal(panel.props["show-y"], 0);
+    panel.emit("select", vid(3));
+    panel.emit("scrolled", 124);
+    await eventually(host, () => assert.equal(panel.props["show-y"], 124));
+    assert.equal(panel.props["selected-index"], 2);
+    // Values a view cannot mean are not kept.
+    panel.emit("scrolled", -5);
+    await eventually(host, () => assert.equal(panel.props["show-y"], 0));
+    panel.emit("scrolled", 186);
+    panel.emit("scrolled", Number.NaN);
+    await eventually(host, () => assert.equal(panel.props["show-y"], 186));
+    // A new search scrolls back to the top, also for a list made while the panel was hidden.
+    const top = panel.props["scroll-top"];
+    panel.emit("search", "again");
+    await eventually(host, () => assert.equal(panel.props["scroll-top"], (top as number) + 1));
+    assert.equal(panel.props["show-y"], 0);
   } finally {
     await stop();
   }

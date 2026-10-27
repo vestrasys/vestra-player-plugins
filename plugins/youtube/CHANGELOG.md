@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.2
+
+- **The results keep their scroll position.** Switching to another sidebar tab and back, hiding and showing the sidebar, detaching it, or the player rebuilding its main window (when any plugin adds or removes a panel, for example a built-in plugin restarting) used to put the list back at the top. The list now opens where you left it, with the same row selected. A new search still starts at the top.
+
 ## 0.4.1
 
 - **Double-click plays at once, anywhere on a row.** In 0.4.0 a double-click on the title or channel of a row that was not yet selected often only selected it. Two causes: every click and every arriving thumbnail made the player rebuild all the rows, which lost the double-click in progress, and the title tooltip, once shown, swallowed the next click. The rows are now updated in place, and they no longer have a title tooltip. Click still selects; right-click, ↑/↓ and Enter work as before.

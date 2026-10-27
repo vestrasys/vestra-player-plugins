@@ -126,6 +126,13 @@ and the player remembers the sidebar's visibility.
   length changes, `rows` always holds 200 entries (the first `count` shown, the
   rest blank and 0 px high), and the list is a ScrollView rather than a ListView
   (whose height estimate does not suit hidden rows); 200 small rows are cheap.
+- **Scroll position (0.4.2).** The player makes the panel's component anew each time
+  it shows (its tab, the sidebar shown again or detached) and whenever it rebuilds the
+  main window (any plugin mounting or unmounting a panel), and restores only the bridge
+  properties the plugin wrote. So the list reports its scroll (`scrolled(y)`), the
+  plugin keeps it and writes it back as `show-y`, and a new list starts there (`init`),
+  as the built-in playlist does. A new search sets it to 0, also while the panel is
+  hidden. The selection is a bridge property already.
 - **Search box:** `Theme.font-tab`, the size of the result titles (0.4.0
   used the smaller `font-body`); its text selection uses the std-widgets
   `Palette.selection-background` and `selection-foreground`, as the
@@ -355,6 +362,7 @@ resolves new URLs.
 | Open ▸ VestraTube | the sidebar shows the VestraTube tab with the empty-state line | GUI screenshot (coordinator); test: `panel.show` |
 | Type "big buck bunny", Enter | "Searching…", then rows with thumbnails, titles, durations, channels | GUI; test: mocked youtubei.js → rows, `host.images` |
 | Scroll the results down with the wheel | near the end "Loading…", then more rows; the list keeps its scroll and the rows above are not rebuilt; at 200 rows or the last page, nothing more | GUI; tests: continuation, one load per page, rows in place |
+| Scroll the results down, switch to the Playlist tab and back (or a built-in plugin restarts) | the list is where it was, the same row selected; a new search starts at the top | GUI; test: `scrolled` → `show-y`, reset by a search |
 | Double-click a row | the video plays (1080p H.264 + audio), the row turns to the playing colour | GUI; test: `source.submit` of the watch URL, resolver output |
 | Pull the network, search | "No network connection." + Retry; Retry after reconnecting works | test (fetch failure), GUI |
 | A video that cannot play (age-restricted, private) | OSD with YouTube's reason; the row shows the failed icon | test (playability), GUI |
