@@ -1,0 +1,22 @@
+{
+  "id": "zysilm.vestranes",
+  "version": "0.4.0",
+  "apiVersion": "vestra/1",
+  "entry": "main.ts",
+  "capabilities": [
+    "commands",
+    "ui.window",
+    "ui.dialog",
+    "playback.read",
+    "playback.control",
+    "producer.av"
+  ],
+  "name": "VestraNES",
+  "author": "zysilm",
+  "punchline": "Play NES games in the player, with the keyboard",
+  "description": "An NES (Famicom) emulator for Vestra Player: load an iNES ROM from Games ▸ VestraNES and its picture and sound play in the player. While the small VestraNES window is in front, the keyboard is the controller: arrow keys, X, Z, A and S; the player's own shortcuts are not affected. Emulation by the bundled open-source library JSNES. No games included.",
+  "tags": ["Games", "Emulator"],
+  "sourceUrl": "https://github.com/vestrasys/vestra-player-plugins/tree/main/plugins/vestranes",
+  "license": "Apache-2.0",
+  "minPlayerVersion": "0.5.8"
+}

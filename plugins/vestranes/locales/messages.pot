@@ -1,0 +1,149 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: zysilm.vestranes 0.4.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: core.ts:68
+msgid "The emulator frame has an invalid size."
+msgstr ""
+
+#: core.ts:94 main.ts:125
+msgid "This is not an NES ROM in iNES format."
+msgstr ""
+
+#: core.ts:97
+msgid "The ROM file is incomplete: shorter than its header says."
+msgstr ""
+
+#: core.ts:110
+msgid "JSNES does not support mapper {} of this ROM."
+msgstr ""
+
+#: core.ts:110
+msgid "JSNES could not load this ROM: {}"
+msgstr ""
+
+#: core.ts:120
+msgid "This ROM is too slow to emulate (it may be damaged)."
+msgstr ""
+
+#: core.ts:123
+msgid "The emulator produced invalid audio data."
+msgstr ""
+
+#: main.ts:42
+msgid "Load NES ROM"
+msgstr ""
+
+#: main.ts:113 main.ts:114 main.ts:115 manifest.json
+msgid "Games"
+msgstr ""
+
+#: main.ts:113 main.ts:114 main.ts:115 manifest.json nes.slint:25
+msgid "VestraNES"
+msgstr ""
+
+#: main.ts:113 nes.slint:123
+msgid "Load ROM…"
+msgstr ""
+
+#: main.ts:114 nes.slint:124
+msgid "Stop"
+msgstr ""
+
+#: main.ts:115
+msgid "VestraNES Window…"
+msgstr ""
+
+#: main.ts:120
+msgid "The ROM file is larger than the 16 MiB limit."
+msgstr ""
+
+#: main.ts:123 main.ts:147
+msgid "This is a folder, not a ROM file."
+msgstr ""
+
+#: main.ts:145
+msgid "The ROM file was not found."
+msgstr ""
+
+#: main.ts:146
+msgid "No permission to read the ROM file."
+msgstr ""
+
+#: manifest.json
+msgid "Play NES games in the player, with the keyboard"
+msgstr ""
+
+#: manifest.json
+msgid "An NES (Famicom) emulator for Vestra Player: load an iNES ROM from Games ▸ VestraNES and its picture and sound play in the player. While the small VestraNES window is in front, the keyboard is the controller: arrow keys, X, Z, A and S; the player's own shortcuts are not affected. Emulation by the bundled open-source library JSNES. No games included."
+msgstr ""
+
+#: manifest.json
+msgid "Emulator"
+msgstr ""
+
+#: nes.slint:36
+msgid "Running {} · 256×240 · 48 kHz stereo"
+msgstr ""
+
+#: nes.slint:37
+msgid "Stopped."
+msgstr ""
+
+#: nes.slint:38
+msgid "Replaced by another source."
+msgstr ""
+
+#: nes.slint:39
+msgid "Emulator stopped: {}"
+msgstr ""
+
+#: nes.slint:40
+msgid "Emulator stopped: the source ended."
+msgstr ""
+
+#: nes.slint:41
+msgid "Error: {}"
+msgstr ""
+
+#: nes.slint:42
+msgid "Error: timed out preparing the first audio and video buffers."
+msgstr ""
+
+#: nes.slint:43
+msgid "Error: timed out waiting for the emulator source to start."
+msgstr ""
+
+#: nes.slint:44
+msgid "Error: start-up timed out."
+msgstr ""
+
+#: nes.slint:45
+msgid "Error: the audio device is not ready."
+msgstr ""
+
+#: nes.slint:46
+msgid "Load an iNES ROM file."
+msgstr ""
+
+#: nes.slint:107
+msgid "While this window is in front, these keys control the game. The player's shortcuts are not affected."
+msgstr ""
+
+#: nes.slint:114
+msgid "D-pad"
+msgstr ""
+
+#: nes.slint:114
+msgid "Arrow keys"
+msgstr ""
+
+#: nes.slint:117
+msgid "Select"
+msgstr ""
+
+#: nes.slint:118
+msgid "Start"
+msgstr ""

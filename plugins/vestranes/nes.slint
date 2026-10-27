@@ -1,0 +1,128 @@
+import { Theme } from "@vestra/theme.slint";
+import { Button } from "@vestra/widgets.slint";
+
+// One row of the key table: the NES button, then the key.
+component KeyRow inherits HorizontalLayout {
+    in property <string> button;
+    in property <string> key;
+    spacing: 8px;
+    Text {
+        width: 96px;
+        text: root.button;
+        color: Theme.text-dim;
+        font-size: Theme.font-body;
+        vertical-alignment: center;
+    }
+    Text {
+        text: root.key;
+        color: Theme.text-list;
+        font-size: Theme.font-body;
+        vertical-alignment: center;
+    }
+}
+
+export component NesWindow inherits Window {
+    title: @tr("VestraNES");
+    width: 340px;
+    background: Theme.bg-panel;
+    // Keys go to the game while this window has the keyboard focus.
+    forward-focus: keys;
+    // The status from main.ts: a state, the ROM's file name, a reason in the player's words.
+    in property <string> state: "idle";
+    in property <string> rom;
+    in property <string> detail;
+    in property <bool> running: false;
+    property <string> status:
+        root.state == "running" ? @tr("Running {} · 256×240 · 48 kHz stereo", root.rom)
+        : root.state == "stopped" ? @tr("Stopped.")
+        : root.state == "replaced" ? @tr("Replaced by another source.")
+        : root.state == "halted" ? @tr("Emulator stopped: {}", root.detail)
+        : root.state == "ended" ? @tr("Emulator stopped: the source ended.")
+        : root.state == "error" ? @tr("Error: {}", root.detail)
+        : root.state == "prefillTimeout" ? @tr("Error: timed out preparing the first audio and video buffers.")
+        : root.state == "activationTimeout" ? @tr("Error: timed out waiting for the emulator source to start.")
+        : root.state == "timeout" ? @tr("Error: start-up timed out.")
+        : root.state == "device" ? @tr("Error: the audio device is not ready.")
+        : @tr("Load an iNES ROM file.");
+    callback load-rom();
+    callback stop();
+    // A key went down or up while a game runs: its text as Slint reports it
+    // (the character it types in the current layout; Slint 1.18 reports no
+    // physical key) and, for a press, whether Ctrl, Alt or ⌘/Win was held.
+    // The plugin maps it (core.ts: arrows, X, Z, A, S) and tracks which key
+    // pressed which button.
+    callback key(string, bool, bool);
+    // Every button up: the window lost the keyboard focus.
+    callback release-all();
+    keys := FocusScope {
+        // Keys go to the game only while one runs. A press with Ctrl, Alt or
+        // ⌘/Win is reported but stays the window's (rejected); the standard
+        // close keys never get here. Auto-repeats are swallowed: a held key is
+        // one press.
+        key-pressed(event) => {
+            if !root.running {
+                return reject;
+            }
+            if event.modifiers.control || event.modifiers.alt || event.modifiers.meta {
+                if !event.repeat {
+                    root.key(event.text, true, true);
+                }
+                return reject;
+            }
+            if !event.repeat {
+                root.key(event.text, true, false);
+            }
+            accept
+        }
+        // Releases always count, whatever modifier went down in between.
+        key-released(event) => {
+            if !root.running {
+                return reject;
+            }
+            root.key(event.text, false, false);
+            accept
+        }
+        // Another window came to the front, or the window was minimized:
+        // nothing stays held.
+        focus-changed-event(reason) => {
+            if !self.has-focus {
+                root.release-all();
+            }
+        }
+        VerticalLayout {
+            padding: Theme.dialog-padding;
+            spacing: 8px;
+            // Two lines at most. No tooltip: a tooltip is a popup, and a popup
+            // takes the keyboard focus from the game while it shows.
+            Text {
+                height: 2 * Theme.label-height;
+                text: root.status;
+                color: Theme.text-list;
+                font-size: Theme.font-body;
+                wrap: word-wrap;
+                overflow: elide;
+                vertical-alignment: center;
+            }
+            Text {
+                text: @tr("While this window is in front, these keys control the game. The player's shortcuts are not affected.");
+                color: Theme.text-dim;
+                font-size: Theme.font-body;
+                wrap: word-wrap;
+            }
+            VerticalLayout {
+                spacing: 2px;
+                KeyRow { button: @tr("D-pad"); key: @tr("Arrow keys"); }
+                KeyRow { button: "A"; key: "X"; }
+                KeyRow { button: "B"; key: "Z"; }
+                KeyRow { button: @tr("Select"); key: "A"; }
+                KeyRow { button: @tr("Start"); key: "S"; }
+            }
+            HorizontalLayout {
+                spacing: 6px;
+                Rectangle { horizontal-stretch: 1; }
+                Button { text: @tr("Load ROM…"); clicked => { root.load-rom(); } }
+                Button { text: @tr("Stop"); enabled: root.running; clicked => { root.stop(); } }
+            }
+        }
+    }
+}

@@ -1,0 +1,150 @@
+msgid ""
+msgstr ""
+"Language: zh-Hans\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#: core.ts:68
+msgid "The emulator frame has an invalid size."
+msgstr "模拟器画面尺寸无效。"
+
+#: core.ts:94 main.ts:125
+msgid "This is not an NES ROM in iNES format."
+msgstr "这不是 iNES 格式的 NES ROM 文件。"
+
+#: core.ts:97
+msgid "The ROM file is incomplete: shorter than its header says."
+msgstr "ROM 文件不完整：比文件头声明的短。"
+
+#: core.ts:110
+msgid "JSNES does not support mapper {} of this ROM."
+msgstr "JSNES 不支持这个 ROM 的 mapper {}。"
+
+#: core.ts:110
+msgid "JSNES could not load this ROM: {}"
+msgstr "JSNES 无法载入这个 ROM：{}"
+
+#: core.ts:120
+msgid "This ROM is too slow to emulate (it may be damaged)."
+msgstr "这个 ROM 模拟起来太慢（文件可能已损坏）。"
+
+#: core.ts:123
+msgid "The emulator produced invalid audio data."
+msgstr "模拟器音频数据无效。"
+
+#: main.ts:42
+msgid "Load NES ROM"
+msgstr "加载 NES ROM"
+
+#: main.ts:113 main.ts:114 main.ts:115 manifest.json
+msgid "Games"
+msgstr "游戏"
+
+#: main.ts:113 main.ts:114 main.ts:115 manifest.json nes.slint:25
+msgid "VestraNES"
+msgstr "VestraNES"
+
+#: main.ts:113 nes.slint:123
+msgid "Load ROM…"
+msgstr "加载 ROM…"
+
+#: main.ts:114 nes.slint:124
+msgid "Stop"
+msgstr "停止"
+
+#: main.ts:115
+msgid "VestraNES Window…"
+msgstr "VestraNES 窗口…"
+
+#: main.ts:120
+msgid "The ROM file is larger than the 16 MiB limit."
+msgstr "ROM 文件超过 16 MiB 上限。"
+
+#: main.ts:123 main.ts:147
+msgid "This is a folder, not a ROM file."
+msgstr "这是一个文件夹，不是 ROM 文件。"
+
+#: main.ts:145
+msgid "The ROM file was not found."
+msgstr "找不到 ROM 文件。"
+
+#: main.ts:146
+msgid "No permission to read the ROM file."
+msgstr "没有权限读取 ROM 文件。"
+
+#: manifest.json
+msgid "Play NES games in the player, with the keyboard"
+msgstr "在播放器里用键盘玩 NES 游戏"
+
+#: manifest.json
+msgid "An NES (Famicom) emulator for Vestra Player: load an iNES ROM from Games ▸ VestraNES and its picture and sound play in the player. While the small VestraNES window is in front, the keyboard is the controller: arrow keys, X, Z, A and S; the player's own shortcuts are not affected. Emulation by the bundled open-source library JSNES. No games included."
+msgstr "Vestra Player 的 NES（红白机）模拟器：从「游戏 ▸ VestraNES」加载 iNES 格式的 ROM，画面和声音在播放器里播放。VestraNES 小窗口在前台时，键盘就是手柄：方向键、X、Z、A 和 S；播放器自己的快捷键不受影响。模拟由内置的开源库 JSNES 完成。不附带游戏。"
+
+#: manifest.json
+msgid "Emulator"
+msgstr "模拟器"
+
+#: nes.slint:36
+msgid "Running {} · 256×240 · 48 kHz stereo"
+msgstr "正在运行 {} · 256×240 · 48 kHz 立体声"
+
+#: nes.slint:37
+msgid "Stopped."
+msgstr "已停止。"
+
+#: nes.slint:38
+msgid "Replaced by another source."
+msgstr "已被其他媒体源替换。"
+
+#: nes.slint:39
+msgid "Emulator stopped: {}"
+msgstr "模拟器已停止：{}"
+
+#: nes.slint:40
+msgid "Emulator stopped: the source ended."
+msgstr "模拟器已停止：媒体源已结束。"
+
+#: nes.slint:41
+msgid "Error: {}"
+msgstr "错误：{}"
+
+#: nes.slint:42
+msgid "Error: timed out preparing the first audio and video buffers."
+msgstr "错误：准备首批音视频缓冲超时。"
+
+#: nes.slint:43
+msgid "Error: timed out waiting for the emulator source to start."
+msgstr "错误：等待模拟器媒体源启动超时。"
+
+#: nes.slint:44
+msgid "Error: start-up timed out."
+msgstr "错误：启动超时。"
+
+#: nes.slint:45
+msgid "Error: the audio device is not ready."
+msgstr "错误：音频设备未就绪。"
+
+#: nes.slint:46
+msgid "Load an iNES ROM file."
+msgstr "请加载 iNES ROM 文件。"
+
+#: nes.slint:107
+msgid "While this window is in front, these keys control the game. The player's shortcuts are not affected."
+msgstr "本窗口在前台时，以下按键操作游戏；播放器的快捷键不受影响。"
+
+#: nes.slint:114
+msgid "D-pad"
+msgstr "十字键"
+
+#: nes.slint:114
+msgid "Arrow keys"
+msgstr "方向键"
+
+#: nes.slint:117
+msgid "Select"
+msgstr "Select"
+
+#: nes.slint:118
+msgid "Start"
+msgstr "Start"
