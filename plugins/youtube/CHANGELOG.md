@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.1
+
+- **Double-click plays at once, anywhere on a row.** In 0.4.0 a double-click on the title or channel of a row that was not yet selected often only selected it. Two causes: every click and every arriving thumbnail made the player rebuild all the rows, which lost the double-click in progress, and the title tooltip, once shown, swallowed the next click. The rows are now updated in place, and they no longer have a title tooltip. Click still selects; right-click, ↑/↓ and Enter work as before.
+- **Infinite scroll.** Scrolling the results down (or ↓ onto the last row) loads the next page by itself, with "Loading…" at the end of the list; if a page fails, the reason and **Retry** show there. The **More results** button is gone. A search whose next pages bring nothing new ends after three such pages instead of asking YouTube again and again. New pages and clicks no longer rebuild the rows already shown.
+- **Readable text selection in the search box** in the dark palette: it uses the player's standard selection colours, as other search fields do.
+- **Larger search box text**, the same size as the result titles.
+- Before the first search the panel says "Search and press Enter" and asks YouTube nothing. There is no recommended feed: logged out, YouTube's home feed is empty and its trending page is gone.
+
 ## 0.4.0
 
 - **A YouTube sidebar.** **Open → VestraTube** shows a sidebar tab with a search box and the results: thumbnail, title, duration and channel. Double-click (or Enter) plays a video; **More results** loads the next page; right-click offers Play and Download….

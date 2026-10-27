@@ -6,7 +6,7 @@ Search YouTube in Vestra Player's sidebar and play videos right away, or downloa
 
 **Open → VestraTube** shows the VestraTube tab in the sidebar.
 
-- Type in the search box and press Enter. The results show a thumbnail, the title, the duration (or LIVE) and the channel; **More results** loads the next page.
+- Type in the search box and press Enter. The results show a thumbnail, the title, the duration (or LIVE) and the channel; scrolling down near the end loads the next page.
 - **Double-click** a video (or select it and press Enter) to play it. The playing video is highlighted; one that cannot play gets a mark and the reason appears on the video.
 - **Download…** in the bottom bar (or right-click → **Download…**) saves the selected video as an `.mkv` file; a line above the bottom bar shows the progress, and **Cancel Download** stops it.
 - **Open URL…** in the bottom bar, or **Open → YouTube Link…**, opens the link window: paste a link, then **Play**, or **Download Video…**.

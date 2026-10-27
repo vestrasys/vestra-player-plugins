@@ -1,11 +1,19 @@
 // The VestraTube sidebar panel (DESIGN.md §3): search box, result rows with
-// thumbnails, More results, and a bottom bar with Open URL… and Download….
+// thumbnails (the next page loads as the list nears its end), and a bottom bar with
+// Open URL… and Download….
 // The panel has no heading of its own: the player's tab strip names it.
-import { ListView } from "std-widgets.slint";
+import { Palette, ScrollView } from "std-widgets.slint";
 import { Theme } from "@vestra/theme.slint";
 import { Icon } from "@vestra/icons.slint";
 import { Button, ToolTipArea } from "@vestra/widgets.slint";
 
+// Rows hold only plain values (no image, no selection): the player then updates a changed row
+// in place. In 0.4.0 a row held its thumbnail, and the player cannot compare images, so every
+// update (a click selecting the row, a thumbnail arriving) replaced the whole model: the row
+// elements were rebuilt under the pointer and the second click of a double-click was lost.
+// The player also replaces a model whose length changes, so `rows` always has MAX_ROWS (200)
+// entries: the first `count` are results, the rest blank and hidden. A new page fills blank
+// rows in place instead of rebuilding the ones above.
 export struct VideoRow {
     // The YouTube video id.
     key: string,
@@ -14,24 +22,32 @@ export struct VideoRow {
     // "12:34", or "" when unknown (live and upcoming videos).
     duration: string,
     live: bool,
-    // 320×180 JPEG from i.ytimg.com, decoded at 192 px; a transparent placeholder until it arrives.
-    thumb: image,
-    selected: bool,
-    // The player's current source is this video.
-    playing: bool,
     // The last attempt to play it failed (the reason was an OSD message).
     failed: bool,
 }
 
 export global TubeBridge {
+    // Always MAX_ROWS long; the first `count` are results.
     in property <[VideoRow]> rows;
+    in property <int> count;
+    // One thumbnail per row, in the same order: 320×180 JPEG from i.ytimg.com, decoded at 192 px;
+    // a transparent placeholder until it arrives. A list of its own, so a new thumbnail replaces
+    // this list and leaves the row elements alone.
+    in property <[image]> thumbs;
+    // The selected row (-1 when none); the list scrolls to keep it in view.
+    in property <int> selected-index: -1;
+    // The key of the video the player plays ("" when none).
+    in property <string> playing-key;
     // The search box. The plugin mirrors it (query-changed), so it survives the panel being rebuilt.
     in-out property <string> query;
     // What the list area says while there are no rows: start, searching, empty, offline, error.
     in property <string> message;
     in property <bool> can-retry;
+    // The search has a next page and its last load did not fail.
     in property <bool> can-more;
     in property <bool> loading-more;
+    // Why the last page failed to load ("" when it did not): shown at the list's end with Retry.
+    in property <string> more-error;
     in property <bool> can-download;
     in property <bool> downloading;
     // 0–1 while downloading; below 0 while the size is unknown.
@@ -42,7 +58,10 @@ export global TubeBridge {
     callback query-changed(string);
     callback search(string);
     callback retry();
-    callback more();
+    // (rows the view has) Load the next page; the plugin ignores a request for a page it already
+    // has or is loading.
+    callback more(int);
+    callback retry-more();
     callback select(string);
     // (rows to move the selection by)
     callback select-step(int);
@@ -63,6 +82,30 @@ export component TubeSidebar inherits Rectangle {
     private property <length> row-height: 62px;
     private property <int> top-request: TubeBridge.scroll-top;
     changed top-request => { list.content-y = 0px; }
+    // Infinite scroll: ask for the next page while less than one screen of rows is left below
+    // the visible part (also when the rows do not fill two screens yet).
+    function more-if-near-end() {
+        if TubeBridge.can-more && !TubeBridge.loading-more && TubeBridge.count > 0
+            && -list.content-y + 2 * list.visible-height >= list.content-height {
+            TubeBridge.more(TubeBridge.count);
+        }
+    }
+    private property <int> shown: TubeBridge.count;
+    changed shown => { root.more-if-near-end(); }
+    private property <bool> more-ready: TubeBridge.can-more && !TubeBridge.loading-more;
+    changed more-ready => { root.more-if-near-end(); }
+    // Keep the selected row in view (↑/↓); a clicked row already is.
+    private property <int> selection: TubeBridge.selected-index;
+    changed selection => {
+        if root.selection >= 0 {
+            let top = root.selection * root.row-height;
+            if top < -list.content-y {
+                list.content-y = -top;
+            } else if top + root.row-height > -list.content-y + list.visible-height {
+                list.content-y = -(top + root.row-height - list.visible-height);
+            }
+        }
+    }
 
     VerticalLayout {
         // Search box: Enter searches, Esc clears, ↓ moves into the list.
@@ -73,14 +116,14 @@ export component TubeSidebar inherits Rectangle {
                 x: 6px;
                 y: (parent.height - self.height) / 2;
                 width: parent.width - 12px;
-                height: 24px;
+                height: 26px;
                 capture-key-pressed(event) => {
                     if event.text == Key.Escape {
                         search.text = "";
                         TubeBridge.query-changed("");
                         return accept;
                     }
-                    if event.text == Key.DownArrow && TubeBridge.rows.length > 0 {
+                    if event.text == Key.DownArrow && TubeBridge.count > 0 {
                         list-keys.focus();
                         TubeBridge.select-step(1);
                         return accept;
@@ -104,8 +147,13 @@ export component TubeSidebar inherits Rectangle {
                         vertical-alignment: center;
                         single-line: true;
                         color: Theme.text;
-                        selection-background-color: Theme.selected-bg;
-                        font-size: Theme.font-body;
+                        // The std-widgets LineEdit's selection colours (as the store's search box):
+                        // they follow the light and dark palettes and keep the text legible.
+                        // Theme.selected-bg is a row colour, too close to the box in the dark palette.
+                        selection-background-color: Palette.selection-background;
+                        selection-foreground-color: Palette.selection-foreground;
+                        // As large as the result titles.
+                        font-size: Theme.font-tab;
                         text <=> TubeBridge.query;
                         edited => { TubeBridge.query-changed(self.text); }
                         accepted => { TubeBridge.search(self.text); }
@@ -116,7 +164,7 @@ export component TubeSidebar inherits Rectangle {
                         height: 100%;
                         text: @tr("Search YouTube");
                         color: Theme.text-dim;
-                        font-size: Theme.font-body;
+                        font-size: Theme.font-tab;
                         vertical-alignment: center;
                     }
                 }
@@ -145,91 +193,99 @@ export component TubeSidebar inherits Rectangle {
             }
             Rectangle {
                 background: Theme.bg-list;
-                list := ListView {
+                // Not a ListView: its height estimate goes wrong with the hidden blank rows, and
+                // 200 rows of a few elements each are cheap to keep.
+                list := ScrollView {
                     width: 100%;
                     height: 100%;
-                    for row in TubeBridge.rows: Rectangle {
-                        height: root.row-height;
-                        background: row.selected ? Theme.selected-bg : touch.has-hover ? Theme.hover-bg : transparent;
-                        if row.playing: Rectangle {
-                            x: 0;
-                            y: 4px;
-                            width: 2px;
-                            height: parent.height - 8px;
-                            border-radius: 1px;
-                            background: Theme.playing;
-                        }
-                        // Thumbnail with the duration (or LIVE) on its bottom right.
-                        Rectangle {
-                            x: 8px;
-                            y: 4px;
-                            width: 96px;
-                            height: 54px;
-                            border-radius: 3px;
-                            clip: true;
-                            background: Theme.bg-bar;
-                            Image {
-                                width: 100%;
-                                height: 100%;
-                                source: row.thumb;
-                                image-fit: cover;
+                    changed content-y => { root.more-if-near-end(); }
+                    changed visible-height => { root.more-if-near-end(); }
+                    VerticalLayout {
+                        alignment: start;
+                        for row[index] in TubeBridge.rows: item := Rectangle {
+                            property <bool> selected: index == TubeBridge.selected-index;
+                            property <bool> playing: row.key != "" && row.key == TubeBridge.playing-key;
+                            visible: index < TubeBridge.count;
+                            height: self.visible ? root.row-height : 0px;
+                            background: self.selected ? Theme.selected-bg : touch.has-hover ? Theme.hover-bg : transparent;
+                            if item.playing: Rectangle {
+                                x: 0;
+                                y: 4px;
+                                width: 2px;
+                                height: parent.height - 8px;
+                                border-radius: 1px;
+                                background: Theme.playing;
                             }
-                            if row.live || row.duration != "": Rectangle {
-                                x: parent.width - self.width - 3px;
-                                y: parent.height - self.height - 3px;
-                                width: badge.preferred-width + 6px;
-                                height: 14px;
-                                border-radius: 2px;
-                                // Drawn over the picture, so light text on a dark (or danger) badge in every palette.
-                                background: row.live ? Theme.danger : #000000c0;
-                                badge := Text {
-                                    text: row.live ? @tr("LIVE") : row.duration;
-                                    color: #ffffff;
-                                    font-size: Theme.font-xs;
-                                    horizontal-alignment: center;
-                                    vertical-alignment: center;
+                            // Thumbnail with the duration (or LIVE) on its bottom right.
+                            Rectangle {
+                                x: 8px;
+                                y: 4px;
+                                width: 96px;
+                                height: 54px;
+                                border-radius: 3px;
+                                clip: true;
+                                background: Theme.bg-bar;
+                                Image {
+                                    width: 100%;
+                                    height: 100%;
+                                    source: index < TubeBridge.thumbs.length ? TubeBridge.thumbs[index] : @image-url("");
+                                    image-fit: cover;
+                                }
+                                if row.live || row.duration != "": Rectangle {
+                                    x: parent.width - self.width - 3px;
+                                    y: parent.height - self.height - 3px;
+                                    width: badge.preferred-width + 6px;
+                                    height: 14px;
+                                    border-radius: 2px;
+                                    // Drawn over the picture, so light text on a dark (or danger) badge in every palette.
+                                    background: row.live ? Theme.danger : #000000c0;
+                                    badge := Text {
+                                        text: row.live ? @tr("LIVE") : row.duration;
+                                        color: #ffffff;
+                                        font-size: Theme.font-xs;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
                                 }
                             }
-                        }
-                        Text {
-                            x: 112px;
-                            y: 5px;
-                            width: parent.width - 120px - (row.failed ? 18px : 0px);
-                            height: 32px;
-                            text: row.title;
-                            wrap: word-wrap;
-                            overflow: elide;
-                            color: row.playing ? Theme.playing : row.selected ? Theme.text : Theme.text-list;
-                            font-size: Theme.font-tab;
-                        }
-                        Text {
-                            x: 112px;
-                            y: 40px;
-                            width: parent.width - 120px;
-                            height: 16px;
-                            text: row.channel;
-                            overflow: elide;
-                            color: Theme.text-dim;
-                            font-size: Theme.font-xs;
-                            vertical-alignment: center;
-                        }
-                        if row.failed: Icon {
-                            x: parent.width - 22px;
-                            y: 7px;
-                            name: "failed";
-                            color: Theme.accent;
-                        }
-                        ToolTipArea {
-                            width: 100%;
-                            height: 100%;
-                            // The whole title (the row elides it after two lines).
-                            text: row.title;
+                            Text {
+                                x: 112px;
+                                y: 5px;
+                                width: parent.width - 120px - (row.failed ? 18px : 0px);
+                                height: 32px;
+                                text: row.title;
+                                wrap: word-wrap;
+                                overflow: elide;
+                                color: item.playing ? Theme.playing : item.selected ? Theme.text : Theme.text-list;
+                                font-size: Theme.font-tab;
+                            }
+                            Text {
+                                x: 112px;
+                                y: 40px;
+                                width: parent.width - 120px;
+                                height: 16px;
+                                text: row.channel;
+                                overflow: elide;
+                                color: Theme.text-dim;
+                                font-size: Theme.font-xs;
+                                vertical-alignment: center;
+                            }
+                            if row.failed: Icon {
+                                x: parent.width - 22px;
+                                y: 7px;
+                                name: "failed";
+                                color: Theme.accent;
+                            }
+                            // No ToolTipArea with the whole title (0.4.0 had one): while its tip shows,
+                            // the player's popup takes the next press to close it, so the first click
+                            // of a double-click never reached the row.
                             touch := TouchArea {
+                                enabled: item.visible;
                                 pointer-event(event) => {
                                     if event.kind == PointerEventKind.down {
                                         list-keys.focus();
                                         // Left or right press selects; the menu opens on the right release.
-                                        if !row.selected { TubeBridge.select(row.key); }
+                                        if !item.selected { TubeBridge.select(row.key); }
                                     }
                                     if event.kind == PointerEventKind.up && event.button == PointerEventButton.right {
                                         TubeBridge.context-menu(row.key, (self.absolute-position.x + self.mouse-x) / 1px, (self.absolute-position.y + self.mouse-y) / 1px);
@@ -238,10 +294,28 @@ export component TubeSidebar inherits Rectangle {
                                 double-clicked => { TubeBridge.play(row.key); }
                             }
                         }
+                        // The end of the list: the next page loading, or why it failed (with Retry).
+                        if TubeBridge.count > 0 && (TubeBridge.loading-more || TubeBridge.more-error != ""): HorizontalLayout {
+                            padding: 8px;
+                            spacing: 8px;
+                            alignment: center;
+                            Text {
+                                text: TubeBridge.loading-more ? @tr("Loading…") : TubeBridge.more-error;
+                                color: Theme.text-dim;
+                                font-size: Theme.font-tab;
+                                overflow: elide;
+                                vertical-alignment: center;
+                            }
+                            if !TubeBridge.loading-more: Button {
+                                text: @tr("Retry");
+                                small: true;
+                                clicked => { TubeBridge.retry-more(); }
+                            }
+                        }
                     }
                 }
                 // No rows: one centred line saying why, with Retry where retrying helps.
-                if TubeBridge.rows.length == 0: VerticalLayout {
+                if TubeBridge.count == 0: VerticalLayout {
                     alignment: center;
                     padding: 16px;
                     spacing: 8px;
@@ -261,23 +335,6 @@ export component TubeSidebar inherits Rectangle {
                         }
                     }
                 }
-            }
-        }
-
-        // The next page of the same search.
-        if TubeBridge.can-more || TubeBridge.loading-more: Rectangle {
-            height: 26px;
-            background: more-touch.has-hover && !TubeBridge.loading-more ? Theme.hover-bg : Theme.bg-list;
-            Text {
-                text: TubeBridge.loading-more ? @tr("Loading…") : @tr("More results");
-                color: TubeBridge.loading-more ? Theme.text-dim : Theme.accent;
-                font-size: Theme.font-tab;
-                horizontal-alignment: center;
-                vertical-alignment: center;
-            }
-            more-touch := TouchArea {
-                enabled: !TubeBridge.loading-more;
-                clicked => { TubeBridge.more(); }
             }
         }
 

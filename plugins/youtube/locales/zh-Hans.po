@@ -29,19 +29,19 @@ msgstr "正在下载视频和音频…"
 msgid "Merging the video and audio…"
 msgstr "正在合并视频和音频…"
 
-#: download.ts:72
+#: download.ts:73
 msgid "ffmpeg was not found. Downloads use the ffmpeg that comes with Vestra Player."
 msgstr "找不到 ffmpeg。下载使用 Vestra Player 自带的 ffmpeg。"
 
-#: download.ts:73
+#: download.ts:74
 msgid "ffmpeg could not merge the video and audio: {}"
 msgstr "ffmpeg 无法合并视频和音频：{}"
 
-#: download.ts:82
+#: download.ts:83
 msgid "The download finished without a complete MKV file."
 msgstr "下载结束，但没有得到完整的 MKV 文件。"
 
-#: download.ts:115
+#: download.ts:116
 msgid "YouTube refused the download (HTTP {})."
 msgstr "YouTube 拒绝了下载（HTTP {}）。"
 
@@ -85,44 +85,44 @@ msgstr "保存 YouTube 视频"
 msgid "Resolving the video…"
 msgstr "正在解析视频…"
 
-#: main.ts:165 youtube.slint:13
+#: main.ts:166 youtube.slint:13
 msgid "Paste a YouTube video link to play or download it."
 msgstr "粘贴 YouTube 视频链接以播放或下载。"
 
-#: main.ts:178
+#: main.ts:179
 msgid "Resolving and loading the video and audio…"
 msgstr "正在解析并加载视频与音频…"
 
-#: main.ts:180
+#: main.ts:181
 msgid "The video is ready."
 msgstr "视频已就绪。"
 
-#: main.ts:182
+#: main.ts:183
 msgid "A download is already running."
 msgstr "已有一个下载正在进行。"
 
-#: main.ts:187
+#: main.ts:188
 msgid "No save location was chosen."
 msgstr "已取消选择保存位置。"
 
-#: main.ts:190 main.ts:230
+#: main.ts:191 main.ts:231
 msgid "Saved: {}"
 msgstr "已保存：{}"
 
-#: main.ts:195
+#: main.ts:196
 msgid "Cancelled."
 msgstr "已取消。"
 
-#: main.ts:234
+#: main.ts:235
 msgid "Download cancelled."
 msgstr "已取消下载。"
 
 #. the plugin's name (a brand); usually kept as it is.
-#: main.ts:251 manifest.json panel.ts:51 youtube.slint:8
+#: main.ts:252 manifest.json panel.ts:55 youtube.slint:8
 msgid "VestraTube"
 msgstr "VestraTube"
 
-#: main.ts:258
+#: main.ts:259
 msgid "YouTube Link…"
 msgstr "YouTube 链接…"
 
@@ -146,55 +146,51 @@ msgstr "YouTube"
 msgid "download"
 msgstr "下载"
 
-#: panel.ts:64
-msgid "Search YouTube to find videos."
-msgstr "搜索 YouTube 以查找视频。"
+#: panel.ts:70
+msgid "Search and press Enter"
+msgstr "请搜索并按回车键"
 
-#: panel.ts:66
+#: panel.ts:72
 msgid "Searching…"
 msgstr "正在搜索…"
 
-#: panel.ts:68
+#: panel.ts:74
 msgid "No videos found."
 msgstr "没有找到视频。"
 
-#: panel.ts:164 youtube.ts:231
+#: panel.ts:187 panel.ts:210 youtube.ts:235
 msgid "No network connection."
 msgstr "无网络连接。"
 
-#: panel.ts:237 youtube.slint:59
+#: panel.ts:273 youtube.slint:59
 msgid "Play"
 msgstr "播放"
 
-#: panel.ts:245 sidebar.slint:325
+#: panel.ts:281 sidebar.slint:382
 msgid "Download…"
 msgstr "下载…"
 
-#: panel.ts:254 sidebar.slint:319
+#: panel.ts:290 sidebar.slint:376
 msgid "Cancel Download"
 msgstr "取消下载"
 
-#: sidebar.slint:117
+#: sidebar.slint:165
 msgid "Search YouTube"
 msgstr "搜索 YouTube"
 
-#: sidebar.slint:186
+#: sidebar.slint:243
 msgid "LIVE"
 msgstr "直播"
 
-#: sidebar.slint:258
-msgid "Retry"
-msgstr "重试"
-
-#: sidebar.slint:272
+#: sidebar.slint:303
 msgid "Loading…"
 msgstr "正在加载…"
 
-#: sidebar.slint:272
-msgid "More results"
-msgstr "更多结果"
+#: sidebar.slint:310 sidebar.slint:332
+msgid "Retry"
+msgstr "重试"
 
-#: sidebar.slint:311
+#: sidebar.slint:368
 msgid "Open URL…"
 msgstr "打开链接…"
 
@@ -210,42 +206,42 @@ msgstr "下载视频…"
 msgid "Cancel"
 msgstr "取消"
 
-#: youtube.ts:102
+#: youtube.ts:106
 msgid "Enter the full link of a YouTube video."
 msgstr "请输入完整的 YouTube 视频链接。"
 
-#: youtube.ts:105
+#: youtube.ts:109
 msgid "Only HTTPS YouTube video links are supported."
 msgstr "仅支持 HTTPS 的 YouTube 视频链接。"
 
-#: youtube.ts:107
+#: youtube.ts:111
 msgid "Enter the link of a single YouTube video (watch, shorts, live or youtu.be)."
 msgstr "请输入单个 YouTube 视频链接（watch、shorts、live 或 youtu.be）。"
 
-#: youtube.ts:246 youtube.ts:257
+#: youtube.ts:250 youtube.ts:261
 msgid "YouTube search failed: {}"
 msgstr "YouTube 搜索失败：{}"
 
-#: youtube.ts:318
+#: youtube.ts:322
 msgid "YouTube refused this video's streams. Try again later."
 msgstr "YouTube 拒绝提供这个视频的流，请稍后再试。"
 
-#: youtube.ts:321
+#: youtube.ts:325
 msgid "VestraTube could not read this video: {}. A newer version of the plugin may fix it."
 msgstr "VestraTube 无法读取这个视频：{}。插件的新版本可能会修复。"
 
-#: youtube.ts:323
+#: youtube.ts:329
 msgid "This video has no stream the player can play."
 msgstr "这个视频没有播放器能播放的流。"
 
-#: youtube.ts:329
+#: youtube.ts:335
 msgid "YouTube asked to confirm you're not a bot. This network is flagged; try another network."
 msgstr "YouTube 要求确认你不是机器人。当前网络被标记，请换一个网络。"
 
-#: youtube.ts:330
+#: youtube.ts:336
 msgid "YouTube: {}"
 msgstr "YouTube：{}"
 
-#: youtube.ts:330
+#: youtube.ts:336
 msgid "YouTube can't play this video ({})."
 msgstr "YouTube 无法播放这个视频（{}）。"
