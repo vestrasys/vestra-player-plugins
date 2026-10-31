@@ -9,7 +9,17 @@ Right-click menu **Video ▸ AI Upscaling (RTX Video Super Resolution)**: pick i
 - The first time you turn it on, a note on the video reminds you of the NVIDIA app switch (below).
 - Your choice is remembered: after a restart, upscaling is turned on again when the first video plays. Audio files do not count, nor do their PNG, BMP, WebP, TIFF or GIF cover pictures; JPEG cover art still counts as video, because the player does not yet say which track is cover art.
 - A video already shown at its own size or smaller is not upscaled; the player follows window and video size changes by itself.
-- While another video filter needs the picture in memory (for example a picture adjustment such as brightness), upscaling pauses and comes back when that filter is off.
+- Upscaling needs the video decoded on the GPU. While it is not, upscaling waits and starts by itself once it is: when another plugin's video filter needs the picture in memory (for example a picture adjustment such as brightness), when hardware decoding is off, or for a video decoded in software (a cover picture, a format the GPU cannot decode). The message says which.
+
+## The AI Upscaling window
+
+**Video ▸ AI Upscaling…** opens a window with one button that turns upscaling on or off, and what the player reports while it is open, updated live:
+
+- whether upscaling is on, and whether the player asked the GPU to upscale now, waits, or cannot work here, and why;
+- the video's size, the size it is upscaled to and the scale factor, the video area, the GPU, the decoder (`d3d11va`, `d3d11va-copy`, software) and whether the upscaler is in the player's filter chain;
+- when other plugins' video filters hold upscaling back, their names (as the player reports them) and what to do there. For the built-in Picture Adjustments, that is **Video ▸ Reset** (key **Q**) and turning off its other video effects. VestraUpscale never changes another plugin's settings itself.
+
+The window listens to the player only while it is open. Nothing in it can show whether the driver really upscales (see below).
 
 The plugin follows the player's interface language (English and Simplified Chinese).
 
@@ -19,7 +29,7 @@ Upscaling only happens when **NVIDIA app ▸ System ▸ Video ▸ RTX Video Enha
 
 ## Requirements
 
-- Vestra Player 0.5.16 or later.
+- Vestra Player 0.6.0 or later.
 - Windows with an NVIDIA RTX GPU and NVIDIA driver 530 or newer.
 - **GPU rendering**: Video ▸ GPU Rendering (Experimental), then restart the player.
 - On a laptop with two GPUs, the player must run on the NVIDIA GPU: in **Windows Settings ▸ System ▸ Display ▸ Graphics**, choose the high-performance GPU for Vestra Player, then restart it.
@@ -33,5 +43,5 @@ Upscaling only happens when **NVIDIA app ▸ System ▸ Video ▸ RTX Video Enha
 ## Limits
 
 - On Windows, checking whether the GPU can upscale wakes a sleeping NVIDIA GPU, so the plugin asks the player only when you first pick the item, or, once you turned upscaling on, when the first video plays. Nothing is checked while the player starts.
-- The driver gives no sign that it upscales; the player only knows that it asked for it.
+- The driver gives no sign that it upscales; the player only knows that it asked for it (the window's "In the filter chain"). The quality level is chosen in the NVIDIA app, not in the player.
 - Upscaling uses the NVIDIA GPU: power use and heat go up.

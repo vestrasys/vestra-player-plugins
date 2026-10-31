@@ -1,4 +1,14 @@
-import type { PlaybackStats, Plugin, PluginError, RenderingState, Text, UpscalingState } from "@vestra-player/sdk";
+import type {
+  Disposable,
+  PlaybackStats,
+  Plugin,
+  PluginError,
+  RenderingState,
+  Text,
+  TextList,
+  UpscalingReason,
+  UpscalingState,
+} from "@vestra-player/sdk";
 
 /** What the plugin keeps across restarts (`upscaling.json` in its data directory). */
 export interface Settings {
@@ -26,12 +36,51 @@ export const isSettings = (value: unknown): value is Settings =>
 
 export const TITLE = "AI Upscaling (RTX Video Super Resolution)";
 
+/** The menu item that opens the window (Video menu, next to {@link TITLE}). */
+export const WINDOW_TITLE = "AI Upscaling…";
+
+/**
+ * The player's built-in Picture Adjustments plugin: only for it does the
+ * window add where its reset is (Video ▸ Reset, key Q). Its name is always
+ * the one the player reports.
+ */
+export const PICTURE_ADJUSTMENTS = "vestra.video";
+
+/**
+ * The causes of a `decoding` reason the plugin words itself (player 0.6.0).
+ * A newer player's cause, and an older player without causes, show the
+ * player's own message.
+ */
+const CAUSES = new Set(["copy-back", "hwdec-off", "software", "other-hwdec"]);
+
+/** The cause of a `decoding` reason when the plugin knows it, else `null`. */
+export function causeOf(reason: UpscalingReason | null | undefined): string | null {
+  if (reason?.code !== "decoding" || reason.cause === undefined) return null;
+  return CAUSES.has(reason.cause) ? reason.cause : null;
+}
+
+/** "1920×1080": a size is data, the same in every language. */
+const size = (width: number, height: number) => `${width}×${height}`;
+
+/**
+ * The size the upscaler scales the video to: the video's display size
+ * fitted into the area it is shown in (the aspect ratio stays).
+ */
+export function targetSize(
+  video: { displayWidth: number; displayHeight: number },
+  area: { width: number; height: number },
+): string {
+  const scale = Math.min(area.width / video.displayWidth, area.height / video.displayHeight);
+  return size(Math.round(video.displayWidth * scale), Math.round(video.displayHeight * scale));
+}
+
 /** What fits the OSD's single line in a default-size window (coordinator's GUI check), in characters. */
 export const OSD_BUDGET = { en: 80, zh: 40 };
 
 /**
  * Reasons that can pass while the player runs: `set(true)` keeps the request
- * (`decoding`: another video filter needs the frames in memory), and
+ * (`decoding`: the video is not decoded on the GPU that renders it, see
+ * {@link causeOf}), and
  * `unchecked` only means the player has not checked the GPU yet. Neither greys
  * the item out. `rendering` while GPU rendering is still starting passes too
  * (see `blocked`).
@@ -72,7 +121,7 @@ export function hasVideo(video: PlaybackStats["video"]): boolean {
  * the item is greyed out from the start.
  */
 export default async function activate(plugin: Plugin) {
-  const { text } = plugin.i18n;
+  const { text, list } = plugin.i18n;
   const upscaling = plugin.video.upscaling;
   const store = plugin.storage.json<Settings>("upscaling", {
     defaults: DEFAULT_SETTINGS,
@@ -143,6 +192,59 @@ export default async function activate(plugin: Plugin) {
   }
 
   /**
+   * Why a `decoding` reason holds upscaling back, by its cause (player
+   * 0.6.0), for the window and the menu item. The plugins whose filters
+   * cause copy-back are named as the player reports them; a player without
+   * a cause, or with a cause this plugin does not know, gives its message.
+   */
+  function waiting(reason: UpscalingReason): Text {
+    switch (causeOf(reason)) {
+      case "copy-back": {
+        const names = (reason.plugins ?? []).map((p) => p.name);
+        if (names.length > 0)
+          return text(
+            // TRANSLATORS: {} is one or more plugin names, as their manifests give them.
+            "AI upscaling waits: the video filters of {} need the frames in memory, so the video is not decoded on the GPU. Turn those filters off or reset them there; upscaling then starts by itself.",
+            [list(names)],
+          );
+        return text(
+          "AI upscaling waits: hardware decoding copies the frames back to memory (copy-back), as the player's hardware decoding setting asks. Upscaling needs the video decoded on the GPU without copy-back.",
+        );
+      }
+      case "hwdec-off":
+        return text("AI upscaling waits: hardware decoding is off. Upscaling needs the video decoded on the GPU.");
+      case "software":
+        return text(
+          "AI upscaling waits: this video is decoded in software, for example a cover picture or a format the GPU cannot decode. It starts again with a video the GPU decodes.",
+        );
+      case "other-hwdec":
+        return text("AI upscaling waits: this video is decoded with another hardware decoder than the one upscaling needs.");
+      default:
+        return text(
+          // TRANSLATORS: {} is the player's own message, in English.
+          "AI upscaling waits: {}",
+          [reason.message],
+        );
+    }
+  }
+
+  /** The OSD after turning it on while a `decoding` reason holds it back: one short line by cause. */
+  function onWaiting(reason: UpscalingReason): Text {
+    switch (causeOf(reason)) {
+      case "copy-back":
+        return text("AI Upscaling: On, waits until other video filters are off");
+      case "hwdec-off":
+        return text("AI Upscaling: On, waits until hardware decoding is on");
+      case "software":
+        return text("AI Upscaling: On, waits: this video is decoded in software");
+      case "other-hwdec":
+        return text("AI Upscaling: On, waits: the video uses another hardware decoder");
+      default:
+        return text("AI Upscaling: On, waits until the video is decoded on the GPU");
+    }
+  }
+
+  /**
    * Why it cannot work, for the menu item's reason: our advice plus the
    * player's English message, which names the GPUs. The OSD gets {@link brief}.
    */
@@ -171,7 +273,7 @@ export default async function activate(plugin: Plugin) {
       case "driver":
         return withMessage(text("The NVIDIA driver is too old for AI upscaling: update it to version 530 or newer."));
       case "decoding":
-        return text("AI upscaling is paused while another video filter is active; it comes back when that filter is off.");
+        return waiting(reason);
       default:
         // `gpu-unsupported` and any code of a newer player: the player's message says it all.
         return text(
@@ -199,7 +301,18 @@ export default async function activate(plugin: Plugin) {
       case "adapter":
         return text("AI upscaling: choose the NVIDIA GPU in Windows graphics settings");
       case "decoding":
-        return text("AI upscaling paused while another video filter is on");
+        switch (causeOf(reason)) {
+          case "copy-back":
+            return text("AI upscaling waits: another plugin's video filter is on");
+          case "hwdec-off":
+            return text("AI upscaling waits: hardware decoding is off");
+          case "software":
+            return text("AI upscaling waits: this video is decoded in software");
+          case "other-hwdec":
+            return text("AI upscaling waits: the video uses another hardware decoder");
+          default:
+            return text("AI upscaling waits until the video is decoded on the GPU");
+        }
       case "rendering": {
         const r = rendering;
         if (!r) return text("AI upscaling needs GPU rendering");
@@ -260,7 +373,7 @@ export default async function activate(plugin: Plugin) {
     if (stopped) return true;
     if (store.value.refused) save({ refused: null });
     if (state?.reason?.code === "decoding") {
-      await osd(text("AI Upscaling: On, waits until other video filters are off"));
+      await osd(onWaiting(state.reason));
     } else if (state?.reason?.code === "rendering") {
       await osd(text("AI Upscaling: On, starts when GPU rendering is ready"));
     } else if (!(await noteOnce()) && interactive) {
@@ -347,6 +460,161 @@ export default async function activate(plugin: Plugin) {
     busy: () => busy,
     reason: () => (busy ? null : state && blocked() ? why(state) : null),
     run: toggle,
+  });
+
+  // ------------------------------------------------------------------ the window
+  /**
+   * The AI Upscaling window: one button turns upscaling on and off, and the
+   * rest shows how it runs, live while the window is open. The player's
+   * change event keeps the plugin running, so it is listened to only while
+   * the window is open.
+   */
+  const window = plugin.windows.create("upscale.slint");
+  /** The `video.upscaling.changed` listener; only while the window is open. */
+  let watch: Disposable | null = null;
+
+  const unwatch = () => {
+    const listener = watch;
+    watch = null;
+    return listener?.dispose();
+  };
+
+  /** "—": the player does not report it (older players) or there is nothing to show. */
+  const NONE = "—";
+
+  /** The headline: on or off, and whether the player asked the GPU to upscale. */
+  function headline(): { status: Text; tone: number } {
+    // Tones (upscale.slint): 0 off, 1 requested, 2 on but waiting or idle, 3 not available.
+    const on = store.value.on && !permanent();
+    if (busy) return { status: text("Please wait…"), tone: on ? 2 : 0 };
+    if (state && blocked()) return { status: text("Not available"), tone: 3 };
+    if (!on) return { status: text("Off"), tone: 0 };
+    if (!state || !state.enabled) return { status: text("On: starts when a video plays"), tone: 2 };
+    if (state.reason) return { status: text("On, waiting"), tone: 2 };
+    if (state.requested) return { status: text("On: upscaling requested"), tone: 1 };
+    if (state.video === null) return { status: text("On: no video"), tone: 2 };
+    return { status: text("On: not needed for this video"), tone: 2 };
+  }
+
+  /** Why it works as it does, under the headline; "" when the headline says it all. */
+  function detail(): Text | string {
+    const current = state;
+    if (!current) return "";
+    const reason = current.reason;
+    if (reason?.code === "unchecked") return "";
+    if (reason?.code === "decoding") return waiting(reason);
+    if (reason) return why(current) ?? reason.message;
+    if (store.value.on && current.enabled && !current.requested && current.video)
+      return text("The video is shown at its own size or smaller: upscaling starts when it is shown larger.");
+    return "";
+  }
+
+  /** For copy-back caused by plugins' filters: whose filters, and what to do in each plugin. */
+  function blockers(): { blocker: Text | string; advice: Text | TextList | string } {
+    const reason = state?.reason;
+    const plugins = causeOf(reason) === "copy-back" ? (reason?.plugins ?? []) : [];
+    if (plugins.length === 0) return { blocker: "", advice: "" };
+    const steps = plugins.map(({ id, name }) =>
+      id === PICTURE_ADJUSTMENTS
+        ? text(
+            // TRANSLATORS: {} is the plugin's name as the player reports it (Picture Adjustments, the built-in plugin).
+            "{}: press Q (Video ▸ Reset) to reset the picture, and turn off its other video effects.",
+            [name],
+          )
+        : text(
+            // TRANSLATORS: {} is the plugin's name as the player reports it.
+            "{}: turn off or reset its video filters there.",
+            [name],
+          ),
+    );
+    return {
+      blocker: text(
+        // TRANSLATORS: {} is one or more plugin names, as their manifests give them.
+        "Upscaling waits for the video filters of: {}",
+        [list(plugins.map((p) => p.name))],
+      ),
+      advice: list(steps, "lines"),
+    };
+  }
+
+  /** What the player reports about the upscaler; "—" for what an older player leaves out. */
+  function monitor() {
+    const current = state;
+    const video = current?.video;
+    const area = current?.area;
+    const factor = current?.factor ?? null;
+    const source =
+      video === undefined
+        ? NONE
+        : video === null
+          ? text("No video")
+          : video.width === video.displayWidth && video.height === video.displayHeight
+            ? size(video.width, video.height)
+            : text(
+                // TRANSLATORS: the stored size, then the size the video is meant to be shown at.
+                "{} (shown as {})",
+                [size(video.width, video.height), size(video.displayWidth, video.displayHeight)],
+              );
+    return {
+      // The monitoring fields came with player 0.6.0; `inChain` is always there from it on.
+      reported: current !== null && current.inChain !== undefined,
+      source,
+      target: video && area && factor !== null ? targetSize(video, area) : NONE,
+      factor: factor !== null ? `×${factor.toFixed(2)}` : NONE,
+      area: area ? size(area.width, area.height) : NONE,
+      gpu: current?.gpu === undefined ? NONE : current.gpu === null ? text("Unknown") : current.gpu,
+      decoding:
+        current?.hwdecCurrent === undefined || current.hwdecCurrent === null
+          ? NONE
+          : current.hwdecCurrent === "no"
+            ? text("Software (no)")
+            : current.hwdecCurrent,
+      chain: current?.inChain === undefined ? NONE : current.inChain ? text("Yes") : text("No"),
+    };
+  }
+
+  window.bind(() => {
+    const { status, tone } = headline();
+    return {
+      on: store.value.on && !permanent(),
+      canToggle: !busy && ((store.value.on && !permanent()) || !blocked()),
+      status,
+      tone,
+      detail: detail(),
+      ...blockers(),
+      ...monitor(),
+    };
+  });
+  window.on("toggle", () => toggle());
+  window.on("closeWindow", async () => {
+    await unwatch();
+    await window.close();
+  });
+  window.onClose(() => unwatch());
+
+  /** Open the window: listen for changes while it is open, then read the state once. */
+  async function openWindow() {
+    watch ??= upscaling.onChange((next) => {
+      if (stopped || !watch) return;
+      void remember(next)
+        .then(() => plugin.update())
+        .catch((error: unknown) => console.error("upscaling: change:", error));
+    });
+    await window.show();
+    // The first read checks the GPU (as the first pick of the menu item does).
+    const next = await upscaling.state().catch(() => null);
+    if (next && !stopped && watch) {
+      await remember(next);
+      plugin.update();
+    }
+  }
+
+  plugin.commands.add({
+    id: "upscaling.window",
+    path: ["@video", WINDOW_TITLE],
+    order: 462,
+    group: "video-rendering",
+    run: openWindow,
   });
 
   // Not Windows: the player answers `platform` without touching a GPU, so the item is greyed from the start.

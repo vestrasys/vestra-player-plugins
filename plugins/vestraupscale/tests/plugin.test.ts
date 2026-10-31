@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { startPlugin, TestHost } from "@vestra-player/sdk/testing";
-import activate, { hasVideo, OSD_BUDGET, TITLE } from "../main.ts";
+import activate, { hasVideo, OSD_BUDGET, targetSize, TITLE, WINDOW_TITLE } from "../main.ts";
 
 const directory = new URL("..", import.meta.url);
 type Locale = "en" | "zh-Hans";
@@ -259,7 +259,15 @@ for (const c of CASES) {
 test("every OSD text fits one line: at most 80 characters in English, 40 in Simplified Chinese", async () => {
   const extra: Case[] = [
     { name: "platform", setup: reason("platform", LONG), menu: /./, osd: /./ },
-    { name: "decoding", setup: reason("decoding", LONG), menu: /./, osd: /./ },
+    { name: "decoding (older player, no cause)", setup: reason("decoding", LONG), menu: /./, osd: /./ },
+    ...(["copy-back", "hwdec-off", "software", "other-hwdec", "some-new-cause"] as const).map((cause) => ({
+      name: `decoding: ${cause}`,
+      setup: (host: TestHost) => {
+        host.upscalingDecoding(cause, [{ id: "vestra.video", name: `Picture Adjustments ${"long ".repeat(20)}` }]);
+      },
+      menu: /./,
+      osd: /./,
+    })),
     {
       name: "rendering: starting",
       setup: (host) => {
@@ -310,7 +318,7 @@ test("every OSD text fits one line: at most 80 characters in English, 40 in Simp
 
 test("decoding: the request is kept and the item stays usable", async () => {
   const host = windows();
-  host.upscaling.reason = { code: "decoding", message: "hwdec is copy-back (d3d11va-copy)" };
+  host.upscalingDecoding("copy-back", [{ id: "vestra.video", name: "Picture Adjustments" }]);
   const { item, stop } = await start(host);
   try {
     await item.run();
@@ -595,5 +603,298 @@ test("Simplified Chinese: menu title and reasons are translated", async () => {
     assert.match(started.item.display.reason ?? "", /^本机无法使用 AI 超分辨率/);
   } finally {
     await started.stop();
+  }
+});
+
+// ------------------------------------------------------------------ the AI Upscaling window
+
+const CHANGED = "video.upscaling.changed";
+const PICTURE = { id: "vestra.video", name: "Picture Adjustments" };
+
+/** Start the plugin and open the window from its menu item. */
+async function opened(host = windows(), locale: Locale = "en") {
+  const started = await start(host, locale);
+  await host.command("upscaling.window").run();
+  await host.settle();
+  return { ...started, window: host.window("upscale") };
+}
+
+test("window: Video ▸ AI Upscaling… opens it; the change event is listened to only while it is open", async () => {
+  const host = windows();
+  const { stop } = await start(host);
+  try {
+    const open = host.command("upscaling.window");
+    assert.deepEqual(open.declaration.path, ["@video", WINDOW_TITLE]);
+    assert.equal(open.declaration.order, 462);
+    assert.equal(open.declaration.group, "video-rendering");
+    assert.equal(host.listening.has(CHANGED), false); // not while closed: it would keep the plugin running
+    await open.run();
+    await host.settle();
+    const window = host.window("upscale");
+    assert.equal(window.visible, true);
+    assert.equal(host.listening.has(CHANGED), true);
+    assert.equal(states(host), 1); // read once when it opens
+    // The user closes it with the title-bar button: the listener goes.
+    window.userClose();
+    await host.settle();
+    assert.equal(host.listening.has(CHANGED), false);
+    // Opened again and closed with its own Close button: the same.
+    await open.run();
+    await host.settle();
+    assert.equal(host.listening.has(CHANGED), true);
+    host.window("upscale").emit("closeWindow"); // a fresh record for the reopened window
+    await host.settle();
+    assert.equal(host.windows.has("upscale"), false); // closed
+    assert.equal(host.listening.has(CHANGED), false);
+    assert.equal(host.keepsRunning.some((why) => /upscaling/.test(why)), false);
+  } finally {
+    await stop();
+  }
+});
+
+test("window: one click turns it on and off; sizes, factor, GPU, decoding and the chain follow the player live", async () => {
+  const { host, window, item, stop } = await opened();
+  try {
+    assert.equal(window.props.on, false);
+    assert.equal(window.props.status, "Off");
+    assert.equal(window.props.tone, 0);
+    assert.equal(window.props["can-toggle"], true);
+    assert.equal(window.props.source, "1920×1080");
+    assert.equal(window.props.target, "—"); // nothing requested while off
+    assert.equal(window.props.factor, "—");
+    assert.equal(window.props.area, "3840×2160");
+    assert.equal(window.props.gpu, "NVIDIA GeForce RTX 4070 Laptop GPU");
+    assert.equal(window.props.decoding, "d3d11va");
+    assert.equal(window.props.chain, "No");
+    assert.equal(window.props.reported, true);
+    window.emit("toggle");
+    await host.settle();
+    assert.deepEqual(sets(host), [true]);
+    assert.equal(item.state.checked, true); // the menu item follows
+    assert.equal(window.props.on, true);
+    assert.equal(window.props.status, "On: upscaling requested");
+    assert.equal(window.props.tone, 1);
+    assert.equal(window.props.target, "3840×2160");
+    assert.equal(window.props.factor, "×2.00");
+    assert.equal(window.props.chain, "Yes");
+    // The main window got smaller: the player sends the change.
+    host.upscaling.area = { width: 2560, height: 1440 };
+    host.upscaling.factor = 1.33;
+    host.upscalingChanged();
+    await host.settle();
+    assert.equal(window.props.factor, "×1.33");
+    assert.equal(window.props.target, "2560×1440");
+    assert.equal(window.props.area, "2560×1440");
+    // Shown at its own size: no longer upscaled, and the window says why.
+    host.upscaling.factor = 1;
+    host.upscalingChanged();
+    await host.settle();
+    assert.equal(window.props.status, "On: not needed for this video");
+    assert.equal(window.props.chain, "No");
+    assert.match(String(window.props.detail), /shown at its own size or smaller/);
+    window.emit("toggle");
+    await host.settle();
+    assert.deepEqual(sets(host), [true, false]);
+    assert.equal(window.props.on, false);
+    assert.equal(window.props.status, "Off");
+  } finally {
+    await stop();
+  }
+});
+
+test("window: the target keeps the aspect ratio (letterboxed, pillarboxed)", () => {
+  assert.equal(targetSize({ displayWidth: 1920, displayHeight: 800 }, { width: 3840, height: 2160 }), "3840×1600");
+  assert.equal(targetSize({ displayWidth: 1440, displayHeight: 1080 }, { width: 3840, height: 2160 }), "2880×2160");
+});
+
+test("window: copy-back names the plugins whose filters block it, with the Q hint only for Picture Adjustments", async () => {
+  const host = windows();
+  host.upscalingDecoding("copy-back", [PICTURE, { id: "zysilm.colors", name: "Colors" }]);
+  const { window, stop } = await opened(host);
+  try {
+    window.emit("toggle");
+    await host.settle();
+    assert.equal(host.upscaling.enabled, true); // kept: it waits
+    assert.equal(window.props.status, "On, waiting");
+    assert.equal(window.props.tone, 2);
+    assert.match(String(window.props.detail), /video filters of Picture Adjustments, Colors need the frames in memory/);
+    assert.equal(window.props.blocker, "Upscaling waits for the video filters of: Picture Adjustments, Colors");
+    assert.deepEqual(String(window.props.advice).split("\n"), [
+      "Picture Adjustments: press Q (Video ▸ Reset) to reset the picture, and turn off its other video effects.",
+      "Colors: turn off or reset its video filters there.",
+    ]);
+    assert.equal(window.props.decoding, "d3d11va-copy");
+    assert.match(host.osd.at(-1)!, /^AI Upscaling: On, waits until other video filters are off/);
+    // The user reset the filters: the player sends the change and the window clears.
+    host.upscaling.reason = null;
+    host.upscaling.hwdecCurrent = "d3d11va";
+    host.upscalingChanged();
+    await host.settle();
+    assert.equal(window.props.blocker, "");
+    assert.equal(window.props.advice, "");
+    assert.equal(window.props.status, "On: upscaling requested");
+    // Nothing of another plugin was changed: the plugin ran no command.
+    assert.equal(host.sent("commands.run").length, 0);
+  } finally {
+    await stop();
+  }
+});
+
+test("window: the Q hint follows the plugin id; the name is the one the player reports", async () => {
+  {
+    const host = windows();
+    host.upscalingDecoding("copy-back", [{ id: "vestra.video", name: "Bildanpassungen" }]);
+    const { window, stop } = await opened(host);
+    assert.match(String(window.props.advice), /^Bildanpassungen: press Q \(Video ▸ Reset\)/);
+    await stop();
+  }
+  {
+    const host = windows();
+    host.upscalingDecoding("copy-back", [{ id: "someone.pictures", name: "Picture Adjustments" }]);
+    const { window, stop } = await opened(host);
+    assert.equal(window.props.advice, "Picture Adjustments: turn off or reset its video filters there.");
+    assert.doesNotMatch(String(window.props.advice), /\bQ\b/);
+    await stop();
+  }
+});
+
+interface CauseCase {
+  cause: string;
+  plugins?: { id: string; name: string }[];
+  detail: RegExp;
+  osd: RegExp;
+  decoding: string;
+}
+
+const CAUSE_CASES: CauseCase[] = [
+  {
+    // Copy-back that no plugin asked for (the user's own hwdec setting).
+    cause: "copy-back",
+    plugins: [],
+    detail: /^AI upscaling waits: hardware decoding copies the frames back to memory \(copy-back\), as the player's hardware decoding setting asks/,
+    osd: /^AI Upscaling: On, waits until other video filters are off$/,
+    decoding: "d3d11va-copy",
+  },
+  {
+    cause: "hwdec-off",
+    detail: /^AI upscaling waits: hardware decoding is off\. /,
+    osd: /^AI Upscaling: On, waits until hardware decoding is on$/,
+    decoding: "Software (no)",
+  },
+  {
+    cause: "software",
+    detail: /^AI upscaling waits: this video is decoded in software, for example a cover picture or a format the GPU cannot decode/,
+    osd: /^AI Upscaling: On, waits: this video is decoded in software$/,
+    decoding: "Software (no)",
+  },
+  {
+    cause: "other-hwdec",
+    detail: /^AI upscaling waits: this video is decoded with another hardware decoder than the one upscaling needs\.$/,
+    osd: /^AI Upscaling: On, waits: the video uses another hardware decoder$/,
+    decoding: "nvdec",
+  },
+  {
+    // A newer player's cause: the player's own message.
+    cause: "some-new-cause",
+    detail: /^AI upscaling waits: this video is decoded with nvdec; upscaling needs it decoded/,
+    osd: /^AI Upscaling: On, waits until the video is decoded on the GPU$/,
+    decoding: "nvdec",
+  },
+];
+
+for (const c of CAUSE_CASES) {
+  test(`window and OSD: decoding cause ${c.cause} has its own words`, async () => {
+    const host = windows();
+    host.upscalingDecoding(c.cause, c.plugins);
+    const { window, item, stop } = await opened(host);
+    try {
+      assert.match(String(window.props.detail), c.detail);
+      assert.equal(window.props.blocker, "");
+      assert.equal(window.props.decoding, c.decoding);
+      await item.run(); // the menu item: kept, with a short OSD line
+      await host.settle();
+      assert.equal(item.state.checked, true);
+      assert.equal(item.state.enabled, true);
+      assert.match(host.osd.at(-1)!, c.osd);
+      for (const shown of [String(window.props.detail), host.osd.at(-1)!])
+        assert.doesNotMatch(shown, /another video filter is (on|active)/); // the old wording, wrong for most causes
+    } finally {
+      await stop();
+    }
+  });
+}
+
+test("window: an older player (no cause, no monitoring fields) shows its message and dashes", async () => {
+  const host = windows();
+  const message = "the video is decoded with copy-back, for example because a video filter needs the frames in memory";
+  // What players before 0.6.0 answer: no `cause`, no `plugins`, none of the monitoring fields.
+  const old = () => ({
+    available: false,
+    reason: { code: "decoding", message },
+    enabled: host.upscaling.enabled,
+    requested: false,
+    factor: null,
+  });
+  host.handle("video.upscaling.state", old);
+  host.handle("video.upscaling.set", (params) => {
+    host.upscaling.enabled = params.enabled === true;
+    return old();
+  });
+  const { window, item, stop } = await opened(host);
+  try {
+    assert.equal(window.props.detail, `AI upscaling waits: ${message}`);
+    assert.equal(window.props.blocker, "");
+    assert.equal(window.props.reported, false);
+    for (const field of ["source", "target", "factor", "area", "gpu", "decoding", "chain"])
+      assert.equal(window.props[field], "—", field);
+    await item.run();
+    await host.settle();
+    assert.equal(host.osd.at(-1), "AI Upscaling: On, waits until the video is decoded on the GPU");
+    assert.equal(window.props.status, "On, waiting");
+  } finally {
+    await stop();
+  }
+});
+
+test("window: a reason that rules it out greys the button and says why", async () => {
+  const host = windows();
+  host.upscaling.reason = { code: "no-gpu", message: "no NVIDIA GPU" };
+  host.upscaling.gpu = null;
+  const { window, stop } = await opened(host);
+  try {
+    assert.equal(window.props.status, "Not available");
+    assert.equal(window.props.tone, 3);
+    assert.equal(window.props["can-toggle"], false);
+    assert.match(String(window.props.detail), /It needs an NVIDIA RTX GPU/);
+    assert.equal(window.props.gpu, "Unknown");
+  } finally {
+    await stop();
+  }
+});
+
+test("window: stopping the plugin ends the listener", async () => {
+  const host = windows();
+  const { stop } = await opened(host);
+  assert.equal(host.listening.has(CHANGED), true);
+  await stop();
+  assert.equal(host.listening.has(CHANGED), false);
+});
+
+test("window, Simplified Chinese: translated; plugin names as the player reports them", async () => {
+  const host = windows();
+  host.upscalingDecoding("copy-back", [PICTURE]);
+  const { window, stop } = await opened(host, "zh-Hans");
+  try {
+    assert.deepEqual(host.command("upscaling.window").display.path, ["视频", "AI 超分辨率…"]);
+    assert.equal(window.props.status, "关");
+    assert.equal(window.props.blocker, "超分辨率正在等待这些插件的视频滤镜：Picture Adjustments");
+    assert.equal(window.props.advice, "Picture Adjustments：按 Q（视频 ▸ 复位）复位画面，并关闭其中的其他视频效果。");
+    assert.match(String(window.props.detail), /^AI 超分辨率等待中：Picture Adjustments 的视频滤镜/);
+    window.emit("toggle");
+    await host.settle();
+    assert.equal(window.props.status, "开，等待中");
+    assert.equal(host.osd.at(-1), "AI 超分辨率：开，其他视频滤镜关闭后生效");
+  } finally {
+    await stop();
   }
 });

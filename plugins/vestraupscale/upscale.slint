@@ -1,0 +1,155 @@
+// The AI Upscaling window: one button turns upscaling on and off; below it, how upscaling runs
+// now, live while the window is open (main.ts listens to the player's changes only then).
+// Width 400 (content 400 − 28 = 372): label column 120 + 8 + value 244. Wrapped texts (the
+// reason, the blocking plugins, the note) grow the window by their height.
+// Texts are @tr (English source; locales/<lang>.po translate them). Sizes, the factor, the GPU's
+// and the decoder's names are data from main.ts; the plugin names are the player's.
+import { Theme } from "@vestra/theme.slint";
+import { Button } from "@vestra/widgets.slint";
+
+// One monitoring row: label right-aligned, value elided (18px, as the About window's rows).
+component InfoRow {
+    in property <string> label;
+    in property <string> value;
+    in property <length> label-width: 120px;
+    height: 18px;
+    HorizontalLayout {
+        spacing: 8px;
+        Text { width: root.label-width; text: root.label; color: Theme.text-dim; font-size: Theme.font-body; horizontal-alignment: right; vertical-alignment: center; overflow: elide; }
+        Text { horizontal-stretch: 1; text: root.value; color: Theme.text; font-size: Theme.font-body; vertical-alignment: center; overflow: elide; }
+    }
+}
+
+// A paragraph that wraps; its height follows the text (0 when empty).
+component Paragraph {
+    in property <string> text;
+    in property <color> color: Theme.text-list;
+    height: root.text == "" ? 0px : body.preferred-height;
+    body := Text {
+        width: 100%;
+        text: root.text;
+        color: root.color;
+        font-size: Theme.font-body;
+        wrap: word-wrap;
+        vertical-alignment: top;
+    }
+}
+
+export component UpscaleWindow inherits Window {
+    title: @tr("AI Upscaling");
+    preferred-width: 400px;
+    min-width: 400px;
+    max-width: 400px;
+    background: Theme.bg-panel;
+    // The user's choice (the menu item's check mark).
+    in property <bool> on;
+    // The button works: not busy, and the player did not rule upscaling out (a saved "on" can always be turned off).
+    in property <bool> can-toggle: true;
+    // The headline and its tone: 0 off, 1 upscaling requested, 2 on but waiting or idle, 3 not available.
+    in property <string> status;
+    in property <int> tone;
+    // Why, under the headline ("" = nothing more to say).
+    in property <string> detail;
+    // Copy-back decoding caused by plugins' video filters: whose ("" = none), and what to do in each (one per line).
+    in property <string> blocker;
+    in property <string> advice;
+    // Monitoring values ("—" when the player does not report them).
+    in property <bool> reported: true;
+    in property <string> source;
+    in property <string> target;
+    in property <string> factor;
+    in property <string> area;
+    in property <string> gpu;
+    in property <string> decoding;
+    in property <string> chain;
+    callback toggle();
+    callback close-window();
+
+    private property <length> label-width: max(120px, label-measure.preferred-width);
+    Rectangle {
+        visible: false;
+        width: 0;
+        height: 0;
+        label-measure := VerticalLayout {
+            Text { text: @tr("Video size"); font-size: Theme.font-body; }
+            Text { text: @tr("Upscaled to"); font-size: Theme.font-body; }
+            Text { text: @tr("Scale factor"); font-size: Theme.font-body; }
+            Text { text: @tr("Video area"); font-size: Theme.font-body; }
+            Text { text: @tr("GPU"); font-size: Theme.font-body; }
+            Text { text: @tr("Decoding"); font-size: Theme.font-body; }
+            Text { text: @tr("In the filter chain"); font-size: Theme.font-body; }
+        }
+    }
+
+    VerticalLayout {
+        padding: Theme.dialog-padding;
+        spacing: 8px;
+        // Headline: a dot in the tone's colour, the state, and the one-click switch.
+        HorizontalLayout {
+            spacing: 8px;
+            height: Theme.button-height;
+            VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 4px;
+                    background: root.tone == 1 ? Theme.playing : root.tone == 2 ? Theme.accent : root.tone == 3 ? Theme.danger : Theme.icon-disabled;
+                }
+            }
+            Text {
+                horizontal-stretch: 1;
+                text: root.status;
+                color: Theme.text;
+                font-size: Theme.font-title;
+                font-weight: 700;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+            Button {
+                text: root.on ? @tr("Turn Off") : @tr("Turn On");
+                enabled: root.can-toggle;
+                clicked => { root.toggle(); }
+            }
+        }
+        Paragraph { text: root.detail; }
+        // Whose video filters keep the frames in memory, and how to turn them off there.
+        if root.blocker != "": Rectangle {
+            background: Theme.bg-list;
+            border-radius: Theme.radius-control;
+            border-width: 1px;
+            border-color: Theme.line;
+            height: blockers.preferred-height;
+            blockers := VerticalLayout {
+                padding: 8px;
+                spacing: 4px;
+                Paragraph { text: root.blocker; color: Theme.text; }
+                Paragraph { text: root.advice; }
+            }
+        }
+        Rectangle { height: 1px; background: Theme.line; }
+        VerticalLayout {
+            InfoRow { label-width: root.label-width; label: @tr("Video size"); value: root.source; }
+            InfoRow { label-width: root.label-width; label: @tr("Upscaled to"); value: root.target; }
+            InfoRow { label-width: root.label-width; label: @tr("Scale factor"); value: root.factor; }
+            InfoRow { label-width: root.label-width; label: @tr("Video area"); value: root.area; }
+            InfoRow { label-width: root.label-width; label: @tr("GPU"); value: root.gpu; }
+            InfoRow { label-width: root.label-width; label: @tr("Decoding"); value: root.decoding; }
+            InfoRow { label-width: root.label-width; label: @tr("In the filter chain"); value: root.chain; }
+        }
+        Paragraph {
+            text: root.reported ? "" : @tr("This player version does not report these details.");
+            color: Theme.text-dim;
+        }
+        Rectangle { height: 1px; background: Theme.line; }
+        // Always shown: nothing tells the player whether the driver upscales.
+        Paragraph {
+            text: @tr("The driver gives no sign that it upscales: the player only knows that it asked for it. Super Resolution must be on in the NVIDIA app (System ▸ Video ▸ RTX Video Enhancement); choose its quality level there.");
+            color: Theme.text-dim;
+        }
+        HorizontalLayout {
+            alignment: end;
+            Button { text: @tr("Close"); clicked => { root.close-window(); } }
+        }
+    }
+}
