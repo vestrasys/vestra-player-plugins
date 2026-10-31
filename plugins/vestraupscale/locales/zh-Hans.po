@@ -74,7 +74,7 @@ msgstr "AI 超分辨率需要 NVIDIA 驱动 530 或更新版本"
 
 #: main.ts:200
 msgid "AI upscaling: choose the NVIDIA GPU in Windows graphics settings"
-msgstr "AI 超分辨率：请在 Windows 图形设置中选择 NVIDIA 显卡"
+msgstr "AI 超分辨率：请在 Windows“显示卡”设置中选择 NVIDIA 显卡"
 
 #: main.ts:202
 msgid "AI upscaling paused while another video filter is on"
@@ -89,7 +89,7 @@ msgid "AI upscaling starts when GPU rendering is ready"
 msgstr "GPU 渲染就绪后，AI 超分辨率即生效"
 
 #: main.ts:207
-msgid "AI upscaling needs GPU rendering, unavailable here"
+msgid "AI upscaling needs GPU rendering, which is unavailable here"
 msgstr "AI 超分辨率需要 GPU 渲染，但本机无法开启"
 
 #: main.ts:209
@@ -101,8 +101,8 @@ msgid "AI upscaling: turn on Video ▸ GPU Rendering, then restart"
 msgstr "AI 超分辨率：请打开“视频 ▸ GPU 渲染”并重启"
 
 #: main.ts:213
-msgid "AI upscaling is not available here (details in the Video menu)"
-msgstr "本机无法使用 AI 超分辨率（详见视频菜单）"
+msgid "AI upscaling is not available on this computer"
+msgstr "本机无法使用 AI 超分辨率"
 
 #: main.ts:234
 msgid "AI Upscaling: On — also turn on Super Resolution in the NVIDIA app"

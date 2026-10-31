@@ -164,13 +164,13 @@ const CASES: Case[] = [
     name: "gpu-unsupported",
     setup: reason("gpu-unsupported", "GTX 1060 does not offer it"),
     menu: /not available on this computer: GTX 1060 does not offer it/,
-    osd: /^AI upscaling is not available here \(details in the Video menu\)$/,
+    osd: /^AI upscaling is not available on this computer$/,
   },
   {
     name: "gpu-unsupported, long message",
     setup: reason("gpu-unsupported", LONG),
     menu: /not available on this computer: the player says a long/,
-    osd: /^AI upscaling is not available here \(details in the Video menu\)$/,
+    osd: /^AI upscaling is not available on this computer$/,
   },
   {
     name: "adapter",
@@ -198,7 +198,7 @@ const CASES: Case[] = [
       host.rendering.gpu = { available: false, reason: { code: "denylist", message: "the driver 31.0.14005 is on the denylist" } };
     },
     menu: /cannot be turned on here: the driver 31\.0\.14005 is on the denylist/,
-    osd: /^AI upscaling needs GPU rendering, unavailable here$/,
+    osd: /^AI upscaling needs GPU rendering, which is unavailable here$/,
     not: /turn on Video ▸ GPU Rendering/,
   },
   {
@@ -227,7 +227,7 @@ const CASES: Case[] = [
     name: "a newer player's code",
     setup: reason("some-new-code", "a newer player's reason"),
     menu: /not available on this computer: a newer player's reason/,
-    osd: /^AI upscaling is not available here \(details in the Video menu\)$/,
+    osd: /^AI upscaling is not available on this computer$/,
   },
 ];
 
@@ -582,6 +582,8 @@ test("Simplified Chinese: menu title and reasons are translated", async () => {
     await item.run();
     await host.settle();
     assert.match(item.display.reason ?? "", /Windows 设置 ▸ 系统 ▸ 屏幕 ▸ 显示卡.*780M/);
+    // The OSD names the same Windows settings page as the menu reason.
+    assert.deepEqual(host.osd, ["AI 超分辨率：请在 Windows“显示卡”设置中选择 NVIDIA 显卡"]);
     host.upscaling.reason = { code: "no-gpu", message: "no NVIDIA GPU" };
   } finally {
     await stop();
