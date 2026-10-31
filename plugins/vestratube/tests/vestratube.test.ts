@@ -9,7 +9,7 @@ import type { TextError } from "@vestra-player/sdk";
 import activate, { fileNameFor } from "../main.ts";
 import { CHUNK_BYTES, downloadMedia } from "../download.ts";
 import { evaluate } from "../evaluator.ts";
-import { MAX_EMPTY_PAGES, MAX_ROWS, PLACEHOLDER, THUMB_SIDE } from "../panel.ts";
+import { END_ROW, MAX_EMPTY_PAGES, MAX_ROWS, PLACEHOLDER, THUMB_SIDE } from "../panel.ts";
 import type { Fetcher, TubeFactory, TubeFormat, TubeInfo, TubeSearch } from "../youtube.ts";
 import {
   formatDuration,
@@ -280,9 +280,12 @@ type Row = {
   selected: boolean;
   playing: boolean;
   failed: boolean;
+  /** The end row (Loading…, or the reason with Retry), not a result. */
+  end: boolean;
 };
-/** What the panel sends as `rows`: plain values only (no image, no selection), always MAX_ROWS of them. */
+/** What the panel sends as `rows`: plain values only (no image, no selection). */
 type RowValue = Omit<Row, "thumb" | "selected" | "playing">;
+/** The results, then the end row while the next page loads or failed to load. */
 const allRowValues = (host: TestHost) => host.mounted().props.rows as unknown as RowValue[];
 /** The results among them (the first `count`). */
 const rowValues = (host: TestHost) => allRowValues(host).slice(0, host.mounted().props.count as number);
@@ -483,9 +486,9 @@ test("the manifest's display texts are English with a Simplified Chinese transla
   const manifest = JSON.parse(await readFile(new URL("manifest.json", directory), "utf8"));
   assert.equal(manifest.id, "zysilm.vestratube", "the id matches the plugin name");
   assert.equal(manifest.name, "VestraTube");
-  assert.equal(manifest.version, "0.5.1");
+  assert.equal(manifest.version, "0.5.2");
   assert.equal(manifest.icon, "assets/icon.png", "store icon");
-  assert.equal(manifest.minPlayerVersion, "0.5.1", "images in rows");
+  assert.equal(manifest.minPlayerVersion, "0.5.2", "images in rows (0.5.1); rows kept in place when the length changes (0.5.2)");
   assert.ok(manifest.capabilities.includes("ui.mount"));
   for (const value of [manifest.name, manifest.punchline, manifest.description, ...manifest.tags])
     assert.doesNotMatch(value, /[　-鿿＀-￯]/, "English source text");
@@ -528,6 +531,7 @@ test("a search fills the rows with titles, channels, durations and thumbnails", 
         selected: false,
         playing: false,
         failed: false,
+        end: false,
       },
     );
     // A remote image is served from the plugin's image cache, not from the placeholder.
@@ -571,10 +575,11 @@ test("selecting, playing and thumbnails leave the row values alone (rows are upd
   try {
     await searchFor(host);
     await eventually(host, () => assert.ok(thumbnailsArrived(host)));
-    assert.equal(allRowValues(host).length, MAX_ROWS, "a fixed length: the player never replaces the model");
+    assert.deepEqual(allRowValues(host), rowValues(host), "only the results: no blank rows, no end row");
     const before = structuredClone(rowValues(host));
     for (const row of before) {
-      assert.deepEqual(Object.keys(row).sort(), ["channel", "duration", "failed", "key", "live", "title"]);
+      assert.deepEqual(Object.keys(row).sort(), ["channel", "duration", "end", "failed", "key", "live", "title"]);
+      assert.equal(row.end, false);
     }
     const panel = host.mounted();
     panel.emit("select", vid(2));
@@ -752,7 +757,7 @@ test("infinite scroll: one load per page, rows above stay as they are, ↓ on th
     assert.equal(rows(host).length, 5, "a request for a page already added is ignored");
     const after = allRowValues(host);
     assert.deepEqual(after.slice(0, 3), before.slice(0, 3), "rows above are unchanged");
-    assert.equal(after.length, MAX_ROWS);
+    assert.equal(after.length, 5, "only the results once the page is in: no blank rows, no end row");
     // ↓ onto the last row loads the next (last) page.
     panel.emit("select", vid(4));
     panel.emit("select-step", 1);
@@ -858,6 +863,155 @@ test("a page that fails to load: the reason and Retry at the end, no automatic r
   } finally {
     await stop();
   }
+});
+
+test("the end row: last in the model while a page loads or failed, not a result; gone once the page is in", async () => {
+  const { host, tube, stop } = await start({ thumbs: [], locale: "zh-Hans" });
+  try {
+    let fail = true;
+    let release!: () => void;
+    tube.results = () =>
+      page(
+        [1, 2],
+        () =>
+          new Promise<TubeSearch>(
+            (resolve, reject) =>
+              (release = () => (fail ? reject(new TypeError("fetch failed")) : resolve(page([3])))),
+          ),
+      );
+    await searchFor(host);
+    const panel = host.mounted();
+    const results = structuredClone(allRowValues(host));
+    assert.equal(results.length, 2, "no end row while nothing loads");
+    assert.deepEqual(
+      Object.keys(END_ROW).sort(),
+      Object.keys(results[0]!).sort(),
+      "the end row has the fields of a result row, so the player keeps the model",
+    );
+    panel.emit("more", 2);
+    await eventually(host, () => {
+      assert.equal(panel.props["loading-more"], true);
+      assert.deepEqual(allRowValues(host), [...results, END_ROW], "Loading… is the last row");
+      assert.equal(panel.props.count, 2, "the end row is not a result");
+    });
+    assert.deepEqual(
+      rows(host).map((row) => row.key),
+      [vid(1), vid(2)],
+    );
+    release();
+    await eventually(host, () => {
+      assert.equal(panel.props["loading-more"], false);
+      assert.equal(panel.props["more-error"], "无网络连接。");
+      assert.deepEqual(allRowValues(host), [...results, END_ROW], "the reason and Retry in the end row");
+    });
+    fail = false;
+    panel.emit("retry-more");
+    await eventually(host, () => assert.equal(panel.props["loading-more"], true));
+    release();
+    await eventually(host, () => {
+      assert.equal(panel.props["loading-more"], false);
+      assert.equal(panel.props["more-error"], "");
+      assert.equal(panel.props.count, 3);
+      assert.deepEqual(
+        allRowValues(host).map((row) => [row.key, row.end]),
+        [
+          [vid(1), false],
+          [vid(2), false],
+          [vid(3), false],
+        ],
+        "the new result takes the end row's place; no end row is left",
+      );
+      assert.deepEqual(allRowValues(host).slice(0, 2), results, "the rows above stay as they were");
+    });
+    // A new search removes the results (and any end row) at once.
+    tube.results = () => page([]);
+    panel.emit("search", "nothing");
+    await eventually(host, () => {
+      assert.equal(panel.props.message, "没有找到视频。");
+      assert.deepEqual(allRowValues(host), []);
+    });
+  } finally {
+    await stop();
+  }
+});
+
+test("a double-click while the list changes still plays: the rows above keep their values (the player keeps their elements)", async () => {
+  const { host, tube, stop } = await start({ thumbs: [1, 2, 3, 4] });
+  try {
+    let release!: () => void;
+    tube.results = () =>
+      page([1, 2, 3], () => new Promise<TubeSearch>((resolve) => (release = () => resolve(page([4])))));
+    await searchFor(host);
+    const panel = host.mounted();
+    const shown = structuredClone(rowValues(host));
+    // The first click selects the row and the list nears its end, so a page starts loading (the
+    // end row is added); thumbnails keep arriving; then the second click lands.
+    panel.emit("select", vid(2));
+    panel.emit("more", 3);
+    await eventually(host, () => {
+      assert.equal(panel.props["selected-index"], 1);
+      assert.equal(panel.props["loading-more"], true);
+      assert.deepEqual(allRowValues(host), [...shown, END_ROW]);
+    });
+    panel.emit("play", vid(2));
+    release();
+    await eventually(host, () => {
+      assert.equal(opens(host).length, 1);
+      assert.equal(rows(host).length, 4);
+      assert.equal(allRowValues(host).length, 4);
+      assert.equal(panel.props["selected-index"], 1);
+      assert.ok(thumbnailsArrived(host));
+    });
+    assert.equal((opens(host)[0]!.intent as { source: string }).source, watchUrl(vid(2)));
+    assert.deepEqual(
+      rowValues(host).slice(0, 3),
+      shown,
+      "every row above the change has the same value, so the player updates in place and rebuilds none",
+    );
+  } finally {
+    await stop();
+  }
+});
+
+test("the scroll position survives a page loading and the end row coming and going; only a new search resets it", async () => {
+  const { host, tube, stop } = await start({ thumbs: [] });
+  try {
+    let release!: () => void;
+    tube.results = () =>
+      page([1, 2, 3, 4, 5, 6], () => new Promise<TubeSearch>((resolve) => (release = () => resolve(page([7, 8])))));
+    await searchFor(host);
+    const panel = host.mounted();
+    const top = panel.props["scroll-top"];
+    panel.emit("scrolled", 248); // 4 rows of 62 px
+    panel.emit("more", 6);
+    await eventually(host, () => {
+      assert.equal(panel.props["show-y"], 248);
+      assert.equal(panel.props["loading-more"], true);
+      assert.equal(allRowValues(host).at(-1)!.end, true);
+    });
+    release();
+    await eventually(host, () => {
+      assert.equal(rows(host).length, 8);
+      assert.equal(allRowValues(host).length, 8, "the end row is gone");
+      assert.equal(panel.props["show-y"], 248, "a list made now opens on the same rows");
+      assert.equal(panel.props["scroll-top"], top, "a page does not scroll the list to the top");
+    });
+  } finally {
+    await stop();
+  }
+});
+
+test("the view: VideoRow has the fields the panel sends; the list is a virtualized ListView; the search box a LineEdit", async () => {
+  const source = await readFile(new URL("sidebar.slint", directory), "utf8");
+  const struct = /export struct VideoRow \{([^}]*)\}/.exec(source)![1]!;
+  const fields = [...struct.matchAll(/^\s*([a-z-]+):/gm)].map((match) => match[1]).sort();
+  assert.deepEqual(fields, Object.keys(END_ROW).sort());
+  assert.match(source, /list := ListView \{/);
+  assert.doesNotMatch(source, /ScrollView/);
+  assert.equal(source.match(/\bfor \w+\[\w+\] in /g)?.length, 1, "one repeater: the end of the list is a row");
+  assert.match(source, /for row\[index\] in TubeBridge\.rows:/);
+  assert.match(source, /search := LineEdit \{/);
+  assert.doesNotMatch(source, /TextInput/);
 });
 
 test("offline: the list says so with Retry, and Retry searches again", async () => {

@@ -1,6 +1,6 @@
 {
   "id": "zysilm.vestratube",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "apiVersion": "vestra/1",
   "entry": "main.ts",
   "capabilities": [
@@ -22,5 +22,5 @@
   "sourceUrl": "https://github.com/vestrasys/vestra-player-plugins/tree/main/plugins/vestratube",
   "license": "Apache-2.0",
   "icon": "assets/icon.png",
-  "minPlayerVersion": "0.5.1"
+  "minPlayerVersion": "0.5.2"
 }
