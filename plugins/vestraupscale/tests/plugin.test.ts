@@ -3,7 +3,7 @@ import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { startPlugin, TestHost } from "@vestra-player/sdk/testing";
+import { HostError, startPlugin, TestHost } from "@vestra-player/sdk/testing";
 import activate, { hasVideo, OSD_BUDGET, targetSize, TITLE, WINDOW_TITLE } from "../main.ts";
 
 const directory = new URL("..", import.meta.url);
@@ -717,7 +717,12 @@ test("window: copy-back names the plugins whose filters block it, with the Q hin
     assert.equal(host.upscaling.enabled, true); // kept: it waits
     assert.equal(window.props.status, "On, waiting");
     assert.equal(window.props.tone, 2);
-    assert.match(String(window.props.detail), /video filters of Picture Adjustments, Colors need the frames in memory/);
+    // One summary in the text; the box below names the plugins (not both).
+    assert.equal(
+      window.props.detail,
+      "AI upscaling waits: other plugins' video filters need the frames in memory, so the video is not decoded on the GPU. Turn those filters off or reset them there; upscaling then starts by itself.",
+    );
+    assert.doesNotMatch(String(window.props.detail), /Picture Adjustments|Colors/);
     assert.equal(window.props.blocker, "Upscaling waits for the video filters of: Picture Adjustments, Colors");
     assert.deepEqual(String(window.props.advice).split("\n"), [
       "Picture Adjustments: press Q (Video ▸ Reset) to reset the picture, and turn off its other video effects.",
@@ -772,7 +777,7 @@ const CAUSE_CASES: CauseCase[] = [
     cause: "copy-back",
     plugins: [],
     detail: /^AI upscaling waits: hardware decoding copies the frames back to memory \(copy-back\), as the player's hardware decoding setting asks/,
-    osd: /^AI Upscaling: On, waits until other video filters are off$/,
+    osd: /^AI Upscaling: On, waits: hardware decoding copies frames back$/, // no filter is on
     decoding: "d3d11va-copy",
   },
   {
@@ -808,7 +813,10 @@ for (const c of CAUSE_CASES) {
     host.upscalingDecoding(c.cause, c.plugins);
     const { window, item, stop } = await opened(host);
     try {
-      assert.match(String(window.props.detail), c.detail);
+      // Off: what would happen, and that the window is not live (the player sends nothing while off).
+      const would = new RegExp(c.detail.source.replace("^AI upscaling waits: ", "^When turned on, AI upscaling will wait: "));
+      assert.match(String(window.props.detail), would);
+      assert.equal(window.props.live, false);
       assert.equal(window.props.blocker, "");
       assert.equal(window.props.decoding, c.decoding);
       await item.run(); // the menu item: kept, with a short OSD line
@@ -816,6 +824,8 @@ for (const c of CAUSE_CASES) {
       assert.equal(item.state.checked, true);
       assert.equal(item.state.enabled, true);
       assert.match(host.osd.at(-1)!, c.osd);
+      assert.match(String(window.props.detail), c.detail);
+      assert.equal(window.props.live, true);
       for (const shown of [String(window.props.detail), host.osd.at(-1)!])
         assert.doesNotMatch(shown, /another video filter is (on|active)/); // the old wording, wrong for most causes
     } finally {
@@ -827,7 +837,8 @@ for (const c of CAUSE_CASES) {
 test("window: an older player (no cause, no monitoring fields) shows its message and dashes", async () => {
   const host = windows();
   const message = "the video is decoded with copy-back, for example because a video filter needs the frames in memory";
-  // What players before 0.6.0 answer: no `cause`, no `plugins`, none of the monitoring fields.
+  // What players before 0.6.0 answer (the SDK docs say 0.5.25, a version that was never released):
+  // no `cause`, no `plugins`, none of the monitoring fields.
   const old = () => ({
     available: false,
     reason: { code: "decoding", message },
@@ -842,7 +853,7 @@ test("window: an older player (no cause, no monitoring fields) shows its message
   });
   const { window, item, stop } = await opened(host);
   try {
-    assert.equal(window.props.detail, `AI upscaling waits: ${message}`);
+    assert.equal(window.props.detail, `When turned on, AI upscaling will wait: ${message}`);
     assert.equal(window.props.blocker, "");
     assert.equal(window.props.reported, false);
     for (const field of ["source", "target", "factor", "area", "gpu", "decoding", "chain"])
@@ -889,11 +900,41 @@ test("window, Simplified Chinese: translated; plugin names as the player reports
     assert.equal(window.props.status, "关");
     assert.equal(window.props.blocker, "超分辨率正在等待这些插件的视频滤镜：Picture Adjustments");
     assert.equal(window.props.advice, "Picture Adjustments：按 Q（视频 ▸ 复位）复位画面，并关闭其中的其他视频效果。");
-    assert.match(String(window.props.detail), /^AI 超分辨率等待中：Picture Adjustments 的视频滤镜/);
+    assert.match(String(window.props.detail), /^开启后，AI 超分辨率将等待：其他插件的视频滤镜/);
     window.emit("toggle");
     await host.settle();
     assert.equal(window.props.status, "开，等待中");
     assert.equal(host.osd.at(-1), "AI 超分辨率：开，其他视频滤镜关闭后生效");
+  } finally {
+    await stop();
+  }
+});
+
+test("window: a window that cannot open leaves no listener behind", async () => {
+  const host = windows();
+  host.handle("ui.open", () => {
+    throw new HostError("unavailable", "no user interface");
+  });
+  const { stop } = await start(host);
+  try {
+    await host.command("upscaling.window").run().catch(() => {}); // the player reports the failure
+    await host.settle();
+    assert.ok(host.sent("events.subscribe").some((params) => params.event === CHANGED)); // it did listen
+    assert.equal(host.listening.has(CHANGED), false); // and stopped when the window failed
+  } finally {
+    await stop();
+  }
+});
+
+test("window: Close right after a title-bar close does not fail", async () => {
+  const host = windows();
+  const { window, stop } = await opened(host);
+  try {
+    window.userClose();
+    window.emit("closeWindow"); // the click raced the title-bar close
+    await host.settle();
+    assert.equal(host.windows.has("upscale"), false);
+    assert.equal(host.listening.has(CHANGED), false);
   } finally {
     await stop();
   }

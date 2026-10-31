@@ -47,7 +47,8 @@ export const WINDOW_TITLE = "AI Upscaling…";
 export const PICTURE_ADJUSTMENTS = "vestra.video";
 
 /**
- * The causes of a `decoding` reason the plugin words itself (player 0.6.0).
+ * The causes of a `decoding` reason the plugin words itself (player 0.6.0;
+ * the SDK docs say 0.5.25, a version that was never released).
  * A newer player's cause, and an older player without causes, show the
  * player's own message.
  */
@@ -193,46 +194,60 @@ export default async function activate(plugin: Plugin) {
 
   /**
    * Why a `decoding` reason holds upscaling back, by its cause (player
-   * 0.6.0), for the window and the menu item. The plugins whose filters
-   * cause copy-back are named as the player reports them; a player without
-   * a cause, or with a cause this plugin does not know, gives its message.
+   * 0.6.0): the part after "AI upscaling waits:". A player without a cause,
+   * or with a cause this plugin does not know, gives its message. The
+   * plugins whose filters cause copy-back are named in the window's box
+   * ({@link blockers}), not here.
    */
-  function waiting(reason: UpscalingReason): Text {
+  function decodingCause(reason: UpscalingReason): Text | string {
     switch (causeOf(reason)) {
-      case "copy-back": {
-        const names = (reason.plugins ?? []).map((p) => p.name);
-        if (names.length > 0)
+      case "copy-back":
+        if ((reason.plugins ?? []).length > 0)
           return text(
-            // TRANSLATORS: {} is one or more plugin names, as their manifests give them.
-            "AI upscaling waits: the video filters of {} need the frames in memory, so the video is not decoded on the GPU. Turn those filters off or reset them there; upscaling then starts by itself.",
-            [list(names)],
+            "other plugins' video filters need the frames in memory, so the video is not decoded on the GPU. Turn those filters off or reset them there; upscaling then starts by itself.",
           );
         return text(
-          "AI upscaling waits: hardware decoding copies the frames back to memory (copy-back), as the player's hardware decoding setting asks. Upscaling needs the video decoded on the GPU without copy-back.",
+          "hardware decoding copies the frames back to memory (copy-back), as the player's hardware decoding setting asks. Upscaling needs the video decoded on the GPU without copy-back.",
         );
-      }
       case "hwdec-off":
-        return text("AI upscaling waits: hardware decoding is off. Upscaling needs the video decoded on the GPU.");
+        return text("hardware decoding is off. Upscaling needs the video decoded on the GPU.");
       case "software":
         return text(
-          "AI upscaling waits: this video is decoded in software, for example a cover picture or a format the GPU cannot decode. It starts again with a video the GPU decodes.",
+          "this video is decoded in software, for example a cover picture or a format the GPU cannot decode. It starts again with a video the GPU decodes.",
         );
       case "other-hwdec":
-        return text("AI upscaling waits: this video is decoded with another hardware decoder than the one upscaling needs.");
+        return text("this video is decoded with another hardware decoder than the one upscaling needs.");
       default:
-        return text(
-          // TRANSLATORS: {} is the player's own message, in English.
-          "AI upscaling waits: {}",
-          [reason.message],
-        );
+        return reason.message; // the player's own message, in English
     }
+  }
+
+  /**
+   * A `decoding` reason for the window and the menu item: "waits" while the
+   * user has upscaling on, "would wait" while it is off.
+   */
+  function waiting(reason: UpscalingReason, on = true): Text {
+    return on
+      ? text(
+          // TRANSLATORS: {} is why (a translated clause, or the player's own message in English).
+          "AI upscaling waits: {}",
+          [decodingCause(reason)],
+        )
+      : text(
+          // TRANSLATORS: {} is why (a translated clause, or the player's own message in English).
+          "When turned on, AI upscaling will wait: {}",
+          [decodingCause(reason)],
+        );
   }
 
   /** The OSD after turning it on while a `decoding` reason holds it back: one short line by cause. */
   function onWaiting(reason: UpscalingReason): Text {
     switch (causeOf(reason)) {
       case "copy-back":
-        return text("AI Upscaling: On, waits until other video filters are off");
+        // Copy-back without plugins: the user's own hardware decoding setting, no filter is on.
+        return (reason.plugins ?? []).length > 0
+          ? text("AI Upscaling: On, waits until other video filters are off")
+          : text("AI Upscaling: On, waits: hardware decoding copies frames back");
       case "hwdec-off":
         return text("AI Upscaling: On, waits until hardware decoding is on");
       case "software":
@@ -301,18 +316,9 @@ export default async function activate(plugin: Plugin) {
       case "adapter":
         return text("AI upscaling: choose the NVIDIA GPU in Windows graphics settings");
       case "decoding":
-        switch (causeOf(reason)) {
-          case "copy-back":
-            return text("AI upscaling waits: another plugin's video filter is on");
-          case "hwdec-off":
-            return text("AI upscaling waits: hardware decoding is off");
-          case "software":
-            return text("AI upscaling waits: this video is decoded in software");
-          case "other-hwdec":
-            return text("AI upscaling waits: the video uses another hardware decoder");
-          default:
-            return text("AI upscaling waits until the video is decoded on the GPU");
-        }
+        // Not reached today: `set(true)` keeps a `decoding` request instead of refusing it (the
+        // OSD then comes from `onWaiting`). Kept short in case a player ever refuses it.
+        return text("AI upscaling waits until the video is decoded on the GPU");
       case "rendering": {
         const r = rendering;
         if (!r) return text("AI upscaling needs GPU rendering");
@@ -502,7 +508,8 @@ export default async function activate(plugin: Plugin) {
     if (!current) return "";
     const reason = current.reason;
     if (reason?.code === "unchecked") return "";
-    if (reason?.code === "decoding") return waiting(reason);
+    // While off the player sends no changes (see `live` in the window): say what would happen.
+    if (reason?.code === "decoding") return waiting(reason, store.value.on && !permanent());
     if (reason) return why(current) ?? reason.message;
     if (store.value.on && current.enabled && !current.requested && current.video)
       return text("The video is shown at its own size or smaller: upscaling starts when it is shown larger.");
@@ -577,6 +584,8 @@ export default async function activate(plugin: Plugin) {
     const { status, tone } = headline();
     return {
       on: store.value.on && !permanent(),
+      // The player sends changes only while some plugin has upscaling on; the window does not poll.
+      live: store.value.on && !permanent(),
       canToggle: !busy && ((store.value.on && !permanent()) || !blocked()),
       status,
       tone,
@@ -588,7 +597,8 @@ export default async function activate(plugin: Plugin) {
   window.on("toggle", () => toggle());
   window.on("closeWindow", async () => {
     await unwatch();
-    await window.close();
+    // `missing` when the user closed it with the title bar just before.
+    await window.close().catch(() => {});
   });
   window.onClose(() => unwatch());
 
@@ -600,7 +610,13 @@ export default async function activate(plugin: Plugin) {
         .then(() => plugin.update())
         .catch((error: unknown) => console.error("upscaling: change:", error));
     });
-    await window.show();
+    try {
+      await window.show();
+    } catch (error) {
+      // No window, no listener: it would keep the plugin running for nothing.
+      if (!window.opened) await unwatch();
+      throw error;
+    }
     // The first read checks the GPU (as the first pick of the menu item does).
     const next = await upscaling.state().catch(() => null);
     if (next && !stopped && watch) {

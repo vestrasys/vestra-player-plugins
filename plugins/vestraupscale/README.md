@@ -19,7 +19,7 @@ Right-click menu **Video ▸ AI Upscaling (RTX Video Super Resolution)**: pick i
 - the video's size, the size it is upscaled to and the scale factor, the video area, the GPU, the decoder (`d3d11va`, `d3d11va-copy`, software) and whether the upscaler is in the player's filter chain;
 - when other plugins' video filters hold upscaling back, their names (as the player reports them) and what to do there. For the built-in Picture Adjustments, that is **Video ▸ Reset** (key **Q**) and turning off its other video effects. VestraUpscale never changes another plugin's settings itself.
 
-The window listens to the player only while it is open. Nothing in it can show whether the driver really upscales (see below).
+The window listens to the player only while it is open, and the player reports changes only while upscaling is on: while it is off, the window shows what it read when it opened. Nothing in it can show whether the driver really upscales (see below).
 
 The plugin follows the player's interface language (English and Simplified Chinese).
 

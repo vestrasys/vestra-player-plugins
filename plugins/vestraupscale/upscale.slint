@@ -55,6 +55,8 @@ export component UpscaleWindow inherits Window {
     in property <string> advice;
     // Monitoring values ("—" when the player does not report them).
     in property <bool> reported: true;
+    // The player sends changes only while upscaling is on; while off the values are those read at opening.
+    in property <bool> live: true;
     in property <string> source;
     in property <string> target;
     in property <string> factor;
@@ -139,6 +141,10 @@ export component UpscaleWindow inherits Window {
         }
         Paragraph {
             text: root.reported ? "" : @tr("This player version does not report these details.");
+            color: Theme.text-dim;
+        }
+        Paragraph {
+            text: root.live ? "" : @tr("Updates live while upscaling is on; while it is off, this shows what was read when the window opened.");
             color: Theme.text-dim;
         }
         Rectangle { height: 1px; background: Theme.line; }
