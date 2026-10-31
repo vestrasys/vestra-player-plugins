@@ -4,86 +4,126 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: main.ts:120
+#: main.ts:131
 msgid "AI upscaling needs GPU rendering."
 msgstr ""
 
-#: main.ts:121
+#: main.ts:132
 msgid "AI upscaling starts when GPU rendering is ready."
 msgstr ""
 
 #. {} is the player's own message, in English.
-#: main.ts:126
+#: main.ts:136
 msgid "AI upscaling needs GPU rendering, which cannot be turned on here: {}"
 msgstr ""
 
-#: main.ts:131
+#: main.ts:140
 msgid "GPU rendering stopped during this run: restart the player to use AI upscaling."
 msgstr ""
 
-#: main.ts:132
+#: main.ts:141
 msgid "GPU rendering is on from the next start: restart the player to use AI upscaling."
 msgstr ""
 
-#: main.ts:133
+#: main.ts:142
 msgid "AI upscaling needs GPU rendering: turn on Video ▸ GPU Rendering (Experimental), then restart the player."
 msgstr ""
 
 #. the first {} is our advice, the second the player's own message, in English.
-#: main.ts:149
+#: main.ts:155
 msgid "{} ({})"
 msgstr ""
 
-#: main.ts:155
+#: main.ts:160
 msgid "AI upscaling is not available on this system. It needs Windows and an NVIDIA RTX GPU."
 msgstr ""
 
-#: main.ts:157
+#: main.ts:162
 msgid "AI upscaling is not available on this computer. It needs an NVIDIA RTX GPU."
 msgstr ""
 
-#: main.ts:163
+#: main.ts:168
 msgid "The player runs on a GPU that cannot upscale: in Windows Settings ▸ System ▸ Display ▸ Graphics, choose the high-performance GPU for Vestra Player, then restart it."
 msgstr ""
 
-#: main.ts:167
+#: main.ts:172
 msgid "The NVIDIA driver is too old for AI upscaling: update it to version 530 or newer."
 msgstr ""
 
-#: main.ts:169
+#: main.ts:174
 msgid "AI upscaling is paused while another video filter is active; it comes back when that filter is off."
 msgstr ""
 
 #. {} is the player's own message, in English.
-#: main.ts:174
+#: main.ts:179
 msgid "AI upscaling is not available on this computer: {}"
 msgstr ""
 
-#: main.ts:197
-msgid "AI Upscaling: On. Also turn on Super Resolution in the NVIDIA app (System ▸ Video ▸ RTX Video Enhancement): the player cannot see that switch."
+#: main.ts:194
+msgid "AI upscaling needs Windows and an NVIDIA RTX GPU"
 msgstr ""
 
-#: main.ts:219
-msgid "AI upscaling is not available on this computer."
+#: main.ts:196
+msgid "AI upscaling needs an NVIDIA RTX GPU"
 msgstr ""
 
-#: main.ts:226
-msgid "AI Upscaling: On. It starts when no other video filter needs the picture in memory."
+#: main.ts:198
+msgid "AI upscaling needs NVIDIA driver 530 or newer"
 msgstr ""
 
-#: main.ts:228
-msgid "AI Upscaling: On. It starts when GPU rendering is ready."
+#: main.ts:200
+msgid "AI upscaling: choose the NVIDIA GPU in Windows graphics settings"
 msgstr ""
 
-#: main.ts:230
+#: main.ts:202
+msgid "AI upscaling paused while another video filter is on"
+msgstr ""
+
+#: main.ts:205
+msgid "AI upscaling needs GPU rendering"
+msgstr ""
+
+#: main.ts:206
+msgid "AI upscaling starts when GPU rendering is ready"
+msgstr ""
+
+#: main.ts:207
+msgid "AI upscaling needs GPU rendering, unavailable here"
+msgstr ""
+
+#: main.ts:209
+msgid "Restart the player to use AI upscaling"
+msgstr ""
+
+#: main.ts:210
+msgid "AI upscaling: turn on Video ▸ GPU Rendering, then restart"
+msgstr ""
+
+#: main.ts:213
+msgid "AI upscaling is not available here (details in the Video menu)"
+msgstr ""
+
+#: main.ts:234
+msgid "AI Upscaling: On — also turn on Super Resolution in the NVIDIA app"
+msgstr ""
+
+#: main.ts:263
+msgid "AI Upscaling: On, waits until other video filters are off"
+msgstr ""
+
+#: main.ts:265
+msgid "AI Upscaling: On, starts when GPU rendering is ready"
+msgstr ""
+
+#: main.ts:267
 msgid "AI Upscaling: On"
 msgstr ""
 
-#: main.ts:244
+#: main.ts:281
 msgid "AI Upscaling: Off"
 msgstr ""
 
-#: main.ts:300
+#: main.ts:340
 msgid "AI Upscaling (RTX Video Super Resolution)"
 msgstr ""
 

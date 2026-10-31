@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { startPlugin, TestHost } from "@vestra-player/sdk/testing";
-import activate, { hasVideo, TITLE } from "../main.ts";
+import activate, { hasVideo, OSD_BUDGET, TITLE } from "../main.ts";
 
 const directory = new URL("..", import.meta.url);
 type Locale = "en" | "zh-Hans";
@@ -110,7 +110,7 @@ test("toggle on and off: set(true) on the first pick, the NVIDIA note once, set(
     assert.equal(states(host), 0); // set(true) does the check itself
     assert.equal(host.upscaling.enabled, true);
     assert.equal(item.state.checked, true);
-    assert.match(host.osd.at(-1)!, /^AI Upscaling: On\. Also turn on Super Resolution in the NVIDIA app/);
+    assert.match(host.osd.at(-1)!, /^AI Upscaling: On — also turn on Super Resolution in the NVIDIA app$/);
     await item.run();
     await host.settle();
     assert.deepEqual(sets(host), [true, false]);
@@ -127,7 +127,7 @@ test("toggle on and off: set(true) on the first pick, the NVIDIA note once, set(
   }
 });
 
-/** A long message of the player's, to test the OSD's 200-character limit. */
+/** A long message of the player's: the OSD must not carry it (single line, short budget). */
 const LONG = `the player says ${"a long explanation ".repeat(16)}end`;
 
 interface Case {
@@ -135,8 +135,8 @@ interface Case {
   setup(host: TestHost): void;
   /** The menu item's reason (English). */
   menu: RegExp;
-  /** The OSD after the refused pick (English); defaults to `menu`. */
-  osd?: RegExp;
+  /** The OSD after the refused pick (English): one short line. */
+  osd: RegExp;
   /** Text that must not appear (wrong advice). */
   not?: RegExp;
 }
@@ -152,30 +152,31 @@ const software = (host: TestHost, message = "upscaling needs GPU rendering, and 
 };
 
 const CASES: Case[] = [
-  { name: "no-gpu", setup: reason("no-gpu", "no NVIDIA GPU"), menu: /not available on this computer\. It needs an NVIDIA RTX GPU/ },
+  { name: "no-gpu", setup: reason("no-gpu", "no NVIDIA GPU"), menu: /not available on this computer\. It needs an NVIDIA RTX GPU/, osd: /^AI upscaling needs an NVIDIA RTX GPU$/ },
   {
     name: "driver",
     setup: reason("driver", "the NVIDIA driver 512.15 on RTX 3060 is too old for RTX Video Super Resolution, which needs 530 or newer; update the driver"),
     menu: /update it to version 530 or newer\. \(.*530 or newer/,
-    osd: /^The NVIDIA driver is too old for AI upscaling: update it to version 530 or newer\.$/,
+    osd: /^AI upscaling needs NVIDIA driver 530 or newer$/,
     not: /531/,
   },
   {
     name: "gpu-unsupported",
     setup: reason("gpu-unsupported", "GTX 1060 does not offer it"),
     menu: /not available on this computer: GTX 1060 does not offer it/,
+    osd: /^AI upscaling is not available here \(details in the Video menu\)$/,
   },
   {
     name: "gpu-unsupported, long message",
     setup: reason("gpu-unsupported", LONG),
     menu: /not available on this computer: the player says a long/,
-    osd: /not available on this computer: the player says a long.*…$/,
+    osd: /^AI upscaling is not available here \(details in the Video menu\)$/,
   },
   {
     name: "adapter",
     setup: reason("adapter", "GPU rendering runs on AMD Radeon 780M; RTX 4070 can upscale"),
     menu: /Windows Settings ▸ System ▸ Display ▸ Graphics.*780M/,
-    osd: /^The player runs on a GPU that cannot upscale: in Windows Settings ▸ System ▸ Display ▸ Graphics.*restart it\.$/,
+    osd: /^AI upscaling: choose the NVIDIA GPU in Windows graphics settings$/,
   },
   {
     name: "rendering: software chosen",
@@ -186,6 +187,7 @@ const CASES: Case[] = [
       host.rendering.reason = { code: "preference", message: "chosen in the player's settings" };
     },
     menu: /^AI upscaling needs GPU rendering: turn on Video ▸ GPU Rendering \(Experimental\), then restart the player\./,
+    osd: /^AI upscaling: turn on Video ▸ GPU Rendering, then restart$/,
   },
   {
     name: "rendering: GPU not allowed here (denylist)",
@@ -196,6 +198,7 @@ const CASES: Case[] = [
       host.rendering.gpu = { available: false, reason: { code: "denylist", message: "the driver 31.0.14005 is on the denylist" } };
     },
     menu: /cannot be turned on here: the driver 31\.0\.14005 is on the denylist/,
+    osd: /^AI upscaling needs GPU rendering, unavailable here$/,
     not: /turn on Video ▸ GPU Rendering/,
   },
   {
@@ -207,6 +210,7 @@ const CASES: Case[] = [
       host.rendering.reason = { code: "preference", message: "chosen in the player's settings" };
     },
     menu: /^GPU rendering is on from the next start: restart the player to use AI upscaling\./,
+    osd: /^Restart the player to use AI upscaling$/,
     not: /turn on Video ▸ GPU Rendering/,
   },
   {
@@ -216,12 +220,14 @@ const CASES: Case[] = [
       host.rendering.reason = { code: "window-fallback", message: "a window could not show GPU frames" };
     },
     menu: /^GPU rendering stopped during this run: restart the player to use AI upscaling\./,
+    osd: /^Restart the player to use AI upscaling$/,
     not: /turn on Video ▸ GPU Rendering/,
   },
   {
     name: "a newer player's code",
     setup: reason("some-new-code", "a newer player's reason"),
     menu: /not available on this computer: a newer player's reason/,
+    osd: /^AI upscaling is not available here \(details in the Video menu\)$/,
   },
 ];
 
@@ -239,7 +245,7 @@ for (const c of CASES) {
       assert.equal(item.state.enabled, false);
       assert.equal(item.state.checked, false);
       assert.match(item.display.reason ?? "", c.menu);
-      assert.match(host.osd.at(-1)!, c.osd ?? c.menu);
+      assert.match(host.osd.at(-1)!, c.osd);
       if (c.not) {
         assert.doesNotMatch(item.display.reason ?? "", c.not);
         assert.doesNotMatch(host.osd.at(-1)!, c.not);
@@ -250,10 +256,10 @@ for (const c of CASES) {
   });
 }
 
-test("every OSD text fits the player's 200 characters, in English and Simplified Chinese", async () => {
+test("every OSD text fits one line: at most 80 characters in English, 40 in Simplified Chinese", async () => {
   const extra: Case[] = [
-    { name: "platform", setup: reason("platform", LONG), menu: /./ },
-    { name: "decoding", setup: reason("decoding", LONG), menu: /./ },
+    { name: "platform", setup: reason("platform", LONG), menu: /./, osd: /./ },
+    { name: "decoding", setup: reason("decoding", LONG), menu: /./, osd: /./ },
     {
       name: "rendering: starting",
       setup: (host) => {
@@ -262,6 +268,7 @@ test("every OSD text fits the player's 200 characters, in English and Simplified
         host.upscaling.renderingStarting = true;
       },
       menu: /./,
+      osd: /./,
     },
     {
       name: "rendering: denylist, long",
@@ -271,8 +278,9 @@ test("every OSD text fits the player's 200 characters, in English and Simplified
         host.rendering.gpu = { available: false, reason: { code: "denylist", message: LONG } };
       },
       menu: /./,
+      osd: /./,
     },
-    { name: "works", setup: () => {}, menu: /./ },
+    { name: "works", setup: () => {}, menu: /./, osd: /./ },
   ];
   for (const locale of LOCALES) {
     for (const c of [...CASES, ...extra]) {
@@ -282,14 +290,17 @@ test("every OSD text fits the player's 200 characters, in English and Simplified
       try {
         await item.run();
         await host.settle();
-        // A text over the limit is refused by the player and missing here.
         assert.equal(host.osd.length, 1, `${locale} ${c.name}: one OSD message`);
-        assert.ok([...host.osd[0]!].length <= 200, `${locale} ${c.name}: ${host.osd[0]}`);
         if (item.state.checked) {
           await item.run(); // the "off" message too
           await host.settle();
-          assert.equal(host.osd.length, 2, `${locale} ${c.name}: off`);
+          await item.run(); // and the plain "on" (the note was shown already)
+          await host.settle();
+          assert.equal(host.osd.length, 3, `${locale} ${c.name}: off, on`);
         }
+        const budget = locale === "en" ? OSD_BUDGET.en : OSD_BUDGET.zh;
+        for (const shown of host.osd)
+          assert.ok([...shown].length <= budget, `${locale} ${c.name}: ${[...shown].length}: ${shown}`);
       } finally {
         await stop();
       }
@@ -308,7 +319,7 @@ test("decoding: the request is kept and the item stays usable", async () => {
     assert.equal(host.upscaling.enabled, true);
     assert.equal(item.state.enabled, true);
     assert.equal(item.state.checked, true);
-    assert.match(host.osd.at(-1)!, /starts when no other video filter/);
+    assert.match(host.osd.at(-1)!, /^AI Upscaling: On, waits until other video filters are off$/);
     // The filter is gone: the next video reads the state again (cached check) and nothing is greyed.
     host.upscaling.reason = null;
     host.openElsewhere("/media/next.mp4");
@@ -332,7 +343,7 @@ test("GPU rendering still starting: accepted, kept, and the item is never greyed
     await host.settle();
     assert.equal(host.upscaling.enabled, true);
     assert.equal(item.state.checked, true);
-    assert.match(host.osd.at(-1)!, /^AI Upscaling: On\. It starts when GPU rendering is ready\.$/);
+    assert.match(host.osd.at(-1)!, /^AI Upscaling: On, starts when GPU rendering is ready$/);
     await item.run(); // off again
     await host.settle();
     host.openElsewhere("/media/next.mp4"); // re-reads the state: still `rendering` while starting
@@ -495,7 +506,7 @@ test("a saved choice refused at a start: kept, told once per reason, and the ite
     await host.settle();
     assert.deepEqual(sets(host), [true]);
     assert.equal(host.upscaling.enabled, false);
-    assert.match(host.osd.at(-1)!, /^AI upscaling needs GPU rendering: turn on/);
+    assert.match(host.osd.at(-1)!, /^AI upscaling: turn on Video ▸ GPU Rendering, then restart$/);
     assert.equal(item.state.checked, true);
     assert.equal(item.state.enabled, true);
     await stop();

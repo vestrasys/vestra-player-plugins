@@ -26,14 +26,8 @@ export const isSettings = (value: unknown): value is Settings =>
 
 export const TITLE = "AI Upscaling (RTX Video Super Resolution)";
 
-/** The player's OSD takes at most 200 characters; the player's own messages are cut to this. */
-const OSD_DETAIL = 120;
-
-/** One line of at most `max` characters. */
-export const clip = (value: string, max: number) => {
-  const flat = value.replace(/\s+/g, " ").trim();
-  return [...flat].length > max ? `${[...flat].slice(0, max - 1).join("")}…` : flat;
-};
+/** What fits the OSD's single line in a default-size window (coordinator's GUI check), in characters. */
+export const OSD_BUDGET = { en: 80, zh: 40 };
 
 /**
  * Reasons that can pass while the player runs: `set(true)` keeps the request
@@ -131,19 +125,17 @@ export default async function activate(plugin: Plugin) {
   /** Fixed for good on this system: the saved choice cannot matter here. */
   const permanent = () => state?.reason?.code === "platform";
 
-  /** Why GPU rendering is off, in our words, following the player's own order of checks. */
-  function renderingAdvice(detail: boolean): Text {
+  /** Why GPU rendering is off, for the menu item, following the player's own order of checks. */
+  function renderingAdvice(): Text {
     const r = rendering;
     if (!r) return text("AI upscaling needs GPU rendering.");
     if (r.reason.code === "pending") return text("AI upscaling starts when GPU rendering is ready.");
-    if (!r.gpu.available) {
-      const why = r.gpu.reason?.message ?? "";
+    if (!r.gpu.available)
       return text(
         // TRANSLATORS: {} is the player's own message, in English.
         "AI upscaling needs GPU rendering, which cannot be turned on here: {}",
-        [detail ? why : clip(why, OSD_DETAIL)],
+        [r.gpu.reason?.message ?? ""],
       );
-    }
     if (r.reason.code === "init-failed" || r.reason.code === "window-fallback")
       return text("GPU rendering stopped during this run: restart the player to use AI upscaling.");
     if (r.nextMode === "gpu") return text("GPU rendering is on from the next start: restart the player to use AI upscaling.");
@@ -151,29 +143,25 @@ export default async function activate(plugin: Plugin) {
   }
 
   /**
-   * Our words for why it cannot work. `detail` (the menu item's reason) adds
-   * the player's English message, which names the GPUs; the OSD (at most 200
-   * characters) gets the advice alone, or a shortened message.
+   * Why it cannot work, for the menu item's reason: our advice plus the
+   * player's English message, which names the GPUs. The OSD gets {@link brief}.
    */
-  function why(current: UpscalingState, detail: boolean): Text | null {
+  function why(current: UpscalingState): Text | null {
     const reason = current.reason;
     if (!reason) return null;
-    const message = detail ? reason.message : clip(reason.message, OSD_DETAIL);
     const withMessage = (advice: Text) =>
-      detail
-        ? text(
-            // TRANSLATORS: the first {} is our advice, the second the player's own message, in English.
-            "{} ({})",
-            [advice, message],
-          )
-        : advice;
+      text(
+        // TRANSLATORS: the first {} is our advice, the second the player's own message, in English.
+        "{} ({})",
+        [advice, reason.message],
+      );
     switch (reason.code) {
       case "platform":
         return text("AI upscaling is not available on this system. It needs Windows and an NVIDIA RTX GPU.");
       case "no-gpu":
         return text("AI upscaling is not available on this computer. It needs an NVIDIA RTX GPU.");
       case "rendering":
-        return withMessage(renderingAdvice(detail));
+        return withMessage(renderingAdvice());
       case "adapter":
         return withMessage(
           text(
@@ -189,8 +177,40 @@ export default async function activate(plugin: Plugin) {
         return text(
           // TRANSLATORS: {} is the player's own message, in English.
           "AI upscaling is not available on this computer: {}",
-          [message],
+          [reason.message],
         );
+    }
+  }
+
+  /**
+   * Why it cannot work, for the OSD: one short line (the OSD is a single line;
+   * at most 80 characters in English, 40 in Chinese: `OSD_BUDGET`). The menu
+   * item's reason has the details.
+   */
+  function brief(current: UpscalingState | null): Text {
+    const reason = current?.reason;
+    switch (reason?.code) {
+      case "platform":
+        return text("AI upscaling needs Windows and an NVIDIA RTX GPU");
+      case "no-gpu":
+        return text("AI upscaling needs an NVIDIA RTX GPU");
+      case "driver":
+        return text("AI upscaling needs NVIDIA driver 530 or newer");
+      case "adapter":
+        return text("AI upscaling: choose the NVIDIA GPU in Windows graphics settings");
+      case "decoding":
+        return text("AI upscaling paused while another video filter is on");
+      case "rendering": {
+        const r = rendering;
+        if (!r) return text("AI upscaling needs GPU rendering");
+        if (r.reason.code === "pending") return text("AI upscaling starts when GPU rendering is ready");
+        if (!r.gpu.available) return text("AI upscaling needs GPU rendering, unavailable here");
+        if (r.reason.code === "init-failed" || r.reason.code === "window-fallback" || r.nextMode === "gpu")
+          return text("Restart the player to use AI upscaling");
+        return text("AI upscaling: turn on Video ▸ GPU Rendering, then restart");
+      }
+      default:
+        return text("AI upscaling is not available here (details in the Video menu)");
     }
   }
 
@@ -211,7 +231,7 @@ export default async function activate(plugin: Plugin) {
     save({ noted: true });
     await osd(
       text(
-        "AI Upscaling: On. Also turn on Super Resolution in the NVIDIA app (System ▸ Video ▸ RTX Video Enhancement): the player cannot see that switch.",
+        "AI Upscaling: On — also turn on Super Resolution in the NVIDIA app",
       ),
     );
     return true;
@@ -233,16 +253,16 @@ export default async function activate(plugin: Plugin) {
       const code = state?.reason?.code ?? null;
       if (interactive || code !== (store.value.refused ?? null)) {
         if (!interactive) save({ refused: code });
-        await osd((state && why(state, false)) ?? text("AI upscaling is not available on this computer."));
+        await osd(brief(state));
       }
       return false;
     }
     if (stopped) return true;
     if (store.value.refused) save({ refused: null });
     if (state?.reason?.code === "decoding") {
-      await osd(text("AI Upscaling: On. It starts when no other video filter needs the picture in memory."));
+      await osd(text("AI Upscaling: On, waits until other video filters are off"));
     } else if (state?.reason?.code === "rendering") {
-      await osd(text("AI Upscaling: On. It starts when GPU rendering is ready."));
+      await osd(text("AI Upscaling: On, starts when GPU rendering is ready"));
     } else if (!(await noteOnce()) && interactive) {
       await osd(text("AI Upscaling: On"));
     }
@@ -325,7 +345,7 @@ export default async function activate(plugin: Plugin) {
     // Greyed out once the player said it cannot work here; a saved "on" stays usable so it can be turned off.
     enabled: () => (store.value.on && !permanent()) || !blocked(),
     busy: () => busy,
-    reason: () => (busy ? null : state && blocked() ? why(state, true) : null),
+    reason: () => (busy ? null : state && blocked() ? why(state) : null),
     run: toggle,
   });
 
