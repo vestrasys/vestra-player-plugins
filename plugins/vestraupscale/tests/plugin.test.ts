@@ -21,7 +21,7 @@ function windows() {
 function withVideo(host: TestHost) {
   host.stats = {
     ...host.stats,
-    video: { codec: "h264", width: 1920, height: 1080, fps: 24 },
+    video: { codec: "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10", decoder: "h264", width: 1920, height: 1080, fps: 24 },
   } as typeof host.stats;
 }
 
@@ -407,9 +407,12 @@ test("audio only: the saved choice waits for a video and does not wake the GPU",
     await host.settle(1700); // the second look after 1.5 s
     assert.deepEqual(sets(host), []);
     assert.equal(host.upscaling.checked, false);
-    // Cover art is not a video either.
-    host.stats = { ...host.stats, video: { codec: "mjpeg", width: 600, height: 600, fps: null } } as typeof host.stats;
-    host.openElsewhere("/media/song-with-cover.mp3");
+    // PNG cover art is not a video either (as the host reports it: mpv's long codec text, short decoder).
+    host.stats = {
+      ...host.stats,
+      video: { codec: "PNG (Portable Network Graphics) image", decoder: "png", width: 600, height: 600, fps: null },
+    } as typeof host.stats;
+    host.openElsewhere("/media/song-with-cover.m4a");
     await host.settle(1700);
     assert.deepEqual(sets(host), []);
     withVideo(host);
@@ -421,13 +424,44 @@ test("audio only: the saved choice waits for a video and does not wake the GPU",
   }
 });
 
-test("hasVideo tells moving video from audio and cover art", () => {
+test("hasVideo: the short decoder name decides, mpv's long codec text is the fallback", () => {
   assert.equal(hasVideo(null), false);
-  const v = (codec: string, fps: number | null) => ({ codec, width: 1920, height: 1080, fps }) as Parameters<typeof hasVideo>[0];
-  assert.equal(hasVideo(v("h264", 24)), true);
-  assert.equal(hasVideo(v("mjpeg", 30)), true);
-  assert.equal(hasVideo(v("mjpeg", null)), false);
-  assert.equal(hasVideo(v("png", null)), false);
+  type Video = Parameters<typeof hasVideo>[0];
+  const v = (codec: string, decoder: string | null, fps: number | null = 24) =>
+    ({ codec, decoder, width: 1920, height: 1080, fps }) as Video;
+  // Moving video, as mpv describes it.
+  assert.equal(hasVideo(v("H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10", "h264")), true);
+  assert.equal(hasVideo(v("H.265 / HEVC (High Efficiency Video Coding)", "hevc")), true);
+  assert.equal(hasVideo(v("Alliance for Open Media AV1", "libdav1d")), true);
+  // JPEG: the same decoder plays Motion JPEG video and JPEG cover art; without a cover-art flag it counts.
+  assert.equal(hasVideo(v("Motion JPEG", "mjpeg", null)), true);
+  // Still pictures by decoder, whatever the codec text says.
+  assert.equal(hasVideo(v("PNG (Portable Network Graphics) image", "png", null)), false);
+  assert.equal(hasVideo(v("BMP (Windows and OS/2 bitmap)", "bmp", null)), false);
+  assert.equal(hasVideo(v("WebP", "WEBP", null)), false);
+  // No decoder name: the long codec text, case-insensitive.
+  assert.equal(hasVideo(v("PNG (Portable Network Graphics) image", null, null)), false);
+  assert.equal(hasVideo(v("GIF (Graphics Interchange Format)", null, null)), false);
+  assert.equal(hasVideo(v("H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10", null)), true);
+  // A track without a size is not shown.
+  assert.equal(hasVideo({ ...v("H.264", "h264"), width: null } as Video), false);
+});
+
+test("GPU rendering that finished starting between the two reads does not grey the item", async () => {
+  const host = windows();
+  // The upscaling answer still says `rendering`, but the rendering state already draws on the GPU.
+  host.upscaling.reason = { code: "rendering", message: "upscaling needs GPU rendering, which is starting" };
+  host.videoRender.gpu = true;
+  host.rendering.reason = { code: "default", message: "nothing rules GPU rendering out" };
+  const { item, stop } = await start(host);
+  try {
+    await item.run();
+    await host.settle();
+    assert.equal(item.state.enabled, true);
+    assert.equal(item.display.reason, null);
+  } finally {
+    await stop();
+  }
 });
 
 test("the choice is applied at once when the plugin starts while a video already plays", async () => {
@@ -520,10 +554,12 @@ test("stop: the item goes, the choice is flushed, and nothing runs afterwards", 
   const { stop } = await start(host, "en", data);
   host.openElsewhere("/media/song.flac");
   await host.settle();
-  await stop();
+  await stop(); // ends the 1.5 s wait at once (the timer is cleared)
+  const looks = host.sent("playback.stats").length;
   withVideo(host);
   await new Promise((resolve) => setTimeout(resolve, 1700));
   assert.deepEqual(sets(host), []);
+  assert.equal(host.sent("playback.stats").length, looks); // no second look after the stop
 });
 
 test("Simplified Chinese: menu title and reasons are translated", async () => {

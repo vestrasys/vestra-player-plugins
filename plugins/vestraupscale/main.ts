@@ -44,17 +44,26 @@ export const clip = (value: string, max: number) => {
  */
 const PASSING = new Set(["decoding", "unchecked"]);
 
-/** Codecs of still pictures: an audio file's cover art is not a video worth waking the GPU for. */
-const STILL = new Set(["png", "bmp", "webp", "tiff", "gif"]);
+/**
+ * Decoders of still-picture formats (`stats.video.decoder`, the short name):
+ * an audio file's cover art is not a video worth waking the GPU for. JPEG is
+ * not here: its decoder (`mjpeg`) also plays Motion JPEG video, and the
+ * player does not say whether a track is cover art.
+ */
+const STILL = new Set(["png", "apng", "bmp", "webp", "tiff", "gif", "qoi"]);
 
-/** The source shows moving video (not audio only, not cover art). */
+/**
+ * The same formats in `stats.video.codec`, mpv's long description ("PNG
+ * (Portable Network Graphics) image"), for a player that leaves `decoder` out.
+ */
+const STILL_CODEC = /\b(a?png|bmp|webp|tiff|gif|qoi)\b|portable network graphics|windows bitmap|graphics interchange format/i;
+
+/** The source shows moving video (not audio only, not a still cover picture). */
 export function hasVideo(video: PlaybackStats["video"]): boolean {
   if (!video || video.width === null || video.height === null) return false;
-  const codec = video.codec?.toLowerCase() ?? "";
-  if (STILL.has(codec)) return false;
-  // Cover art as JPEG: mjpeg without a frame rate (or a single frame per second).
-  if (codec === "mjpeg" && (video.fps === null || video.fps <= 1)) return false;
-  return true;
+  const decoder = video.decoder?.toLowerCase() ?? null;
+  if (decoder !== null) return !STILL.has(decoder);
+  return !STILL_CODEC.test(video.codec ?? "");
 }
 
 /**
@@ -84,8 +93,15 @@ export default async function activate(plugin: Plugin) {
   /** The saved choice still waits for the first video of this run. */
   let pending = store.value.on;
   let stopped = false;
+  /** The second look for a video track (`applySaved`), and how to end the wait early. */
+  let retry: { timer: ReturnType<typeof setTimeout>; done: () => void } | null = null;
   plugin.onDispose(() => {
     stopped = true;
+    if (retry) {
+      clearTimeout(retry.timer);
+      retry.done();
+      retry = null;
+    }
   });
 
   const save = (patch: Partial<Settings>) => store.save({ ...store.value, ...patch });
@@ -107,7 +123,8 @@ export default async function activate(plugin: Plugin) {
     const reason = state?.reason;
     if (!state || state.available || !reason || PASSING.has(reason.code)) return false;
     // Without the rendering state the plugin cannot tell "starting" apart: leave the item usable.
-    if (reason.code === "rendering") return rendering !== null && !starting();
+    // GPU rendering drawing now: it finished starting between the two reads, so the reason has passed.
+    if (reason.code === "rendering") return rendering !== null && !starting() && rendering.mode !== "gpu";
     return true;
   };
 
@@ -257,7 +274,10 @@ export default async function activate(plugin: Plugin) {
     let stats = await plugin.player.stats().catch(() => null);
     // The video track may be known a moment after the source is ready.
     if (stats && !hasVideo(stats.video)) {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await new Promise<void>((resolve) => {
+        retry = { timer: setTimeout(resolve, 1500), done: resolve };
+      });
+      retry = null;
       if (stopped || plugin.player.state.sourceId !== sourceId) return;
       stats = await plugin.player.stats().catch(() => null);
     }

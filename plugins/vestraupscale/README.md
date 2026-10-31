@@ -7,7 +7,7 @@ AI upscaling for Vestra Player with NVIDIA RTX Video Super Resolution: the NVIDI
 Right-click menu **Video ▸ AI Upscaling (RTX Video Super Resolution)**: pick it to turn upscaling on (checked) or off.
 
 - The first time you turn it on, a note on the video reminds you of the NVIDIA app switch (below).
-- Your choice is remembered: after a restart, upscaling is turned on again when the first video plays (audio files, also with cover art, do not count).
+- Your choice is remembered: after a restart, upscaling is turned on again when the first video plays. Audio files do not count, nor do their PNG, BMP, WebP, TIFF or GIF cover pictures; JPEG cover art still counts as video, because the player does not yet say which track is cover art.
 - A video already shown at its own size or smaller is not upscaled; the player follows window and video size changes by itself.
 - While another video filter needs the picture in memory (for example a picture adjustment such as brightness), upscaling pauses and comes back when that filter is off.
 
