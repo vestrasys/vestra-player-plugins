@@ -1,6 +1,6 @@
 {
   "id": "zysilm.vestraupscale",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "apiVersion": "vestra/1",
   "entry": "main.ts",
   "capabilities": ["commands", "events", "playback.read", "ui.osd", "video.upscaling"],

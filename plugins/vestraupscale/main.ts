@@ -204,13 +204,13 @@ export default async function activate(plugin: Plugin) {
         const r = rendering;
         if (!r) return text("AI upscaling needs GPU rendering");
         if (r.reason.code === "pending") return text("AI upscaling starts when GPU rendering is ready");
-        if (!r.gpu.available) return text("AI upscaling needs GPU rendering, unavailable here");
+        if (!r.gpu.available) return text("AI upscaling needs GPU rendering, which is unavailable here");
         if (r.reason.code === "init-failed" || r.reason.code === "window-fallback" || r.nextMode === "gpu")
           return text("Restart the player to use AI upscaling");
         return text("AI upscaling: turn on Video ▸ GPU Rendering, then restart");
       }
       default:
-        return text("AI upscaling is not available here (details in the Video menu)");
+        return text("AI upscaling is not available on this computer");
     }
   }
 

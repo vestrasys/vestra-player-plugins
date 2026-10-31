@@ -1,6 +1,6 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: zysilm.vestraupscale 0.1.0\n"
+"Project-Id-Version: zysilm.vestraupscale 0.1.1\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
@@ -88,7 +88,7 @@ msgid "AI upscaling starts when GPU rendering is ready"
 msgstr ""
 
 #: main.ts:207
-msgid "AI upscaling needs GPU rendering, unavailable here"
+msgid "AI upscaling needs GPU rendering, which is unavailable here"
 msgstr ""
 
 #: main.ts:209
@@ -100,7 +100,7 @@ msgid "AI upscaling: turn on Video ▸ GPU Rendering, then restart"
 msgstr ""
 
 #: main.ts:213
-msgid "AI upscaling is not available here (details in the Video menu)"
+msgid "AI upscaling is not available on this computer"
 msgstr ""
 
 #: main.ts:234
