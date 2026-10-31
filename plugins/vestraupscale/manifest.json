@@ -1,0 +1,15 @@
+{
+  "id": "zysilm.vestraupscale",
+  "version": "0.1.0",
+  "apiVersion": "vestra/1",
+  "entry": "main.ts",
+  "capabilities": ["commands", "events", "playback.read", "ui.osd", "video.upscaling"],
+  "name": "VestraUpscale",
+  "author": "zysilm",
+  "punchline": "AI upscaling of the video with NVIDIA RTX Video Super Resolution",
+  "description": "Adds Video ▸ AI Upscaling (RTX Video Super Resolution): the NVIDIA GPU sharpens and enlarges the video to the size it is shown at. Needs Windows, an NVIDIA RTX GPU, GPU rendering and Super Resolution turned on in the NVIDIA app. Elsewhere the item is greyed out with the reason. Remembers your choice.",
+  "tags": ["video", "upscaling", "NVIDIA"],
+  "sourceUrl": "https://github.com/vestrasys/vestra-player-plugins/tree/main/plugins/vestraupscale",
+  "license": "Apache-2.0",
+  "minPlayerVersion": "0.5.16"
+}

@@ -1,0 +1,88 @@
+msgid ""
+msgstr ""
+"Language: zh-Hans\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#. the first {} is our advice, the second the player's own message, in English.
+#: main.ts:80
+msgid "{} ({})"
+msgstr "{}（{}）"
+
+#: main.ts:87
+msgid "AI upscaling is not available here. It needs Windows and an NVIDIA RTX GPU."
+msgstr "此处无法使用 AI 超分辨率，需要 Windows 和 NVIDIA RTX 显卡。"
+
+#: main.ts:89
+msgid "Needs GPU rendering: turn on Video ▸ GPU Rendering (Experimental), then restart the player."
+msgstr "需要 GPU 渲染：打开“视频 ▸ GPU 渲染（实验性）”，然后重启播放器。"
+
+#: main.ts:93
+msgid "The player runs on a GPU that cannot upscale: in Windows Settings ▸ System ▸ Display ▸ Graphics, choose the high-performance GPU for Vestra Player, then restart it."
+msgstr "播放器正运行在不支持超分辨率的显卡上：请在 Windows 设置 ▸ 系统 ▸ 屏幕 ▸ 显示卡 中为 Vestra Player 选择“高性能”显卡，然后重启播放器。"
+
+#: main.ts:97
+msgid "The NVIDIA driver is too old for AI upscaling: update it to 531.18 or newer."
+msgstr "NVIDIA 驱动版本过旧，无法使用 AI 超分辨率：请更新到 531.18 或更新版本。"
+
+#: main.ts:99
+msgid "AI upscaling is paused while another video filter is active; it comes back when that filter is off."
+msgstr "其他视频滤镜生效期间 AI 超分辨率暂停，关闭该滤镜后自动恢复。"
+
+#. {} is the player's own message, in English.
+#: main.ts:104
+msgid "AI upscaling is not available here: {}"
+msgstr "此处无法使用 AI 超分辨率：{}"
+
+#: main.ts:125
+msgid "AI upscaling on. Also turn on Super Resolution in the NVIDIA app (System ▸ Video ▸ RTX Video Enhancement): the player cannot see that switch."
+msgstr "AI 超分辨率已开启。还需在 NVIDIA App 中打开“超分辨率”（系统 ▸ 视频 ▸ RTX 视频增强）：播放器无法读取该开关。"
+
+#: main.ts:140
+msgid "AI upscaling is not available here."
+msgstr "此处无法使用 AI 超分辨率。"
+
+#: main.ts:146
+msgid "AI upscaling is on; it starts when no other video filter needs the picture in memory."
+msgstr "AI 超分辨率已开启，将在没有其他视频滤镜占用画面时生效。"
+
+#: main.ts:149
+msgid "AI upscaling is on; it starts when GPU rendering is ready."
+msgstr "AI 超分辨率已开启，将在 GPU 渲染就绪后生效。"
+
+#: main.ts:151
+msgid "AI upscaling on"
+msgstr "AI 超分辨率：开"
+
+#: main.ts:165
+msgid "AI upscaling off"
+msgstr "AI 超分辨率：关"
+
+#: main.ts:212
+msgid "AI Upscaling (RTX Video Super Resolution)"
+msgstr "AI 超分辨率（RTX 视频超分辨率）"
+
+#: manifest.json
+msgid "VestraUpscale"
+msgstr "VestraUpscale"
+
+#: manifest.json
+msgid "AI upscaling of the video with NVIDIA RTX Video Super Resolution"
+msgstr "用 NVIDIA RTX 视频超分辨率对视频做 AI 放大"
+
+#: manifest.json
+msgid "Adds Video ▸ AI Upscaling (RTX Video Super Resolution): the NVIDIA GPU sharpens and enlarges the video to the size it is shown at. Needs Windows, an NVIDIA RTX GPU, GPU rendering and Super Resolution turned on in the NVIDIA app. Elsewhere the item is greyed out with the reason. Remembers your choice."
+msgstr "添加“视频 ▸ AI 超分辨率（RTX 视频超分辨率）”：由 NVIDIA 显卡将视频锐化并放大到显示尺寸。需要 Windows、NVIDIA RTX 显卡、GPU 渲染，并在 NVIDIA App 中打开“超分辨率”。其他环境下该菜单项变灰并显示原因。会记住你的选择。"
+
+#: manifest.json
+msgid "video"
+msgstr "视频"
+
+#: manifest.json
+msgid "upscaling"
+msgstr "超分辨率"
+
+#: manifest.json
+msgid "NVIDIA"
+msgstr "NVIDIA"

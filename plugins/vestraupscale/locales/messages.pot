@@ -1,0 +1,87 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: zysilm.vestraupscale 0.1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#. the first {} is our advice, the second the player's own message, in English.
+#: main.ts:80
+msgid "{} ({})"
+msgstr ""
+
+#: main.ts:87
+msgid "AI upscaling is not available here. It needs Windows and an NVIDIA RTX GPU."
+msgstr ""
+
+#: main.ts:89
+msgid "Needs GPU rendering: turn on Video ▸ GPU Rendering (Experimental), then restart the player."
+msgstr ""
+
+#: main.ts:93
+msgid "The player runs on a GPU that cannot upscale: in Windows Settings ▸ System ▸ Display ▸ Graphics, choose the high-performance GPU for Vestra Player, then restart it."
+msgstr ""
+
+#: main.ts:97
+msgid "The NVIDIA driver is too old for AI upscaling: update it to 531.18 or newer."
+msgstr ""
+
+#: main.ts:99
+msgid "AI upscaling is paused while another video filter is active; it comes back when that filter is off."
+msgstr ""
+
+#. {} is the player's own message, in English.
+#: main.ts:104
+msgid "AI upscaling is not available here: {}"
+msgstr ""
+
+#: main.ts:125
+msgid "AI upscaling on. Also turn on Super Resolution in the NVIDIA app (System ▸ Video ▸ RTX Video Enhancement): the player cannot see that switch."
+msgstr ""
+
+#: main.ts:140
+msgid "AI upscaling is not available here."
+msgstr ""
+
+#: main.ts:146
+msgid "AI upscaling is on; it starts when no other video filter needs the picture in memory."
+msgstr ""
+
+#: main.ts:149
+msgid "AI upscaling is on; it starts when GPU rendering is ready."
+msgstr ""
+
+#: main.ts:151
+msgid "AI upscaling on"
+msgstr ""
+
+#: main.ts:165
+msgid "AI upscaling off"
+msgstr ""
+
+#: main.ts:212
+msgid "AI Upscaling (RTX Video Super Resolution)"
+msgstr ""
+
+#: manifest.json
+msgid "VestraUpscale"
+msgstr ""
+
+#: manifest.json
+msgid "AI upscaling of the video with NVIDIA RTX Video Super Resolution"
+msgstr ""
+
+#: manifest.json
+msgid "Adds Video ▸ AI Upscaling (RTX Video Super Resolution): the NVIDIA GPU sharpens and enlarges the video to the size it is shown at. Needs Windows, an NVIDIA RTX GPU, GPU rendering and Super Resolution turned on in the NVIDIA app. Elsewhere the item is greyed out with the reason. Remembers your choice."
+msgstr ""
+
+#: manifest.json
+msgid "video"
+msgstr ""
+
+#: manifest.json
+msgid "upscaling"
+msgstr ""
+
+#: manifest.json
+msgid "NVIDIA"
+msgstr ""
