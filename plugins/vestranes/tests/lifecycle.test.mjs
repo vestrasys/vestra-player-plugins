@@ -239,8 +239,9 @@ test('Stop (window button, menu) closes the source before the producer transport
 
     await load(host, window, files.red);
     await host.command('nes.stop').run();
-    assert.equal(status(), 'Stopped.');
-    await until(() => window().props.running === false, 'running false'); // props are written one by one
+    // The window's props reach the host one write at a time, after the
+    // command's reply: wait for the state, do not read it at once.
+    await until(() => status() === 'Stopped.' && window().props.running === false, 'stopped from the menu');
     await until(() => closedUnder.length === 2, 'second transport closed');
     assert.equal(closedUnder[1], 'null empty');
     assert.equal(host.source.phase, 'empty');

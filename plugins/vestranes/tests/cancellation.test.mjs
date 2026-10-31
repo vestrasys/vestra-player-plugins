@@ -34,7 +34,8 @@ for (const [boundary, matches] of Object.entries(pending)) {
       await host.command('nes.load').run();
       await until(reached, boundary);
       await host.command('nes.stop').run();
-      assert.equal(status(), 'Stopped.');
+      // The props reach the host after the command's reply: wait for them.
+      await until(() => status() === 'Stopped.', 'stopped');
       blocked.open();
       await until(() => host.producers.size === 1 && released(host), 'release');
       await host.settle(50);
