@@ -4,61 +4,86 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
+#: main.ts:120
+msgid "AI upscaling needs GPU rendering."
+msgstr ""
+
+#: main.ts:121
+msgid "AI upscaling starts when GPU rendering is ready."
+msgstr ""
+
+#. {} is the player's own message, in English.
+#: main.ts:126
+msgid "AI upscaling needs GPU rendering, which cannot be turned on here: {}"
+msgstr ""
+
+#: main.ts:131
+msgid "GPU rendering stopped during this run: restart the player to use AI upscaling."
+msgstr ""
+
+#: main.ts:132
+msgid "GPU rendering is on from the next start: restart the player to use AI upscaling."
+msgstr ""
+
+#: main.ts:133
+msgid "AI upscaling needs GPU rendering: turn on Video ▸ GPU Rendering (Experimental), then restart the player."
+msgstr ""
+
 #. the first {} is our advice, the second the player's own message, in English.
-#: main.ts:80
+#: main.ts:149
 msgid "{} ({})"
 msgstr ""
 
-#: main.ts:87
-msgid "AI upscaling is not available here. It needs Windows and an NVIDIA RTX GPU."
+#: main.ts:155
+msgid "AI upscaling is not available on this system. It needs Windows and an NVIDIA RTX GPU."
 msgstr ""
 
-#: main.ts:89
-msgid "Needs GPU rendering: turn on Video ▸ GPU Rendering (Experimental), then restart the player."
+#: main.ts:157
+msgid "AI upscaling is not available on this computer. It needs an NVIDIA RTX GPU."
 msgstr ""
 
-#: main.ts:93
+#: main.ts:163
 msgid "The player runs on a GPU that cannot upscale: in Windows Settings ▸ System ▸ Display ▸ Graphics, choose the high-performance GPU for Vestra Player, then restart it."
 msgstr ""
 
-#: main.ts:97
-msgid "The NVIDIA driver is too old for AI upscaling: update it to 531.18 or newer."
+#: main.ts:167
+msgid "The NVIDIA driver is too old for AI upscaling: update it to version 530 or newer."
 msgstr ""
 
-#: main.ts:99
+#: main.ts:169
 msgid "AI upscaling is paused while another video filter is active; it comes back when that filter is off."
 msgstr ""
 
 #. {} is the player's own message, in English.
-#: main.ts:104
-msgid "AI upscaling is not available here: {}"
+#: main.ts:174
+msgid "AI upscaling is not available on this computer: {}"
 msgstr ""
 
-#: main.ts:125
-msgid "AI upscaling on. Also turn on Super Resolution in the NVIDIA app (System ▸ Video ▸ RTX Video Enhancement): the player cannot see that switch."
+#: main.ts:197
+msgid "AI Upscaling: On. Also turn on Super Resolution in the NVIDIA app (System ▸ Video ▸ RTX Video Enhancement): the player cannot see that switch."
 msgstr ""
 
-#: main.ts:140
-msgid "AI upscaling is not available here."
+#: main.ts:219
+msgid "AI upscaling is not available on this computer."
 msgstr ""
 
-#: main.ts:146
-msgid "AI upscaling is on; it starts when no other video filter needs the picture in memory."
+#: main.ts:226
+msgid "AI Upscaling: On. It starts when no other video filter needs the picture in memory."
 msgstr ""
 
-#: main.ts:149
-msgid "AI upscaling is on; it starts when GPU rendering is ready."
+#: main.ts:228
+msgid "AI Upscaling: On. It starts when GPU rendering is ready."
 msgstr ""
 
-#: main.ts:151
-msgid "AI upscaling on"
+#: main.ts:230
+msgid "AI Upscaling: On"
 msgstr ""
 
-#: main.ts:165
-msgid "AI upscaling off"
+#: main.ts:244
+msgid "AI Upscaling: Off"
 msgstr ""
 
-#: main.ts:212
+#: main.ts:300
 msgid "AI Upscaling (RTX Video Super Resolution)"
 msgstr ""
 
@@ -71,7 +96,7 @@ msgid "AI upscaling of the video with NVIDIA RTX Video Super Resolution"
 msgstr ""
 
 #: manifest.json
-msgid "Adds Video ▸ AI Upscaling (RTX Video Super Resolution): the NVIDIA GPU sharpens and enlarges the video to the size it is shown at. Needs Windows, an NVIDIA RTX GPU, GPU rendering and Super Resolution turned on in the NVIDIA app. Elsewhere the item is greyed out with the reason. Remembers your choice."
+msgid "Adds Video ▸ AI Upscaling (RTX Video Super Resolution): the NVIDIA GPU sharpens and enlarges the video to the size it is shown at. Needs Windows, an NVIDIA RTX GPU, GPU rendering and Super Resolution turned on in the NVIDIA app. On macOS and Linux the item is greyed out from the start; on Windows it is greyed out with the reason once the player has checked the GPU. Remembers your choice."
 msgstr ""
 
 #: manifest.json
