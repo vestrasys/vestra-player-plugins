@@ -252,7 +252,12 @@ async function start(
   );
   return { ...started, tube, net };
 }
-/** Retry `assertion` until it passes: `settle()` does not wait for the plugin's own fetches and files. */
+/**
+ * Retry `assertion` until it passes: `settle()` does not wait for the plugin's own fetches and files.
+ * The SDK writes a view's properties one at a time (a round trip each), so a property that changed
+ * together with the one a test waited for may still show its old value: wait for every property a
+ * step changes in one `eventually`, not for one and then read the others.
+ */
 async function eventually(host: TestHost, assertion: () => void, ms = 5000) {
   const deadline = Date.now() + ms;
   for (;;) {
@@ -292,11 +297,38 @@ const rows = (host: TestHost): Row[] => {
     playing: row.key === props["playing-key"],
   }));
 };
+/** Open > YouTube Link… and wait until the window is shown (`run()` does not wait for the command's reply). */
+async function openLinkWindow(host: TestHost) {
+  await host.command("youtube.open").run();
+  await eventually(host, () => assert.equal(host.window("youtube").visible, true));
+  return host.window("youtube");
+}
 const opens = (host: TestHost) =>
   host.sent("source.submit").filter((call) => (call.intent as { kind: string }).kind === "open");
+/** The file a row's thumbnail shows: `null` until the panel has sent it. */
+const thumbPath = (host: TestHost, row: Row) => host.imagePath(row.thumb as never);
+/** Every row shows its downloaded thumbnail (sent, and not the placeholder). */
+const thumbnailsArrived = (host: TestHost) =>
+  rows(host).every((row) => thumbPath(host, row) !== null && thumbPath(host, row) !== PLACEHOLDER);
+/**
+ * Search as the box does and wait until the panel shows the outcome: every row with its values
+ * and a thumbnail (the placeholder or the image), or the message that ends the search.
+ */
 async function searchFor(host: TestHost, query = "big buck bunny") {
-  host.mounted().emit("search", query);
-  await eventually(host, () => assert.ok(rows(host).length > 0 || host.mounted().props.message !== "Searching…"));
+  const panel = host.mounted();
+  panel.emit("search", query);
+  const waiting = ["Searching…", "Search and press Enter"].map((source) => host.translate(source));
+  await eventually(host, () => {
+    assert.equal(panel.props.query, query);
+    assert.ok(!waiting.includes(String(panel.props.message)), "the search has ended");
+    const shown = rows(host);
+    assert.ok(
+      shown.length
+        ? shown.every((row) => row.key !== "" && thumbPath(host, row) !== null)
+        : panel.props.message !== "",
+      "its rows or its message are shown",
+    );
+  });
 }
 let requestId = 100;
 /** Ask the plugin's resolver as the player does for an open of `url`; the answer as sent. */
@@ -438,8 +470,10 @@ test("activation: the panel in the sidebar, the resolver, the menu entries and t
     assert.equal(host.command("youtube.play-selected").state.enabled, false, "nothing selected yet");
     await host.command("youtube.panel").run();
     assert.equal(host.layout.sidebar?.preferred, true);
-    await host.command("youtube.open").run();
-    assert.equal(host.window("youtube").props.status, "粘贴 YouTube 视频链接以播放或下载。");
+    await openLinkWindow(host);
+    await eventually(host, () =>
+      assert.equal(host.window("youtube").props.status, "粘贴 YouTube 视频链接以播放或下载。"),
+    );
   } finally {
     await stop();
   }
@@ -473,7 +507,12 @@ test("a search fills the rows with titles, channels, durations and thumbnails", 
   try {
     const panel = host.mounted();
     panel.emit("search", "  big buck bunny ");
-    await eventually(host, () => assert.equal(rows(host).length, 3));
+    await eventually(host, () =>
+      assert.deepEqual(
+        rows(host).map((row) => row.key),
+        [1, 2, 3].map(vid),
+      ),
+    );
     assert.deepEqual(tube.searches, ["big buck bunny"]);
     assert.deepEqual(tube.sessions, [false], "search needs no player script");
     const [first] = rows(host);
@@ -492,16 +531,16 @@ test("a search fills the rows with titles, channels, durations and thumbnails", 
       },
     );
     // A remote image is served from the plugin's image cache, not from the placeholder.
-    await eventually(host, () =>
-      assert.ok(rows(host).every((row) => host.imagePath(row.thumb as never) !== PLACEHOLDER)),
-    );
+    await eventually(host, () => {
+      assert.ok(thumbnailsArrived(host));
+      assert.equal(panel.props.message, "");
+      assert.equal(panel.props["can-more"], false);
+      assert.equal(panel.props["can-download"], false, "nothing selected");
+    });
     const thumbs = new Set(
       host.images.filter((image) => image.maxSide === THUMB_SIDE).map((image) => image.ref),
     );
     assert.equal(thumbs.size, 3, "one 192 px image per row");
-    assert.equal(panel.props.message, "");
-    assert.equal(panel.props["can-more"], false);
-    assert.equal(panel.props["can-download"], false, "nothing selected");
   } finally {
     await stop();
   }
@@ -531,9 +570,7 @@ test("selecting, playing and thumbnails leave the row values alone (rows are upd
   const { host, stop } = await start();
   try {
     await searchFor(host);
-    await eventually(host, () =>
-      assert.ok(rows(host).every((row) => host.imagePath(row.thumb as never) !== PLACEHOLDER)),
-    );
+    await eventually(host, () => assert.ok(thumbnailsArrived(host)));
     assert.equal(allRowValues(host).length, MAX_ROWS, "a fixed length: the player never replaces the model");
     const before = structuredClone(rowValues(host));
     for (const row of before) {
@@ -541,11 +578,9 @@ test("selecting, playing and thumbnails leave the row values alone (rows are upd
     }
     const panel = host.mounted();
     panel.emit("select", vid(2));
-    await host.settle();
-    assert.equal(panel.props["selected-index"], 1);
+    await eventually(host, () => assert.equal(panel.props["selected-index"], 1));
     panel.emit("select-step", -1);
-    await host.settle();
-    assert.equal(panel.props["selected-index"], 0);
+    await eventually(host, () => assert.equal(panel.props["selected-index"], 0));
     panel.emit("play", vid(1));
     await eventually(host, () => assert.equal(panel.props["playing-key"], vid(1)));
     assert.deepEqual(rowValues(host), before, "no row changed, so the player keeps every row element");
@@ -559,9 +594,12 @@ test("rows show a placeholder until (or when never) the thumbnail arrives", asyn
   const { host, stop } = await start({ thumbs: [1] });
   try {
     await searchFor(host);
-    await eventually(host, () => assert.notEqual(host.imagePath(rows(host)[0]!.thumb as never), PLACEHOLDER));
-    assert.equal(host.imagePath(rows(host)[1]!.thumb as never), PLACEHOLDER);
-    assert.equal(host.imagePath(rows(host)[2]!.thumb as never), PLACEHOLDER);
+    await eventually(host, () => {
+      const [first, second, third] = rows(host);
+      assert.notEqual(thumbPath(host, first!), PLACEHOLDER);
+      assert.equal(thumbPath(host, second!), PLACEHOLDER);
+      assert.equal(thumbPath(host, third!), PLACEHOLDER);
+    });
   } finally {
     await stop();
   }
@@ -621,8 +659,10 @@ test("the list's scroll and selection are kept for the next list the player make
     assert.equal(panel.props["show-y"], 0);
     panel.emit("select", vid(3));
     panel.emit("scrolled", 124);
-    await eventually(host, () => assert.equal(panel.props["show-y"], 124));
-    assert.equal(panel.props["selected-index"], 2);
+    await eventually(host, () => {
+      assert.equal(panel.props["show-y"], 124);
+      assert.equal(panel.props["selected-index"], 2);
+    });
     // Values a view cannot mean are not kept.
     panel.emit("scrolled", -5);
     await eventually(host, () => assert.equal(panel.props["show-y"], 0));
@@ -632,8 +672,10 @@ test("the list's scroll and selection are kept for the next list the player make
     // A new search scrolls back to the top, also for a list made while the panel was hidden.
     const top = panel.props["scroll-top"];
     panel.emit("search", "again");
-    await eventually(host, () => assert.equal(panel.props["scroll-top"], (top as number) + 1));
-    assert.equal(panel.props["show-y"], 0);
+    await eventually(host, () => {
+      assert.equal(panel.props["scroll-top"], (top as number) + 1);
+      assert.equal(panel.props["show-y"], 0);
+    });
   } finally {
     await stop();
   }
@@ -645,16 +687,16 @@ test("the next page is appended without duplicates, up to the row cap", async ()
     tube.results = () => page([1, 2], () => page([2, 3, 4]));
     await searchFor(host);
     const panel = host.mounted();
-    assert.equal(panel.props["can-more"], true);
+    await eventually(host, () => assert.equal(panel.props["can-more"], true));
     panel.emit("more", 2);
-    await eventually(host, () =>
+    await eventually(host, () => {
       assert.deepEqual(
         rows(host).map((row) => row.key),
         [1, 2, 3, 4].map(vid),
-      ),
-    );
-    assert.equal(panel.props["can-more"], false, "the last page");
-    assert.equal(panel.props["loading-more"], false);
+      );
+      assert.equal(panel.props["can-more"], false, "the last page");
+      assert.equal(panel.props["loading-more"], false);
+    });
     // A search of many pages stops at MAX_ROWS.
     let n = 0;
     const endless = (): TubeSearch =>
@@ -669,7 +711,8 @@ test("the next page is appended without duplicates, up to the row cap", async ()
       panel.emit("more", rows(host).length);
       await eventually(host, () => assert.equal(rows(host).length, 20 * (i + 2)));
     }
-    assert.equal(panel.props["can-more"], false);
+    await eventually(host, () => assert.equal(panel.props["can-more"], false));
+    assert.equal(rows(host).length, MAX_ROWS);
   } finally {
     await stop();
   }
@@ -691,11 +734,18 @@ test("infinite scroll: one load per page, rows above stay as they are, ↓ on th
     // Scrolling sends one request per step while the page loads; a stale count is ignored.
     panel.emit("more", 3);
     panel.emit("more", 3);
-    await eventually(host, () => assert.equal(panel.props["loading-more"], true));
+    await eventually(host, () => {
+      assert.equal(panel.props["loading-more"], true);
+      assert.equal(panel.props["can-more"], false, "not while loading");
+    });
     panel.emit("more", 3);
-    assert.equal(panel.props["can-more"], false, "not while loading");
     release();
-    await eventually(host, () => assert.equal(rows(host).length, 5));
+    await eventually(host, () =>
+      assert.deepEqual(
+        rows(host).map((row) => row.key),
+        [1, 2, 3, 4, 5].map(vid),
+      ),
+    );
     assert.equal(calls, 1, "the continuation ran once");
     panel.emit("more", 3);
     await host.settle();
@@ -706,8 +756,10 @@ test("infinite scroll: one load per page, rows above stay as they are, ↓ on th
     // ↓ onto the last row loads the next (last) page.
     panel.emit("select", vid(4));
     panel.emit("select-step", 1);
-    await eventually(host, () => assert.equal(rows(host).length, 6));
-    assert.equal(panel.props["can-more"], false, "no more results");
+    await eventually(host, () => {
+      assert.equal(rows(host).length, 6);
+      assert.equal(panel.props["can-more"], false, "no more results");
+    });
   } finally {
     await stop();
   }
@@ -719,39 +771,59 @@ test("pages that add no row end the search after a few, instead of a request loo
     // Every continuation repeats the known videos (or has only cards toVideo drops) and still
     // offers a next page, as YouTube does for some searches.
     let continuations = 0;
-    const repeat = (): TubeSearch =>
-      page([1, 2], () => {
-        continuations++;
-        return repeat();
+    let deliver: (() => void) | undefined;
+    /** A continuation whose page arrives when the test delivers it (after the panel shows it loading). */
+    const held = (next: () => TubeSearch) => () => {
+      continuations++;
+      return new Promise<TubeSearch>((resolve) => (deliver = () => resolve(next())));
+    };
+    const panel = host.mounted();
+    // The view asks again whenever the row count stays and loading ends (changed more-ready), as
+    // long as it shows can-more. Each step waits for the rows and both flags the page leaves
+    // (they are separate property writes), so a stale value is never taken for the answer.
+    const nextPage = async (count: number, more: boolean) => {
+      assert.equal(panel.props["can-more"], true, "the view asks only while more can load");
+      panel.emit("more", rows(host).length);
+      await eventually(host, () => {
+        assert.equal(panel.props["loading-more"], true);
+        assert.equal(panel.props["can-more"], false);
       });
+      deliver!();
+      await eventually(host, () => {
+        assert.equal(panel.props["loading-more"], false);
+        assert.equal(rows(host).length, count);
+        assert.equal(panel.props["can-more"], more);
+      });
+    };
+    const repeat = (): TubeSearch => page([1, 2], held(repeat));
     tube.results = repeat;
     await searchFor(host);
-    const panel = host.mounted();
-    // The view asks again whenever the row count stays and loading ends (changed more-ready).
-    for (let i = 0; i < 10 && panel.props["can-more"]; i++) {
-      panel.emit("more", rows(host).length);
-      await eventually(host, () => assert.equal(panel.props["loading-more"], false));
-    }
-    await host.settle();
+    await eventually(host, () => assert.equal(panel.props["can-more"], true));
+    for (let i = 1; i <= MAX_EMPTY_PAGES; i++) await nextPage(2, i < MAX_EMPTY_PAGES);
     assert.equal(continuations, MAX_EMPTY_PAGES, "a few empty pages, then the search ends");
-    assert.equal(panel.props["can-more"], false);
     assert.equal(panel.props["more-error"], "", "not a failure: the list just ends");
-    assert.equal(rows(host).length, 2);
     // A page that adds rows resets the count: 2 empty, 1 full, then up to 3 empty again.
     let n = 0;
     continuations = 0;
-    const mixed = (): TubeSearch =>
-      page(++n === 3 || n === 6 ? [n + 100] : [1], () => {
-        continuations++;
-        return mixed();
-      });
+    const mixed = (): TubeSearch => page(++n === 3 || n === 6 ? [n + 100] : [1], held(mixed));
     tube.results = mixed;
-    panel.emit("search", "mixed");
-    await eventually(host, () => assert.equal(rows(host).length, 1));
-    for (let i = 0; i < 20 && panel.props["can-more"]; i++) {
-      panel.emit("more", rows(host).length);
-      await eventually(host, () => assert.equal(panel.props["loading-more"], false));
-    }
+    await searchFor(host, "mixed");
+    await eventually(host, () => {
+      assert.equal(rows(host).length, 1);
+      assert.equal(panel.props["can-more"], true);
+    });
+    // Pages 2 to 9: pages 3 and 6 add a row; 7, 8 and 9 are empty, so 9 ends the search.
+    for (const [count, more] of [
+      [1, true],
+      [2, true],
+      [2, true],
+      [2, true],
+      [3, true],
+      [3, true],
+      [3, true],
+      [3, false],
+    ] as const)
+      await nextPage(count, more);
     assert.equal(rows(host).length, 1 + 2, "pages 3 and 6 added a row; then 7, 8, 9 were empty");
     assert.equal(continuations, 8, "pages 2 to 9");
   } finally {
@@ -771,14 +843,18 @@ test("a page that fails to load: the reason and Retry at the end, no automatic r
     await searchFor(host);
     const panel = host.mounted();
     panel.emit("more", 2);
-    await eventually(host, () => assert.equal(panel.props["more-error"], "无网络连接。"));
-    assert.equal(panel.props["loading-more"], false);
-    assert.equal(panel.props["can-more"], false, "scrolling does not retry on its own");
+    await eventually(host, () => {
+      assert.equal(panel.props["more-error"], "无网络连接。");
+      assert.equal(panel.props["loading-more"], false);
+      assert.equal(panel.props["can-more"], false, "scrolling does not retry on its own");
+    });
     assert.equal(rows(host).length, 2, "the rows stay");
     fail = false;
     panel.emit("retry-more");
-    await eventually(host, () => assert.equal(rows(host).length, 3));
-    assert.equal(panel.props["more-error"], "");
+    await eventually(host, () => {
+      assert.equal(rows(host).length, 3);
+      assert.equal(panel.props["more-error"], "");
+    });
   } finally {
     await stop();
   }
@@ -792,13 +868,17 @@ test("offline: the list says so with Retry, and Retry searches again", async () 
     };
     await searchFor(host, "cats");
     const panel = host.mounted();
-    await eventually(host, () => assert.equal(panel.props.message, "无网络连接。"));
-    assert.equal(panel.props["can-retry"], true);
+    await eventually(host, () => {
+      assert.equal(panel.props.message, "无网络连接。");
+      assert.equal(panel.props["can-retry"], true);
+    });
     tube.results = () => page([1]);
     panel.emit("retry");
-    await eventually(host, () => assert.equal(rows(host).length, 1));
+    await eventually(host, () => {
+      assert.equal(rows(host).length, 1);
+      assert.equal(panel.props["can-retry"], false);
+    });
     assert.deepEqual(tube.searches, ["cats", "cats"]);
-    assert.equal(panel.props["can-retry"], false);
   } finally {
     await stop();
   }
@@ -836,9 +916,11 @@ test("double-click plays the row through the player; the playing row is marked",
     await eventually(host, () => assert.equal(opens(host).length, 1));
     assert.equal((opens(host)[0]!.intent as { source: string }).source, watchUrl(vid(2)));
     host.setSource({ phase: "ready" });
-    await eventually(host, () => assert.equal(rows(host)[1]!.playing, true));
-    assert.equal(rows(host)[1]!.selected, true);
-    assert.equal(rows(host)[0]!.playing, false);
+    await eventually(host, () => {
+      assert.equal(rows(host)[1]!.playing, true);
+      assert.equal(rows(host)[1]!.selected, true);
+      assert.equal(rows(host)[0]!.playing, false);
+    });
   } finally {
     await stop();
   }
@@ -851,8 +933,10 @@ test("a video that fails to play gets the failed mark and an OSD message", async
     host.mounted().emit("play", vid(1));
     await eventually(host, () => assert.equal(opens(host).length, 1));
     host.setSource({ phase: "error", terminalReason: { failed: "YouTube: Video unavailable" } });
-    await eventually(host, () => assert.equal(rows(host)[0]!.failed, true));
-    assert.equal(host.osd.at(-1), "YouTube: Video unavailable");
+    await eventually(host, () => {
+      assert.equal(rows(host)[0]!.failed, true);
+      assert.equal(host.osd.at(-1), "YouTube: Video unavailable");
+    });
     // Playing it again clears the mark.
     host.mounted().emit("play", vid(1));
     await eventually(host, () => assert.equal(rows(host)[0]!.failed, false));
@@ -867,19 +951,20 @@ test("keys and the right-click menu act on the selected row", async () => {
     await searchFor(host);
     const panel = host.mounted();
     panel.emit("select-step", 1);
-    await host.settle();
-    assert.equal(rows(host)[0]!.selected, true, "↓ from nothing selects the first row");
+    await eventually(host, () => assert.equal(rows(host)[0]!.selected, true, "↓ from nothing selects the first row"));
     panel.emit("select-step", 5);
-    await host.settle();
-    assert.equal(rows(host)[2]!.selected, true, "clamped at the last row");
-    assert.equal(panel.props["can-download"], true);
+    await eventually(host, () => {
+      assert.equal(rows(host)[2]!.selected, true, "clamped at the last row");
+      assert.equal(panel.props["can-download"], true);
+    });
     panel.emit("context-menu", vid(2), 40, 120);
-    await host.settle();
-    assert.equal(rows(host)[1]!.selected, true);
-    assert.deepEqual(host.menus.at(-1), {
-      items: ["youtube.play-selected", "youtube.download-selected"],
-      x: 40,
-      y: 120,
+    await eventually(host, () => {
+      assert.equal(rows(host)[1]!.selected, true);
+      assert.deepEqual(host.menus.at(-1), {
+        items: ["youtube.play-selected", "youtube.download-selected"],
+        x: 40,
+        y: 120,
+      });
     });
     assert.equal(await host.press("Enter", { panel: true }), "ran");
     await eventually(host, () => assert.equal(opens(host).length, 1));
@@ -888,8 +973,7 @@ test("keys and the right-click menu act on the selected row", async () => {
     await host.settle();
     assert.equal((panel.locks as { focused: boolean }).focused, true);
     panel.emit("open-url");
-    await host.settle();
-    assert.equal(host.window("youtube").props.busy, false);
+    await eventually(host, () => assert.equal(host.window("youtube").props.busy, false));
   } finally {
     await stop();
   }
@@ -1085,7 +1169,10 @@ test("Download… on a row: save dialog, ranges into staging, ffmpeg mux, rename
     panel.emit("select", id);
     host.dialogAnswers.push([join(dir, "Video 2.mkv")]);
     panel.emit("download");
-    await eventually(host, () => assert.equal(host.osd.at(-1), "已保存：Video 2.mkv"));
+    await eventually(host, () => {
+      assert.equal(host.osd.at(-1), "已保存：Video 2.mkv");
+      assert.equal(panel.props.downloading, false);
+    });
     assert.deepEqual(host.fileDialogs.at(-1), {
       kind: "saveFile",
       title: "保存 YouTube 视频",
@@ -1103,7 +1190,6 @@ test("Download… on a row: save dialog, ranges into staging, ffmpeg mux, rename
       ranges.map((r) => r.range),
       ["bytes=0-999", "bytes=0-599"],
     );
-    assert.equal(panel.props.downloading, false);
     assert.equal(opens(host).length, 0, "downloading never changes the source");
   } finally {
     await stop();
@@ -1124,17 +1210,22 @@ test("a download in progress shows in the bottom bar and can be cancelled; nothi
     panel.emit("select", id);
     host.dialogAnswers.push([join(dir, "a.mkv")]);
     panel.emit("download");
-    await eventually(host, () => assert.equal(panel.props.progress, 1000 / 1600));
-    assert.equal(panel.props.downloading, true);
-    assert.equal(panel.props["can-download"], false);
-    assert.equal(panel.props["progress-text"], "Downloading 62%");
-    assert.equal(host.command("youtube.cancel-download").state.enabled, true);
+    await eventually(host, () => {
+      assert.equal(panel.props.progress, 1000 / 1600);
+      assert.equal(panel.props.downloading, true);
+      assert.equal(panel.props["can-download"], false);
+      assert.equal(panel.props["progress-text"], "Downloading 62%");
+      assert.equal(host.command("youtube.cancel-download").state.enabled, true);
+    });
     panel.emit("context-menu", id, 1, 1);
-    await host.settle();
-    assert.deepEqual(host.menus.at(-1)!.items, ["youtube.play-selected", "youtube.cancel-download"]);
+    await eventually(host, () =>
+      assert.deepEqual(host.menus.at(-1)?.items, ["youtube.play-selected", "youtube.cancel-download"]),
+    );
     panel.emit("cancel-download");
-    await eventually(host, () => assert.equal(host.osd.at(-1), "Download cancelled."));
-    assert.equal(panel.props.downloading, false);
+    await eventually(host, () => {
+      assert.equal(host.osd.at(-1), "Download cancelled.");
+      assert.equal(panel.props.downloading, false);
+    });
     assert.deepEqual(await readdir(dir), []);
   } finally {
     await stop();
@@ -1283,21 +1374,22 @@ test("download failures: no ffmpeg, a refused range, a live video", async () => 
 test("link window: Play submits the normalized URL and reports ready from the source state", async () => {
   const { host, stop } = await start({ locale: "zh-Hans" });
   try {
-    await host.command("youtube.open").run();
+    await openLinkWindow(host);
     const window = host.window("youtube");
     assert.deepEqual(window.callbacks.sort(), ["cancel", "download", "play"]);
     window.emit("play", "https://youtu.be/jNQXAC9IVRw?t=2");
-    await host.settle();
-    assert.equal((opens(host)[0]!.intent as { source: string }).source, watchUrl("jNQXAC9IVRw"));
-    assert.equal(window.props.status, "正在解析并加载视频与音频…");
-    assert.equal(window.props.busy, true);
+    await eventually(host, () => {
+      assert.equal((opens(host)[0]?.intent as { source: string } | undefined)?.source, watchUrl("jNQXAC9IVRw"));
+      assert.equal(window.props.status, "正在解析并加载视频与音频…");
+      assert.equal(window.props.busy, true);
+    });
     host.setSource({ phase: "ready" });
-    await host.settle();
-    assert.equal(window.props.status, "视频已就绪。");
-    assert.equal(window.props.busy, false);
+    await eventually(host, () => {
+      assert.equal(window.props.status, "视频已就绪。");
+      assert.equal(window.props.busy, false);
+    });
     window.emit("play", "https://youtube.com/playlist?list=abc");
-    await host.settle();
-    assert.match(String(window.props.status), /单个 YouTube 视频/);
+    await eventually(host, () => assert.match(String(window.props.status), /单个 YouTube 视频/));
     assert.equal(opens(host).length, 1);
   } finally {
     await stop();
@@ -1311,13 +1403,14 @@ test("link window: English source texts; cancelling the save dialog; a full down
   fakeFfmpeg(host);
   try {
     assert.deepEqual(host.command("youtube.open").display.path, ["Open", "YouTube Link…"]);
-    await host.command("youtube.open").run();
+    await openLinkWindow(host);
     const window = host.window("youtube");
-    assert.equal(window.props.status, "Paste a YouTube video link to play or download it.");
+    await eventually(host, () =>
+      assert.equal(window.props.status, "Paste a YouTube video link to play or download it."),
+    );
     host.dialogAnswers.push(null);
     window.emit("download", "https://youtu.be/jNQXAC9IVRw");
-    await host.settle();
-    assert.equal(window.props.status, "No save location was chosen.");
+    await eventually(host, () => assert.equal(window.props.status, "No save location was chosen."));
     assert.deepEqual(host.fileDialogs.at(-1), {
       kind: "saveFile",
       title: "Save YouTube Video",
@@ -1325,9 +1418,11 @@ test("link window: English source texts; cancelling the save dialog; a full down
     });
     host.dialogAnswers.push([join(dir, "saved.mkv")]);
     window.emit("download", "https://youtu.be/jNQXAC9IVRw");
-    await eventually(host, () => assert.equal(window.props.status, "Saved: saved.mkv"));
-    assert.equal(window.props.progress, 1);
-    assert.equal(window.props.busy, false);
+    await eventually(host, () => {
+      assert.equal(window.props.status, "Saved: saved.mkv");
+      assert.equal(window.props.progress, 1);
+      assert.equal(window.props.busy, false);
+    });
     assert.deepEqual(await readdir(dir), ["saved.mkv"]);
   } finally {
     await stop();
@@ -1341,17 +1436,21 @@ test("link window: Cancel stops the running download and closes the window", asy
   serve(net, "jNQXAC9IVRw");
   net.hang.add("https://cdn.test/jNQXAC9IVRw/299");
   try {
-    await host.command("youtube.open").run();
+    await openLinkWindow(host);
     const window = host.window("youtube");
     host.dialogAnswers.push([join(dir, "a.mkv")]);
     window.emit("download", "https://youtu.be/jNQXAC9IVRw");
-    await eventually(host, () => assert.ok(net.requests.some((r) => r.range === "bytes=0-999")));
-    assert.equal(host.mounted().props.downloading, true, "the panel shows the window's download too");
+    await eventually(host, () => {
+      assert.ok(net.requests.some((r) => r.range === "bytes=0-999"));
+      assert.equal(host.mounted().props.downloading, true, "the panel shows the window's download too");
+    });
     window.emit("cancel");
     await eventually(host, () => assert.equal(host.mounted().props.downloading, false));
     assert.equal(host.sent("ui.close").length, 1);
-    await host.command("youtube.open").run();
-    assert.equal(host.window("youtube").props.status, "粘贴 YouTube 视频链接以播放或下载。");
+    await openLinkWindow(host);
+    await eventually(host, () =>
+      assert.equal(host.window("youtube").props.status, "粘贴 YouTube 视频链接以播放或下载。"),
+    );
     assert.deepEqual(await readdir(dir), []);
   } finally {
     await stop();
