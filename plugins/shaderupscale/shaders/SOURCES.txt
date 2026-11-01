@@ -1,0 +1,23 @@
+Third-party shaders in this package
+===================================
+
+The plugin's own code is Apache-2.0. The mpv GLSL shaders under shaders/ are
+third-party files, redistributed unchanged (line endings normalised to LF)
+under their own licences: MIT, except the two Anime4K AutoDownscalePre files,
+which are under the Unlicense (public domain). Each file also carries its
+copyright and licence notice in its header.
+
+anime4k/
+  Anime4K by bloc97 and contributors
+  https://github.com/bloc97/Anime4K
+  Version: release v4.0.1, asset Anime4K_v4.0.zip
+  Licence: MIT, Copyright (c) 2019-2021 bloc97 (anime4k/LICENSE), except
+    Anime4K_AutoDownscalePre_x2 and _x4: the Unlicense (public domain; the
+    text is in each file's header)
+  Files: Anime4K_Clamp_Highlights, Anime4K_AutoDownscalePre_x2/_x4,
+    Anime4K_Restore_CNN_{VL,M,S}, Anime4K_Restore_CNN_Soft_{VL,M,S},
+    Anime4K_Upscale_CNN_x2_{VL,M,S}, Anime4K_Upscale_Denoise_CNN_x2_{VL,M}
+  The presets follow the upstream mpv templates, taken from the master
+  branch (the v4.0.1 tag does not contain them):
+  md/Template/GLSL_Mac_Linux_High-end/input.conf (HQ) and
+  md/Template/GLSL_Mac_Linux_Low-end/input.conf (Fast).

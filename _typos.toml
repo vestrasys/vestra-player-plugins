@@ -6,3 +6,10 @@ BaW_jenozKc = "BaW_jenozKc"
 [default.extend-words]
 # The content-length field of a YouTube stream format.
 clen = "clen"
+
+[files]
+# Third-party files shipped unchanged from upstream (the mpv shaders and their
+# LICENSE files) are never edited here, so typos does not read them.
+# Only the upstream subdirectories: the plugin's own shaders/SOURCES.txt is
+# still checked.
+extend-exclude = ["plugins/shaderupscale/shaders/*/"]

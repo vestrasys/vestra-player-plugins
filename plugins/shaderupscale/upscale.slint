@@ -1,0 +1,173 @@
+// The Shader Upscaling window: the model (only with more than one), its two parameters, what the preset does, one button that
+// turns upscaling on and off, and the status line (what is applied, or why not).
+// Width 400 (content 400 − 28 = 372): label column 90 + 8 + drop-down 274. Height: the content's
+// (min = max = the layout's preferred height, as the About window), so the window follows the
+// wrapped texts (the description, the status detail) as they change after it opens and nothing in
+// it stretches.
+// Texts are @tr (English source; locales/<lang>.po translate them); the drop-down labels, the
+// description and the status come translated from main.ts.
+import { Theme } from "@vestra/theme.slint";
+import { Button, Choice } from "@vestra/widgets.slint";
+
+// A paragraph that wraps; its height follows the text (0 when empty).
+component Paragraph {
+    in property <string> text;
+    in property <color> color: Theme.text-list;
+    height: root.text == "" ? 0px : body.preferred-height;
+    body := Text {
+        width: 100%;
+        text: root.text;
+        color: root.color;
+        font-size: Theme.font-body;
+        wrap: word-wrap;
+        vertical-alignment: top;
+    }
+}
+
+// One labelled drop-down row: the label right-aligned, the drop-down filling the rest.
+component ChoiceRow {
+    in property <string> label;
+    in property <length> label-width: 90px;
+    in property <[string]> model;
+    in-out property <int> current-index;
+    in property <length> window-height;
+    callback selected(int);
+    HorizontalLayout {
+        spacing: 8px;
+        Text {
+            width: root.label-width;
+            text: root.label;
+            color: Theme.text-dim;
+            font-size: Theme.font-body;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        Choice {
+            horizontal-stretch: 1;
+            model: root.model;
+            current-index <=> root.current-index;
+            window-height: root.window-height;
+            selected(index) => { root.selected(index); }
+        }
+    }
+}
+
+export component UpscaleWindow inherits Window {
+    title: @tr("Shader Upscaling");
+    preferred-width: 400px;
+    min-width: 400px;
+    max-width: 400px;
+    preferred-height: body.preferred-height;
+    min-height: body.preferred-height;
+    max-height: body.preferred-height;
+    background: Theme.bg-panel;
+    // The models and the chosen one; the drop-down shows only with more than one (Anime4K alone in 0.1.1).
+    in property <[string]> models;
+    in-out property <int> model-index;
+    // The chosen model's two parameters: label, items and the chosen item.
+    in property <string> param-a-label;
+    in property <[string]> param-a-items;
+    in-out property <int> param-a-index;
+    in property <string> param-b-label;
+    in property <[string]> param-b-items;
+    in-out property <int> param-b-index;
+    // What the preset does, one part per line.
+    in property <string> description;
+    // The user's choice, and whether the button works (a saved "on" can always be turned off).
+    in property <bool> on;
+    in property <bool> can-toggle: true;
+    // The status line and its tone: 0 off, 1 applied, 2 on but waiting, 3 not available or failed.
+    in property <string> status;
+    in property <int> tone;
+    // Why, under the status line ("" = nothing more to say).
+    in property <string> detail;
+    callback pick-model(int);
+    callback pick-a(int);
+    callback pick-b(int);
+    callback toggle();
+    callback close-window();
+
+    private property <length> label-width: max(90px, label-measure.preferred-width);
+    Rectangle {
+        visible: false;
+        width: 0;
+        height: 0;
+        label-measure := VerticalLayout {
+            Text { text: root.models.length > 1 ? @tr("Model") : ""; font-size: Theme.font-body; }
+            Text { text: root.param-a-label; font-size: Theme.font-body; }
+            Text { text: root.param-b-label; font-size: Theme.font-body; }
+        }
+    }
+
+    body := VerticalLayout {
+        padding: Theme.dialog-padding;
+        spacing: 8px;
+        if root.models.length > 1: ChoiceRow {
+            label: @tr("Model");
+            label-width: root.label-width;
+            model: root.models;
+            current-index <=> root.model-index;
+            window-height: root.height;
+            selected(index) => { root.pick-model(index); }
+        }
+        ChoiceRow {
+            label: root.param-a-label;
+            label-width: root.label-width;
+            model: root.param-a-items;
+            current-index <=> root.param-a-index;
+            window-height: root.height;
+            selected(index) => { root.pick-a(index); }
+        }
+        ChoiceRow {
+            label: root.param-b-label;
+            label-width: root.label-width;
+            model: root.param-b-items;
+            current-index <=> root.param-b-index;
+            window-height: root.height;
+            selected(index) => { root.pick-b(index); }
+        }
+        Paragraph { text: root.description; }
+        Rectangle { height: 1px; background: Theme.line; }
+        // The status line: a dot in the tone's colour, what is applied, and the one-click switch.
+        HorizontalLayout {
+            spacing: 8px;
+            height: Theme.button-height;
+            VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 4px;
+                    background: root.tone == 1 ? Theme.playing : root.tone == 2 ? Theme.accent : root.tone == 3 ? Theme.danger : Theme.icon-disabled;
+                }
+            }
+            Text {
+                horizontal-stretch: 1;
+                text: root.status;
+                color: Theme.text;
+                font-size: Theme.font-title;
+                font-weight: 700;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+            Button {
+                text: root.on ? @tr("Turn Off") : @tr("Turn On");
+                enabled: root.can-toggle;
+                clicked => { root.toggle(); }
+            }
+        }
+        // Only when there is something to say: an empty one would still take the layout's spacing.
+        if root.detail != "": Paragraph { text: root.detail; }
+        Rectangle { height: 1px; background: Theme.line; }
+        Paragraph {
+            text: @tr("Shaders run on the GPU while the picture is drawn: only with GPU rendering, and exported videos and pictures do not contain them. If playback stutters, choose a preset that is not marked demanding.");
+            color: Theme.text-dim;
+        }
+        HorizontalLayout {
+            height: Theme.button-height;
+            alignment: end;
+            Button { text: @tr("Close"); clicked => { root.close-window(); } }
+        }
+    }
+}
