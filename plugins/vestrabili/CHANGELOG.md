@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.1
+
+- After yt-dlp is ready, the window says "Resolving the video and audio…" at once instead of keeping the last download percentage until the video opens (with SDK 1.5.45 and later a window refreshes when its handler returns, and this one was still waiting for the video).
+
 ## 0.5.0
 
 - yt-dlp no longer has to be installed by hand. On first use VestraBili asks whether to download it; with your consent it fetches the standalone build from the yt-dlp project's official GitHub releases, verifies the release's signed checksums (yt-dlp's OpenPGP key is pinned in the plugin) and the file's SHA-256, and refuses anything that does not verify. It is kept in the plugin's data directory and updated at most once a day, or when a link fails in a way a newer yt-dlp may fix.

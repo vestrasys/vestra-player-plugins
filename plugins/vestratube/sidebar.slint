@@ -9,7 +9,7 @@ import { Button, ToolTipArea } from "@vestra/widgets.slint";
 
 // Rows hold only plain values (no image, no selection), so the player updates a changed row in
 // place and keeps the row elements under the pointer (a rebuilt row loses a double-click in
-// progress). Since player 0.5.2 that also holds when the length changes: a new page appends
+// progress). Since player 0.5.4 that also holds when the length changes: a new page appends
 // rows, a new search removes them, and the rows above stay as they are. So `rows` holds only
 // the results, plus the end row while the list's end has something to say.
 export struct VideoRow {

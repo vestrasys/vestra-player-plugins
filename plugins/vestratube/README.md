@@ -17,7 +17,7 @@ The plugin follows the player's interface language (English and Simplified Chine
 
 ## Requirements
 
-- Vestra Player 0.5.2 or later;
+- Vestra Player 0.5.4 or later;
 - a network connection.
 
 Nothing else: the YouTube part is the open-source library [youtubei.js](https://github.com/LuanRT/YouTube.js) (MIT), bundled in the plugin; downloads use the ffmpeg that comes with the player. yt-dlp is no longer used.

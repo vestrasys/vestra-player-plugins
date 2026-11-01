@@ -201,11 +201,13 @@ export function vestrabili(dependencies: Dependencies = {}) {
         source = validateUrl(input, fail);
         busy = true;
         status = text("Resolving the video and audio…"); // a download shows its progress instead
+        plugin.update(); // the handler is still running: show the new status now, not when it returns
         // yt-dlp first (asking, downloading): only Cancel ends this wait.
         await ytdlp.program({ interactive: true, signal: run.signal });
         // The loading timeout covers resolution and backend readiness; only Cancel aborts `run`.
         signal = AbortSignal.any([run.signal, AbortSignal.timeout(60_000)]);
         status = text("Resolving the video and audio…");
+        plugin.update();
         const media = await plugin.player.open(source, { signal }); // resolved by the resolver above
         await media.ready({ signal }); // on abort the SDK closes this media if it is still current
         status = text("The video is ready.");
