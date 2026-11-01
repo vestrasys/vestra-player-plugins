@@ -6,16 +6,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { HostError, startPlugin, TestHost } from "@vestra-player/sdk/testing";
 import activate, { OSD_BUDGET, shaderPath, WINDOW_TITLE } from "../main.ts";
-import {
-  ANIME4K_MODES,
-  ANIME4K_QUALITIES,
-  anime4kFiles,
-  ARTCNN_SIZES,
-  ARTCNN_STYLES,
-  artcnnFiles,
-  DEFAULT_SETTINGS,
-  isSettings,
-} from "../presets.ts";
+import { ANIME4K_MODES, ANIME4K_QUALITIES, anime4kFiles, DEFAULT_SETTINGS, isSettings, MODELS, readSettings } from "../presets.ts";
 
 const directory = new URL("..", import.meta.url);
 const SHADERS = new URL("../shaders/", import.meta.url);
@@ -110,8 +101,6 @@ test("presets: every chain is Anime4K's own template, and every file is bundled"
     "anime4k/Anime4K_Restore_CNN_Soft_S.glsl",
     "anime4k/Anime4K_Upscale_CNN_x2_S.glsl",
   ]);
-  assert.deepEqual(artcnnFiles("c4f32", "ds"), ["artcnn/ArtCNN_C4F32_DS.glsl"]);
-  assert.deepEqual(artcnnFiles("c4f16", "neutral"), ["artcnn/ArtCNN_C4F16.glsl"]);
 });
 
 test("presets: the package ships exactly the shaders the presets use, each with its licence", async () => {
@@ -122,14 +111,15 @@ test("presets: the package ships exactly the shaders the presets use, each with 
       assert.ok(files.length <= 16 && new Set(files).size === files.length, `${mode} ${quality}`);
       files.forEach((file) => used.add(file));
     }
-  for (const size of ARTCNN_SIZES) for (const style of ARTCNN_STYLES) artcnnFiles(size, style).forEach((file) => used.add(file));
   const shipped = new Set<string>();
-  for (const model of ["anime4k", "artcnn"]) {
-    const names = await readdir(new URL(`${model}/`, SHADERS));
-    assert.ok(names.includes("LICENSE"), `${model}: licence text`);
-    names.filter((name) => name.endsWith(".glsl")).forEach((name) => shipped.add(`${model}/${name}`));
-  }
+  const names = await readdir(new URL("anime4k/", SHADERS));
+  assert.ok(names.includes("LICENSE"), "anime4k: licence text");
+  names.filter((name) => name.endsWith(".glsl")).forEach((name) => shipped.add(`anime4k/${name}`));
   assert.deepEqual([...used].sort(), [...shipped].sort());
+  // Anime4K only: ArtCNN needs mpv's gpu-next, which the player's libmpv does not use.
+  assert.deepEqual((await readdir(SHADERS)).sort(), ["SOURCES.txt", "anime4k"].sort());
+  assert.deepEqual(MODELS, ["anime4k"]);
+  assert.doesNotMatch(await readFile(new URL("SOURCES.txt", SHADERS), "utf8"), /artcnn/i);
   for (const file of used) assert.ok(existsSync(shaderPath(file)), file);
   assert.ok(existsSync(new URL("SOURCES.txt", SHADERS)));
 });
@@ -138,8 +128,48 @@ test("settings: the defaults are valid; broken or unknown values are refused", (
   assert.equal(isSettings(DEFAULT_SETTINGS), true);
   assert.equal(isSettings({ ...DEFAULT_SETTINGS, model: "fsrcnnx" }), false);
   assert.equal(isSettings({ ...DEFAULT_SETTINGS, anime4k: { mode: "D", quality: "fast" } }), false);
-  assert.equal(isSettings({ ...DEFAULT_SETTINGS, artcnn: { size: "c4f16" } }), false);
+  assert.equal(isSettings({ ...DEFAULT_SETTINGS, model: "artcnn" }), false);
   assert.equal(isSettings(null), false);
+});
+
+test("settings: 0.1.0's ArtCNN choice becomes Anime4K mode A (Fast), on/off kept; its ArtCNN parameters go", () => {
+  const artcnn = { size: "c4f32", style: "ds" };
+  assert.deepEqual(readSettings({ on: true, model: "artcnn", anime4k: { mode: "A+A", quality: "hq" }, artcnn }), {
+    on: true,
+    model: "anime4k",
+    anime4k: { mode: "A", quality: "fast" },
+  });
+  assert.deepEqual(readSettings({ on: false, model: "anime4k", anime4k: { mode: "C", quality: "hq" }, artcnn }), {
+    on: false,
+    model: "anime4k",
+    anime4k: { mode: "C", quality: "hq" },
+  });
+  assert.equal(readSettings({ on: true, model: "fsrcnnx", anime4k: DEFAULT_SETTINGS.anime4k }), null);
+  assert.equal(readSettings({ on: true, model: "anime4k", anime4k: { mode: "D", quality: "fast" } }), null);
+  assert.equal(readSettings("on"), null);
+});
+
+test("settings: a saved ArtCNN choice is migrated at start, applied as Anime4K mode A (Fast) and saved", async () => {
+  const data = await mkdtemp(join(tmpdir(), "shaderupscale-"));
+  await writeFile(
+    join(data, "upscaling.json"),
+    JSON.stringify({ on: true, model: "artcnn", anime4k: { mode: "B", quality: "hq" }, artcnn: { size: "c4f32", style: "dn" } }),
+  );
+  const { host, window, stop } = await opened(windowsGpu(), "en", data);
+  try {
+    await eventually(host, () => {
+      assert.deepEqual(held(host), paths(anime4kFiles("A", "fast")));
+      assert.equal(window.props.status, "On: Anime4K mode A (Fast)");
+    });
+    assert.equal(host.osd.length, 0);
+  } finally {
+    await stop();
+  }
+  assert.deepEqual(await saved(data), { on: true, model: "anime4k", anime4k: { mode: "A", quality: "fast" } });
+  assert.deepEqual(
+    (await readdir(data)).filter((name) => name.includes(".bad-")),
+    [],
+  );
 });
 
 // ------------------------------------------------------------------ the menu item
@@ -168,7 +198,8 @@ test("window: the defaults, one click on, the status says what is applied, one c
   const { host, window, stop } = await opened();
   try {
     assert.equal(window.visible, true);
-    assert.deepEqual(window.props.models, ["Anime4K", "ArtCNN"]);
+    // One model: the window hides its drop-down (shown only with more than one).
+    assert.deepEqual(window.props.models, ["Anime4K"]);
     assert.equal(window.props["model-index"], 0);
     assert.equal(window.props["param-a-label"], "Mode");
     assert.deepEqual(window.props["param-a-items"], [
@@ -213,7 +244,7 @@ test("window: the defaults, one click on, the status says what is applied, one c
   }
 });
 
-test("window: a new mode, quality or model applies at once while on, and is remembered per model", async () => {
+test("window: a new mode or quality applies at once while on, and is remembered", async () => {
   const data = await mkdtemp(join(tmpdir(), "shaderupscale-"));
   const { host, window, stop } = await opened(windowsGpu(), "en", data);
   try {
@@ -226,42 +257,16 @@ test("window: a new mode, quality or model applies at once while on, and is reme
       assert.equal(window.props["param-a-index"], 3);
       assert.equal(window.props.status, "On: Anime4K mode A+A (HQ)");
     });
-
-    window.emit("pickModel", 1); // ArtCNN
-    await eventually(host, () => assert.deepEqual(held(host), paths(["artcnn/ArtCNN_C4F16.glsl"])));
-    assert.equal(window.props["param-a-label"], "Size");
-    assert.equal(window.props["param-b-label"], "Variant");
-    assert.deepEqual(window.props["param-b-items"], ["Neutral", "Denoise and sharpen", "Denoise and soften"]);
-    assert.deepEqual(window.props["param-a-items"], [
-      "C4F16: light on the GPU",
-      "C4F32 (demanding): more detail, needs a faster GPU",
-    ]);
-    window.emit("pickA", 1);
-    window.emit("pickB", 1);
-    await eventually(host, () => {
-      assert.deepEqual(held(host), paths(["artcnn/ArtCNN_C4F32_DS.glsl"]));
-      assert.equal(window.props.status, "On: ArtCNN C4F32 (Denoise and sharpen)");
-    });
-    assert.match(String(window.props.description), /\nC4F32 \(demanding\) runs/);
-
-    // Back to Anime4K: its own parameters are as they were.
-    window.emit("pickModel", 0);
-    await eventually(host, () => assert.deepEqual(held(host), paths(anime4kFiles("A+A", "hq"))));
-    assert.equal(window.props["param-a-index"], 3);
-    assert.equal(window.props["param-b-index"], 1);
-    // An index out of range changes nothing.
+    assert.match(String(window.props.description), /\nHQ \(demanding\) runs/);
+    // An index out of range changes nothing; neither does the one model's index.
     window.emit("pickA", 99);
+    window.emit("pickModel", 0);
     await host.settle();
     assert.deepEqual(held(host), paths(anime4kFiles("A+A", "hq")));
   } finally {
     await stop();
   }
-  assert.deepEqual(await saved(data), {
-    on: true,
-    model: "anime4k",
-    anime4k: { mode: "A+A", quality: "hq" },
-    artcnn: { size: "c4f32", style: "ds" },
-  });
+  assert.deepEqual(await saved(data), { on: true, model: "anime4k", anime4k: { mode: "A+A", quality: "hq" } });
 });
 
 test("while off, a choice is only saved; on applies it", async () => {
@@ -281,16 +286,16 @@ test("while off, a choice is only saved; on applies it", async () => {
 test("restart: the saved choice is applied again at once, without opening the window", async () => {
   const data = await mkdtemp(join(tmpdir(), "shaderupscale-"));
   const first = await opened(windowsGpu(), "en", data);
-  first.window.emit("pickModel", 1);
+  first.window.emit("pickA", 1);
   first.window.emit("toggle");
-  await eventually(first.host, () => assert.deepEqual(held(first.host), paths(["artcnn/ArtCNN_C4F16.glsl"])));
+  await eventually(first.host, () => assert.deepEqual(held(first.host), paths(anime4kFiles("B", "fast"))));
   await first.stop();
 
   const { host, stop } = await start(windowsGpu(), "en", data);
   try {
     host.openElsewhere("/media/clip.mkv");
     await host.settle();
-    assert.deepEqual(held(host), paths(["artcnn/ArtCNN_C4F16.glsl"]));
+    assert.deepEqual(held(host), paths(anime4kFiles("B", "fast")));
   } finally {
     await stop();
   }
@@ -341,7 +346,7 @@ test("crash safety: a guard.json left by an earlier build is deleted at start an
 
 test("crash safety: the player refuses with previous-crash: the choice is kept, the status says why, no OSD, no retry", async () => {
   const data = await mkdtemp(join(tmpdir(), "shaderupscale-"));
-  const choice = { ...DEFAULT_SETTINGS, on: true, model: "artcnn", artcnn: { size: "c4f32", style: "neutral" } };
+  const choice = { ...DEFAULT_SETTINGS, on: true, anime4k: { mode: "A+A", quality: "hq" } };
   await writeFile(join(data, "upscaling.json"), JSON.stringify(choice));
   const { host, window, stop } = await opened(refusing(windowsGpu(), CRASH_DAYS), "en", data);
   try {
@@ -356,10 +361,10 @@ test("crash safety: the player refuses with previous-crash: the choice is kept, 
     assert.ok(String(window.props.detail).endsWith(CRASH_DAYS));
     // The player shows its own OSD line; the plugin adds none.
     assert.equal(host.osd.length, 0);
-    // Nothing tries again by itself: a new video, a new preset, a new model.
+    // Nothing tries again by itself: a new video, a new mode, a new quality.
     host.openElsewhere("/media/other.mkv");
     window.emit("pickA", 0);
-    window.emit("pickModel", 0);
+    window.emit("pickB", 0);
     await host.settle(100);
     assert.equal(attempts(host).length, 1);
     assert.equal(window.props.status, REFUSED);
@@ -370,8 +375,7 @@ test("crash safety: the player refuses with previous-crash: the choice is kept, 
   // Still on in the settings, with the new choice.
   const settings = await saved(data);
   assert.equal(settings.on, true);
-  assert.equal(settings.model, "anime4k");
-  assert.equal(settings.artcnn.size, "c4f16");
+  assert.deepEqual(settings.anime4k, { mode: "A", quality: "fast" });
 });
 
 test("crash safety: while refused, Turn Off saves off; Turn On then tries exactly once and shows the same reason", async () => {
@@ -535,24 +539,13 @@ test("a switch to software rendering during the run: the status says to restart"
   }
 });
 
-test("macOS: Anime4K runs; ArtCNN (compute shaders) is greyed out with the reason", async () => {
+test("macOS: Anime4K runs", async () => {
   const host = new TestHost(); // macOS on the GPU
   const { window, stop } = await opened(host);
   try {
     window.emit("toggle");
     await eventually(host, () => assert.deepEqual(held(host), paths(anime4kFiles("A", "fast"))));
-    window.emit("pickModel", 1);
-    await eventually(host, () => assert.equal(held(host), undefined)); // withdrawn
-    assert.equal(window.props.status, "Not available");
-    assert.match(String(window.props.detail), /^ArtCNN needs compute shaders/);
-    assert.equal(window.props["can-toggle"], true); // on: can be turned off
-    window.emit("toggle");
-    await host.settle();
-    assert.equal(window.props["can-toggle"], false);
-    window.emit("pickModel", 0);
-    await host.settle();
-    assert.equal(window.props["can-toggle"], true);
-    assert.equal(window.props.status, "Off");
+    assert.equal(window.props.status, "On: Anime4K mode A (Fast)");
   } finally {
     await stop();
   }
@@ -585,11 +578,12 @@ test("other plugins hold most of the 16 shaders: the status says there is no roo
     window.emit("toggle");
     await eventually(host, () => assert.equal(window.props.status, "On, but not applied"));
     assert.match(String(window.props.detail), /^Other plugins' shaders leave no room/);
-    // ArtCNN is one shader: it fits.
-    window.emit("pickModel", 1);
+    // Mode C (Fast) is five shaders: with fewer held elsewhere (10 + 5) it fits.
+    host.videoShaders.others = 10;
+    window.emit("pickA", 2);
     await eventually(host, () => {
-      assert.deepEqual(held(host), paths(["artcnn/ArtCNN_C4F16.glsl"]));
-      assert.equal(window.props.status, "On: ArtCNN C4F16 (Neutral)");
+      assert.deepEqual(held(host), paths(anime4kFiles("C", "fast")));
+      assert.equal(window.props.status, "On: Anime4K mode C (Fast)");
     });
   } finally {
     await stop();
@@ -629,18 +623,17 @@ test("Simplified Chinese: the menu, the window and the OSD are translated", asyn
 for (const locale of ["en", "zh-Hans"] as const) {
   test(`${locale}: every OSD line fits the OSD's budget`, async () => {
     const budget = locale === "en" ? OSD_BUDGET.en : OSD_BUDGET.zh;
-    // The longest presets, software rendering and macOS with ArtCNN.
+    // The longest presets and software rendering.
     const gpuRun = await opened(windowsGpu(), locale);
     gpuRun.window.emit("pickA", 3);
     gpuRun.window.emit("pickB", 1);
     gpuRun.window.emit("toggle");
     await eventually(gpuRun.host, () => assert.deepEqual(held(gpuRun.host), paths(anime4kFiles("A+A", "hq"))));
-    gpuRun.window.emit("pickModel", 1);
-    gpuRun.window.emit("pickB", 1);
+    gpuRun.window.emit("pickA", 5);
     gpuRun.window.emit("toggle");
     gpuRun.window.emit("toggle");
     await eventually(gpuRun.host, () => {
-      assert.deepEqual(held(gpuRun.host), paths(["artcnn/ArtCNN_C4F16_DS.glsl"]));
+      assert.deepEqual(held(gpuRun.host), paths(anime4kFiles("C+A", "hq")));
       assert.equal(gpuRun.host.osd.length, 3); // on, off, on
     });
     gpuRun.host.failVideoShaders(HANDLE, "broken");
@@ -653,12 +646,6 @@ for (const locale of ["en", "zh-Hans"] as const) {
     await soft.host.settle();
     lines.push(...soft.host.osd);
     await soft.stop();
-    const mac = await opened(new TestHost(), locale);
-    mac.window.emit("pickModel", 1);
-    mac.window.emit("toggle");
-    await mac.host.settle();
-    lines.push(...mac.host.osd);
-    await mac.stop();
     assert.ok(lines.length >= 5);
     for (const line of lines) assert.ok(line.length <= budget, `${line.length} > ${budget}: ${line}`);
   });

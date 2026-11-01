@@ -4,13 +4,11 @@ import type { FilterStatus, Plugin, RenderingState, Text, TextList, VideoShaders
 import {
   ANIME4K_MODES,
   ANIME4K_QUALITIES,
-  ARTCNN_SIZES,
-  ARTCNN_STYLES,
   DEFAULT_SETTINGS,
-  isSettings,
+  isStoredSettings,
   MODELS,
   demandingMode,
-  needsCompute,
+  readSettings,
   type Settings,
   shaderFiles,
 } from "./presets.ts";
@@ -31,15 +29,14 @@ export const shaderPath = (file: string) => join(PACKAGE, "shaders", ...file.spl
 
 /**
  * Shader Upscale for Vestra Player (`zysilm.shaderupscale`): real-time
- * upscaling with mpv GLSL shaders bundled in the package (Anime4K, ArtCNN),
- * applied through the plugin's own shader handle (`plugin.video.shaders`,
- * player 0.5.20). One menu item, Video ▸ Shader Upscaling…, opens a window
- * with the model, its parameters, one On/Off button and what is applied.
+ * upscaling with Anime4K's mpv GLSL shaders, bundled in the package, applied
+ * through the plugin's own shader handle (`plugin.video.shaders`, player
+ * 0.5.20). One menu item, Video ▸ Shader Upscaling…, opens a window with
+ * Anime4K's mode and quality, one On/Off button and what is applied.
  *
  * Shaders run only where the player renders on the GPU (macOS; Windows with
  * Video ▸ GPU Rendering (Experimental)); under software rendering the window
- * greys the button out and says why. ArtCNN's shaders are compute shaders,
- * which macOS's OpenGL 4.1 lacks, so it is greyed out there too.
+ * greys the button out and says why.
  *
  * Nothing runs while it is off: the plugin holds nothing, so with lazy
  * activation the player may stop it. While on, its shaders keep it running.
@@ -56,8 +53,11 @@ export default async function activate(plugin: Plugin) {
   const { text, list } = plugin.i18n;
   const store = plugin.storage.json<Settings>("upscaling", {
     defaults: DEFAULT_SETTINGS,
-    validate: isSettings,
+    validate: isStoredSettings,
   });
+  // 0.1.0's settings (ArtCNN, its parameters) as the current ones, saved at once.
+  const current = readSettings(store.value) ?? DEFAULT_SETTINGS;
+  if (JSON.stringify(current) !== JSON.stringify(store.value)) store.save(current);
   const save = (patch: Partial<Settings>) => store.save({ ...store.value, ...patch });
   /**
    * The player refused shaders in this player run (`previous-crash`) with
@@ -105,16 +105,9 @@ export default async function activate(plugin: Plugin) {
 
   /** The player draws on the GPU (an unknown renderer counts as GPU: the player's answer then decides). */
   const gpu = () => !fellBack && system?.rendering !== "software";
-  /** ArtCNN on macOS: compute shaders, which macOS's OpenGL lacks. */
-  const noCompute = () => system?.os === "macos" && needsCompute(store.value.model);
-  /** Why the chosen model cannot run here, or `null`. */
+  /** Why the shaders cannot run here, or `null`. */
   function unavailable(): Text | null {
-    if (!gpu()) return renderingAdvice();
-    if (noCompute())
-      return text(
-        "ArtCNN needs compute shaders, which macOS's OpenGL does not have. Choose Anime4K, which runs everywhere the player renders on the GPU.",
-      );
-    return null;
+    return gpu() ? null : renderingAdvice();
   }
 
   /** Why GPU rendering is off and what to do, following the player's own order of checks (as RTX Upscale). */
@@ -135,23 +128,14 @@ export default async function activate(plugin: Plugin) {
 
   // ------------------------------------------------------------------ names
   const qualityName = (quality: Settings["anime4k"]["quality"]) => (quality === "hq" ? text("HQ") : text("Fast"));
-  const styleName = (style: Settings["artcnn"]["style"]) =>
-    style === "ds" ? text("Denoise and sharpen") : style === "dn" ? text("Denoise and soften") : text("Neutral");
-  const sizeName = (size: Settings["artcnn"]["size"]) => size.toUpperCase();
 
-  /** The preset as one short name: "Anime4K mode A (Fast)", "ArtCNN C4F16 (Neutral)". */
+  /** The preset as one short name: "Anime4K mode A (Fast)". */
   function presetName(settings = store.value): Text {
-    return settings.model === "anime4k"
-      ? text(
-          // TRANSLATORS: {} are the mode (A, B, C, A+A, B+B, C+A) and the quality (Fast or HQ).
-          "Anime4K mode {} ({})",
-          [settings.anime4k.mode, qualityName(settings.anime4k.quality)],
-        )
-      : text(
-          // TRANSLATORS: {} are the network size (C4F16 or C4F32) and the variant (Neutral, …).
-          "ArtCNN {} ({})",
-          [sizeName(settings.artcnn.size), styleName(settings.artcnn.style)],
-        );
+    return text(
+      // TRANSLATORS: {} are the mode (A, B, C, A+A, B+B, C+A) and the quality (Fast or HQ).
+      "Anime4K mode {} ({})",
+      [settings.anime4k.mode, qualityName(settings.anime4k.quality)],
+    );
   }
 
   // ------------------------------------------------------------------ applying
@@ -230,9 +214,7 @@ export default async function activate(plugin: Plugin) {
             "Shader Upscaling: On, {}",
             [presetName()],
           )
-        : gpu()
-          ? text("Shader Upscaling: ArtCNN does not run on macOS")
-          : text("Shader Upscaling needs GPU rendering"),
+        : text("Shader Upscaling needs GPU rendering"),
     );
   }
 
@@ -318,88 +300,58 @@ export default async function activate(plugin: Plugin) {
     }
   }
 
-  /** The two parameter drop-downs of the chosen model: labels, items and the current index. */
+  /** The two parameter drop-downs (Anime4K's mode and quality): labels, items and the current index. */
   function parameters() {
     const s = store.value;
-    if (s.model === "anime4k")
-      return {
-        paramALabel: text("Mode"),
-        paramAItems: ANIME4K_MODES.map((mode) =>
-          demandingMode(mode)
-            ? text(
-                // TRANSLATORS: {} is the mode (A+A, B+B or C+A).
-                "Mode {} (demanding)",
-                [mode],
-              )
-            : text(
-                // TRANSLATORS: {} is the mode (A, B or C).
-                "Mode {}",
-                [mode],
-              ),
-        ),
-        paramAIndex: ANIME4K_MODES.indexOf(s.anime4k.mode),
-        paramBLabel: text("Quality"),
-        paramBItems: ANIME4K_QUALITIES.map((quality) =>
-          quality === "hq" ? text("HQ (demanding): large networks, fast GPU") : text("Fast: smaller networks, most GPUs"),
-        ),
-        paramBIndex: ANIME4K_QUALITIES.indexOf(s.anime4k.quality),
-      };
     return {
-      paramALabel: text("Size"),
-      paramAItems: ARTCNN_SIZES.map((size) =>
-        size === "c4f32" ? text("C4F32 (demanding): more detail, needs a faster GPU") : text("C4F16: light on the GPU"),
+      paramALabel: text("Mode"),
+      paramAItems: ANIME4K_MODES.map((mode) =>
+        demandingMode(mode)
+          ? text(
+              // TRANSLATORS: {} is the mode (A+A, B+B or C+A).
+              "Mode {} (demanding)",
+              [mode],
+            )
+          : text(
+              // TRANSLATORS: {} is the mode (A, B or C).
+              "Mode {}",
+              [mode],
+            ),
       ),
-      paramAIndex: ARTCNN_SIZES.indexOf(s.artcnn.size),
-      paramBLabel: text("Variant"),
-      paramBItems: ARTCNN_STYLES.map(styleName),
-      paramBIndex: ARTCNN_STYLES.indexOf(s.artcnn.style),
+      paramAIndex: ANIME4K_MODES.indexOf(s.anime4k.mode),
+      paramBLabel: text("Quality"),
+      paramBItems: ANIME4K_QUALITIES.map((quality) =>
+        quality === "hq" ? text("HQ (demanding): large networks, fast GPU") : text("Fast: smaller networks, most GPUs"),
+      ),
+      paramBIndex: ANIME4K_QUALITIES.indexOf(s.anime4k.quality),
     };
   }
 
   /** What the chosen preset does and what it suits (one line per part). */
   function description(): TextList {
     const s = store.value;
-    if (s.model === "anime4k") {
-      const mode = {
-        A: text(
-          "Mode A: for most 1080p anime and blurry older or SD anime. Restores lines and removes blur, noise and compression smear; can strengthen ringing or banding already in the video.",
-        ),
-        B: text(
-          "Mode B: for most 720p anime and anime downscaled from 1080p. A softer restore that also reduces ringing and aliasing; some blur may stay.",
-        ),
-        C: text(
-          "Mode C: for clean sources with little blur, such as anime downscaled to 480p. Upscales with denoising and stays closest to the source.",
-        ),
-        "A+A": text(
-          "Mode A+A (demanding): mode A with a second restore pass: the sharpest lines, but it can ring, band or alias. Only when the video is enlarged 2× or more.",
-        ),
-        "B+B": text("Mode B+B (demanding): mode B with a second soft restore pass. Only when the video is enlarged 2× or more."),
-        "C+A": text("Mode C+A (demanding): mode C with a restore pass after it. Only when the video is enlarged 2× or more."),
-      }[s.anime4k.mode];
-      const quality =
-        s.anime4k.quality === "hq"
-          ? text("HQ (demanding) runs the large networks (VL and M): about four times the work of Fast; for fast GPUs.")
-          : text("Fast runs the smaller networks (M and S), for most GPUs.");
-      return list(
-        [text("Anime4K: neural networks for anime and cartoons that restore and double the picture twice."), mode, quality],
-        "lines",
-      );
-    }
-    const style = {
-      neutral: text("Neutral: doubles the detail without changing the picture's character."),
-      ds: text("Denoise and sharpen: also removes noise and sharpens lines."),
-      dn: text("Denoise and soften: removes noise, with a softer result."),
-    }[s.artcnn.style];
+    const mode = {
+      A: text(
+        "Mode A: for most 1080p anime and blurry older or SD anime. Restores lines and removes blur, noise and compression smear; can strengthen ringing or banding already in the video.",
+      ),
+      B: text(
+        "Mode B: for most 720p anime and anime downscaled from 1080p. A softer restore that also reduces ringing and aliasing; some blur may stay.",
+      ),
+      C: text(
+        "Mode C: for clean sources with little blur, such as anime downscaled to 480p. Upscales with denoising and stays closest to the source.",
+      ),
+      "A+A": text(
+        "Mode A+A (demanding): mode A with a second restore pass: the sharpest lines, but it can ring, band or alias. Only when the video is enlarged 2× or more.",
+      ),
+      "B+B": text("Mode B+B (demanding): mode B with a second soft restore pass. Only when the video is enlarged 2× or more."),
+      "C+A": text("Mode C+A (demanding): mode C with a restore pass after it. Only when the video is enlarged 2× or more."),
+    }[s.anime4k.mode];
+    const quality =
+      s.anime4k.quality === "hq"
+        ? text("HQ (demanding) runs the large networks (VL and M): about four times the work of Fast; for fast GPUs.")
+        : text("Fast runs the smaller networks (M and S), for most GPUs.");
     return list(
-      [
-        text(
-          "ArtCNN: a small neural network trained on anime that doubles the brightness (luma) detail once; the player scales the colour.",
-        ),
-        style,
-        ...(s.artcnn.size === "c4f32"
-          ? [text("C4F32 (demanding) runs a network four times the size of C4F16; for fast GPUs.")]
-          : []),
-      ],
+      [text("Anime4K: neural networks for anime and cartoons that restore and double the picture twice."), mode, quality],
       "lines",
     );
   }
@@ -409,12 +361,12 @@ export default async function activate(plugin: Plugin) {
     const on = store.value.on;
     const head = headline(shaders?.status ?? null);
     return {
-      models: MODELS.map((model) => (model === "anime4k" ? text("Anime4K") : text("ArtCNN"))),
+      models: MODELS.map(() => text("Anime4K")),
       modelIndex: MODELS.indexOf(store.value.model),
       ...parameters(),
       description: description(),
       on,
-      // A saved "on" can always be turned off (also while refused); turning on needs a model that runs here.
+      // A saved "on" can always be turned off (also while refused); turning on needs GPU rendering.
       canToggle: on || unavailable() === null,
       ...head,
     };
@@ -425,25 +377,13 @@ export default async function activate(plugin: Plugin) {
     else plugin.update();
   });
   window.on("pickA", (index: number) => {
-    const s = store.value;
-    if (s.model === "anime4k") {
-      const mode = ANIME4K_MODES[index];
-      if (mode) return choose({ anime4k: { ...s.anime4k, mode } });
-    } else {
-      const size = ARTCNN_SIZES[index];
-      if (size) return choose({ artcnn: { ...s.artcnn, size } });
-    }
+    const mode = ANIME4K_MODES[index];
+    if (mode) return choose({ anime4k: { ...store.value.anime4k, mode } });
     plugin.update();
   });
   window.on("pickB", (index: number) => {
-    const s = store.value;
-    if (s.model === "anime4k") {
-      const quality = ANIME4K_QUALITIES[index];
-      if (quality) return choose({ anime4k: { ...s.anime4k, quality } });
-    } else {
-      const style = ARTCNN_STYLES[index];
-      if (style) return choose({ artcnn: { ...s.artcnn, style } });
-    }
+    const quality = ANIME4K_QUALITIES[index];
+    if (quality) return choose({ anime4k: { ...store.value.anime4k, quality } });
     plugin.update();
   });
   window.on("toggle", () => setOn(!store.value.on));

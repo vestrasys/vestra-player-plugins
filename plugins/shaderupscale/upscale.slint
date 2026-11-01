@@ -1,4 +1,4 @@
-// The Shader Upscaling window: the model, its two parameters, what the preset does, one button that
+// The Shader Upscaling window: the model (only with more than one), its two parameters, what the preset does, one button that
 // turns upscaling on and off, and the status line (what is applied, or why not).
 // Width 400 (content 400 − 28 = 372): label column 90 + 8 + drop-down 274. Height: the content's
 // (min = max = the layout's preferred height, as the About window), so the window follows the
@@ -62,7 +62,7 @@ export component UpscaleWindow inherits Window {
     min-height: body.preferred-height;
     max-height: body.preferred-height;
     background: Theme.bg-panel;
-    // The models and the chosen one.
+    // The models and the chosen one; the drop-down shows only with more than one (Anime4K alone in 0.1.1).
     in property <[string]> models;
     in-out property <int> model-index;
     // The chosen model's two parameters: label, items and the chosen item.
@@ -94,7 +94,7 @@ export component UpscaleWindow inherits Window {
         width: 0;
         height: 0;
         label-measure := VerticalLayout {
-            Text { text: @tr("Model"); font-size: Theme.font-body; }
+            Text { text: root.models.length > 1 ? @tr("Model") : ""; font-size: Theme.font-body; }
             Text { text: root.param-a-label; font-size: Theme.font-body; }
             Text { text: root.param-b-label; font-size: Theme.font-body; }
         }
@@ -103,7 +103,7 @@ export component UpscaleWindow inherits Window {
     body := VerticalLayout {
         padding: Theme.dialog-padding;
         spacing: 8px;
-        ChoiceRow {
+        if root.models.length > 1: ChoiceRow {
             label: @tr("Model");
             label-width: root.label-width;
             model: root.models;

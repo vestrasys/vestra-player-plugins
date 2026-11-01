@@ -4,8 +4,14 @@
  * against the files in `shaders/`.
  */
 
-/** The models the window offers, in its drop-down order. */
-export const MODELS = ["anime4k", "artcnn"] as const;
+/**
+ * The models the window offers, in its drop-down order (the window shows the
+ * drop-down only with more than one). ArtCNN (0.1.0) was taken out in 0.1.1: its
+ * shaders write the luma plane with four components, which needs mpv's
+ * gpu-next renderer; the player's libmpv draws with vo_gpu, where they cost
+ * GPU time without taking effect (and compile for about a minute).
+ */
+export const MODELS = ["anime4k"] as const;
 export type ModelId = (typeof MODELS)[number];
 
 /** Anime4K's six modes, as its own mpv templates define them (Anime4K 4.0.1). */
@@ -16,30 +22,20 @@ export type Anime4kMode = (typeof ANIME4K_MODES)[number];
 export const ANIME4K_QUALITIES = ["fast", "hq"] as const;
 export type Anime4kQuality = (typeof ANIME4K_QUALITIES)[number];
 
-/** ArtCNN's real-time sizes: C4F16 (about 12k parameters) and C4F32 (about 48k). */
-export const ARTCNN_SIZES = ["c4f16", "c4f32"] as const;
-export type ArtcnnSize = (typeof ARTCNN_SIZES)[number];
-
-/** ArtCNN's variants: neutral, DS (denoise and sharpen), DN (denoise and soften). */
-export const ARTCNN_STYLES = ["neutral", "ds", "dn"] as const;
-export type ArtcnnStyle = (typeof ARTCNN_STYLES)[number];
-
 /** What the plugin keeps across restarts (`upscaling.json` in its data directory). */
 export interface Settings {
   /** The user turned shader upscaling on (and has not turned it off). */
   on: boolean;
   /** The model the window shows and, while on, applies. */
   model: ModelId;
-  /** Each model keeps its own parameters, so switching models back finds them as they were. */
+  /** The model's parameters. */
   anime4k: { mode: Anime4kMode; quality: Anime4kQuality };
-  artcnn: { size: ArtcnnSize; style: ArtcnnStyle };
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   on: false,
   model: "anime4k",
   anime4k: { mode: "A", quality: "fast" },
-  artcnn: { size: "c4f16", style: "neutral" },
 };
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null;
@@ -53,11 +49,26 @@ export const isSettings = (value: unknown): value is Settings =>
   isObject(value.anime4k) &&
   oneOf(ANIME4K_MODES, value.anime4k.mode) &&
   oneOf(ANIME4K_QUALITIES, value.anime4k.quality) &&
-  isObject(value.artcnn) &&
-  oneOf(ARTCNN_SIZES, value.artcnn.size) &&
-  oneOf(ARTCNN_STYLES, value.artcnn.style);
+  Object.keys(value).length === 3;
 
-/** The modes with a second restore pass: marked demanding, as HQ and ArtCNN C4F32 are. */
+/**
+ * A saved `upscaling.json` as the current settings, or `null` when it is
+ * neither those nor what 0.1.0 saved. 0.1.0's ArtCNN choice becomes Anime4K
+ * mode A (Fast), the default preset, with on/off kept; its `artcnn`
+ * parameters are dropped.
+ */
+export function readSettings(value: unknown): Settings | null {
+  if (isSettings(value)) return value;
+  if (!isObject(value) || typeof value.on !== "boolean" || !isObject(value.anime4k)) return null;
+  if (value.model === "artcnn") return { on: value.on, model: "anime4k", anime4k: { ...DEFAULT_SETTINGS.anime4k } };
+  const current = { on: value.on, model: value.model, anime4k: value.anime4k };
+  return isSettings(current) ? current : null;
+}
+
+/** What the store accepts: current settings, or 0.1.0's to be migrated with {@link readSettings}. */
+export const isStoredSettings = (value: unknown): value is Settings => readSettings(value) !== null;
+
+/** The modes with a second restore pass: marked demanding, as HQ is. */
 export const demandingMode = (mode: Anime4kMode) => mode.includes("+");
 
 /** A file of Anime4K's under `shaders/anime4k/`. */
@@ -93,21 +104,7 @@ export function anime4kFiles(mode: Anime4kMode, quality: Anime4kQuality): string
   }
 }
 
-/** ArtCNN's one shader for a size and variant (a luma doubler; the player scales the colour planes). */
-export function artcnnFiles(size: ArtcnnSize, style: ArtcnnStyle): string[] {
-  const suffix = style === "neutral" ? "" : `_${style.toUpperCase()}`;
-  return [`artcnn/ArtCNN_${size.toUpperCase()}${suffix}.glsl`];
-}
-
 /** The shader files (relative to `shaders/`, with `/`) the settings' model and parameters run, in order. */
 export function shaderFiles(settings: Settings): string[] {
-  return settings.model === "anime4k"
-    ? anime4kFiles(settings.anime4k.mode, settings.anime4k.quality)
-    : artcnnFiles(settings.artcnn.size, settings.artcnn.style);
+  return anime4kFiles(settings.anime4k.mode, settings.anime4k.quality);
 }
-
-/**
- * The model's shaders are compute shaders (`//!COMPUTE`). macOS's OpenGL 4.1
- * has none, so mpv cannot run them there; Direct3D 11 on Windows can.
- */
-export const needsCompute = (model: ModelId) => model === "artcnn";

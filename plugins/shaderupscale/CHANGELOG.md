@@ -2,9 +2,10 @@
 
 ## 0.1.1
 
+- Anime4K only: ArtCNN is removed. Its shaders need mpv's gpu-next renderer, which the player does not use yet; with the player's renderer they cost GPU time without taking effect, and took about a minute to compile. A saved ArtCNN choice becomes Anime4K mode A (Fast), with on/off kept. The Model drop-down is hidden while Anime4K is the only model.
 - Crash safety is the player's (0.6.3): after a run that ended abnormally while shaders were drawing, the player refuses them (for the next start; after a second such run within a day, for days) and shows its own OSD line. The window then says "Not running" with the player's message, keeps the choice (still on), says it applies when the player allows shaders again and suggests a preset that is not marked demanding. The plugin does not retry by itself for the rest of the player run, also after its own stop and wake; Turn Off saves off, and Turn On tries once.
 - Needs Vestra Player 0.6.3 or later, for that crash guard.
-- The heavy presets are marked "demanding" in the drop-downs and the description: Anime4K HQ, modes A+A, B+B and C+A, and ArtCNN C4F32.
+- The heavy presets are marked "demanding" in the drop-downs and the description: Anime4K HQ, and modes A+A, B+B and C+A.
 - The window's height follows its content, so the Close button no longer stretches when the status text fills in after the window opens.
 
 ## 0.1.0
