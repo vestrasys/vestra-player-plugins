@@ -221,19 +221,48 @@ test("the cache survives a restart and is keyed by the file's path, size and tim
   }
 });
 
-test("black pillarbox: one width crop; fade-in frames are skipped", async () => {
+test("centred box on black: cropped; fade-in frames are skipped", async () => {
   const { paths, cleanup } = await files(["a.mp4"]);
   const a = paths[0]!;
-  const picture = { x: 240, y: 0, width: 1440, height: 1080 };
+  const picture = { x: 320, y: 180, width: 1280, height: 720 };
   const host = makeHost(
     new Map([[a, { width: 1920, height: 1080, duration: 80, background: BLACK, content: (i: number) => (i < 3 ? null : picture) }]]),
   );
   const { stop } = await startPlugin(activate, { directory, host });
   try {
     host.openElsewhere(a);
-    await until(host, () => host.osd.includes("Auto-framed to 1440×1080"), "the OSD");
-    assert.equal(chain(host).length, 1);
+    await until(host, () => host.osd.includes("Auto-framed to 1280×720"), "the OSD");
+    assert.equal(chain(host).length, 2);
     assert.deepEqual(cut(host, 1920, 1080), picture);
+  } finally {
+    await stop();
+    await cleanup();
+  }
+});
+
+test("letterboxed and pillarboxed films stay untouched; Detect Again says why", async () => {
+  const { paths, cleanup } = await files(["scope.mp4", "academy.mp4"]);
+  const [scope, academy] = paths as [string, string];
+  const host = makeHost(
+    new Map([
+      [scope, { width: 1920, height: 1080, duration: 80, background: BLACK, content: always({ x: 0, y: 132, width: 1920, height: 816 }) }],
+      [academy, { width: 1920, height: 1080, duration: 80, background: BLACK, content: always({ x: 240, y: 0, width: 1440, height: 1080 }) }],
+    ]),
+  );
+  const { stop } = await startPlugin(activate, { directory, host });
+  try {
+    for (const [file, runs] of [[scope, 8], [academy, 16]] as const) {
+      host.openElsewhere(file);
+      await until(host, () => ffmpegRuns(host) === runs, "the detection");
+      await host.settle(50);
+      assert.deepEqual(chain(host), []);
+      assert.deepEqual(host.osd, []); // automatic: no message
+    }
+    assert.equal(host.sent("processing.replace").length, 0);
+    await host.command("detect").run();
+    await until(host, () => host.osd.length > 0, "the OSD");
+    assert.deepEqual(host.osd, ["Auto Frame: bars only above and below or only at the sides are kept"]);
+    assert.deepEqual(chain(host), []);
   } finally {
     await stop();
     await cleanup();
@@ -280,7 +309,7 @@ test("no crop: content fills the frame, too few frames with a picture, a stream 
 test("a picture too narrow for the player's crop is not cropped, with a reason", async () => {
   const { paths, cleanup } = await files(["a.mp4"]);
   const host = makeHost(
-    new Map([[paths[0]!, { width: 1920, height: 1080, duration: 80, background: GREY, content: always({ x: 0, y: 400, width: 1900, height: 300 }) }]]),
+    new Map([[paths[0]!, { width: 1920, height: 1080, duration: 80, background: GREY, content: always({ x: 0, y: 400, width: 1800, height: 420 }) }]]),
   );
   const { stop } = await startPlugin(activate, { directory, host });
   try {
@@ -463,16 +492,16 @@ test("another plugin's geometry (Crop/Stretch, rotation): paused before, undone 
 test("a rotated file is framed in the picture as the player shows it", async () => {
   const { paths, cleanup } = await files(["portrait.mp4"]);
   const a = paths[0]!;
-  // Stored 1920×1080, shown 1080×1920 (rotation −90): the picture is 1080×1440 at the top.
+  // Stored 1920×1080, shown 1080×1920 (rotation −90): the picture is 720×1280 at the top left.
   const host = makeHost(
-    new Map([[a, { width: 1920, height: 1080, rotation: -90, duration: 80, background: GREY, content: always({ x: 0, y: 0, width: 1080, height: 1440 }) }]]),
+    new Map([[a, { width: 1920, height: 1080, rotation: -90, duration: 80, background: GREY, content: always({ x: 0, y: 0, width: 720, height: 1280 }) }]]),
   );
   const { stop } = await startPlugin(activate, { directory, host });
   try {
     host.openElsewhere(a);
     await until(host, () => host.osd.length > 0, "the OSD");
-    assert.equal(host.osd.at(-1), "Auto-framed to 1080×1440");
-    assert.deepEqual(cut(host, 1080, 1920), { x: 0, y: 0, width: 1080, height: 1440 });
+    assert.equal(host.osd.at(-1), "Auto-framed to 720×1280");
+    assert.deepEqual(cut(host, 1080, 1920), { x: 0, y: 0, width: 720, height: 1280 });
   } finally {
     await stop();
     await cleanup();

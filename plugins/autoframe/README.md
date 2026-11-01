@@ -8,7 +8,8 @@ When a video file on this computer starts, the plugin reads a few frames of it (
 
 - the border's colour is the most common colour of the outermost pixels; at least one whole edge must be that colour;
 - the picture is every row and column with more than a few pixels of another colour, joined over the frames, so a dark scene does not shrink it; frames of only the border's colour (fades) are skipped;
-- a size within 1 % of a usual one (2560×1440, 1920×1080, 1280×720 …) is taken as that size.
+- a size within 1 % of a usual one (2560×1440, 1920×1080, 1280×720 …) is taken as that size;
+- the video is cropped only when the border is on both axes: the picture is narrower **and** lower than the video (less than 95 % of its width and of its height). An ordinary film with bars only above and below (letterbox, such as 2.35:1 in 16:9) or only at the sides (pillarbox, such as 4:3 in 16:9) is left as it is.
 
 The answer is remembered per file (its path, size and modification time), so the file is read only once. The video is then cropped in the player and a note on the video says so, for example "Auto-framed to 2560×1440".
 
@@ -24,6 +25,7 @@ Right-click menu **Video ▸ Auto Frame**:
 
 ## When it does not crop
 
+- The border is on one axis only: the picture covers 95 % or more of the video's width or of its height (a letterboxed or pillarboxed film).
 - The picture fills (almost) the whole video: 95 % or more in both directions.
 - Fewer than three of the frames show a picture (a very dark or very short video).
 - The picture is smaller than a tenth of the video or 160 pixels on a side.

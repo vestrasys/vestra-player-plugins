@@ -25,58 +25,62 @@ msgid "Auto Frame: no solid border around the picture"
 msgstr ""
 
 #: main.ts:356
+msgid "Auto Frame: bars only above and below or only at the sides are kept"
+msgstr ""
+
+#: main.ts:357
 msgid "Auto Frame: the picture inside the border is too small to frame"
 msgstr ""
 
-#: main.ts:384
+#: main.ts:385
 msgid "Auto Frame paused: Crop/Stretch or rotation changes the picture"
 msgstr ""
 
-#: main.ts:410
+#: main.ts:411
 msgid "Auto Frame undone: Crop/Stretch or rotation changes the picture"
 msgstr ""
 
-#: main.ts:415
+#: main.ts:416
 msgid "Auto-framed to {}"
 msgstr ""
 
-#: main.ts:497
+#: main.ts:498
 msgid "Play a video file on this computer to use Auto Frame"
 msgstr ""
 
-#: main.ts:501 main.ts:522 main.ts:537
+#: main.ts:502 main.ts:523 main.ts:538
 msgid "Auto Frame"
 msgstr ""
 
-#: main.ts:501
+#: main.ts:502
 msgid "Auto-Frame Videos"
 msgstr ""
 
-#: main.ts:511
+#: main.ts:512
 msgid "Auto Frame: Off"
 msgstr ""
 
-#: main.ts:514
+#: main.ts:515
 msgid "Auto Frame: On"
 msgstr ""
 
-#: main.ts:522
+#: main.ts:523
 msgid "Detect Again"
 msgstr ""
 
-#: main.ts:528 main.ts:540
+#: main.ts:529 main.ts:541
 msgid "Auto-Frame Videos is off"
 msgstr ""
 
-#: main.ts:530
+#: main.ts:531
 msgid "The full picture is shown for this file"
 msgstr ""
 
-#: main.ts:537
+#: main.ts:538
 msgid "Show Full Picture for This File"
 msgstr ""
 
-#: main.ts:551
+#: main.ts:552
 msgid "Showing the full picture of this file"
 msgstr ""
 
@@ -89,7 +93,7 @@ msgid "Crops away the solid-colour border around a video's picture"
 msgstr ""
 
 #: manifest.json
-msgid "Some videos are larger than their picture: a 2560×1440 picture in a corner of a 3840×2160 video, the rest one solid colour. Auto Frame finds the picture when a video file on this computer starts and crops the video to it, so the picture fills the window. It reads a few frames of the file with the player's FFmpeg, remembers the answer per file and says on the video what it did. Video ▸ Auto Frame turns it on and off, detects again, and shows the full picture of one file."
+msgid "Some videos are larger than their picture: a 2560×1440 picture in a corner of a 3840×2160 video, the rest one solid colour. Auto Frame finds the picture when a video file on this computer starts and crops the video to it, so the picture fills the window. Films with bars only above and below, or only at the sides, are left as they are. It reads a few frames of the file with the player's FFmpeg, remembers the answer per file and says on the video what it did. Video ▸ Auto Frame turns it on and off, detects again, and shows the full picture of one file."
 msgstr ""
 
 #: manifest.json

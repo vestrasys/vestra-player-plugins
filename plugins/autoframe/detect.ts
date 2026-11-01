@@ -26,7 +26,12 @@ export type Colour = readonly [number, number, number];
 export const TOLERANCE = 16;
 /** An edge is border when at least this share of its pixels has the border colour. */
 export const EDGE_SHARE = 0.95;
-/** No crop when the content covers at least this share of the frame in both directions. */
+/**
+ * A direction has a border only when the content covers less than this share
+ * of the frame in it. The content is cropped only when it has a border in
+ * both directions (user ruling): an ordinary letterboxed (bars above and
+ * below) or pillarboxed (bars at the sides) film is left as it is.
+ */
 export const FULL_SHARE = 0.95;
 /** The content must cover at least this share of the frame's area. */
 export const MIN_AREA = 0.1;
@@ -202,6 +207,11 @@ export type NoCrop =
   | "few-frames"
   /** No solid border, or the content fills (almost) the whole frame. */
   | "no-border"
+  /**
+   * A border in one direction only: bars above and below (letterbox) or at
+   * the sides (pillarbox), which are not cropped.
+   */
+  | "one-axis"
   /** The content is smaller than {@link MIN_AREA} of the frame or {@link MIN_SIDE} pixels. */
   | "small"
   /** The content's display aspect is outside {@link MIN_ASPECT}–{@link MAX_ASPECT}. */
@@ -223,9 +233,12 @@ const sameColour = (a: Colour, b: Colour, tolerance: number) =>
  * - The box is the union over the frames, widened to even edges, then
  *   snapped to a standard size ({@link STANDARD_SIZES}) within
  *   {@link SNAP_SHARE}, keeping the side that touches the frame's edge.
- * - No crop when the box covers {@link FULL_SHARE} of the frame in both
- *   directions, is smaller than {@link MIN_AREA} or {@link MIN_SIDE}, or its
- *   display aspect (`sar` is the pixel aspect) is outside 0.25–4.
+ * - Cropped only when the box covers less than {@link FULL_SHARE} of the
+ *   frame in width and in height: `no-border` when in neither direction,
+ *   `one-axis` for a letterbox or pillarbox (a border in one direction).
+ * - No crop either when it is smaller than {@link MIN_AREA} or
+ *   {@link MIN_SIDE}, or its display aspect (`sar` is the pixel aspect) is
+ *   outside 0.25–4.
  */
 export function decide(results: FrameResult[], width: number, height: number, sar = 1, tolerance = TOLERANCE): Decision {
   const shown = results.filter((r) => r.kind !== "blank");
@@ -259,7 +272,10 @@ export function decide(results: FrameResult[], width: number, height: number, sa
   x1 = Math.min(x1 + (x1 % 2), width & ~1);
   y1 = Math.min(y1 + (y1 % 2), height & ~1);
   let rect: Rect = { x: x0, y: y0, width: (x1 - x0) & ~1, height: (y1 - y0) & ~1 };
-  if (rect.width >= FULL_SHARE * width && rect.height >= FULL_SHARE * height) return { reason: "no-border" };
+  const fullWidth = rect.width >= FULL_SHARE * width;
+  const fullHeight = rect.height >= FULL_SHARE * height;
+  if (fullWidth && fullHeight) return { reason: "no-border" };
+  if (fullWidth || fullHeight) return { reason: "one-axis" };
   rect = snapStandard(rect, width, height);
   if (rect.width * rect.height < MIN_AREA * width * height || rect.width < MIN_SIDE || rect.height < MIN_SIDE) {
     return { reason: "small" };

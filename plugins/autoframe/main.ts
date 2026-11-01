@@ -353,6 +353,7 @@ export default async function activate(plugin: Plugin) {
     if (!manual) return;
     if (reason === "few-frames") return plugin.osd.show("Auto Frame: too few frames show a picture to decide");
     if (reason === "no-border") return plugin.osd.show("Auto Frame: no solid border around the picture");
+    if (reason === "one-axis") return plugin.osd.show("Auto Frame: bars only above and below or only at the sides are kept");
     return plugin.osd.show("Auto Frame: the picture inside the border is too small to frame");
   }
 

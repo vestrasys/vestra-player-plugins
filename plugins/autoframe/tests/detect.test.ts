@@ -71,12 +71,9 @@ test("decide: a 2560×1440 picture top-left in 3840×2160 grey (4K frames)", () 
   assert.deepEqual(decide(results, 3840, 2160), { rect: { x: 0, y: 0, width: 2560, height: 1440 } });
 });
 
-test("decide: centred on white, black pillarbox, any corner", () => {
+test("decide: centred on white, any corner, any colour", () => {
   assert.deepEqual(decide(frames(1920, 1080, WHITE, { x: 320, y: 180, width: 1280, height: 720 }), 1920, 1080), {
     rect: { x: 320, y: 180, width: 1280, height: 720 },
-  });
-  assert.deepEqual(decide(frames(1920, 1080, BLACK, { x: 240, y: 0, width: 1440, height: 1080 }), 1920, 1080), {
-    rect: { x: 240, y: 0, width: 1440, height: 1080 },
   });
   assert.deepEqual(decide(frames(1920, 1080, [30, 60, 200], { x: 640, y: 360, width: 1280, height: 720 }), 1920, 1080), {
     rect: { x: 640, y: 360, width: 1280, height: 720 },
@@ -113,6 +110,31 @@ test("decide: the union of frames, and a frame without border or with another bo
   assert.deepEqual(decide([...a, ...b, ...other], 1920, 1080), { reason: "no-border" });
 });
 
+test("decide: a border on one axis only is not cropped (ruling: both axes)", () => {
+  // 2.35:1 letterbox: 1920×816 between black bars above and below.
+  assert.deepEqual(decide(frames(1920, 1080, BLACK, { x: 0, y: 132, width: 1920, height: 816 }), 1920, 1080), {
+    reason: "one-axis",
+  });
+  // 4:3 pillarbox: 1440×1080 between bars at the sides.
+  assert.deepEqual(decide(frames(1920, 1080, BLACK, { x: 240, y: 0, width: 1440, height: 1080 }), 1920, 1080), {
+    reason: "one-axis",
+  });
+  // The threshold: 95 % in one direction is "full"; just under it in both is cropped.
+  assert.deepEqual(decide(frames(1920, 1080, GREY, { x: 0, y: 0, width: 1824, height: 720 }), 1920, 1080), {
+    reason: "one-axis",
+  });
+  assert.deepEqual(decide(frames(1920, 1080, GREY, { x: 0, y: 0, width: 1822, height: 1024 }), 1920, 1080), {
+    rect: { x: 0, y: 0, width: 1822, height: 1024 },
+  });
+  // A 2K picture top-left of 4K, and a centred box: both axes, cropped.
+  assert.deepEqual(decide(frames(3840, 2160, GREY, { x: 0, y: 0, width: 1920, height: 1080 }, 3), 3840, 2160), {
+    rect: { x: 0, y: 0, width: 1920, height: 1080 },
+  });
+  assert.deepEqual(decide(frames(3840, 2160, BLACK, { x: 960, y: 540, width: 1920, height: 1080 }, 3), 3840, 2160), {
+    rect: { x: 960, y: 540, width: 1920, height: 1080 },
+  });
+});
+
 test("decide: no crop for nearly full, too small, or too narrow content", () => {
   assert.deepEqual(decide(frames(1920, 1080, BLACK, { x: 20, y: 20, width: 1880, height: 1040 }), 1920, 1080), {
     reason: "no-border",
@@ -120,11 +142,11 @@ test("decide: no crop for nearly full, too small, or too narrow content", () => 
   assert.deepEqual(decide(frames(1920, 1080, GREY, { x: 0, y: 0, width: 400, height: 300 }), 1920, 1080), {
     reason: "small",
   });
-  assert.deepEqual(decide(frames(1920, 1080, GREY, { x: 0, y: 0, width: 150, height: 1080 }), 1920, 1080), {
+  assert.deepEqual(decide(frames(1920, 1080, GREY, { x: 0, y: 0, width: 150, height: 800 }), 1920, 1080), {
     reason: "small",
   });
-  // 1900×300 is over 10 % of the area but wider than 4:1.
-  assert.deepEqual(decide(frames(1920, 1080, GREY, { x: 0, y: 400, width: 1900, height: 300 }), 1920, 1080), {
+  // 1800×420 is over 10 % of the area but wider than 4:1.
+  assert.deepEqual(decide(frames(1920, 1080, GREY, { x: 0, y: 400, width: 1800, height: 420 }), 1920, 1080), {
     reason: "aspect",
   });
 });
