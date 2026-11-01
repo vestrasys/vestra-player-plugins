@@ -100,7 +100,7 @@ export function mountPanel(plugin: Plugin, youtube: YouTube, actions: PanelActio
     return {
       // Plain values only, so the player updates a changed row in place and never rebuilds the
       // row elements under the pointer (a rebuilt row loses a double-click in progress). Since
-      // player 0.5.2 that holds when the length changes too (a page appended, the end row
+      // player 0.5.4 that holds when the length changes too (a page appended, the end row
       // added or removed). The thumbnails, the selection and the playing video live in
       // properties of their own.
       rows: [

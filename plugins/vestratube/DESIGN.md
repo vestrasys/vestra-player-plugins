@@ -46,9 +46,9 @@ partly (no title, tabs "N/A") and their content is regional and editorial,
 so none of these is a reliable logged-out feed. A local history of searches
 or plays was considered and left out (user ruling, 2026-10-26).
 
-**Preconditions, independent of other plugins.** Vestra Player 0.5.2 or
+**Preconditions, independent of other plugins.** Vestra Player 0.5.4 or
 later (images in list rows, 0.5.1; rows kept in place when the list's length
-changes, 0.5.2), a network connection, and for downloads the
+changes, 0.5.4), a network connection, and for downloads the
 player's bundled ffmpeg (`plugin.tools`). The panel works whether or not the
 playlist or any other plugin is loaded; it shares the sidebar as a tab.
 
@@ -128,7 +128,7 @@ and the player remembers the sidebar's visibility.
   have elements. `rows` holds the results only (`count` of them), plus one end row
   (`end: true`, every other field empty) while the next page loads or failed to load;
   a ListView has a single repeater, so "Loading…" or the reason with Retry is that last
-  row, drawn as before. Player 0.5.2 updates a plain-value model in place when its
+  row, drawn as before. Player 0.5.4 updates a plain-value model in place when its
   length changes (the shared rows by `set_row_data`, the tail pushed or removed), so a
   page appended or the end row coming and going keeps every row element above it, with
   its hover and a double-click in progress. Up to 0.5.1 the player replaced such a model,
@@ -292,8 +292,9 @@ export global TubeBridge { in property <[VideoRow]> rows; in-out property <strin
 
 Capabilities: `commands`, `events`, `ui.window`, `ui.dialog`, `ui.mount`,
 `ui.osd`, `playback.read`, `playback.control`, `source.resolve` (0.3 plus
-`ui.mount` and `ui.osd`). `minPlayerVersion` 0.5.2 (rows kept in place when the
-list's length changes).
+`ui.mount` and `ui.osd`). `minPlayerVersion` 0.5.4 (rows kept in place when the
+list's length changes; the player change landed after the 0.5.3 version bump, so
+0.5.4 is the first version that always has it).
 
 **SDK version.** The code runs on the player's SDK, so a plugin needs no
 SDK upgrade to *run* on player 0.5.1. Its *tests and types* need SDK

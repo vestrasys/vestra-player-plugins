@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.3
+
+- Corrected: needs Vestra Player 0.5.4 or later, not 0.5.2. The player keeps the rows on screen in place when the list grows or shrinks only from 0.5.4 (the change came after 0.5.3 was numbered, so some 0.5.3 builds have it and some do not). On an older player each new page rebuilt every row, losing a double-click in progress and the hover. Nothing else changes.
+
 ## 0.5.2
 
 - **The search box is the player's standard text field.** Right-click it for Cut, Copy and Paste; it looks like the player's other search fields (the search icon in the box is gone). Enter still searches, Esc still clears, ↓ still moves into the results.
