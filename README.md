@@ -25,14 +25,7 @@ Vestra Player has three kinds of plugins:
 | **Hosted third-party** | source in this repository, [`plugins/`](plugins) | `<github-owner>.<name>` | stricter: every change is a pull request here, checked by this repository's full CI |
 | **Registered third-party** | source in the author's repository, registered in [`registry/`](registry) and built from source (not implemented yet, see below) | `<github-owner>.<name>` | a maintainer reviews the source at the registered commit |
 
-Every plugin in this repository is a third-party plugin: being hosted here means stricter review, not that the plugin is official. The hosted plugins today:
-
-| Plugin | Id | Owner | What it does |
-| --- | --- | --- | --- |
-| [VestraTube](plugins/vestratube) | `zysilm.vestratube` | [zysilm](https://github.com/zysilm) | Search YouTube in a sidebar and play videos directly, or paste a link to play or download (bundles youtubei.js; no yt-dlp; ffmpeg for downloads). |
-| [VestraBili](plugins/vestrabili) | `zysilm.vestrabili` | [zysilm](https://github.com/zysilm) | Plays a Bilibili video from its link: BV or av number, or a b23.tv short link (needs yt-dlp). |
-| [VestraNES](plugins/vestranes) | `zysilm.vestranes` | [zysilm](https://github.com/zysilm) | Plays NES game ROMs in the player, with the keyboard as the controller while its window is in front (bundles JSNES; no games included). |
-| [VestraUpscale](plugins/vestraupscale) | `zysilm.vestraupscale` | [zysilm](https://github.com/zysilm) | Adds Video ▸ AI Upscaling: NVIDIA RTX Video Super Resolution sharpens and enlarges the video to the size it is shown at (needs Vestra Player 0.5.16+, Windows with an NVIDIA RTX GPU and GPU rendering on; installs everywhere, greyed out with the reason elsewhere). |
+Every plugin in this repository is a third-party plugin: being hosted here means stricter review, not that the plugin is official. The store lists every plugin: open it in Vestra Player, or read the signed index below; the hosted plugins' sources are in [`plugins/`](plugins).
 
 Every merge to `main` publishes the signed index at **https://vestrasys.github.io/vestra-player-plugins/index.json**, which the player's store reads. It lists the third-party plugins of this repository; the official plugins ship with the player and are not in it.
 

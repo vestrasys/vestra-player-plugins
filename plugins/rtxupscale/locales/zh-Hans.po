@@ -1,0 +1,335 @@
+msgid ""
+msgstr ""
+"Language: zh-Hans\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#: main.ts:183
+msgid "AI upscaling needs GPU rendering."
+msgstr "AI 超分辨率需要 GPU 渲染。"
+
+#: main.ts:184
+msgid "AI upscaling starts when GPU rendering is ready."
+msgstr "GPU 渲染就绪后，AI 超分辨率即会生效。"
+
+#. {} is the player's own message, in English.
+#: main.ts:188
+msgid "AI upscaling needs GPU rendering, which cannot be turned on here: {}"
+msgstr "AI 超分辨率需要 GPU 渲染，但本机无法开启 GPU 渲染：{}"
+
+#: main.ts:192
+msgid "GPU rendering stopped during this run: restart the player to use AI upscaling."
+msgstr "GPU 渲染在本次运行中已停止：请重启播放器以使用 AI 超分辨率。"
+
+#: main.ts:193
+msgid "GPU rendering is on from the next start: restart the player to use AI upscaling."
+msgstr "GPU 渲染将在下次启动时开启：请重启播放器以使用 AI 超分辨率。"
+
+#: main.ts:194
+msgid "AI upscaling needs GPU rendering: turn on Video ▸ GPU Rendering (Experimental), then restart the player."
+msgstr "AI 超分辨率需要 GPU 渲染：请打开“视频 ▸ GPU 渲染（实验性）”，然后重启播放器。"
+
+#: main.ts:209
+msgid "other plugins' video filters need the frames in memory, so the video is not decoded on the GPU. Turn those filters off or reset them there; upscaling then starts by itself."
+msgstr "其他插件的视频滤镜需要把画面放在内存中，因此视频没有在显卡上解码。请在对应插件中关闭或复位这些滤镜，之后超分辨率会自动开始。"
+
+#: main.ts:212
+msgid "hardware decoding copies the frames back to memory (copy-back), as the player's hardware decoding setting asks. Upscaling needs the video decoded on the GPU without copy-back."
+msgstr "按播放器的硬件解码设置，解码后的画面会复制回内存（copy-back）。超分辨率需要在显卡上直接解码，不经 copy-back。"
+
+#: main.ts:215
+msgid "hardware decoding is off. Upscaling needs the video decoded on the GPU."
+msgstr "硬件解码已关闭。超分辨率需要视频在显卡上解码。"
+
+#: main.ts:218
+msgid "this video is decoded in software, for example a cover picture or a format the GPU cannot decode. It starts again with a video the GPU decodes."
+msgstr "此视频为软件解码，例如封面图片，或显卡无法解码的格式。播放显卡能解码的视频时会重新开始。"
+
+#: main.ts:221
+msgid "this video is decoded with another hardware decoder than the one upscaling needs."
+msgstr "此视频使用的硬件解码器不是超分辨率所需的那一个。"
+
+#. {} is why (a translated clause, or the player's own message in English).
+#: main.ts:235
+msgid "AI upscaling waits: {}"
+msgstr "AI 超分辨率等待中：{}"
+
+#. {} is why (a translated clause, or the player's own message in English).
+#: main.ts:240
+msgid "When turned on, AI upscaling will wait: {}"
+msgstr "开启后，AI 超分辨率将等待：{}"
+
+#: main.ts:251
+msgid "AI Upscaling: On, waits until other video filters are off"
+msgstr "AI 超分辨率：开，其他视频滤镜关闭后生效"
+
+#: main.ts:252
+msgid "AI Upscaling: On, waits: hardware decoding copies frames back"
+msgstr "AI 超分辨率：开，硬件解码把画面复制回内存，暂不生效"
+
+#: main.ts:254
+msgid "AI Upscaling: On, waits until hardware decoding is on"
+msgstr "AI 超分辨率：开，硬件解码打开后生效"
+
+#: main.ts:256
+msgid "AI Upscaling: On, waits: this video is decoded in software"
+msgstr "AI 超分辨率：开，此视频为软件解码，暂不生效"
+
+#: main.ts:258
+msgid "AI Upscaling: On, waits: the video uses another hardware decoder"
+msgstr "AI 超分辨率：开，此视频用了其他硬件解码器，暂不生效"
+
+#: main.ts:260
+msgid "AI Upscaling: On, waits until the video is decoded on the GPU"
+msgstr "AI 超分辨率：开，视频在显卡上解码后生效"
+
+#. the first {} is our advice, the second the player's own message, in English.
+#: main.ts:274
+msgid "{} ({})"
+msgstr "{}（{}）"
+
+#: main.ts:279
+msgid "AI upscaling is not available on this system. It needs Windows and an NVIDIA RTX GPU."
+msgstr "本机无法使用 AI 超分辨率，需要 Windows 和 NVIDIA RTX 显卡。"
+
+#: main.ts:281
+msgid "AI upscaling is not available on this computer. It needs an NVIDIA RTX GPU."
+msgstr "本机无法使用 AI 超分辨率，需要 NVIDIA RTX 显卡。"
+
+#: main.ts:287
+msgid "The player runs on a GPU that cannot upscale: in Windows Settings ▸ System ▸ Display ▸ Graphics, choose the high-performance GPU for Vestra Player, then restart it."
+msgstr "播放器正运行在不支持超分辨率的显卡上：请在 Windows 设置 ▸ 系统 ▸ 屏幕 ▸ 显示卡 中为 Vestra Player 选择“高性能”显卡，然后重启播放器。"
+
+#: main.ts:291
+msgid "The NVIDIA driver is too old for AI upscaling: update it to version 530 or newer."
+msgstr "NVIDIA 驱动版本过旧，无法使用 AI 超分辨率：请更新到 530 或更高版本。"
+
+#. {} is the player's own message, in English.
+#: main.ts:298
+msgid "AI upscaling is not available on this computer: {}"
+msgstr "本机无法使用 AI 超分辨率：{}"
+
+#: main.ts:313
+msgid "AI upscaling needs Windows and an NVIDIA RTX GPU"
+msgstr "AI 超分辨率需要 Windows 和 NVIDIA RTX 显卡"
+
+#: main.ts:315
+msgid "AI upscaling needs an NVIDIA RTX GPU"
+msgstr "AI 超分辨率需要 NVIDIA RTX 显卡"
+
+#: main.ts:317
+msgid "AI upscaling needs NVIDIA driver 530 or newer"
+msgstr "AI 超分辨率需要 NVIDIA 驱动 530 或更新版本"
+
+#: main.ts:319
+msgid "AI upscaling: choose the NVIDIA GPU in Windows graphics settings"
+msgstr "AI 超分辨率：请在 Windows“显示卡”设置中选择 NVIDIA 显卡"
+
+#: main.ts:323
+msgid "AI upscaling waits until the video is decoded on the GPU"
+msgstr "AI 超分辨率等待视频在显卡上解码"
+
+#: main.ts:326
+msgid "AI upscaling needs GPU rendering"
+msgstr "AI 超分辨率需要 GPU 渲染"
+
+#: main.ts:327
+msgid "AI upscaling starts when GPU rendering is ready"
+msgstr "GPU 渲染就绪后，AI 超分辨率即生效"
+
+#: main.ts:328
+msgid "AI upscaling needs GPU rendering, which is unavailable here"
+msgstr "AI 超分辨率需要 GPU 渲染，但本机无法开启"
+
+#: main.ts:330
+msgid "Restart the player to use AI upscaling"
+msgstr "重启播放器以使用 AI 超分辨率"
+
+#: main.ts:331
+msgid "AI upscaling: turn on Video ▸ GPU Rendering, then restart"
+msgstr "AI 超分辨率：请打开“视频 ▸ GPU 渲染”并重启"
+
+#: main.ts:334
+msgid "AI upscaling is not available on this computer"
+msgstr "本机无法使用 AI 超分辨率"
+
+#: main.ts:355
+msgid "AI Upscaling: On — also turn on Super Resolution in the NVIDIA app"
+msgstr "AI 超分辨率：开——还需在 NVIDIA App 中打开超分辨率"
+
+#: main.ts:386
+msgid "AI Upscaling: On, starts when GPU rendering is ready"
+msgstr "AI 超分辨率：开，GPU 渲染就绪后生效"
+
+#: main.ts:388
+msgid "AI Upscaling: On"
+msgstr "AI 超分辨率：开"
+
+#: main.ts:402
+msgid "AI Upscaling: Off"
+msgstr "AI 超分辨率：关"
+
+#: main.ts:461
+msgid "AI Upscaling (RTX Video Super Resolution)"
+msgstr "AI 超分辨率（RTX 视频超分辨率）"
+
+#: main.ts:497
+msgid "Please wait…"
+msgstr "请稍候…"
+
+#: main.ts:498
+msgid "Not available"
+msgstr "无法使用"
+
+#: main.ts:499
+msgid "Off"
+msgstr "关"
+
+#: main.ts:500
+msgid "On: starts when a video plays"
+msgstr "开：播放视频时开始"
+
+#: main.ts:501
+msgid "On, waiting"
+msgstr "开，等待中"
+
+#: main.ts:502
+msgid "On: upscaling requested"
+msgstr "开：已请求超分辨率"
+
+#: main.ts:503
+msgid "On: no video"
+msgstr "开：没有视频"
+
+#: main.ts:504
+msgid "On: not needed for this video"
+msgstr "开：此视频无需放大"
+
+#: main.ts:517
+msgid "The video is shown at its own size or smaller: upscaling starts when it is shown larger."
+msgstr "视频以原始尺寸或更小尺寸显示：显示得比原始尺寸大时，超分辨率才会开始。"
+
+#. {} is the plugin's name as the player reports it (Picture Adjustments, the built-in plugin).
+#: main.ts:530
+msgid "{}: press Q (Video ▸ Reset) to reset the picture, and turn off its other video effects."
+msgstr "{}：按 Q（视频 ▸ 复位）复位画面，并关闭其中的其他视频效果。"
+
+#. {} is the plugin's name as the player reports it.
+#: main.ts:535
+msgid "{}: turn off or reset its video filters there."
+msgstr "{}：请在该插件中关闭或复位其视频滤镜。"
+
+#. {} is one or more plugin names, as their manifests give them.
+#: main.ts:542
+msgid "Upscaling waits for the video filters of: {}"
+msgstr "超分辨率正在等待这些插件的视频滤镜：{}"
+
+#: main.ts:559
+msgid "No video"
+msgstr "没有视频"
+
+#. the stored size, then the size the video is meant to be shown at.
+#: main.ts:564
+msgid "{} (shown as {})"
+msgstr "{}（显示为 {}）"
+
+#: main.ts:574
+msgid "Unknown"
+msgstr "未知"
+
+#: main.ts:579
+msgid "Software (no)"
+msgstr "软件解码（no）"
+
+#: main.ts:581
+msgid "Yes"
+msgstr "是"
+
+#: main.ts:581
+msgid "No"
+msgstr "否"
+
+#: main.ts:632
+msgid "AI Upscaling…"
+msgstr "AI 超分辨率…"
+
+#: manifest.json
+msgid "RTX Upscale for Vestra Player"
+msgstr "RTX Upscale for Vestra Player"
+
+#: manifest.json
+msgid "AI upscaling of the video with NVIDIA RTX Video Super Resolution"
+msgstr "用 NVIDIA RTX 视频超分辨率对视频做 AI 放大"
+
+#: manifest.json
+msgid "Adds Video ▸ AI Upscaling (RTX Video Super Resolution): the NVIDIA GPU sharpens and enlarges the video to the size it is shown at. Video ▸ AI Upscaling… opens a window that turns it on and off and shows how it runs: the sizes and scale factor, the GPU, the decoding, and which plugins' video filters hold it back. Needs Windows, an NVIDIA RTX GPU, GPU rendering and Super Resolution turned on in the NVIDIA app. On macOS and Linux the item is greyed out from the start; on Windows it is greyed out with the reason once the player has checked the GPU. Remembers your choice."
+msgstr "添加“视频 ▸ AI 超分辨率（RTX 视频超分辨率）”：由 NVIDIA 显卡将视频锐化并放大到显示尺寸。“视频 ▸ AI 超分辨率…”打开一个窗口，可一键开关，并显示运行情况：尺寸与放大倍数、显卡、解码方式，以及哪些插件的视频滤镜在阻碍它。需要 Windows、NVIDIA RTX 显卡、GPU 渲染，并在 NVIDIA App 中打开“超分辨率”。在 macOS 和 Linux 上该菜单项一开始就是灰色；在 Windows 上，播放器检查显卡后如无法使用，菜单项变灰并显示原因。会记住你的选择。"
+
+#: manifest.json
+msgid "video"
+msgstr "视频"
+
+#: manifest.json
+msgid "upscaling"
+msgstr "超分辨率"
+
+#: manifest.json
+msgid "NVIDIA"
+msgstr "NVIDIA"
+
+#: upscale.slint:39
+msgid "AI Upscaling"
+msgstr "AI 超分辨率"
+
+#: upscale.slint:76 upscale.slint:134
+msgid "Video size"
+msgstr "视频尺寸"
+
+#: upscale.slint:77 upscale.slint:135
+msgid "Upscaled to"
+msgstr "放大到"
+
+#: upscale.slint:78 upscale.slint:136
+msgid "Scale factor"
+msgstr "放大倍数"
+
+#: upscale.slint:79 upscale.slint:137
+msgid "Video area"
+msgstr "视频区域"
+
+#: upscale.slint:80 upscale.slint:138
+msgid "GPU"
+msgstr "显卡"
+
+#: upscale.slint:81 upscale.slint:139
+msgid "Decoding"
+msgstr "解码"
+
+#: upscale.slint:82 upscale.slint:140
+msgid "In the filter chain"
+msgstr "在滤镜链中"
+
+#: upscale.slint:112
+msgid "Turn Off"
+msgstr "停用"
+
+#: upscale.slint:112
+msgid "Turn On"
+msgstr "启用"
+
+#: upscale.slint:143
+msgid "This player version does not report these details."
+msgstr "此版本的播放器不报告这些信息。"
+
+#: upscale.slint:147
+msgid "Updates live while upscaling is on; while it is off, this shows what was read when the window opened."
+msgstr "超分辨率开启时实时更新；关闭时显示的是打开窗口时读取的信息。"
+
+#: upscale.slint:153
+msgid "The driver gives no sign that it upscales: the player only knows that it asked for it. Super Resolution must be on in the NVIDIA app (System ▸ Video ▸ RTX Video Enhancement); choose its quality level there."
+msgstr "驱动不会告知是否正在超分辨率处理：播放器只知道自己已发出请求。必须在 NVIDIA App 中打开“超分辨率”（系统 ▸ 视频 ▸ RTX 视频增强），质量级别也在那里选择。"
+
+#: upscale.slint:158
+msgid "Close"
+msgstr "关闭"
