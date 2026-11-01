@@ -46,7 +46,7 @@ A small neural network that doubles the brightness (luma) detail once; the playe
 
 The player itself guards against shaders that crash it or lose the GPU (Vestra Player 0.6.3 and later). After a run that ended abnormally while plugin shaders were drawing, it does not run plugin shaders at the next start and shows one OSD line; after two such runs within a day it keeps them off until the GPU, the driver or the player changes, or for 7 days. A normal quit never counts.
 
-Shader upscaling then stays **on** in its settings, but the window says "Off for this start: the player ended abnormally while shaders were drawing", keeps your model and parameters, and suggests a preset that is not marked demanding. The plugin does not try again by itself, also not for a new video or preset; Turn On tries once more and, while the player still refuses, shows the same reason.
+While the player refuses, shader upscaling keeps your choice (on, with your model and parameters) and the window says "Not running: the player ended abnormally while shaders were drawing", with the player's own message, which says for how long. Your choice applies when the player allows shaders again; consider a preset that is not marked demanding. The plugin does not try again by itself during that player run, also not for a new video or preset. **Turn Off** saves off, so the next start runs no shaders; Turn On tries once more, which the player refuses for the rest of that run.
 
 ## Limits
 

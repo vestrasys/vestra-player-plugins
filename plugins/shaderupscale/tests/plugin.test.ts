@@ -62,9 +62,10 @@ const saved = async (data: string) => JSON.parse(await readFile(join(data, "upsc
 
 /**
  * Retry `check` until it passes, 20 ms at a time for up to 2 s, then fail
- * with its last error. Turning shaders on writes `guard.json` before they are
- * sent: the plugin's own file I/O, which `host.settle()` does not wait for
- * (testing.d.ts, `settle`). Every assertion that follows such a write polls.
+ * with its last error. Some outcomes come after work `host.settle()` does
+ * not wait for (testing.d.ts, `settle`): the plugin's own file I/O (the
+ * saved settings) and the wait for the player's answer before the OSD line of
+ * Turn On. Every assertion that follows such work polls.
  */
 async function eventually(host: TestHost, check: () => unknown) {
   const end = Date.now() + 2000;
@@ -297,14 +298,23 @@ test("restart: the saved choice is applied again at once, without opening the wi
 
 // ------------------------------------------------------------------ crash safety
 
-/** The player's crash guard (0.6.3): what its refusal of a non-empty list says. */
-const CRASH_MESSAGE = "plugin shaders are off for this start: the player ended abnormally while they were drawing";
-const REFUSED = "Off for this start: the player ended abnormally while shaders were drawing";
+/**
+ * The player's crash guard (0.6.3) refuses a non-empty list with these
+ * messages (`src/host/src/host/diagnostics.rs`, `ShaderGuard::refuse`): one
+ * for the start after an abnormal end, one for the block after a second
+ * within a day. The plugin ids in parentheses are the plugins that drew then.
+ */
+const CRASH_THIS_START =
+  "plugin shaders are off for this start: the player ended unexpectedly while they were on (zysilm.shaderupscale); the next start applies them again";
+const CRASH_DAYS =
+  "plugin shaders are off: the player ended unexpectedly twice within a day while they were on (zysilm.shaderupscale); they apply again after a graphics driver or player update, or in 7 days";
+const REFUSED = "Not running: the player ended abnormally while shaders were drawing";
+const REFUSED_DETAIL = /^Your choice applies when the player allows shaders again; consider a preset that is not marked demanding\. The player says: /;
 
 /** A player whose crash guard refuses every non-empty list; clearing still works. */
-function refusing(host: TestHost) {
+function refusing(host: TestHost, message = CRASH_THIS_START) {
   host.handle("video.shaders.set", (params) => {
-    if (Array.isArray(params.paths) && params.paths.length > 0) throw new HostError("previous-crash", CRASH_MESSAGE);
+    if (Array.isArray(params.paths) && params.paths.length > 0) throw new HostError("previous-crash", message);
     return { state: "applied" };
   });
   return host;
@@ -333,16 +343,17 @@ test("crash safety: the player refuses with previous-crash: the choice is kept, 
   const data = await mkdtemp(join(tmpdir(), "shaderupscale-"));
   const choice = { ...DEFAULT_SETTINGS, on: true, model: "artcnn", artcnn: { size: "c4f32", style: "neutral" } };
   await writeFile(join(data, "upscaling.json"), JSON.stringify(choice));
-  const { host, window, stop } = await opened(refusing(windowsGpu()), "en", data);
+  const { host, window, stop } = await opened(refusing(windowsGpu(), CRASH_DAYS), "en", data);
   try {
     await eventually(host, () => assert.equal(window.props.status, REFUSED));
     assert.equal(held(host), undefined);
     assert.equal(attempts(host).length, 1);
-    // Shown off, so the button offers Turn On; the reason, the player's message and a lighter preset.
-    assert.equal(window.props.on, false);
+    // The saved choice, so the button offers Turn Off; no duration of its own: the player's message says how long.
+    assert.equal(window.props.on, true);
     assert.equal(window.props["can-toggle"], true);
-    assert.match(String(window.props.detail), /^Your choice is kept\. Choose a preset that is not marked demanding/);
-    assert.ok(String(window.props.detail).endsWith(CRASH_MESSAGE));
+    assert.equal(window.props.tone, 3);
+    assert.match(String(window.props.detail), REFUSED_DETAIL);
+    assert.ok(String(window.props.detail).endsWith(CRASH_DAYS));
     // The player shows its own OSD line; the plugin adds none.
     assert.equal(host.osd.length, 0);
     // Nothing tries again by itself: a new video, a new preset, a new model.
@@ -363,29 +374,40 @@ test("crash safety: the player refuses with previous-crash: the choice is kept, 
   assert.equal(settings.artcnn.size, "c4f16");
 });
 
-test("crash safety: after a refusal, Turn On tries exactly once and shows the same reason; once allowed, it applies", async () => {
+test("crash safety: while refused, Turn Off saves off; Turn On then tries exactly once and shows the same reason", async () => {
   const data = await mkdtemp(join(tmpdir(), "shaderupscale-"));
   await writeFile(join(data, "upscaling.json"), JSON.stringify({ ...DEFAULT_SETTINGS, on: true }));
   const { host, window, stop } = await opened(refusing(windowsGpu()), "en", data);
   try {
     await eventually(host, () => assert.equal(window.props.status, REFUSED));
     window.emit("toggle");
+    await eventually(host, async () => {
+      assert.equal(window.props.on, false);
+      assert.equal(window.props.status, "Off");
+      assert.equal(window.props.detail, "");
+      assert.deepEqual(host.osd, ["Shader Upscaling: Off"]);
+      assert.equal((await saved(data)).on, false);
+    });
+    assert.equal(attempts(host).length, 1);
+    // The explicit Turn On: one attempt, refused again, the same reason, no OSD of the plugin's.
+    window.emit("toggle");
     await eventually(host, () => assert.equal(attempts(host).length, 2));
     await host.settle(100);
     assert.equal(attempts(host).length, 2);
     assert.equal(window.props.status, REFUSED);
-    assert.equal(window.props.on, false);
-    assert.equal(host.osd.length, 0);
+    assert.equal(window.props.on, true);
+    assert.deepEqual(host.osd, ["Shader Upscaling: Off"]);
     assert.equal(held(host), undefined);
-    // A player that lets them through (here: the refusal removed) applies the next Turn On.
+    // This stands for the next start, where the player allows shaders again (here: the refusal
+    // removed); within one run the player refuses every list, so Turn On cannot get through there.
     host.reset("video.shaders.set");
+    window.emit("toggle");
     window.emit("toggle");
     await eventually(host, () => {
       assert.deepEqual(held(host), paths(anime4kFiles("A", "fast")));
       assert.equal(window.props.status, "On: Anime4K mode A (Fast)");
-      assert.equal(window.props.on, true);
       assert.equal(window.props.detail, "");
-      assert.deepEqual(host.osd, ["Shader Upscaling: On, Anime4K mode A (Fast)"]);
+      assert.equal(host.osd.at(-1), "Shader Upscaling: On, Anime4K mode A (Fast)");
     });
     assert.equal(attempts(host).length, 3);
   } finally {
@@ -402,9 +424,37 @@ test("crash safety: refused while off: Turn On is the one attempt, with no OSD a
     await host.settle(100);
     assert.equal(attempts(host).length, 1);
     assert.equal(host.osd.length, 0);
-    assert.equal(window.props.on, false);
+    assert.equal(window.props.on, true);
   } finally {
     await stop();
+  }
+});
+
+test("crash safety: a stop and wake of the plugin within the player run does not send again; a new player run does", async () => {
+  const data = await mkdtemp(join(tmpdir(), "shaderupscale-"));
+  await writeFile(join(data, "upscaling.json"), JSON.stringify({ ...DEFAULT_SETTINGS, on: true }));
+  const first = await opened(refusing(windowsGpu()), "en", data);
+  await eventually(first.host, () => assert.equal(first.window.props.status, REFUSED));
+  const session = first.host.sessionStorage;
+  await first.stop();
+  // Woken in the same player run (lazy activation, a reload): the refusal is remembered.
+  const woken = refusing(windowsGpu());
+  const { host, stop } = await startPlugin(activate, { directory, host: woken, locale: "en", dataDirectory: data, sessionStorage: session });
+  try {
+    host.openElsewhere("/media/clip.mkv");
+    await host.command(ITEM).run();
+    await host.settle(100);
+    assert.equal(attempts(host).length, 0);
+    assert.equal(host.window("upscale").props.status, REFUSED);
+  } finally {
+    await stop();
+  }
+  // A new player run that allows shaders: the saved choice applies.
+  const next = await opened(windowsGpu(), "en", data);
+  try {
+    assert.deepEqual(held(next.host), paths(anime4kFiles("A", "fast")));
+  } finally {
+    await next.stop();
   }
 });
 

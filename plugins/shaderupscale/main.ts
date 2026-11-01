@@ -45,10 +45,12 @@ export const shaderPath = (file: string) => join(PACKAGE, "shaders", ...file.spl
  * activation the player may stop it. While on, its shaders keep it running.
  *
  * Crash safety is the player's (0.6.3): after a run that ended abnormally
- * while plugin shaders were drawing, it refuses non-empty shader lists at
- * the next start with `previous-crash` and shows its own OSD line. The
- * plugin then keeps the user's choice, sends nothing more on its own, and
- * says in the window why the shaders are off; an explicit Turn On tries once.
+ * while plugin shaders were drawing, it refuses non-empty shader lists with
+ * `previous-crash` (for that start; after a second such run within a day,
+ * for days) and shows its own OSD line. The plugin then keeps the user's
+ * choice, sends nothing more on its own for the rest of the player run (also
+ * across its own stop and wake), and says in the window why nothing runs;
+ * Turn Off saves off, and an explicit Turn On tries once.
  */
 export default async function activate(plugin: Plugin) {
   const { text, list } = plugin.i18n;
@@ -58,10 +60,17 @@ export default async function activate(plugin: Plugin) {
   });
   const save = (patch: Partial<Settings>) => store.save({ ...store.value, ...patch });
   /**
-   * The player refused shaders for this start (`previous-crash`) with this
-   * message: nothing is sent again until the user turns them on explicitly.
+   * The player refused shaders in this player run (`previous-crash`) with
+   * this message: nothing is sent again until the user turns them on
+   * explicitly. Kept in session storage, so a lazy stop and wake of the
+   * plugin does not send them again either.
    */
-  let refused: string | null = null;
+  const kept = await plugin.storage.session.get<unknown>("refused").catch(() => undefined);
+  let refused: string | null = typeof kept === "string" ? kept : null;
+  const remember = (message: string | null) => {
+    refused = message;
+    void plugin.storage.session.set("refused", message).catch(() => {});
+  };
   // Unreleased builds of 0.1.1 kept their own crash flag here; the player's guard replaces it.
   await rm(join(plugin.dataDirectory, "guard.json"), { force: true }).catch(() => {});
 
@@ -193,7 +202,7 @@ export default async function activate(plugin: Plugin) {
     } else if (status.state === "failed" && status.error.code === "previous-crash") {
       // The player's crash guard: it shows its own OSD line. Keep the choice, send nothing more
       // (a new video or preset does not try again), and let the handle go.
-      refused = status.error.message;
+      remember(status.error.message);
       sent = [];
       queue = queue.then(release).catch(() => {});
     } else if (status.state === "failed" && status.error.code === "failed" && !toldFailure) {
@@ -205,7 +214,7 @@ export default async function activate(plugin: Plugin) {
 
   async function setOn(on: boolean) {
     // An explicit Turn On after a refusal tries once more; a refusal again shows the same reason.
-    if (on) refused = null;
+    if (on && refused !== null) remember(null);
     save({ on });
     await apply();
     plugin.update();
@@ -256,11 +265,11 @@ export default async function activate(plugin: Plugin) {
     if (!store.value.on) return { status: text("Off"), tone: 0, detail: "" };
     if (refused !== null)
       return {
-        status: text("Off for this start: the player ended abnormally while shaders were drawing"),
+        status: text("Not running: the player ended abnormally while shaders were drawing"),
         tone: 3,
         detail: text(
-          // TRANSLATORS: {} is the player's own message, in English.
-          "Your choice is kept. Choose a preset that is not marked demanding, then Turn On to try once more. The player says: {}",
+          // TRANSLATORS: {} is the player's own message, in English; it says for how long.
+          "Your choice applies when the player allows shaders again; consider a preset that is not marked demanding. The player says: {}",
           [refused],
         ),
       };
@@ -396,8 +405,8 @@ export default async function activate(plugin: Plugin) {
   }
 
   window.bind(() => {
-    // Refused for this start: shown off, so the button offers Turn On (the saved choice stays on).
-    const on = store.value.on && refused === null;
+    // The saved choice, also while the player refuses: Turn Off then saves off.
+    const on = store.value.on;
     const head = headline(shaders?.status ?? null);
     return {
       models: MODELS.map((model) => (model === "anime4k" ? text("Anime4K") : text("ArtCNN"))),
@@ -405,7 +414,7 @@ export default async function activate(plugin: Plugin) {
       ...parameters(),
       description: description(),
       on,
-      // A saved "on" can always be turned off; turning on needs a model that runs here.
+      // A saved "on" can always be turned off (also while refused); turning on needs a model that runs here.
       canToggle: on || unavailable() === null,
       ...head,
     };
@@ -437,7 +446,7 @@ export default async function activate(plugin: Plugin) {
     }
     plugin.update();
   });
-  window.on("toggle", () => setOn(!(store.value.on && refused === null)));
+  window.on("toggle", () => setOn(!store.value.on));
   window.on("closeWindow", () =>
     // `missing` when the user closed it with the title bar just before.
     window.close().catch(() => {}),
