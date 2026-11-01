@@ -1,8 +1,9 @@
 # Changelog
 
-## 0.2.1
+## 0.3.0
 
-- New name: **RTX Upscale for Vestra Player** (was VestraUpscale), in the store and in every language. The plugin id stays `zysilm.vestraupscale`, so installed copies keep their settings and get this version as an update.
+- **New plugin id `zysilm.rtxupscale`** (was `zysilm.vestraupscale`), with the folder `plugins/rtxupscale`. The store treats it as a new plugin: uninstall the old `zysilm.vestraupscale` and install this one. The saved choice (upscaling on or off, the one-time NVIDIA app note) is not carried over.
+- New name: **RTX Upscale for Vestra Player** (was VestraUpscale), in the store and in every language.
 - New icon: "RTX" with four arrows expanding to the corners. "RTX" names the NVIDIA technology the plugin uses; the plugin is not made or endorsed by NVIDIA.
 
 ## 0.2.0

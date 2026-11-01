@@ -32,7 +32,7 @@ async function start(host = windows(), locale: Locale = "en", dataDirectory?: st
 
 /** A data directory where the user turned upscaling on in an earlier run. */
 async function savedOn() {
-  const data = await mkdtemp(join(tmpdir(), "vestraupscale-"));
+  const data = await mkdtemp(join(tmpdir(), "rtxupscale-"));
   const { host, item, stop } = await start(windows(), "en", data);
   await item.run();
   await host.settle();
@@ -405,7 +405,7 @@ test("the choice persists: re-applied on the first video after a restart, not at
 });
 
 test("settings of 0.1.0 (without `refused`) are read, not discarded", async () => {
-  const data = await mkdtemp(join(tmpdir(), "vestraupscale-"));
+  const data = await mkdtemp(join(tmpdir(), "rtxupscale-"));
   const { writeFile } = await import("node:fs/promises");
   await writeFile(join(data, "upscaling.json"), JSON.stringify({ on: true, noted: true }));
   const { item, stop } = await start(windows(), "en", data);
@@ -559,7 +559,7 @@ test("turning off before any check never starts it", async () => {
 });
 
 test("stop: the item goes, the choice is flushed, and nothing runs afterwards", async () => {
-  const data = await mkdtemp(join(tmpdir(), "vestraupscale-"));
+  const data = await mkdtemp(join(tmpdir(), "rtxupscale-"));
   {
     const { host, item, stop } = await start(windows(), "en", data);
     await item.run();
@@ -940,9 +940,9 @@ test("window: Close right after a title-bar close does not fail", async () => {
   }
 });
 
-test("store listing: the new name, the same id, a 256×256 icon", async () => {
+test("store listing: the name, the id of the directory, a 256×256 icon", async () => {
   const manifest = JSON.parse(await readFile(new URL("manifest.json", directory), "utf8"));
-  assert.equal(manifest.id, "zysilm.vestraupscale"); // the identity installed copies and updates depend on
+  assert.equal(manifest.id, "zysilm.rtxupscale"); // <owner>.<directory>, as the repository requires
   assert.equal(manifest.name, "RTX Upscale for Vestra Player");
   assert.equal(manifest.icon, "assets/icon.png");
   const png = await readFile(new URL(manifest.icon, directory));

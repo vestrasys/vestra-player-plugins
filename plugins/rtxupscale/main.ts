@@ -111,8 +111,7 @@ export function hasVideo(video: PlaybackStats["video"]): boolean {
 }
 
 /**
- * RTX Upscale for Vestra Player (id `zysilm.vestraupscale`, its name until
- * 0.2.0 VestraUpscale): a Video menu item that turns NVIDIA RTX Video Super
+ * RTX Upscale for Vestra Player (`zysilm.rtxupscale`): a Video menu item that turns NVIDIA RTX Video Super
  * Resolution on and off through `plugin.video.upscaling`, and a window that
  * does the same and shows how it runs.
  *
