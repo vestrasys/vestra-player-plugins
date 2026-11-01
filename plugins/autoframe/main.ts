@@ -453,7 +453,7 @@ export default async function activate(plugin: Plugin) {
       await plugin.osd.show("Auto Frame undone: Crop/Stretch or rotation changes the picture");
       return;
     }
-    watch(c, chain, cropped);
+    watch(c, chain, cropped, full);
     if (announced !== c.sourceId) {
       announced = c.sourceId;
       await plugin.osd.show("Auto-framed to {}", [`${d.rect.width}×${d.rect.height}`]);
@@ -467,7 +467,12 @@ export default async function activate(plugin: Plugin) {
    * place, so it is withdrawn once two checks in a row disagree. The player
    * sends no event for another plugin's filters, hence the timer.
    */
-  function watch(c: Current, chain: CropNode[], cropped: { width: number; height: number }) {
+  function watch(
+    c: Current,
+    chain: CropNode[],
+    cropped: { width: number; height: number },
+    full: { width: number; height: number },
+  ) {
     unwatch();
     let misses = 0;
     let checking = false;
@@ -479,7 +484,8 @@ export default async function activate(plugin: Plugin) {
       try {
         const shown = await shownSize();
         if (!live(c) || nodes !== chain) return;
-        if (!shown || same(shown, cropped)) {
+        // `full`: the crop has not taken effect yet (a slow decoder, paused), as the verify loop accepts it.
+        if (!shown || same(shown, cropped) || same(shown, full)) {
           misses = 0;
           return;
         }

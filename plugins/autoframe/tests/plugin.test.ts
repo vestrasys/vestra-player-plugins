@@ -721,3 +721,30 @@ test("slides on a white background (boxes that move) are not cropped", async () 
     await cleanup();
   }
 });
+
+test("a crop that takes effect after more than 3 s (slow decoder, paused) is kept", async () => {
+  const { paths, cleanup } = await files(["a.mp4"]);
+  let since: number | null = null;
+  const host = makeHost(
+    new Map([[paths[0]!, { width: 1920, height: 1080, duration: 80, background: GREY, content: always({ x: 0, y: 0, width: 1280, height: 720 }) }]]),
+    {
+      // The player still shows the full picture for 6.5 s after the crop is applied.
+      geometry: (size) => {
+        if (size.width === 1920) return size;
+        since ??= Date.now();
+        return Date.now() - since < 6500 ? { width: 1920, height: 1080 } : size;
+      },
+    },
+  );
+  const { stop } = await startPlugin(activate, { directory, host });
+  try {
+    host.openElsewhere(paths[0]!);
+    await until(host, () => host.osd.includes("Auto-framed to 1280×720"), "the OSD");
+    await host.settle(5000); // past the 6.5 s, with watch checks before and after
+    assert.equal(chain(host).length, 2);
+    assert.deepEqual(host.osd, ["Auto-framed to 1280×720"]);
+  } finally {
+    await stop();
+    await cleanup();
+  }
+});
