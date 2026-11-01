@@ -1,0 +1,286 @@
+msgid ""
+msgstr ""
+"Language: zh-Hans\n"
+"Project-Id-Version: zysilm.shaderupscale 0.1.1\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: main.ts:111
+msgid "ArtCNN needs compute shaders, which macOS's OpenGL does not have. Choose Anime4K, which runs everywhere the player renders on the GPU."
+msgstr "ArtCNN 需要计算着色器，而 macOS 的 OpenGL 不支持。请选择 Anime4K，它在播放器使用 GPU 渲染的地方都能运行。"
+
+#: main.ts:119 main.ts:129
+msgid "Shader upscaling needs GPU rendering: turn on Video ▸ GPU Rendering (Experimental), then restart the player."
+msgstr "着色器超分辨率需要 GPU 渲染：请打开“视频 ▸ GPU 渲染（实验性）”，然后重启播放器。"
+
+#. {} is the player's own message, in English.
+#: main.ts:123
+msgid "Shader upscaling needs GPU rendering, which cannot be turned on here: {}"
+msgstr "着色器超分辨率需要 GPU 渲染，但本机无法开启 GPU 渲染：{}"
+
+#: main.ts:127
+msgid "GPU rendering stopped during this run: restart the player to use shader upscaling."
+msgstr "GPU 渲染在本次运行中已停止：请重启播放器以使用着色器超分辨率。"
+
+#: main.ts:128
+msgid "GPU rendering is on from the next start: restart the player to use shader upscaling."
+msgstr "GPU 渲染将在下次启动时开启：请重启播放器以使用着色器超分辨率。"
+
+#: main.ts:133
+msgid "HQ"
+msgstr "高画质"
+
+#: main.ts:133
+msgid "Fast"
+msgstr "快速"
+
+#: main.ts:135
+msgid "Denoise and sharpen"
+msgstr "降噪并锐化"
+
+#: main.ts:135
+msgid "Denoise and soften"
+msgstr "降噪并柔化"
+
+#: main.ts:135
+msgid "Neutral"
+msgstr "中性"
+
+#. {} are the mode (A, B, C, A+A, B+B, C+A) and the quality (Fast or HQ).
+#: main.ts:143
+msgid "Anime4K mode {} ({})"
+msgstr "Anime4K 模式 {}（{}）"
+
+#. {} are the network size (C4F16 or C4F32) and the variant (Neutral, …).
+#: main.ts:148
+msgid "ArtCNN {} ({})"
+msgstr "ArtCNN {}（{}）"
+
+#: main.ts:207
+msgid "Shader Upscaling: a shader did not compile"
+msgstr "着色器超分辨率：有着色器编译失败"
+
+#: main.ts:217
+msgid "Shader Upscaling: Off"
+msgstr "着色器超分辨率：关"
+
+#. {} is the preset, for example "Anime4K mode A (Fast)".
+#: main.ts:223
+msgid "Shader Upscaling: On, {}"
+msgstr "着色器超分辨率：开，{}"
+
+#: main.ts:227
+msgid "Shader Upscaling: ArtCNN does not run on macOS"
+msgstr "着色器超分辨率：ArtCNN 无法在 macOS 上运行"
+
+#: main.ts:228
+msgid "Shader Upscaling needs GPU rendering"
+msgstr "着色器超分辨率需要 GPU 渲染"
+
+#: main.ts:243
+msgid "Not available"
+msgstr "无法使用"
+
+#: main.ts:246
+msgid "Off"
+msgstr "关"
+
+#: main.ts:250
+msgid "Shader upscaling was turned off because the player did not close normally while it was on. Turn it on again, or first choose a preset that is not marked demanding."
+msgstr "着色器超分辨率已关闭，因为它开启时播放器未正常退出。可以重新开启，或先选择一个未标为“高负载”的预设。"
+
+#. {} is the preset, for example "Anime4K mode A (Fast)".
+#: main.ts:259
+msgid "On: {}"
+msgstr "开：{}"
+
+#: main.ts:268
+msgid "On, but a shader did not compile"
+msgstr "开，但有着色器编译失败"
+
+#. {} is mpv's compiler message, in English.
+#: main.ts:272
+msgid "The player cannot tell whose shader failed when other plugins add shaders too. Its message: {}"
+msgstr "其他插件也添加了着色器时，播放器无法判断是谁的着色器失败。播放器的消息：{}"
+
+#: main.ts:278 main.ts:287
+msgid "On, but not applied"
+msgstr "开，但未生效"
+
+#. {} is the player's own message, in English.
+#: main.ts:282
+msgid "Other plugins' shaders leave no room: at most 16 shaders run at once. {}"
+msgstr "其他插件的着色器已占满：同时最多运行 16 个着色器。{}"
+
+#: main.ts:293
+msgid "On: applying…"
+msgstr "开：正在应用…"
+
+#: main.ts:295
+msgid "On: applies when a video plays"
+msgstr "开：播放视频时生效"
+
+#: main.ts:304
+msgid "Mode"
+msgstr "模式"
+
+#. {} is the mode (A+A, B+B or C+A).
+#: main.ts:309
+msgid "Mode {} (demanding)"
+msgstr "模式 {}（高负载）"
+
+#: main.ts:312
+msgid "Mode {}"
+msgstr "模式 {}"
+
+#: main.ts:315
+msgid "Quality"
+msgstr "画质"
+
+#: main.ts:317
+msgid "HQ (demanding): large networks, fast GPU"
+msgstr "高画质（高负载）：大网络，需要较快的 GPU"
+
+#: main.ts:317
+msgid "Fast: smaller networks, most GPUs"
+msgstr "快速：小网络，适合大多数 GPU"
+
+#: main.ts:322
+msgid "Size"
+msgstr "规模"
+
+#: main.ts:324
+msgid "C4F32 (demanding): more detail, needs a faster GPU"
+msgstr "C4F32（高负载）：细节更多，需要较快的 GPU"
+
+#: main.ts:324
+msgid "C4F16: light on the GPU"
+msgstr "C4F16：GPU 负担小"
+
+#: main.ts:327
+msgid "Variant"
+msgstr "变体"
+
+#: main.ts:339
+msgid "Mode A: for most 1080p anime and blurry older or SD anime. Restores lines and removes blur, noise and compression smear; can strengthen ringing or banding already in the video."
+msgstr "模式 A：适合大多数 1080p 动画，以及模糊的老动画或标清动画。修复线条，去除模糊、噪点和压缩涂抹；视频中已有的振铃或色带可能被加强。"
+
+#: main.ts:342
+msgid "Mode B: for most 720p anime and anime downscaled from 1080p. A softer restore that also reduces ringing and aliasing; some blur may stay."
+msgstr "模式 B：适合大多数 720p 动画和由 1080p 缩小的动画。修复较柔和，同时减少振铃和锯齿；可能残留一些模糊。"
+
+#: main.ts:345
+msgid "Mode C: for clean sources with little blur, such as anime downscaled to 480p. Upscales with denoising and stays closest to the source."
+msgstr "模式 C：适合模糊很少的干净片源，例如缩小到 480p 的动画。放大时降噪，最接近原片。"
+
+#: main.ts:348
+msgid "Mode A+A (demanding): mode A with a second restore pass: the sharpest lines, but it can ring, band or alias. Only when the video is enlarged 2× or more."
+msgstr "模式 A+A（高负载）：模式 A 再加一遍修复：线条最锐利，但可能出现振铃、色带或锯齿。仅在视频放大 2 倍或以上时使用。"
+
+#: main.ts:350
+msgid "Mode B+B (demanding): mode B with a second soft restore pass. Only when the video is enlarged 2× or more."
+msgstr "模式 B+B（高负载）：模式 B 再加一遍柔和修复。仅在视频放大 2 倍或以上时使用。"
+
+#: main.ts:351
+msgid "Mode C+A (demanding): mode C with a restore pass after it. Only when the video is enlarged 2× or more."
+msgstr "模式 C+A（高负载）：模式 C 之后再加一遍修复。仅在视频放大 2 倍或以上时使用。"
+
+#: main.ts:355
+msgid "HQ (demanding) runs the large networks (VL and M): about four times the work of Fast; for fast GPUs."
+msgstr "高画质（高负载）运行大网络（VL 和 M）：计算量约为快速的四倍，适合较快的 GPU。"
+
+#: main.ts:356
+msgid "Fast runs the smaller networks (M and S), for most GPUs."
+msgstr "快速运行较小的网络（M 和 S），适合大多数 GPU。"
+
+#: main.ts:358
+msgid "Anime4K: neural networks for anime and cartoons that restore and double the picture twice."
+msgstr "Anime4K：面向动画和卡通的神经网络，修复画面并两次放大一倍。"
+
+#: main.ts:363
+msgid "Neutral: doubles the detail without changing the picture's character."
+msgstr "中性：细节放大一倍，不改变画面风格。"
+
+#: main.ts:364
+msgid "Denoise and sharpen: also removes noise and sharpens lines."
+msgstr "降噪并锐化：同时去除噪点并锐化线条。"
+
+#: main.ts:365
+msgid "Denoise and soften: removes noise, with a softer result."
+msgstr "降噪并柔化：去除噪点，效果较柔和。"
+
+#: main.ts:370
+msgid "ArtCNN: a small neural network trained on anime that doubles the brightness (luma) detail once; the player scales the colour."
+msgstr "ArtCNN：以动画训练的小型神经网络，将亮度（luma）细节放大一倍；色彩由播放器缩放。"
+
+#: main.ts:374
+msgid "C4F32 (demanding) runs a network four times the size of C4F16; for fast GPUs."
+msgstr "C4F32（高负载）运行的网络是 C4F16 的四倍大，适合较快的 GPU。"
+
+#: main.ts:385
+msgid "Anime4K"
+msgstr "Anime4K"
+
+#: main.ts:385
+msgid "ArtCNN"
+msgstr "ArtCNN"
+
+#: main.ts:439
+msgid "Shader Upscaling…"
+msgstr "着色器超分辨率…"
+
+#: main.ts:454
+msgid "Shader Upscaling turned off: the player did not close normally"
+msgstr "着色器超分辨率已关闭：播放器上次未正常退出"
+
+#: manifest.json
+msgid "Shader Upscale for Vestra Player"
+msgstr "Vestra Player 着色器超分辨率"
+
+#: manifest.json
+msgid "Real-time AI upscaling of the video with mpv GLSL shaders: Anime4K and ArtCNN"
+msgstr "用 mpv GLSL 着色器实时 AI 超分辨率：Anime4K 和 ArtCNN"
+
+#: manifest.json
+msgid "Sharpens and enlarges the video on the GPU while it plays, with neural-network shaders for mpv bundled in the plugin: Anime4K (six modes, Fast or HQ) and ArtCNN (two sizes, neutral, denoise and sharpen, or denoise and soften). Video ▸ Shader Upscaling… opens a window to choose the model and its parameters, turn upscaling on and off, and see what is applied. Needs GPU rendering: macOS, or Windows with Video ▸ GPU Rendering (Experimental); ArtCNN needs Windows. Remembers your choice."
+msgstr "播放时在 GPU 上锐化并放大视频，使用插件自带的 mpv 神经网络着色器：Anime4K（六种模式，快速或高画质）和 ArtCNN（两种规模，中性、降噪并锐化或降噪并柔化）。“视频 ▸ 着色器超分辨率…”打开一个窗口，可选择模型及其参数、开关超分辨率，并查看当前应用的内容。需要 GPU 渲染：macOS，或在 Windows 上打开“视频 ▸ GPU 渲染（实验性）”；ArtCNN 需要 Windows。会记住你的选择。"
+
+#: manifest.json
+msgid "video"
+msgstr "视频"
+
+#: manifest.json
+msgid "upscaling"
+msgstr "超分辨率"
+
+#: manifest.json
+msgid "shaders"
+msgstr "着色器"
+
+#: manifest.json
+msgid "anime"
+msgstr "动画"
+
+#: upscale.slint:57
+msgid "Shader Upscaling"
+msgstr "着色器超分辨率"
+
+#: upscale.slint:97 upscale.slint:107
+msgid "Model"
+msgstr "模型"
+
+#: upscale.slint:155
+msgid "Turn Off"
+msgstr "停用"
+
+#: upscale.slint:155
+msgid "Turn On"
+msgstr "启用"
+
+#: upscale.slint:163
+msgid "Shaders run on the GPU while the picture is drawn: only with GPU rendering, and exported videos and pictures do not contain them. If playback stutters, choose a preset that is not marked demanding."
+msgstr "着色器在绘制画面时于 GPU 上运行：仅在 GPU 渲染下生效，导出的视频和图片不包含其效果。如果播放卡顿，请选择未标为“高负载”的预设。"
+
+#: upscale.slint:169
+msgid "Close"
+msgstr "关闭"

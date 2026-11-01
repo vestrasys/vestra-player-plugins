@@ -1,0 +1,27 @@
+Third-party shaders in this package
+===================================
+
+The plugin's own code is Apache-2.0. The mpv GLSL shaders under shaders/ are
+third-party files, redistributed unchanged (line endings normalised to LF)
+under their own MIT licences. Each file also carries its copyright and licence
+notice in its header.
+
+anime4k/
+  Anime4K by bloc97 and contributors
+  https://github.com/bloc97/Anime4K
+  Version: release v4.0.1, asset Anime4K_v4.0.zip
+  Licence: MIT, Copyright (c) 2019-2021 bloc97 (anime4k/LICENSE)
+  Files: Anime4K_Clamp_Highlights, Anime4K_AutoDownscalePre_x2/_x4,
+    Anime4K_Restore_CNN_{VL,M,S}, Anime4K_Restore_CNN_Soft_{VL,M,S},
+    Anime4K_Upscale_CNN_x2_{VL,M,S}, Anime4K_Upscale_Denoise_CNN_x2_{VL,M}
+  The presets follow the upstream mpv templates
+  md/Template/GLSL_Mac_Linux_High-end/input.conf (HQ) and
+  md/Template/GLSL_Mac_Linux_Low-end/input.conf (Fast).
+
+artcnn/
+  ArtCNN by Joao Chrisostomo (Artoriuz) and Kacper Michajlow
+  https://github.com/Artoriuz/ArtCNN
+  Version: GLSL/ at commit 0837e5326e710f49e2ab0a8d995da0708047442e
+  Licence: MIT, Copyright (c) 2024 Joao Chrisostomo (artcnn/LICENSE)
+  Files: ArtCNN_C4F16.glsl, ArtCNN_C4F16_DS.glsl, ArtCNN_C4F16_DN.glsl,
+    ArtCNN_C4F32.glsl, ArtCNN_C4F32_DS.glsl, ArtCNN_C4F32_DN.glsl

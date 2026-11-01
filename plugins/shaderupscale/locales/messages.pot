@@ -1,0 +1,285 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: zysilm.shaderupscale 0.1.1\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: main.ts:111
+msgid "ArtCNN needs compute shaders, which macOS's OpenGL does not have. Choose Anime4K, which runs everywhere the player renders on the GPU."
+msgstr ""
+
+#: main.ts:119 main.ts:129
+msgid "Shader upscaling needs GPU rendering: turn on Video ▸ GPU Rendering (Experimental), then restart the player."
+msgstr ""
+
+#. {} is the player's own message, in English.
+#: main.ts:123
+msgid "Shader upscaling needs GPU rendering, which cannot be turned on here: {}"
+msgstr ""
+
+#: main.ts:127
+msgid "GPU rendering stopped during this run: restart the player to use shader upscaling."
+msgstr ""
+
+#: main.ts:128
+msgid "GPU rendering is on from the next start: restart the player to use shader upscaling."
+msgstr ""
+
+#: main.ts:133
+msgid "HQ"
+msgstr ""
+
+#: main.ts:133
+msgid "Fast"
+msgstr ""
+
+#: main.ts:135
+msgid "Denoise and sharpen"
+msgstr ""
+
+#: main.ts:135
+msgid "Denoise and soften"
+msgstr ""
+
+#: main.ts:135
+msgid "Neutral"
+msgstr ""
+
+#. {} are the mode (A, B, C, A+A, B+B, C+A) and the quality (Fast or HQ).
+#: main.ts:143
+msgid "Anime4K mode {} ({})"
+msgstr ""
+
+#. {} are the network size (C4F16 or C4F32) and the variant (Neutral, …).
+#: main.ts:148
+msgid "ArtCNN {} ({})"
+msgstr ""
+
+#: main.ts:207
+msgid "Shader Upscaling: a shader did not compile"
+msgstr ""
+
+#: main.ts:217
+msgid "Shader Upscaling: Off"
+msgstr ""
+
+#. {} is the preset, for example "Anime4K mode A (Fast)".
+#: main.ts:223
+msgid "Shader Upscaling: On, {}"
+msgstr ""
+
+#: main.ts:227
+msgid "Shader Upscaling: ArtCNN does not run on macOS"
+msgstr ""
+
+#: main.ts:228
+msgid "Shader Upscaling needs GPU rendering"
+msgstr ""
+
+#: main.ts:243
+msgid "Not available"
+msgstr ""
+
+#: main.ts:246
+msgid "Off"
+msgstr ""
+
+#: main.ts:250
+msgid "Shader upscaling was turned off because the player did not close normally while it was on. Turn it on again, or first choose a preset that is not marked demanding."
+msgstr ""
+
+#. {} is the preset, for example "Anime4K mode A (Fast)".
+#: main.ts:259
+msgid "On: {}"
+msgstr ""
+
+#: main.ts:268
+msgid "On, but a shader did not compile"
+msgstr ""
+
+#. {} is mpv's compiler message, in English.
+#: main.ts:272
+msgid "The player cannot tell whose shader failed when other plugins add shaders too. Its message: {}"
+msgstr ""
+
+#: main.ts:278 main.ts:287
+msgid "On, but not applied"
+msgstr ""
+
+#. {} is the player's own message, in English.
+#: main.ts:282
+msgid "Other plugins' shaders leave no room: at most 16 shaders run at once. {}"
+msgstr ""
+
+#: main.ts:293
+msgid "On: applying…"
+msgstr ""
+
+#: main.ts:295
+msgid "On: applies when a video plays"
+msgstr ""
+
+#: main.ts:304
+msgid "Mode"
+msgstr ""
+
+#. {} is the mode (A+A, B+B or C+A).
+#: main.ts:309
+msgid "Mode {} (demanding)"
+msgstr ""
+
+#: main.ts:312
+msgid "Mode {}"
+msgstr ""
+
+#: main.ts:315
+msgid "Quality"
+msgstr ""
+
+#: main.ts:317
+msgid "HQ (demanding): large networks, fast GPU"
+msgstr ""
+
+#: main.ts:317
+msgid "Fast: smaller networks, most GPUs"
+msgstr ""
+
+#: main.ts:322
+msgid "Size"
+msgstr ""
+
+#: main.ts:324
+msgid "C4F32 (demanding): more detail, needs a faster GPU"
+msgstr ""
+
+#: main.ts:324
+msgid "C4F16: light on the GPU"
+msgstr ""
+
+#: main.ts:327
+msgid "Variant"
+msgstr ""
+
+#: main.ts:339
+msgid "Mode A: for most 1080p anime and blurry older or SD anime. Restores lines and removes blur, noise and compression smear; can strengthen ringing or banding already in the video."
+msgstr ""
+
+#: main.ts:342
+msgid "Mode B: for most 720p anime and anime downscaled from 1080p. A softer restore that also reduces ringing and aliasing; some blur may stay."
+msgstr ""
+
+#: main.ts:345
+msgid "Mode C: for clean sources with little blur, such as anime downscaled to 480p. Upscales with denoising and stays closest to the source."
+msgstr ""
+
+#: main.ts:348
+msgid "Mode A+A (demanding): mode A with a second restore pass: the sharpest lines, but it can ring, band or alias. Only when the video is enlarged 2× or more."
+msgstr ""
+
+#: main.ts:350
+msgid "Mode B+B (demanding): mode B with a second soft restore pass. Only when the video is enlarged 2× or more."
+msgstr ""
+
+#: main.ts:351
+msgid "Mode C+A (demanding): mode C with a restore pass after it. Only when the video is enlarged 2× or more."
+msgstr ""
+
+#: main.ts:355
+msgid "HQ (demanding) runs the large networks (VL and M): about four times the work of Fast; for fast GPUs."
+msgstr ""
+
+#: main.ts:356
+msgid "Fast runs the smaller networks (M and S), for most GPUs."
+msgstr ""
+
+#: main.ts:358
+msgid "Anime4K: neural networks for anime and cartoons that restore and double the picture twice."
+msgstr ""
+
+#: main.ts:363
+msgid "Neutral: doubles the detail without changing the picture's character."
+msgstr ""
+
+#: main.ts:364
+msgid "Denoise and sharpen: also removes noise and sharpens lines."
+msgstr ""
+
+#: main.ts:365
+msgid "Denoise and soften: removes noise, with a softer result."
+msgstr ""
+
+#: main.ts:370
+msgid "ArtCNN: a small neural network trained on anime that doubles the brightness (luma) detail once; the player scales the colour."
+msgstr ""
+
+#: main.ts:374
+msgid "C4F32 (demanding) runs a network four times the size of C4F16; for fast GPUs."
+msgstr ""
+
+#: main.ts:385
+msgid "Anime4K"
+msgstr ""
+
+#: main.ts:385
+msgid "ArtCNN"
+msgstr ""
+
+#: main.ts:439
+msgid "Shader Upscaling…"
+msgstr ""
+
+#: main.ts:454
+msgid "Shader Upscaling turned off: the player did not close normally"
+msgstr ""
+
+#: manifest.json
+msgid "Shader Upscale for Vestra Player"
+msgstr ""
+
+#: manifest.json
+msgid "Real-time AI upscaling of the video with mpv GLSL shaders: Anime4K and ArtCNN"
+msgstr ""
+
+#: manifest.json
+msgid "Sharpens and enlarges the video on the GPU while it plays, with neural-network shaders for mpv bundled in the plugin: Anime4K (six modes, Fast or HQ) and ArtCNN (two sizes, neutral, denoise and sharpen, or denoise and soften). Video ▸ Shader Upscaling… opens a window to choose the model and its parameters, turn upscaling on and off, and see what is applied. Needs GPU rendering: macOS, or Windows with Video ▸ GPU Rendering (Experimental); ArtCNN needs Windows. Remembers your choice."
+msgstr ""
+
+#: manifest.json
+msgid "video"
+msgstr ""
+
+#: manifest.json
+msgid "upscaling"
+msgstr ""
+
+#: manifest.json
+msgid "shaders"
+msgstr ""
+
+#: manifest.json
+msgid "anime"
+msgstr ""
+
+#: upscale.slint:57
+msgid "Shader Upscaling"
+msgstr ""
+
+#: upscale.slint:97 upscale.slint:107
+msgid "Model"
+msgstr ""
+
+#: upscale.slint:155
+msgid "Turn Off"
+msgstr ""
+
+#: upscale.slint:155
+msgid "Turn On"
+msgstr ""
+
+#: upscale.slint:163
+msgid "Shaders run on the GPU while the picture is drawn: only with GPU rendering, and exported videos and pictures do not contain them. If playback stutters, choose a preset that is not marked demanding."
+msgstr ""
+
+#: upscale.slint:169
+msgid "Close"
+msgstr ""
