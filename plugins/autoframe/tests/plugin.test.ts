@@ -24,6 +24,8 @@ interface Video {
   background: Rgb;
   /** The content box of the frame at `index` (0–7 in time order), `null` for a blank frame. */
   content: (index: number) => Rect | null;
+  /** Every time decodes the same keyframe (a file with one keyframe). */
+  still?: boolean;
 }
 
 type Node = { kind: string; aspect: number; x: number; y: number };
@@ -35,7 +37,10 @@ function chain(host: TestHost): Node[] {
 }
 
 /** A host that plays fake videos: ffprobe and ffmpeg answer from `videos` by path, `player.stats()` reports the shown size after the chain. */
-function makeHost(videos: Map<string, Video>, options: { geometry?: (size: { width: number; height: number }) => { width: number; height: number } } = {}) {
+function makeHost(videos: Map<string, Video>, options: {
+    geometry?: (size: { width: number; height: number }) => { width: number; height: number };
+    beforeStats?: () => Promise<void>;
+  } = {}) {
   const host = new TestHost();
   const playing = () => videos.get(host.source.source ?? "");
   host.tools.handle("ffprobe", (args) => {
@@ -62,9 +67,10 @@ function makeHost(videos: Map<string, Video>, options: { geometry?: (size: { wid
     const time = Number(args[args.indexOf("-ss") + 1]);
     const index = Math.round(((time / video.duration - 0.05) / 0.9) * 7);
     const [w, h] = Math.abs(video.rotation ?? 0) === 90 ? [video.height, video.width] : [video.width, video.height];
-    return { stdout: makeFrame(w, h, video.background, video.content(index), index) };
+    return { stdout: makeFrame(w, h, video.background, video.content(index), video.still ? 0 : index) };
   });
-  host.handle("playback.stats", () => {
+  host.handle("playback.stats", async () => {
+    await options.beforeStats?.();
     const video = playing();
     if (!video || host.source.phase !== "ready") return { ...host.stats, video: null };
     const [w, h] = Math.abs(video.rotation ?? 0) === 90 ? [video.height, video.width] : [video.width, video.height];
@@ -151,7 +157,7 @@ test("a 2560×1440 picture top-left of a 4K grey frame is cropped exactly, once 
     host.openElsewhere(a);
     await until(host, () => host.osd.includes("Auto-framed to 2560×1440"), "the OSD");
     assert.equal(ffmpegRuns(host), 8);
-    assert.deepEqual(host.tools.calls[0]?.args.slice(0, 4), ["-v", "error", "-select_streams", "v:0"]);
+    assert.deepEqual(host.tools.calls[0]?.args.slice(0, 4), ["-v", "error", "-select_streams", "V:0"]);
     const frameArgs = host.tools.calls[1]!.args;
     for (const arg of ["-nostdin", "-skip_frame", "nokey", "-noaccurate_seek", "rgb24", "rawvideo"]) assert.ok(frameArgs.includes(arg));
     const nodes = chain(host);
@@ -553,6 +559,8 @@ test("helpers: local paths and ffprobe's answer", () => {
     parseProbe({ streams: [{ width: 1440, height: 1080, sample_aspect_ratio: "4:3" }], format: { duration: "12.5" } }),
     { width: 1440, height: 1080, sar: [4, 3], duration: 12.5 },
   );
+  // No duration in the container: the stream's.
+  assert.equal(parseProbe({ streams: [{ width: 640, height: 480, duration: "30.0" }], format: {} })?.duration, 30);
   assert.deepEqual(parseProbe({ streams: [{ width: 1920, height: 1080, sample_aspect_ratio: "0:1", tags: { rotate: "90" } }], format: {} }), {
     width: 1080,
     height: 1920,
@@ -561,4 +569,155 @@ test("helpers: local paths and ffprobe's answer", () => {
   });
   assert.equal(parseProbe({ streams: [{ width: 600, height: 600, disposition: { attached_pic: 1 } }] }), null);
   assert.equal(parseProbe({ streams: [] }), null);
+});
+
+test("a crop already on is withdrawn when another plugin changes the picture later", async () => {
+  const { paths, cleanup } = await files(["a.mp4"]);
+  let rotated = false;
+  const host = makeHost(
+    new Map([[paths[0]!, { width: 1920, height: 1080, duration: 80, background: GREY, content: always({ x: 0, y: 0, width: 1280, height: 720 }) }]]),
+    { geometry: (size) => (rotated ? { width: size.height, height: size.width } : size) },
+  );
+  const { stop } = await startPlugin(activate, { directory, host });
+  try {
+    host.openElsewhere(paths[0]!);
+    await until(host, () => host.osd.includes("Auto-framed to 1280×720"), "the OSD");
+    await host.settle(1500);
+    assert.equal(chain(host).length, 2); // the same size: kept
+    rotated = true; // the user rotates the video with the built-in item
+    await until(host, () => chain(host).length === 0, "the crop withdrawn");
+    assert.equal(host.osd.at(-1), "Auto Frame undone: Crop/Stretch or rotation changes the picture");
+  } finally {
+    await stop();
+    await cleanup();
+  }
+});
+
+test("turning Auto Frame off while a crop is being applied wins", async () => {
+  const { paths, cleanup } = await files(["a.mp4"]);
+  let open: () => void = () => {};
+  let gate: Promise<void> | null = null;
+  const host = makeHost(
+    new Map([[paths[0]!, { width: 1920, height: 1080, duration: 80, background: GREY, content: always({ x: 0, y: 0, width: 1280, height: 720 }) }]]),
+    { beforeStats: () => gate ?? Promise.resolve() },
+  );
+  gate = new Promise<void>((resolve) => (open = resolve));
+  const { stop } = await startPlugin(activate, { directory, host });
+  try {
+    host.openElsewhere(paths[0]!);
+    // The plugin reads the shown size before it crops; the answer is held back.
+    // (Polled with timers: host.settle() would wait for the held request.)
+    const end = Date.now() + 10_000;
+    while (!host.calls.some((c) => c.method === "playback.stats")) {
+      if (Date.now() > end) throw new Error("timed out waiting for the size check");
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    const off = host.command("auto").run();
+    // Not host.settle(): the held size request stays in flight.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    open();
+    await off;
+    await host.settle(200);
+    assert.deepEqual(chain(host), []);
+    assert.equal(host.sent("processing.replace").length, 0);
+    assert.ok(!host.osd.some((m) => m.startsWith("Auto-framed")));
+  } finally {
+    open();
+    await stop();
+    await cleanup();
+  }
+});
+
+test("the previous file's crop is withdrawn as soon as another file loads, before it is read", async () => {
+  const { paths, cleanup } = await files(["a.mp4", "b.mp4"]);
+  const [a, b] = paths as [string, string];
+  const video: Video = { width: 1920, height: 1080, duration: 80, background: GREY, content: always({ x: 0, y: 0, width: 1280, height: 720 }) };
+  const host = makeHost(new Map([[a, video], [b, video]]));
+  const probe = host.tools.handlers.get("ffprobe")!;
+  let release: () => void = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  host.tools.handle("ffprobe", async (args) => {
+    if (args.includes(b)) await held; // file b is never read during the test
+    return probe(args);
+  });
+  const { stop } = await startPlugin(activate, { directory, host });
+  try {
+    host.openElsewhere(a);
+    await until(host, () => chain(host).length === 2, "the crop");
+    // The empty chain is set at the first change to b (loading); the player
+    // takes chains for ready media, so it applies once b is ready, still
+    // before b is read.
+    host.openElsewhere(b, "loading");
+    await host.settle(20);
+    host.setSource({ phase: "ready" });
+    await until(host, () => chain(host).length === 0, "the empty chain");
+    assert.deepEqual(host.sent("processing.replace").at(-1)?.nodes, []);
+    assert.equal(host.tools.calls.filter((c) => c.args.includes(b)).length, 1); // ffprobe started, held
+  } finally {
+    release();
+    await stop();
+    await cleanup();
+  }
+});
+
+test("a frame that cannot be read: the answer is used but not cached; the same keyframe counts once", async () => {
+  const { paths, cleanup } = await files(["a.mp4", "still.mp4"]);
+  const [a, still] = paths as [string, string];
+  const video: Video = { width: 1920, height: 1080, duration: 80, background: GREY, content: always({ x: 0, y: 0, width: 1280, height: 720 }) };
+  const host = makeHost(new Map([[a, video], [still, { ...video, still: true }]]));
+  const answer = host.tools.handlers.get("ffmpeg")!;
+  let slow = true;
+  host.tools.handle("ffmpeg", (args) => {
+    if (slow && args.includes(a) && args[args.indexOf("-ss") + 1] === "4.000") throw new HostError("timeout", "timed out");
+    return answer(args);
+  });
+  const { stop } = await startPlugin(activate, { directory, host });
+  try {
+    host.openElsewhere(a);
+    await until(host, () => host.osd.includes("Auto-framed to 1280×720"), "the OSD");
+    slow = false;
+    host.openElsewhere(still);
+    await until(host, () => ffmpegRuns(host) === 16, "the still file");
+    await host.settle(50);
+    // Eight times, one keyframe: one frame with a picture, too few to decide.
+    assert.deepEqual(chain(host), []);
+    await host.command("detect").run();
+    await until(host, () => host.osd.at(-1) === "Auto Frame: too few frames show a picture to decide", "the reason");
+    // The first file again: read again, since one frame timed out the first time.
+    const runs = ffmpegRuns(host);
+    host.openElsewhere(a);
+    await until(host, () => ffmpegRuns(host) === runs + 8, "the second reading");
+  } finally {
+    await stop();
+    await cleanup();
+  }
+});
+
+test("slides on a white background (boxes that move) are not cropped", async () => {
+  const { paths, cleanup } = await files(["slides.mp4"]);
+  const boxes = [
+    { x: 160, y: 100, width: 1500, height: 700 },
+    { x: 200, y: 140, width: 1400, height: 820 },
+    { x: 180, y: 120, width: 1560, height: 600 },
+    { x: 240, y: 200, width: 1300, height: 760 },
+    { x: 150, y: 110, width: 1600, height: 840 },
+    { x: 300, y: 300, width: 1200, height: 500 },
+    { x: 170, y: 130, width: 1520, height: 780 },
+    { x: 220, y: 160, width: 1450, height: 800 },
+  ];
+  const host = makeHost(new Map([[paths[0]!, { width: 1920, height: 1080, duration: 80, background: WHITE, content: (i: number) => boxes[i] ?? null }]]));
+  const { stop } = await startPlugin(activate, { directory, host });
+  try {
+    host.openElsewhere(paths[0]!);
+    await until(host, () => ffmpegRuns(host) === 8, "the detection");
+    await host.settle(50);
+    assert.deepEqual(chain(host), []);
+    assert.deepEqual(host.osd, []);
+    await host.command("detect").run();
+    await until(host, () => host.osd.length > 0, "the reason");
+    assert.deepEqual(host.osd, ["Auto Frame: the picture moves on a plain background, not cropped"]);
+  } finally {
+    await stop();
+    await cleanup();
+  }
 });

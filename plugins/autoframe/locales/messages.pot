@@ -4,83 +4,87 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: main.ts:300
+#: main.ts:327
 msgid "Auto Frame needs ffmpeg, which was not found"
 msgstr ""
 
-#: main.ts:303
+#: main.ts:330
 msgid "Auto Frame could not read this video"
 msgstr ""
 
-#: main.ts:352
+#: main.ts:390
 msgid "Auto Frame: the picture is too narrow or too wide to frame"
 msgstr ""
 
-#: main.ts:354
+#: main.ts:392
 msgid "Auto Frame: too few frames show a picture to decide"
 msgstr ""
 
-#: main.ts:355
+#: main.ts:393
 msgid "Auto Frame: no solid border around the picture"
 msgstr ""
 
-#: main.ts:356
+#: main.ts:394
 msgid "Auto Frame: bars only above and below or only at the sides are kept"
 msgstr ""
 
-#: main.ts:357
+#: main.ts:395
+msgid "Auto Frame: the picture moves on a plain background, not cropped"
+msgstr ""
+
+#: main.ts:396
 msgid "Auto Frame: the picture inside the border is too small to frame"
 msgstr ""
 
-#: main.ts:385
+#: main.ts:426
 msgid "Auto Frame paused: Crop/Stretch or rotation changes the picture"
 msgstr ""
 
-#: main.ts:411
+#: main.ts:453 main.ts:491
 msgid "Auto Frame undone: Crop/Stretch or rotation changes the picture"
 msgstr ""
 
-#: main.ts:416
+#: main.ts:459
 msgid "Auto-framed to {}"
 msgstr ""
 
-#: main.ts:498
+#: main.ts:581
 msgid "Play a video file on this computer to use Auto Frame"
 msgstr ""
 
-#: main.ts:502 main.ts:523 main.ts:538
+#: main.ts:585 main.ts:607 main.ts:622
 msgid "Auto Frame"
 msgstr ""
 
-#: main.ts:502
+#: main.ts:585
 msgid "Auto-Frame Videos"
 msgstr ""
 
-#: main.ts:512
+#: main.ts:596
 msgid "Auto Frame: Off"
 msgstr ""
 
-#: main.ts:515
+#: main.ts:599
 msgid "Auto Frame: On"
 msgstr ""
 
-#: main.ts:523
+#: main.ts:607
 msgid "Detect Again"
 msgstr ""
 
-#: main.ts:529 main.ts:541
+#: main.ts:613 main.ts:625
 msgid "Auto-Frame Videos is off"
 msgstr ""
 
-#: main.ts:531
+#: main.ts:615
 msgid "The full picture is shown for this file"
 msgstr ""
 
-#: main.ts:538
+#: main.ts:622
 msgid "Show Full Picture for This File"
 msgstr ""
 
-#: main.ts:552
+#: main.ts:637
 msgid "Showing the full picture of this file"
 msgstr ""
 

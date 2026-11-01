@@ -42,8 +42,17 @@ export const MIN_ASPECT = 0.25;
 export const MAX_ASPECT = 4;
 /** At least this many frames must show content (not only the border colour). */
 export const MIN_FRAMES = 3;
-/** A detected size within this share of a standard size becomes that size. */
+/** A detected size up to this share smaller than a standard size grows to that size. */
 export const SNAP_SHARE = 0.01;
+/** A detected size at most this many pixels larger than a standard size shrinks to it (never cutting more). */
+export const SNAP_SHRINK = 4;
+/**
+ * Each edge of the joined box must be reached, within this many pixels, by
+ * at least half of the frames with a picture: a picture in a canvas has the
+ * same box in every frame, while slides or a screen recording on a plain
+ * background have boxes that move.
+ */
+export const STABLE_PX = 4;
 
 /** Common picture sizes a content box is snapped to (portrait ones are added below). */
 const LANDSCAPE: readonly (readonly [number, number])[] = [
@@ -215,7 +224,13 @@ export type NoCrop =
   /** The content is smaller than {@link MIN_AREA} of the frame or {@link MIN_SIDE} pixels. */
   | "small"
   /** The content's display aspect is outside {@link MIN_ASPECT}–{@link MAX_ASPECT}. */
-  | "aspect";
+  | "aspect"
+  /**
+   * The content's box moves between frames (slides, a screen recording or an
+   * animation on a plain background): fewer than half of the frames reach
+   * one of its edges ({@link STABLE_PX}).
+   */
+  | "unstable";
 
 export type Decision = { rect: Rect } | { reason: NoCrop };
 
@@ -230,9 +245,14 @@ const sameColour = (a: Colour, b: Colour, tolerance: number) =>
  *   {@link MIN_FRAMES} others are needed.
  * - The border colour must be the same in every frame that has one: a frame
  *   whose border has another colour (or none) counts as content everywhere.
- * - The box is the union over the frames, widened to even edges, then
- *   snapped to a standard size ({@link STANDARD_SIZES}) within
- *   {@link SNAP_SHARE}, keeping the side that touches the frame's edge.
+ * - The box is the union over the frames. Each of its edges must be
+ *   reached (within {@link STABLE_PX}) by at least half of those frames, or
+ *   the content moves and is not a picture in a canvas (`unstable`); a dark
+ *   scene in a few frames is fine.
+ * - The box is widened to even edges, then snapped to a standard size
+ *   ({@link STANDARD_SIZES}): grown by up to {@link SNAP_SHARE}, or shrunk by
+ *   at most {@link SNAP_SHRINK} pixels, keeping the side that touches the
+ *   frame's edge.
  * - Cropped only when the box covers less than {@link FULL_SHARE} of the
  *   frame in width and in height: `no-border` when in neither direction,
  *   `one-axis` for a letterbox or pillarbox (a border in one direction).
@@ -255,16 +275,22 @@ export function decide(results: FrameResult[], width: number, height: number, sa
   let y0 = height;
   let x1 = 0;
   let y1 = 0;
-  for (const r of shown) {
-    const box =
-      r.kind === "border" && colour && sameColour(r.colour, colour, tolerance)
-        ? r.box
-        : { x: 0, y: 0, width, height };
+  const boxes = shown.map((r) =>
+    r.kind === "border" && colour && sameColour(r.colour, colour, tolerance) ? r.box : { x: 0, y: 0, width, height },
+  );
+  for (const box of boxes) {
     x0 = Math.min(x0, box.x);
     y0 = Math.min(y0, box.y);
     x1 = Math.max(x1, box.x + box.width);
     y1 = Math.max(y1, box.y + box.height);
   }
+  const near = (a: number, b: number) => Math.abs(a - b) <= STABLE_PX;
+  const reached = (edge: (box: Rect) => boolean) => boxes.filter(edge).length * 2 >= boxes.length;
+  const stable =
+    reached((b) => near(b.x, x0)) &&
+    reached((b) => near(b.y, y0)) &&
+    reached((b) => near(b.x + b.width, x1)) &&
+    reached((b) => near(b.y + b.height, y1));
   // Even edges keep 4:2:0 chroma whole, as the player's crop needs (its
   // crop never keeps the last column or row of an odd size).
   x0 -= x0 % 2;
@@ -276,6 +302,7 @@ export function decide(results: FrameResult[], width: number, height: number, sa
   const fullHeight = rect.height >= FULL_SHARE * height;
   if (fullWidth && fullHeight) return { reason: "no-border" };
   if (fullWidth || fullHeight) return { reason: "one-axis" };
+  if (!stable) return { reason: "unstable" };
   rect = snapStandard(rect, width, height);
   if (rect.width * rect.height < MIN_AREA * width * height || rect.width < MIN_SIDE || rect.height < MIN_SIDE) {
     return { reason: "small" };
@@ -296,9 +323,11 @@ function place(start: number, size: number, next: number, frame: number): number
 }
 
 /**
- * The nearest standard size ({@link STANDARD_SIZES}) when both sides are
- * within {@link SNAP_SHARE} of it and it fits the frame; otherwise the box
- * as it is. Compression blurs a box edge by a pixel or two.
+ * The nearest standard size ({@link STANDARD_SIZES}) that fits the frame,
+ * when each side is at most {@link SNAP_SHARE} smaller than it (grown: the
+ * border around a picture is cheap to keep) or at most {@link SNAP_SHRINK}
+ * pixels larger (shrunk: compression blurs a box edge by a pixel or two,
+ * and more would cut real picture); otherwise the box as it is.
  */
 export function snapStandard(rect: Rect, width: number, height: number): Rect {
   let best: readonly [number, number] | null = null;
@@ -306,7 +335,9 @@ export function snapStandard(rect: Rect, width: number, height: number): Rect {
   for (const size of STANDARD_SIZES) {
     const [w, h] = size;
     if (w > width || h > height) continue;
-    if (Math.abs(rect.width - w) > SNAP_SHARE * w || Math.abs(rect.height - h) > SNAP_SHARE * h) continue;
+    const fits = (got: number, standard: number) =>
+      got <= standard ? standard - got <= SNAP_SHARE * standard : got - standard <= SNAP_SHRINK;
+    if (!fits(rect.width, w) || !fits(rect.height, h)) continue;
     const d = Math.abs(rect.width - w) + Math.abs(rect.height - h);
     if (d < distance) [best, distance] = [size, d];
   }

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { realpath, stat } from "node:fs/promises";
 import { isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -75,6 +76,8 @@ const FRAME_TIMEOUT = 30_000;
 /** After applying a crop: how often and how long the player's display size is read back. */
 export const VERIFY_INTERVAL = 250;
 export const VERIFY_TRIES = 12;
+/** While a crop is on: how often the player's display size is checked for another plugin's geometry change. */
+export const WATCH_INTERVAL = 1000;
 
 /** Menu path of the plugin's submenu (Video ▸ Auto Frame). */
 export const MENU = ["@video", "Auto Frame"] as const;
@@ -122,6 +125,7 @@ export function parseProbe(json: unknown): (Picture & { duration: number }) | nu
       disposition?: { attached_pic?: number };
       tags?: { rotate?: string };
       side_data_list?: { rotation?: number }[];
+      duration?: string;
     }[];
     format?: { duration?: string };
   };
@@ -137,16 +141,17 @@ export function parseProbe(json: unknown): (Picture & { duration: number }) | nu
     [width, height] = [height, width];
     sar = [sar[1], sar[0]];
   }
-  const duration = Number(root.format?.duration);
-  return { width, height, sar, duration: Number.isFinite(duration) ? duration : 0 };
+  // The container's duration, else the stream's (some containers leave one out).
+  const durations = [root.format?.duration, stream.duration].map(Number).filter((d) => Number.isFinite(d) && d > 0);
+  return { width, height, sar, duration: durations[0] ?? 0 };
 }
 
-/** ffprobe's arguments: the first video stream and the container. */
+/** ffprobe's arguments: the first video stream (`V`: not a cover picture) and the container. */
 export const probeArgs = (path: string) => [
   "-v",
   "error",
   "-select_streams",
-  "v:0",
+  "V:0",
   "-show_streams",
   "-show_format",
   "-of",
@@ -154,7 +159,12 @@ export const probeArgs = (path: string) => [
   path,
 ];
 
-/** ffmpeg's arguments: the keyframe at or after `time`, one frame of raw `rgb24` on stdout, as the player's own thumbnails read frames. */
+/**
+ * ffmpeg's arguments: the last keyframe at or before `time` (a fast seek
+ * that decodes keyframes only), one frame of raw `rgb24` on stdout, as the
+ * player's own thumbnails read frames; `V`: the first video stream that is
+ * not a cover picture.
+ */
 export const frameArgs = (path: string, time: number) => [
   "-nostdin",
   "-v",
@@ -167,7 +177,7 @@ export const frameArgs = (path: string, time: number) => [
   "-i",
   path,
   "-map",
-  "0:v:0",
+  "0:V:0",
   "-frames:v",
   "1",
   "-an",
@@ -220,9 +230,21 @@ export default async function activate(plugin: Plugin) {
   let stopped = false;
   /** ffmpeg or ffprobe was missing: said once per run. */
   let toldMissing = false;
+  /**
+   * Bumped by every change that decides the crop anew (another source, the
+   * menu items, a new detection): work started before it sets no chain.
+   */
+  let generation = 0;
+  /** The check of the display size while a crop is on. */
+  let watchTimer: ReturnType<typeof setInterval> | null = null;
+  const unwatch = () => {
+    if (watchTimer) clearInterval(watchTimer);
+    watchTimer = null;
+  };
   plugin.onDispose(() => {
     stopped = true;
     job?.abort();
+    unwatch();
   });
 
   const log = (...args: unknown[]) => console.error("autoframe:", ...args);
@@ -230,6 +252,7 @@ export default async function activate(plugin: Plugin) {
   function setChain(next: CropNode[]) {
     // Nothing to withdraw: an empty chain is never sent first.
     if (next.length === 0 && nodes.length === 0) return;
+    if (next.length === 0) unwatch();
     nodes = next;
     everSet = true;
     filter.set(next);
@@ -291,7 +314,11 @@ export default async function activate(plugin: Plugin) {
 
   // ------------------------------------------------------------------ detection
   /** Reads the file and finds its content box; `null` when it could not (told on the OSD when `manual`). */
-  async function detect(c: Current, signal: AbortSignal, manual: boolean): Promise<Detected | null> {
+  async function detect(
+    c: Current,
+    signal: AbortSignal,
+    manual: boolean,
+  ): Promise<{ detected: Detected; conclusive: boolean } | null> {
     const fail = async (error: unknown) => {
       const code = (error as PluginError).code;
       if (code === "aborted" || signal.aborted) return null;
@@ -318,11 +345,15 @@ export default async function activate(plugin: Plugin) {
     if (signal.aborted) return null;
     if (!picture) {
       // Audio only, or a cover picture: nothing to frame.
-      return { width: 0, height: 0, sar: [1, 1], rect: null, reason: "no-border" };
+      return { detected: { width: 0, height: 0, sar: [1, 1], rect: null, reason: "no-border" }, conclusive: true };
     }
     const { width, height, sar } = picture;
     const bytes = width * height * 3;
     const results: FrameResult[] = [];
+    /** Hashes of the frames read: two times can land on the same keyframe, which counts once. */
+    const seenFrames = new Set<string>();
+    /** A frame could not be read (a timeout, an error): the answer is used now but not cached. */
+    let failed = false;
     for (const time of sampleTimes(picture.duration, SAMPLES)) {
       try {
         const { stdout } = await plugin.tools.run("ffmpeg", frameArgs(c.path, time), {
@@ -332,19 +363,26 @@ export default async function activate(plugin: Plugin) {
         });
         if (signal.aborted) return null;
         // A frame of another size (a stream that changes size): not used.
-        if (stdout.length === bytes) results.push(analyseFrame({ width, height, data: stdout }));
+        if (stdout.length !== bytes) continue;
+        const hash = createHash("sha1").update(stdout).digest("hex");
+        if (seenFrames.has(hash)) continue;
+        seenFrames.add(hash);
+        results.push(analyseFrame({ width, height, data: stdout }));
       } catch (error) {
         const code = (error as PluginError).code;
         if (code === "aborted" || signal.aborted) return null;
         if (code === "unavailable") return fail(error);
-        // One unreadable position (past the last keyframe): try the others.
+        // One unreadable position: try the others.
         log("frame", time, error);
+        failed = true;
       }
     }
     const decision = decide(results, width, height, sar[0] / sar[1]);
-    return "rect" in decision
-      ? { width, height, sar, rect: decision.rect, reason: null }
-      : { width, height, sar, rect: null, reason: decision.reason };
+    const detected: Detected =
+      "rect" in decision
+        ? { width, height, sar, rect: decision.rect, reason: null }
+        : { width, height, sar, rect: null, reason: decision.reason };
+    return { detected, conclusive: !failed };
   }
 
   /** Why a detection does not crop, on the OSD: only when the user asked, except a shape the player cannot crop to. */
@@ -354,6 +392,7 @@ export default async function activate(plugin: Plugin) {
     if (reason === "few-frames") return plugin.osd.show("Auto Frame: too few frames show a picture to decide");
     if (reason === "no-border") return plugin.osd.show("Auto Frame: no solid border around the picture");
     if (reason === "one-axis") return plugin.osd.show("Auto Frame: bars only above and below or only at the sides are kept");
+    if (reason === "unstable") return plugin.osd.show("Auto Frame: the picture moves on a plain background, not cropped");
     return plugin.osd.show("Auto Frame: the picture inside the border is too small to frame");
   }
 
@@ -365,7 +404,9 @@ export default async function activate(plugin: Plugin) {
    * player's size before or after does not match, the crop is withdrawn and
    * the OSD says why.
    */
-  async function apply(c: Current, d: Detected & { rect: Rect }) {
+  async function apply(c: Current, d: Detected & { rect: Rect }, gen: number) {
+    // Still wanted: the same file, nothing changed since, on, and not shown in full.
+    const wanted = () => live(c) && gen === generation && settings.value.enabled && !entry(c.key)?.full;
     const sar = d.sar[0] / d.sar[1];
     const chain = cropNodes(d.rect, d.width, d.height, sar);
     if (!chain) {
@@ -377,15 +418,16 @@ export default async function activate(plugin: Plugin) {
     const cropped = displaySize(d.rect.width, d.rect.height, ...d.sar);
     if (nodes.length === 0) {
       if (everSet) await settled();
-      if (!live(c)) return;
+      if (!wanted()) return;
       const before = await shownSize();
-      if (!live(c)) return;
+      if (!wanted()) return;
       if (before && !same(before, full)) {
         log("shown at", before, "expected", full);
         await plugin.osd.show("Auto Frame paused: Crop/Stretch or rotation changes the picture");
         return;
       }
     }
+    if (!wanted()) return;
     setChain(chain);
     plugin.update();
     const status = await settled();
@@ -411,16 +453,53 @@ export default async function activate(plugin: Plugin) {
       await plugin.osd.show("Auto Frame undone: Crop/Stretch or rotation changes the picture");
       return;
     }
+    watch(c, chain, cropped);
     if (announced !== c.sourceId) {
       announced = c.sourceId;
       await plugin.osd.show("Auto-framed to {}", [`${d.rect.width}×${d.rect.height}`]);
     }
   }
 
+  /**
+   * While the crop is on, checks the size the player shows every
+   * {@link WATCH_INTERVAL}: when another plugin changes the picture later
+   * (the built-in Crop/Stretch, a rotation), the crop lands in the wrong
+   * place, so it is withdrawn once two checks in a row disagree. The player
+   * sends no event for another plugin's filters, hence the timer.
+   */
+  function watch(c: Current, chain: CropNode[], cropped: { width: number; height: number }) {
+    unwatch();
+    let misses = 0;
+    let checking = false;
+    watchTimer = setInterval(async () => {
+      if (checking) return;
+      if (!live(c) || nodes !== chain) return unwatch();
+      if (plugin.player.state.phase !== "ready") return;
+      checking = true;
+      try {
+        const shown = await shownSize();
+        if (!live(c) || nodes !== chain) return;
+        if (!shown || same(shown, cropped)) {
+          misses = 0;
+          return;
+        }
+        if (++misses < 2) return;
+        log("shown at", shown, "expected", cropped);
+        generation++;
+        clear();
+        plugin.update();
+        await plugin.osd.show("Auto Frame undone: Crop/Stretch or rotation changes the picture");
+      } finally {
+        checking = false;
+      }
+    }, WATCH_INTERVAL);
+  }
+
   /** Frames the playing file: from the cache, or detects it first (always when `manual`). */
   async function frame(manual: boolean) {
     const c = current;
     if (!c || stopped) return;
+    const gen = ++generation;
     const saved = entry(c.key);
     if (!settings.value.enabled || saved?.full) {
       clear();
@@ -433,14 +512,17 @@ export default async function activate(plugin: Plugin) {
       const controller = new AbortController();
       job = controller;
       plugin.update();
+      let found: Awaited<ReturnType<typeof detect>>;
       try {
-        detected = await detect(c, controller.signal, manual);
+        found = await detect(c, controller.signal, manual);
       } finally {
         if (job === controller) job = null;
         plugin.update();
       }
-      if (!detected || !live(c) || controller.signal.aborted) return;
-      saveEntry(c.key, { detected });
+      if (!found || !live(c) || controller.signal.aborted || gen !== generation) return;
+      detected = found.detected;
+      // Only a conclusive answer is cached: after a timeout the file is read again next time.
+      saveEntry(c.key, found.conclusive ? { detected } : {});
       fresh = true;
     } else {
       saveEntry(c.key, {});
@@ -453,7 +535,7 @@ export default async function activate(plugin: Plugin) {
       return;
     }
     if (manual) announced = null;
-    await apply(c, detected as Detected & { rect: Rect });
+    await apply(c, detected as Detected & { rect: Rect }, gen);
   }
 
   // ------------------------------------------------------------------ the player
@@ -480,6 +562,7 @@ export default async function activate(plugin: Plugin) {
     if (state.sourceId !== seen) {
       // Another source: what was found for the last one does not apply.
       seen = state.sourceId;
+      generation++;
       job?.abort();
       job = null;
       current = null;
@@ -506,6 +589,7 @@ export default async function activate(plugin: Plugin) {
       settings.save({ enabled });
       plugin.update();
       if (!enabled) {
+        generation++;
         job?.abort();
         clear();
         plugin.update();
@@ -546,6 +630,7 @@ export default async function activate(plugin: Plugin) {
       saveEntry(c.key, { full });
       plugin.update();
       if (full) {
+        generation++;
         job?.abort();
         clear();
         plugin.update();

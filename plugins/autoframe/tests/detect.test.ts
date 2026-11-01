@@ -151,15 +151,51 @@ test("decide: no crop for nearly full, too small, or too narrow content", () => 
   });
 });
 
-test("snapStandard: within 1 % of a standard size only", () => {
-  assert.deepEqual(snapStandard({ x: 0, y: 0, width: 2568, height: 1446 }, 3840, 2160), {
-    x: 0,
-    y: 0,
-    width: 2560,
-    height: 1440,
-  });
+test("snapStandard: grows by up to 1 %, shrinks by at most 4 px", () => {
+  // Grown: up to 1 % of border around the picture is kept.
+  assert.deepEqual(snapStandard({ x: 0, y: 0, width: 2546, height: 1432 }, 3840, 2160), { x: 0, y: 0, width: 2560, height: 1440 });
+  // Shrunk by 4 px (compression blur): snapped.
+  assert.deepEqual(snapStandard({ x: 0, y: 0, width: 2564, height: 1444 }, 3840, 2160), { x: 0, y: 0, width: 2560, height: 1440 });
+  // Shrunk by more would cut picture: kept (the reviewer's 1934×1088 is not cut to 1920×1080).
+  const wide = { x: 0, y: 0, width: 2568, height: 1446 };
+  assert.deepEqual(snapStandard(wide, 3840, 2160), wide);
+  const odd = { x: 100, y: 100, width: 1934, height: 1088 };
+  assert.deepEqual(snapStandard(odd, 3840, 2160), odd);
   const far = { x: 0, y: 0, width: 2600, height: 1440 };
   assert.deepEqual(snapStandard(far, 3840, 2160), far);
+});
+
+test("decide: a stable box is needed (slides and screen recordings on a plain background are not cropped)", () => {
+  const W = 1920;
+  const H = 1080;
+  const boxes = [
+    { x: 160, y: 100, width: 1500, height: 700 },
+    { x: 200, y: 140, width: 1400, height: 820 },
+    { x: 180, y: 120, width: 1560, height: 600 },
+    { x: 240, y: 200, width: 1300, height: 760 },
+    { x: 150, y: 110, width: 1600, height: 840 },
+    { x: 300, y: 300, width: 1200, height: 500 },
+    { x: 170, y: 130, width: 1520, height: 780 },
+    { x: 220, y: 160, width: 1450, height: 800 },
+  ];
+  const slides = boxes.map((box, i) => analyseFrame(frame(W, H, WHITE, box, i)));
+  assert.deepEqual(decide(slides, W, H), { reason: "unstable" });
+  // A fixed region: cropped.
+  const fixed = frames(W, H, WHITE, { x: 100, y: 100, width: 1280, height: 720 });
+  assert.deepEqual(decide(fixed, W, H), { rect: { x: 100, y: 100, width: 1280, height: 720 } });
+  // A fixed region whose picture is dark at the edges in some frames (dark scenes): still cropped.
+  const region = { x: 0, y: 0, width: 2560, height: 1440 };
+  const dark = { x: 600, y: 300, width: 1200, height: 700 };
+  const scenes = [
+    ...frames(3840, 2160, BLACK, region, 5),
+    ...Array.from({ length: 3 }, (_, i) => analyseFrame(frame(3840, 2160, BLACK, dark, i))),
+  ];
+  assert.deepEqual(decide(scenes, 3840, 2160), { rect: region });
+  // Half the frames dark is still enough; more than half is not.
+  const half = [...frames(1920, 1080, BLACK, { x: 0, y: 0, width: 1280, height: 720 }, 4), ...frames(1920, 1080, BLACK, { x: 100, y: 100, width: 800, height: 400 }, 4)];
+  assert.deepEqual(decide(half, 1920, 1080), { rect: { x: 0, y: 0, width: 1280, height: 720 } });
+  const most = [...frames(1920, 1080, BLACK, { x: 0, y: 0, width: 1280, height: 720 }, 3), ...frames(1920, 1080, BLACK, { x: 100, y: 100, width: 800, height: 400 }, 5)];
+  assert.deepEqual(decide(most, 1920, 1080), { reason: "unstable" });
 });
 
 /** Every even rect in a frame, sampled, gives crop nodes that the host's own expressions turn into exactly that rect. */

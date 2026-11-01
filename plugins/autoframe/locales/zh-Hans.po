@@ -5,83 +5,87 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: main.ts:300
+#: main.ts:327
 msgid "Auto Frame needs ffmpeg, which was not found"
 msgstr "自动取景需要 ffmpeg，但未找到"
 
-#: main.ts:303
+#: main.ts:330
 msgid "Auto Frame could not read this video"
 msgstr "自动取景无法读取此视频"
 
-#: main.ts:352
+#: main.ts:390
 msgid "Auto Frame: the picture is too narrow or too wide to frame"
 msgstr "自动取景：画面过窄或过宽，无法取景"
 
-#: main.ts:354
+#: main.ts:392
 msgid "Auto Frame: too few frames show a picture to decide"
 msgstr "自动取景：有画面的帧太少，无法判断"
 
-#: main.ts:355
+#: main.ts:393
 msgid "Auto Frame: no solid border around the picture"
 msgstr "自动取景：画面周围没有纯色边框"
 
-#: main.ts:356
+#: main.ts:394
 msgid "Auto Frame: bars only above and below or only at the sides are kept"
 msgstr "自动取景：只在上下或只在左右有边框的画面保持原样"
 
-#: main.ts:357
+#: main.ts:395
+msgid "Auto Frame: the picture moves on a plain background, not cropped"
+msgstr "自动取景：画面在纯色背景上移动，不裁切"
+
+#: main.ts:396
 msgid "Auto Frame: the picture inside the border is too small to frame"
 msgstr "自动取景：边框内的画面太小，无法取景"
 
-#: main.ts:385
+#: main.ts:426
 msgid "Auto Frame paused: Crop/Stretch or rotation changes the picture"
 msgstr "自动取景已暂停：“裁剪/拉伸”或旋转改变了画面"
 
-#: main.ts:411
+#: main.ts:453 main.ts:491
 msgid "Auto Frame undone: Crop/Stretch or rotation changes the picture"
 msgstr "自动取景已撤销：“裁剪/拉伸”或旋转改变了画面"
 
-#: main.ts:416
+#: main.ts:459
 msgid "Auto-framed to {}"
 msgstr "已自动取景为 {}"
 
-#: main.ts:498
+#: main.ts:581
 msgid "Play a video file on this computer to use Auto Frame"
 msgstr "播放本机上的视频文件即可使用自动取景"
 
-#: main.ts:502 main.ts:523 main.ts:538
+#: main.ts:585 main.ts:607 main.ts:622
 msgid "Auto Frame"
 msgstr "自动取景"
 
-#: main.ts:502
+#: main.ts:585
 msgid "Auto-Frame Videos"
 msgstr "自动取景视频"
 
-#: main.ts:512
+#: main.ts:596
 msgid "Auto Frame: Off"
 msgstr "自动取景：关"
 
-#: main.ts:515
+#: main.ts:599
 msgid "Auto Frame: On"
 msgstr "自动取景：开"
 
-#: main.ts:523
+#: main.ts:607
 msgid "Detect Again"
 msgstr "重新检测"
 
-#: main.ts:529 main.ts:541
+#: main.ts:613 main.ts:625
 msgid "Auto-Frame Videos is off"
 msgstr "“自动取景视频”已关闭"
 
-#: main.ts:531
+#: main.ts:615
 msgid "The full picture is shown for this file"
 msgstr "此文件显示完整画面"
 
-#: main.ts:538
+#: main.ts:622
 msgid "Show Full Picture for This File"
 msgstr "此文件显示完整画面"
 
-#: main.ts:552
+#: main.ts:637
 msgid "Showing the full picture of this file"
 msgstr "正在显示此文件的完整画面"
 
