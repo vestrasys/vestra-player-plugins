@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1
+
+- Corrected: the AI Upscaling window opened taller than its content, with the Close button stretched to fill the spare height. The window now takes exactly the height of its content.
+
 ## 0.3.0
 
 - **New plugin id `zysilm.rtxupscale`** (was `zysilm.vestraupscale`), with the folder `plugins/rtxupscale`. The store treats it as a new plugin: uninstall the old `zysilm.vestraupscale` and install this one. The saved choice (upscaling on or off, the one-time NVIDIA app note) is not carried over.

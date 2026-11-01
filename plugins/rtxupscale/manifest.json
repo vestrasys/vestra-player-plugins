@@ -1,6 +1,6 @@
 {
   "id": "zysilm.rtxupscale",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "apiVersion": "vestra/1",
   "entry": "main.ts",
   "capabilities": ["commands", "events", "playback.read", "ui.osd", "ui.window", "video.upscaling"],
