@@ -2,18 +2,16 @@
 // thumbnails (the next page loads as the list nears its end), and a bottom bar with
 // Open URL… and Download….
 // The panel has no heading of its own: the player's tab strip names it.
-import { Palette, ScrollView } from "std-widgets.slint";
+import { LineEdit, ListView } from "std-widgets.slint";
 import { Theme } from "@vestra/theme.slint";
 import { Icon } from "@vestra/icons.slint";
 import { Button, ToolTipArea } from "@vestra/widgets.slint";
 
-// Rows hold only plain values (no image, no selection): the player then updates a changed row
-// in place. In 0.4.0 a row held its thumbnail, and the player cannot compare images, so every
-// update (a click selecting the row, a thumbnail arriving) replaced the whole model: the row
-// elements were rebuilt under the pointer and the second click of a double-click was lost.
-// The player also replaces a model whose length changes, so `rows` always has MAX_ROWS (200)
-// entries: the first `count` are results, the rest blank and hidden. A new page fills blank
-// rows in place instead of rebuilding the ones above.
+// Rows hold only plain values (no image, no selection), so the player updates a changed row in
+// place and keeps the row elements under the pointer (a rebuilt row loses a double-click in
+// progress). Since player 0.5.2 that also holds when the length changes: a new page appends
+// rows, a new search removes them, and the rows above stay as they are. So `rows` holds only
+// the results, plus the end row while the list's end has something to say.
 export struct VideoRow {
     // The YouTube video id.
     key: string,
@@ -24,11 +22,16 @@ export struct VideoRow {
     live: bool,
     // The last attempt to play it failed (the reason was an OSD message).
     failed: bool,
+    // The end row, after the results (no video; every other field empty): the next page
+    // loading, or why it failed with Retry. A ListView has a single repeater, so the end of
+    // the list is a row of the model.
+    end: bool,
 }
 
 export global TubeBridge {
-    // Always MAX_ROWS long; the first `count` are results.
+    // The results, then the end row while the next page loads or failed to load.
     in property <[VideoRow]> rows;
+    // The results among `rows` (the end row not counted).
     in property <int> count;
     // One thumbnail per row, in the same order: 320×180 JPEG from i.ytimg.com, decoded at 192 px;
     // a transparent placeholder until it arrives. A list of its own, so a new thumbnail replaces
@@ -87,6 +90,8 @@ export component TubeSidebar inherits Rectangle {
     preferred-width: 317px;
     background: Theme.bg-list;
     private property <length> row-height: 62px;
+    // The end row: a small button between 8 px paddings.
+    private property <length> end-height: Theme.button-small-height + 16px;
     private property <int> top-request: TubeBridge.scroll-top;
     changed top-request => { list.content-y = 0px; }
     // Infinite scroll: ask for the next page while less than one screen of rows is left below
@@ -137,43 +142,18 @@ export component TubeSidebar inherits Rectangle {
                     }
                     return reject;
                 }
-                Rectangle {
-                    background: Theme.hover-bg;
-                    border-radius: Theme.radius-control;
-                    clip: true;
-                    Icon {
-                        x: 5px;
-                        y: (parent.height - self.height) / 2;
-                        name: "search";
-                        color: Theme.text-dim;
-                    }
-                    search := TextInput {
-                        x: 24px;
-                        width: parent.width - 30px;
-                        height: 100%;
-                        vertical-alignment: center;
-                        single-line: true;
-                        color: Theme.text;
-                        // The std-widgets LineEdit's selection colours (as the store's search box):
-                        // they follow the light and dark palettes and keep the text legible.
-                        // Theme.selected-bg is a row colour, too close to the box in the dark palette.
-                        selection-background-color: Palette.selection-background;
-                        selection-foreground-color: Palette.selection-foreground;
-                        // As large as the result titles.
-                        font-size: Theme.font-tab;
-                        text <=> TubeBridge.query;
-                        edited => { TubeBridge.query-changed(self.text); }
-                        accepted => { TubeBridge.search(self.text); }
-                        changed has-focus => { TubeBridge.focus-changed(self.has-focus); }
-                    }
-                    if search.text == "": Text {
-                        x: 24px;
-                        height: 100%;
-                        text: @tr("Search YouTube");
-                        color: Theme.text-dim;
-                        font-size: Theme.font-tab;
-                        vertical-alignment: center;
-                    }
+                // The standard line edit, as the player's own search fields: its placeholder,
+                // palette selection colours and the right-click Cut/Copy/Paste menu.
+                search := LineEdit {
+                    width: 100%;
+                    height: 100%;
+                    // As large as the result titles.
+                    font-size: Theme.font-tab;
+                    placeholder-text: @tr("Search YouTube");
+                    text <=> TubeBridge.query;
+                    edited(text) => { TubeBridge.query-changed(text); }
+                    accepted(text) => { TubeBridge.search(text); }
+                    changed has-focus => { TubeBridge.focus-changed(self.has-focus); }
                 }
             }
             Rectangle {
@@ -200,9 +180,10 @@ export component TubeSidebar inherits Rectangle {
             }
             Rectangle {
                 background: Theme.bg-list;
-                // Not a ListView: its height estimate goes wrong with the hidden blank rows, and
-                // 200 rows of a few elements each are cheap to keep.
-                list := ScrollView {
+                // Virtualized: only the rows in view have elements. Every result row is
+                // row-height tall (only the end row is shorter), so the list's height estimate
+                // holds and a restored scroll position lands on the same rows.
+                list := ListView {
                     width: 100%;
                     height: 100%;
                     init => { self.content-y = -TubeBridge.show-y * 1px; }
@@ -211,13 +192,11 @@ export component TubeSidebar inherits Rectangle {
                         root.more-if-near-end();
                     }
                     changed visible-height => { root.more-if-near-end(); }
-                    VerticalLayout {
-                        alignment: start;
-                        for row[index] in TubeBridge.rows: item := Rectangle {
+                    for row[index] in TubeBridge.rows: Rectangle {
+                        height: row.end ? root.end-height : root.row-height;
+                        if !row.end: item := Rectangle {
                             property <bool> selected: index == TubeBridge.selected-index;
                             property <bool> playing: row.key != "" && row.key == TubeBridge.playing-key;
-                            visible: index < TubeBridge.count;
-                            height: self.visible ? root.row-height : 0px;
                             background: self.selected ? Theme.selected-bg : touch.has-hover ? Theme.hover-bg : transparent;
                             if item.playing: Rectangle {
                                 x: 0;
@@ -291,7 +270,6 @@ export component TubeSidebar inherits Rectangle {
                             // the player's popup takes the next press to close it, so the first click
                             // of a double-click never reached the row.
                             touch := TouchArea {
-                                enabled: item.visible;
                                 pointer-event(event) => {
                                     if event.kind == PointerEventKind.down {
                                         list-keys.focus();
@@ -306,7 +284,7 @@ export component TubeSidebar inherits Rectangle {
                             }
                         }
                         // The end of the list: the next page loading, or why it failed (with Retry).
-                        if TubeBridge.count > 0 && (TubeBridge.loading-more || TubeBridge.more-error != ""): HorizontalLayout {
+                        if row.end: HorizontalLayout {
                             padding: 8px;
                             spacing: 8px;
                             alignment: center;

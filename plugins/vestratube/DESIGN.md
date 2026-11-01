@@ -46,8 +46,9 @@ partly (no title, tabs "N/A") and their content is regional and editorial,
 so none of these is a reliable logged-out feed. A local history of searches
 or plays was considered and left out (user ruling, 2026-10-26).
 
-**Preconditions, independent of other plugins.** Vestra Player 0.5.1 or
-later (images in list rows), a network connection, and for downloads the
+**Preconditions, independent of other plugins.** Vestra Player 0.5.2 or
+later (images in list rows, 0.5.1; rows kept in place when the list's length
+changes, 0.5.2), a network connection, and for downloads the
 player's bundled ffmpeg (`plugin.tools`). The panel works whether or not the
 playlist or any other plugin is loaded; it shares the sidebar as a tab.
 
@@ -122,10 +123,16 @@ and the player remembers the sidebar's visibility.
   whose `count` is not the current row count (a page already added). A failed page
   stops automatic loading and shows the reason with Retry at the end. The
   **More results** button of 0.4.0 is gone: Retry covers the failure, and at the
-  last page there is nothing to offer. Because the player replaces a model whose
-  length changes, `rows` always holds 200 entries (the first `count` shown, the
-  rest blank and 0 px high), and the list is a ScrollView rather than a ListView
-  (whose height estimate does not suit hidden rows); 200 small rows are cheap.
+  last page there is nothing to offer.
+- **A virtualized list (0.5.2).** The list is a Slint `ListView`: only the rows in view
+  have elements. `rows` holds the results only (`count` of them), plus one end row
+  (`end: true`, every other field empty) while the next page loads or failed to load;
+  a ListView has a single repeater, so "Loading…" or the reason with Retry is that last
+  row, drawn as before. Player 0.5.2 updates a plain-value model in place when its
+  length changes (the shared rows by `set_row_data`, the tail pushed or removed), so a
+  page appended or the end row coming and going keeps every row element above it, with
+  its hover and a double-click in progress. Up to 0.5.1 the player replaced such a model,
+  so 0.4.1 to 0.5.1 sent 200 rows with hidden blanks to a plain ScrollView.
 - **Scroll position (0.4.2).** The player makes the panel's component anew each time
   it shows (its tab, the sidebar shown again or detached) and whenever it rebuilds the
   main window (any plugin mounting or unmounting a panel), and restores only the bridge
@@ -133,10 +140,11 @@ and the player remembers the sidebar's visibility.
   plugin keeps it and writes it back as `show-y`, and a new list starts there (`init`),
   as the built-in playlist does. A new search sets it to 0, also while the panel is
   hidden. The selection is a bridge property already.
-- **Search box:** `Theme.font-tab`, the size of the result titles (0.4.0
-  used the smaller `font-body`); its text selection uses the std-widgets
-  `Palette.selection-background` and `selection-foreground`, as the
-  std-widgets LineEdit does, legible in both palettes.
+- **Search box (0.5.2):** the std-widgets `LineEdit`, as the player's own search
+  fields, with its placeholder "Search YouTube", the palette's selection colours and
+  the right-click Cut/Copy/Paste menu (user decision; until 0.5.1 a bare TextInput with
+  a search icon and a hand-made placeholder). 26 px high in the 35 px bar, at
+  `Theme.font-tab`, the size of the result titles.
 - **Focus:** while the search box has focus the panel asks the player to
   keep it up (`setInteraction({ focused: true })`), so it does not hide in
   fullscreen while the user types.
@@ -278,13 +286,14 @@ await plugin.osd.show(plugin.i18n.text("Saved: {}", [name]));                   
 
 ```slint
 export struct VideoRow { key: string, title: string, channel: string, duration: string,
-                         live: bool, thumb: image, selected: bool, playing: bool, failed: bool }
+                         live: bool, failed: bool, end: bool }   // thumbnails: the parallel `thumbs`
 export global TubeBridge { in property <[VideoRow]> rows; in-out property <string> query; callback search(string); … }
 ```
 
 Capabilities: `commands`, `events`, `ui.window`, `ui.dialog`, `ui.mount`,
 `ui.osd`, `playback.read`, `playback.control`, `source.resolve` (0.3 plus
-`ui.mount` and `ui.osd`). `minPlayerVersion` 0.5.1.
+`ui.mount` and `ui.osd`). `minPlayerVersion` 0.5.2 (rows kept in place when the
+list's length changes).
 
 **SDK version.** The code runs on the player's SDK, so a plugin needs no
 SDK upgrade to *run* on player 0.5.1. Its *tests and types* need SDK

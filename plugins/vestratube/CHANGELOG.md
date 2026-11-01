@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.2
+
+- **The search box is the player's standard text field.** Right-click it for Cut, Copy and Paste; it looks like the player's other search fields (the search icon in the box is gone). Enter still searches, Esc still clears, ↓ still moves into the results.
+- **A lighter result list.** The list now draws only the rows on screen instead of always keeping 200 rows, the unused ones hidden. Scrolling, the end of the list ("Loading…", or the reason and **Retry**), double-click to play while a page loads, selection, and the scroll position kept across tab switches work as before.
+- Needs Vestra Player 0.5.2 or later (it keeps the rows on screen as they are when the list grows or shrinks). Nothing to change on your side.
+
 ## 0.5.1
 
 - **Store icon.** VestraTube now has its own icon in the plugin store.

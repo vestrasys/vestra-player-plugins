@@ -3,7 +3,7 @@ import type { ImageRef, Plugin, Scope, TextValue } from "@vestra-player/sdk";
 import type { Page, Video, YouTube } from "./youtube.ts";
 import { formatDuration, isOffline, isTextError, oneLine, thumbnailUrl, videoIdOf } from "./youtube.ts";
 
-/** 10 pages; at 192×108 a decoded thumbnail is ~83 KB, so 200 rows stay well inside the player's 32 MB per view. */
+/** At most this many results (10 pages); at 192×108 a decoded thumbnail is ~83 KB, so 200 rows stay well inside the player's 32 MB per view. */
 export const MAX_ROWS = 200;
 /** About twice the drawn width (96 px). */
 export const THUMB_SIDE = 192;
@@ -33,8 +33,12 @@ type Phase = "start" | "searching" | "results" | "empty" | "failed";
  * a request loop with nothing on screen while YouTube keeps answering such pages.
  */
 export const MAX_EMPTY_PAGES = 3;
-/** A hidden row past the results (`rows` always has MAX_ROWS entries). */
-const BLANK_ROW = { key: "", title: "", channel: "", duration: "", live: false, failed: false };
+/**
+ * The end row after the results while the next page loads or failed to load: the view draws
+ * "Loading…" or the reason with Retry there (a ListView has one repeater, so the list's end is a
+ * row). It has every field of a result row, so the player updates the model in place.
+ */
+export const END_ROW = { key: "", title: "", channel: "", duration: "", live: false, failed: false, end: true };
 
 /** The sidebar panel: search, rows with thumbnails (more as the list nears its end), and the bottom bar. */
 export function mountPanel(plugin: Plugin, youtube: YouTube, actions: PanelActions) {
@@ -94,23 +98,23 @@ export function mountPanel(plugin: Plugin, youtube: YouTube, actions: PanelActio
     const current = videoIdOf(plugin.player.state.source);
     const job = actions.downloading;
     return {
-      // Plain values only, and always MAX_ROWS of them, so the player updates a changed row in
-      // place and never rebuilds the row elements under the pointer (a rebuilt row loses a
-      // double-click in progress): it replaces a model that holds images or changes length.
-      // A new page fills blank rows. The thumbnails, the selection and the playing video live
-      // in properties of their own.
-      rows: Array.from({ length: MAX_ROWS }, (_, index) => {
-        const video = entries[index]?.video;
-        if (!video) return BLANK_ROW;
-        return {
+      // Plain values only, so the player updates a changed row in place and never rebuilds the
+      // row elements under the pointer (a rebuilt row loses a double-click in progress). Since
+      // player 0.5.2 that holds when the length changes too (a page appended, the end row
+      // added or removed). The thumbnails, the selection and the playing video live in
+      // properties of their own.
+      rows: [
+        ...entries.map(({ video }) => ({
           key: video.id,
           title: video.title,
           channel: video.channel,
           duration: formatDuration(video.seconds),
           live: video.live,
           failed: failed.has(video.id),
-        };
-      }),
+          end: false,
+        })),
+        ...(entries.length > 0 && (loadingMore || moreError !== null) ? [END_ROW] : []),
+      ],
       count: entries.length,
       thumbs: entries.map(({ thumb }) => thumb),
       selectedIndex: entries.findIndex((entry) => entry.video.id === selected),
