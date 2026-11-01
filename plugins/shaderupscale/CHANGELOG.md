@@ -2,7 +2,8 @@
 
 ## 0.1.1
 
-- Crash safety: if the player did not close normally while shaders were applied, the next start begins with shader upscaling off, says so on the OSD and in the window, and keeps the chosen model and parameters. A restart of the plugin alone leaves it on.
+- Crash safety is the player's (0.6.3): after a run that ended abnormally while shaders were drawing, the player refuses them at the next start and shows its own OSD line. The window then says "Off for this start", keeps the choice (still on in the settings) and suggests a preset that is not marked demanding; the plugin does not retry by itself, and Turn On tries once more.
+- Needs Vestra Player 0.6.3 or later, for that crash guard.
 - The heavy presets are marked "demanding" in the drop-downs and the description: Anime4K HQ, modes A+A, B+B and C+A, and ArtCNN C4F32.
 - The window's height follows its content, so the Close button no longer stretches when the status text fills in after the window opens.
 

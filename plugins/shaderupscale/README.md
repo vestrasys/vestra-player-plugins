@@ -37,14 +37,16 @@ A small neural network that doubles the brightness (luma) detail once; the playe
 
 ## Requirements
 
-- Vestra Player 0.6.0 or later.
+- Vestra Player 0.6.3 or later (its crash guard for shaders, below).
 - **GPU rendering.** Shaders run only where the player draws the picture on the GPU: on macOS always, on Windows after **Video ▸ GPU Rendering (Experimental)** and a restart. With software rendering (the Windows default, and Linux) the window greys the button out and says what to do.
 - **ArtCNN needs Windows.** Its shaders are compute shaders, which macOS's OpenGL does not have; on macOS ArtCNN is greyed out. Anime4K runs on both.
 - A capable GPU: the presets marked **demanding** (HQ, modes A+A, B+B and C+A, and ArtCNN C4F32) cost several times what Fast and C4F16 do. If playback stutters, choose a preset that is not marked demanding.
 
-## If the player does not close normally
+## If the player crashes while shaders run
 
-While shaders are applied, the plugin notes so in its data directory and clears the note when it stops normally. If the player crashes or is ended while shader upscaling is on, the next start begins with it **off**: the OSD says "Shader Upscaling turned off: the player did not close normally" and the window says why. Your model and parameters are kept; turn it on again, or first choose a lighter preset. A restart of the plugin alone (a reload, an upgrade) leaves upscaling on.
+The player itself guards against shaders that crash it or lose the GPU (Vestra Player 0.6.3 and later). After a run that ended abnormally while plugin shaders were drawing, it does not run plugin shaders at the next start and shows one OSD line; after two such runs within a day it keeps them off until the GPU, the driver or the player changes, or for 7 days. A normal quit never counts.
+
+Shader upscaling then stays **on** in its settings, but the window says "Off for this start: the player ended abnormally while shaders were drawing", keeps your model and parameters, and suggests a preset that is not marked demanding. The plugin does not try again by itself, also not for a new video or preset; Turn On tries once more and, while the player still refuses, shows the same reason.
 
 ## Limits
 

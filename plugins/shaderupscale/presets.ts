@@ -57,13 +57,6 @@ export const isSettings = (value: unknown): value is Settings =>
   oneOf(ARTCNN_SIZES, value.artcnn.size) &&
   oneOf(ARTCNN_STYLES, value.artcnn.style);
 
-/** `guard.json`: shaders are applied in this run (see main.ts, crash safety). */
-export interface Guard {
-  active: boolean;
-}
-
-export const isGuard = (value: unknown): value is Guard => isObject(value) && typeof value.active === "boolean";
-
 /** The modes with a second restore pass: marked demanding, as HQ and ArtCNN C4F32 are. */
 export const demandingMode = (mode: Anime4kMode) => mode.includes("+");
 

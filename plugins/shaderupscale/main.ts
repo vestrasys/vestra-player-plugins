@@ -1,3 +1,4 @@
+import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { FilterStatus, Plugin, RenderingState, Text, TextList, VideoShaders } from "@vestra-player/sdk";
 import {
@@ -9,8 +10,6 @@ import {
   isSettings,
   MODELS,
   demandingMode,
-  type Guard,
-  isGuard,
   needsCompute,
   type Settings,
   shaderFiles,
@@ -45,12 +44,11 @@ export const shaderPath = (file: string) => join(PACKAGE, "shaders", ...file.spl
  * Nothing runs while it is off: the plugin holds nothing, so with lazy
  * activation the player may stop it. While on, its shaders keep it running.
  *
- * Crash safety: while shaders are applied, `guard.json` says so
- * (`active: true`); a clean stop clears it. Found set at the next start of
- * the player (session storage empty, so not a restart of the plugin within
- * one player run), the player did not close normally while the shaders ran,
- * so the plugin starts with them off and says why, rather than risk the same
- * end again.
+ * Crash safety is the player's (0.6.3): after a run that ended abnormally
+ * while plugin shaders were drawing, it refuses non-empty shader lists at
+ * the next start with `previous-crash` and shows its own OSD line. The
+ * plugin then keeps the user's choice, sends nothing more on its own, and
+ * says in the window why the shaders are off; an explicit Turn On tries once.
  */
 export default async function activate(plugin: Plugin) {
   const { text, list } = plugin.i18n;
@@ -59,16 +57,13 @@ export default async function activate(plugin: Plugin) {
     validate: isSettings,
   });
   const save = (patch: Partial<Settings>) => store.save({ ...store.value, ...patch });
-  /** Shaders are applied (written before they are sent, cleared when they are withdrawn and at a clean stop). */
-  const guard = plugin.storage.json<Guard>("guard", { defaults: { active: false }, validate: isGuard, debounceMs: 0 });
-  // Registered after the store, so it runs first and the store's own disposal writes the cleared flag.
-  plugin.onDispose(async () => {
-    if (!guard.value.active) return;
-    guard.save({ active: false });
-    await guard.flush().catch((error: unknown) => console.error("shaderupscale: guard:", error));
-  });
-  /** Turned off at this start because the player did not close normally while the shaders ran (until turned on again). */
-  let recovered = false;
+  /**
+   * The player refused shaders for this start (`previous-crash`) with this
+   * message: nothing is sent again until the user turns them on explicitly.
+   */
+  let refused: string | null = null;
+  // Unreleased builds of 0.1.1 kept their own crash flag here; the player's guard replaces it.
+  await rm(join(plugin.dataDirectory, "guard.json"), { force: true }).catch(() => {});
 
   const window = plugin.windows.create("upscale.slint");
   /**
@@ -158,18 +153,12 @@ export default async function activate(plugin: Plugin) {
   }
 
   async function applyNow() {
-    const want = store.value.on && unavailable() === null ? shaderFiles(store.value).map(shaderPath) : [];
+    const want = store.value.on && refused === null && unavailable() === null ? shaderFiles(store.value).map(shaderPath) : [];
     if (want.length === sent.length && want.every((path, i) => path === sent[i])) return;
     sent = want;
     toldFailure = false;
-    if (want.length > 0) {
-      if (!guard.value.active) {
-        guard.save({ active: true });
-        // On disk before the player runs them: a crash from here on is noticed at the next start.
-        await guard.flush().catch((error: unknown) => console.error("shaderupscale: guard:", error));
-      }
-      (shaders ??= handle()).set(want);
-    } else await release();
+    if (want.length > 0) (shaders ??= handle()).set(want);
+    else await release();
   }
 
   /** Withdraw the shaders and let the handle go (the plugin may then be stopped while idle). */
@@ -177,7 +166,6 @@ export default async function activate(plugin: Plugin) {
     const old = shaders;
     shaders = null;
     await old?.dispose();
-    if (guard.value.active) guard.save({ active: false });
     plugin.update();
   }
 
@@ -202,6 +190,12 @@ export default async function activate(plugin: Plugin) {
             plugin.update();
           })
           .catch(() => {});
+    } else if (status.state === "failed" && status.error.code === "previous-crash") {
+      // The player's crash guard: it shows its own OSD line. Keep the choice, send nothing more
+      // (a new video or preset does not try again), and let the handle go.
+      refused = status.error.message;
+      sent = [];
+      queue = queue.then(release).catch(() => {});
     } else if (status.state === "failed" && status.error.code === "failed" && !toldFailure) {
       toldFailure = true;
       void osd(text("Shader Upscaling: a shader did not compile"));
@@ -210,11 +204,15 @@ export default async function activate(plugin: Plugin) {
   }
 
   async function setOn(on: boolean) {
-    recovered = false;
+    // An explicit Turn On after a refusal tries once more; a refusal again shows the same reason.
+    if (on) refused = null;
     save({ on });
     await apply();
     plugin.update();
     if (!on) return osd(text("Shader Upscaling: Off"));
+    await outcome(shaders);
+    // Refused: the status line says why (the player showed its OSD line at the start).
+    if (refused !== null) return;
     const why = unavailable();
     return osd(
       why === null
@@ -229,7 +227,21 @@ export default async function activate(plugin: Plugin) {
     );
   }
 
-  /** A new model or parameter: saved, and applied at once while on. */
+  /** Resolves once the player answered the list just sent (at most 3 s). */
+  function outcome(from: VideoShaders | null) {
+    if (from === null || from.status.state !== "applying") return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      const timer = setTimeout(done, 3000);
+      const watch = from.onStatus((status) => status.state !== "applying" && done());
+      function done() {
+        clearTimeout(timer);
+        void watch.dispose();
+        resolve();
+      }
+    });
+  }
+
+  /** A new model or parameter: saved, and applied at once while on (not after a refusal). */
   async function choose(patch: Partial<Settings>) {
     save(patch);
     plugin.update();
@@ -241,15 +253,16 @@ export default async function activate(plugin: Plugin) {
   function headline(status: FilterStatus | null): { status: Text; tone: number; detail: Text | string } {
     const why = unavailable();
     if (why !== null) return { status: text("Not available"), tone: 3, detail: why };
-    if (!store.value.on)
+    if (!store.value.on) return { status: text("Off"), tone: 0, detail: "" };
+    if (refused !== null)
       return {
-        status: text("Off"),
-        tone: 0,
-        detail: recovered
-          ? text(
-              "Shader upscaling was turned off because the player did not close normally while it was on. Turn it on again, or first choose a preset that is not marked demanding.",
-            )
-          : "",
+        status: text("Off for this start: the player ended abnormally while shaders were drawing"),
+        tone: 3,
+        detail: text(
+          // TRANSLATORS: {} is the player's own message, in English.
+          "Your choice is kept. Choose a preset that is not marked demanding, then Turn On to try once more. The player says: {}",
+          [refused],
+        ),
       };
     switch (status?.state) {
       case "applied":
@@ -383,7 +396,8 @@ export default async function activate(plugin: Plugin) {
   }
 
   window.bind(() => {
-    const on = store.value.on;
+    // Refused for this start: shown off, so the button offers Turn On (the saved choice stays on).
+    const on = store.value.on && refused === null;
     const head = headline(shaders?.status ?? null);
     return {
       models: MODELS.map((model) => (model === "anime4k" ? text("Anime4K") : text("ArtCNN"))),
@@ -423,7 +437,7 @@ export default async function activate(plugin: Plugin) {
     }
     plugin.update();
   });
-  window.on("toggle", () => setOn(!store.value.on));
+  window.on("toggle", () => setOn(!(store.value.on && refused === null)));
   window.on("closeWindow", () =>
     // `missing` when the user closed it with the title bar just before.
     window.close().catch(() => {}),
@@ -435,20 +449,6 @@ export default async function activate(plugin: Plugin) {
     if (!gpu()) {
       rendering = await plugin.rendering.state().catch(() => null);
       plugin.update();
-    }
-  }
-
-  // A crash while the shaders ran: start with them off. Session storage tells a restart of the
-  // plugin within one player run (the player kept running: nothing to undo) from a new player run.
-  // Decided before the menu item exists, so an early Turn On cannot be taken for a leftover flag.
-  const sameRun = (await plugin.storage.session.get<boolean>("running").catch(() => undefined)) === true;
-  await plugin.storage.session.set("running", true).catch(() => {});
-  if (guard.value.active) {
-    guard.save({ active: false });
-    if (!sameRun && store.value.on) {
-      recovered = true;
-      save({ on: false });
-      void osd(text("Shader Upscaling turned off: the player did not close normally"));
     }
   }
 
