@@ -1,0 +1,113 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: zysilm.autoframe 0.1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: main.ts:327
+msgid "Auto Frame needs ffmpeg, which was not found"
+msgstr ""
+
+#: main.ts:330
+msgid "Auto Frame could not read this video"
+msgstr ""
+
+#: main.ts:390
+msgid "Auto Frame: the picture is too narrow or too wide to frame"
+msgstr ""
+
+#: main.ts:392
+msgid "Auto Frame: too few frames show a picture to decide"
+msgstr ""
+
+#: main.ts:393
+msgid "Auto Frame: no solid border around the picture"
+msgstr ""
+
+#: main.ts:394
+msgid "Auto Frame: bars only above and below or only at the sides are kept"
+msgstr ""
+
+#: main.ts:395
+msgid "Auto Frame: the picture moves on a plain background, not cropped"
+msgstr ""
+
+#: main.ts:396
+msgid "Auto Frame: the picture inside the border is too small to frame"
+msgstr ""
+
+#: main.ts:426
+msgid "Auto Frame paused: Crop/Stretch or rotation changes the picture"
+msgstr ""
+
+#: main.ts:453 main.ts:491
+msgid "Auto Frame undone: Crop/Stretch or rotation changes the picture"
+msgstr ""
+
+#: main.ts:459
+msgid "Auto-framed to {}"
+msgstr ""
+
+#: main.ts:581
+msgid "Play a video file on this computer to use Auto Frame"
+msgstr ""
+
+#: main.ts:585 main.ts:607 main.ts:622
+msgid "Auto Frame"
+msgstr ""
+
+#: main.ts:585
+msgid "Auto-Frame Videos"
+msgstr ""
+
+#: main.ts:596
+msgid "Auto Frame: Off"
+msgstr ""
+
+#: main.ts:599
+msgid "Auto Frame: On"
+msgstr ""
+
+#: main.ts:607
+msgid "Detect Again"
+msgstr ""
+
+#: main.ts:613 main.ts:625
+msgid "Auto-Frame Videos is off"
+msgstr ""
+
+#: main.ts:615
+msgid "The full picture is shown for this file"
+msgstr ""
+
+#: main.ts:622
+msgid "Show Full Picture for This File"
+msgstr ""
+
+#: main.ts:637
+msgid "Showing the full picture of this file"
+msgstr ""
+
+#: manifest.json
+msgid "Auto Frame for Vestra Player"
+msgstr ""
+
+#: manifest.json
+msgid "Crops away the solid-colour border around a video's picture"
+msgstr ""
+
+#: manifest.json
+msgid "Some videos are larger than their picture: a 2560×1440 picture in a corner of a 3840×2160 video, the rest one solid colour. Auto Frame finds the picture when a video file on this computer starts and crops the video to it, so the picture fills the window. Films with bars only above and below, or only at the sides, are left as they are. It reads a few frames of the file with the player's FFmpeg, remembers the answer per file and says on the video what it did. Video ▸ Auto Frame turns it on and off, detects again, and shows the full picture of one file."
+msgstr ""
+
+#: manifest.json
+msgid "video"
+msgstr ""
+
+#: manifest.json
+msgid "crop"
+msgstr ""
+
+#: manifest.json
+msgid "border"
+msgstr ""
