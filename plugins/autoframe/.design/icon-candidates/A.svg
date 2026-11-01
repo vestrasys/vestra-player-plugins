@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- A: the solid canvas (dark grey), the picture (teal) in its top-left corner,
+       four crop corners closing onto the picture, and an arrow: it is enlarged. -->
+  <rect x="8" y="8" width="240" height="240" rx="48" fill="#34373C"/>
+  <rect x="8.5" y="8.5" width="239" height="239" rx="47.5" fill="none" stroke="#4A4E55" stroke-width="1"/>
+  <rect x="50" y="56" width="112" height="64" rx="4" fill="#1FB5A8"/>
+  <g fill="none" stroke="#F4F5F7" stroke-width="12" stroke-linecap="square" stroke-linejoin="miter">
+    <path d="M38,70 V44 H64"/>
+    <path d="M148,44 H174 V70"/>
+    <path d="M38,106 V132 H64"/>
+    <path d="M148,132 H174 V106"/>
+  </g>
+  <g fill="none" stroke="#1FB5A8" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M178,148 L212,182"/>
+    <path d="M186,186 H214 V158"/>
+  </g>
+</svg>

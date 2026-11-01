@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- B: two interlocking crop marks around a solid amber picture on near-black. -->
+  <rect x="8" y="8" width="240" height="240" rx="48" fill="#141517"/>
+  <rect x="84" y="84" width="88" height="88" fill="#F2A72B"/>
+  <g fill="none" stroke="#ECECEC" stroke-width="16" stroke-linecap="square" stroke-linejoin="miter">
+    <path d="M72,40 V184 H216"/>
+    <path d="M40,72 H184 V216"/>
+  </g>
+</svg>

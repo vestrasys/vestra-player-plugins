@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- C: a light solid background, a small picture off-centre (slate blue, one
+       coral accent) inside a dashed bounding box and viewfinder brackets. -->
+  <rect x="8" y="8" width="240" height="240" rx="48" fill="#E9EDF2"/>
+  <rect x="58" y="62" width="100" height="70" rx="4" fill="#4B5E80"/>
+  <circle cx="134" cy="84" r="10" fill="#FF6F4D"/>
+  <path d="M62,128 L92,96 L112,116 L124,104 L154,128 Z" fill="#7E93B5"/>
+  <rect x="50" y="54" width="116" height="86" fill="none" stroke="#FF6F4D" stroke-width="4" stroke-dasharray="10 7"/>
+  <g fill="none" stroke="#4B5E80" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M34,64 V38 H60"/>
+    <path d="M156,38 H182 V64"/>
+    <path d="M34,130 V156 H60"/>
+    <path d="M156,156 H182 V130"/>
+  </g>
+</svg>
