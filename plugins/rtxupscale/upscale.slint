@@ -1,7 +1,10 @@
 // The AI Upscaling window: one button turns upscaling on and off; below it, how upscaling runs
 // now, live while the window is open (main.ts listens to the player's changes only then).
-// Width 400 (content 400 − 28 = 372): label column 120 + 8 + value 244. Wrapped texts (the
-// reason, the blocking plugins, the note) grow the window by their height.
+// Width 400 (content 400 − 28 = 372): label column 120 + 8 + value 244. The height is the
+// content's (min = preferred = max, as the About window): the player sizes a window only when it
+// is created, before main.ts fills the texts, so without the bounds the window opens taller than
+// its content and the spare height stretches the Close row. Wrapped texts (the reason, the
+// blocking plugins, the note) change the height with them.
 // Texts are @tr (English source; locales/<lang>.po translate them). Sizes, the factor, the GPU's
 // and the decoder's names are data from main.ts; the plugin names are the player's.
 import { Theme } from "@vestra/theme.slint";
@@ -40,6 +43,9 @@ export component UpscaleWindow inherits Window {
     preferred-width: 400px;
     min-width: 400px;
     max-width: 400px;
+    preferred-height: body.preferred-height;
+    min-height: body.preferred-height;
+    max-height: body.preferred-height;
     background: Theme.bg-panel;
     // The user's choice (the menu item's check mark).
     in property <bool> on;
@@ -83,7 +89,7 @@ export component UpscaleWindow inherits Window {
         }
     }
 
-    VerticalLayout {
+    body := VerticalLayout {
         padding: Theme.dialog-padding;
         spacing: 8px;
         // Headline: a dot in the tone's colour, the state, and the one-click switch.
@@ -155,6 +161,7 @@ export component UpscaleWindow inherits Window {
         }
         HorizontalLayout {
             alignment: end;
+            height: Theme.button-height;
             Button { text: @tr("Close"); clicked => { root.close-window(); } }
         }
     }
