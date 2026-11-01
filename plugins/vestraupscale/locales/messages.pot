@@ -1,260 +1,260 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: zysilm.vestraupscale 0.2.0\n"
+"Project-Id-Version: zysilm.vestraupscale 0.2.1\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: main.ts:180
+#: main.ts:183
 msgid "AI upscaling needs GPU rendering."
 msgstr ""
 
-#: main.ts:181
+#: main.ts:184
 msgid "AI upscaling starts when GPU rendering is ready."
 msgstr ""
 
 #. {} is the player's own message, in English.
-#: main.ts:185
+#: main.ts:188
 msgid "AI upscaling needs GPU rendering, which cannot be turned on here: {}"
 msgstr ""
 
-#: main.ts:189
+#: main.ts:192
 msgid "GPU rendering stopped during this run: restart the player to use AI upscaling."
 msgstr ""
 
-#: main.ts:190
+#: main.ts:193
 msgid "GPU rendering is on from the next start: restart the player to use AI upscaling."
 msgstr ""
 
-#: main.ts:191
+#: main.ts:194
 msgid "AI upscaling needs GPU rendering: turn on Video ▸ GPU Rendering (Experimental), then restart the player."
 msgstr ""
 
-#: main.ts:206
+#: main.ts:209
 msgid "other plugins' video filters need the frames in memory, so the video is not decoded on the GPU. Turn those filters off or reset them there; upscaling then starts by itself."
 msgstr ""
 
-#: main.ts:209
+#: main.ts:212
 msgid "hardware decoding copies the frames back to memory (copy-back), as the player's hardware decoding setting asks. Upscaling needs the video decoded on the GPU without copy-back."
 msgstr ""
 
-#: main.ts:212
+#: main.ts:215
 msgid "hardware decoding is off. Upscaling needs the video decoded on the GPU."
 msgstr ""
 
-#: main.ts:215
+#: main.ts:218
 msgid "this video is decoded in software, for example a cover picture or a format the GPU cannot decode. It starts again with a video the GPU decodes."
 msgstr ""
 
-#: main.ts:218
+#: main.ts:221
 msgid "this video is decoded with another hardware decoder than the one upscaling needs."
 msgstr ""
 
 #. {} is why (a translated clause, or the player's own message in English).
-#: main.ts:232
+#: main.ts:235
 msgid "AI upscaling waits: {}"
 msgstr ""
 
 #. {} is why (a translated clause, or the player's own message in English).
-#: main.ts:237
+#: main.ts:240
 msgid "When turned on, AI upscaling will wait: {}"
 msgstr ""
 
-#: main.ts:248
+#: main.ts:251
 msgid "AI Upscaling: On, waits until other video filters are off"
 msgstr ""
 
-#: main.ts:249
+#: main.ts:252
 msgid "AI Upscaling: On, waits: hardware decoding copies frames back"
 msgstr ""
 
-#: main.ts:251
+#: main.ts:254
 msgid "AI Upscaling: On, waits until hardware decoding is on"
 msgstr ""
 
-#: main.ts:253
+#: main.ts:256
 msgid "AI Upscaling: On, waits: this video is decoded in software"
 msgstr ""
 
-#: main.ts:255
+#: main.ts:258
 msgid "AI Upscaling: On, waits: the video uses another hardware decoder"
 msgstr ""
 
-#: main.ts:257
+#: main.ts:260
 msgid "AI Upscaling: On, waits until the video is decoded on the GPU"
 msgstr ""
 
 #. the first {} is our advice, the second the player's own message, in English.
-#: main.ts:271
+#: main.ts:274
 msgid "{} ({})"
 msgstr ""
 
-#: main.ts:276
+#: main.ts:279
 msgid "AI upscaling is not available on this system. It needs Windows and an NVIDIA RTX GPU."
 msgstr ""
 
-#: main.ts:278
+#: main.ts:281
 msgid "AI upscaling is not available on this computer. It needs an NVIDIA RTX GPU."
 msgstr ""
 
-#: main.ts:284
+#: main.ts:287
 msgid "The player runs on a GPU that cannot upscale: in Windows Settings ▸ System ▸ Display ▸ Graphics, choose the high-performance GPU for Vestra Player, then restart it."
 msgstr ""
 
-#: main.ts:288
+#: main.ts:291
 msgid "The NVIDIA driver is too old for AI upscaling: update it to version 530 or newer."
 msgstr ""
 
 #. {} is the player's own message, in English.
-#: main.ts:295
+#: main.ts:298
 msgid "AI upscaling is not available on this computer: {}"
 msgstr ""
 
-#: main.ts:310
+#: main.ts:313
 msgid "AI upscaling needs Windows and an NVIDIA RTX GPU"
 msgstr ""
 
-#: main.ts:312
+#: main.ts:315
 msgid "AI upscaling needs an NVIDIA RTX GPU"
 msgstr ""
 
-#: main.ts:314
+#: main.ts:317
 msgid "AI upscaling needs NVIDIA driver 530 or newer"
 msgstr ""
 
-#: main.ts:316
+#: main.ts:319
 msgid "AI upscaling: choose the NVIDIA GPU in Windows graphics settings"
 msgstr ""
 
-#: main.ts:320
+#: main.ts:323
 msgid "AI upscaling waits until the video is decoded on the GPU"
 msgstr ""
 
-#: main.ts:323
+#: main.ts:326
 msgid "AI upscaling needs GPU rendering"
 msgstr ""
 
-#: main.ts:324
+#: main.ts:327
 msgid "AI upscaling starts when GPU rendering is ready"
 msgstr ""
 
-#: main.ts:325
+#: main.ts:328
 msgid "AI upscaling needs GPU rendering, which is unavailable here"
 msgstr ""
 
-#: main.ts:327
+#: main.ts:330
 msgid "Restart the player to use AI upscaling"
 msgstr ""
 
-#: main.ts:328
+#: main.ts:331
 msgid "AI upscaling: turn on Video ▸ GPU Rendering, then restart"
 msgstr ""
 
-#: main.ts:331
+#: main.ts:334
 msgid "AI upscaling is not available on this computer"
 msgstr ""
 
-#: main.ts:352
+#: main.ts:355
 msgid "AI Upscaling: On — also turn on Super Resolution in the NVIDIA app"
 msgstr ""
 
-#: main.ts:383
+#: main.ts:386
 msgid "AI Upscaling: On, starts when GPU rendering is ready"
 msgstr ""
 
-#: main.ts:385
+#: main.ts:388
 msgid "AI Upscaling: On"
 msgstr ""
 
-#: main.ts:399
+#: main.ts:402
 msgid "AI Upscaling: Off"
 msgstr ""
 
-#: main.ts:458
+#: main.ts:461
 msgid "AI Upscaling (RTX Video Super Resolution)"
 msgstr ""
 
-#: main.ts:494
+#: main.ts:497
 msgid "Please wait…"
 msgstr ""
 
-#: main.ts:495
+#: main.ts:498
 msgid "Not available"
 msgstr ""
 
-#: main.ts:496
+#: main.ts:499
 msgid "Off"
 msgstr ""
 
-#: main.ts:497
+#: main.ts:500
 msgid "On: starts when a video plays"
 msgstr ""
 
-#: main.ts:498
+#: main.ts:501
 msgid "On, waiting"
 msgstr ""
 
-#: main.ts:499
+#: main.ts:502
 msgid "On: upscaling requested"
 msgstr ""
 
-#: main.ts:500
+#: main.ts:503
 msgid "On: no video"
 msgstr ""
 
-#: main.ts:501
+#: main.ts:504
 msgid "On: not needed for this video"
 msgstr ""
 
-#: main.ts:514
+#: main.ts:517
 msgid "The video is shown at its own size or smaller: upscaling starts when it is shown larger."
 msgstr ""
 
 #. {} is the plugin's name as the player reports it (Picture Adjustments, the built-in plugin).
-#: main.ts:527
+#: main.ts:530
 msgid "{}: press Q (Video ▸ Reset) to reset the picture, and turn off its other video effects."
 msgstr ""
 
 #. {} is the plugin's name as the player reports it.
-#: main.ts:532
+#: main.ts:535
 msgid "{}: turn off or reset its video filters there."
 msgstr ""
 
 #. {} is one or more plugin names, as their manifests give them.
-#: main.ts:539
+#: main.ts:542
 msgid "Upscaling waits for the video filters of: {}"
 msgstr ""
 
-#: main.ts:556
+#: main.ts:559
 msgid "No video"
 msgstr ""
 
 #. the stored size, then the size the video is meant to be shown at.
-#: main.ts:561
+#: main.ts:564
 msgid "{} (shown as {})"
 msgstr ""
 
-#: main.ts:571
+#: main.ts:574
 msgid "Unknown"
 msgstr ""
 
-#: main.ts:576
+#: main.ts:579
 msgid "Software (no)"
 msgstr ""
 
-#: main.ts:578
+#: main.ts:581
 msgid "Yes"
 msgstr ""
 
-#: main.ts:578
+#: main.ts:581
 msgid "No"
 msgstr ""
 
-#: main.ts:629
+#: main.ts:632
 msgid "AI Upscaling…"
 msgstr ""
 
 #: manifest.json
-msgid "VestraUpscale"
+msgid "RTX Upscale for Vestra Player"
 msgstr ""
 
 #: manifest.json

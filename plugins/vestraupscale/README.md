@@ -1,4 +1,4 @@
-# VestraUpscale
+# RTX Upscale for Vestra Player
 
 AI upscaling for Vestra Player with NVIDIA RTX Video Super Resolution: the NVIDIA GPU sharpens and enlarges the video to the size it is shown at.
 
@@ -17,7 +17,7 @@ Right-click menu **Video ▸ AI Upscaling (RTX Video Super Resolution)**: pick i
 
 - whether upscaling is on, and whether the player asked the GPU to upscale now, waits, or cannot work here, and why;
 - the video's size, the size it is upscaled to and the scale factor, the video area, the GPU, the decoder (`d3d11va`, `d3d11va-copy`, software) and whether the upscaler is in the player's filter chain;
-- when other plugins' video filters hold upscaling back, their names (as the player reports them) and what to do there. For the built-in Picture Adjustments, that is **Video ▸ Reset** (key **Q**) and turning off its other video effects. VestraUpscale never changes another plugin's settings itself.
+- when other plugins' video filters hold upscaling back, their names (as the player reports them) and what to do there. For the built-in Picture Adjustments, that is **Video ▸ Reset** (key **Q**) and turning off its other video effects. The plugin never changes another plugin's settings itself.
 
 The window listens to the player only while it is open, and the player reports changes only while upscaling is on: while it is off, the window shows what it read when it opened. Nothing in it can show whether the driver really upscales (see below).
 
@@ -45,3 +45,5 @@ Upscaling only happens when **NVIDIA app ▸ System ▸ Video ▸ RTX Video Enha
 - On Windows, checking whether the GPU can upscale wakes a sleeping NVIDIA GPU, so the plugin asks the player only when you first pick the item, or, once you turned upscaling on, when the first video plays. Nothing is checked while the player starts.
 - The driver gives no sign that it upscales; the player only knows that it asked for it (the window's "In the filter chain"). The quality level is chosen in the NVIDIA app, not in the player.
 - Upscaling uses the NVIDIA GPU: power use and heat go up.
+
+NVIDIA and RTX are trademarks of NVIDIA Corporation. This plugin uses RTX Video Super Resolution through the driver; it is not made or endorsed by NVIDIA.

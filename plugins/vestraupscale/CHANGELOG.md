@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1
+
+- New name: **RTX Upscale for Vestra Player** (was VestraUpscale), in the store and in every language. The plugin id stays `zysilm.vestraupscale`, so installed copies keep their settings and get this version as an update.
+- New icon: "RTX" with four arrows expanding to the corners. "RTX" names the NVIDIA technology the plugin uses; the plugin is not made or endorsed by NVIDIA.
+
 ## 0.2.0
 
 - New window, **Video ▸ AI Upscaling…**: one button turns upscaling on and off, and the window shows live how it runs: on or off, whether the player asked the GPU to upscale, waits or cannot work here, and why; the video's size, the size it is upscaled to and the scale factor, the video area, the GPU, the decoder and whether the upscaler is in the filter chain. A note says that the driver gives no sign that it upscales and that Super Resolution (and its quality level) is set in the NVIDIA app. The window listens to the player only while it is open, so the plugin is not kept running otherwise. The player reports changes only while upscaling is on; while it is off, the window shows what it read when it opened, says so, and words a decoding reason as what would happen once upscaling is on.

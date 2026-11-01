@@ -939,3 +939,13 @@ test("window: Close right after a title-bar close does not fail", async () => {
     await stop();
   }
 });
+
+test("store listing: the new name, the same id, a 256×256 icon", async () => {
+  const manifest = JSON.parse(await readFile(new URL("manifest.json", directory), "utf8"));
+  assert.equal(manifest.id, "zysilm.vestraupscale"); // the identity installed copies and updates depend on
+  assert.equal(manifest.name, "RTX Upscale for Vestra Player");
+  assert.equal(manifest.icon, "assets/icon.png");
+  const png = await readFile(new URL(manifest.icon, directory));
+  assert.equal(png.toString("latin1", 1, 4), "PNG");
+  assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [256, 256]);
+});
