@@ -57,9 +57,9 @@ The plugin follows the player's interface language (English and Simplified Chine
 
 ## Credits and licences
 
-The plugin's code is Apache-2.0. The shaders are redistributed unchanged under their own MIT licences, included in the package (`shaders/anime4k/LICENSE`, `shaders/artcnn/LICENSE`, and `shaders/SOURCES.txt` with versions):
+The plugin's code is Apache-2.0. The shaders are redistributed unchanged under their own licences (MIT; the Unlicense for two of Anime4K's), included in the package (`shaders/anime4k/LICENSE`, `shaders/artcnn/LICENSE`, and `shaders/SOURCES.txt` with versions):
 
-- [Anime4K](https://github.com/bloc97/Anime4K) v4.0.1, © 2019–2021 bloc97, MIT.
+- [Anime4K](https://github.com/bloc97/Anime4K) v4.0.1, © 2019–2021 bloc97, MIT; `Anime4K_AutoDownscalePre_x2.glsl` and `_x4.glsl` are under the Unlicense (public domain). The mode presets follow Anime4K's mpv templates from its master branch (the v4.0.1 tag does not contain them).
 - [ArtCNN](https://github.com/Artoriuz/ArtCNN), © 2024 João Chrisóstomo and Kacper Michajłow, MIT.
 
 FSRCNNX, NNEDI3 and RAVU are not included: their licences (GPL-3.0 and LGPL-3.0) are not ones this repository ships.

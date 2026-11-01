@@ -72,7 +72,8 @@ const a4k = (name: string) => `anime4k/Anime4K_${name}.glsl`;
 
 /**
  * Anime4K's shader chain for a mode, exactly as the upstream mpv templates
- * (`md/Template/GLSL_Mac_Linux_{High,Low}-end/input.conf`) list it. "HQ"
+ * (`md/Template/GLSL_Mac_Linux_{High,Low}-end/input.conf` on the master
+ * branch; the v4.0.1 tag does not contain them) list it. "HQ"
  * uses the VL network for the first steps and M for the last; "Fast" uses M
  * and S. The two AutoDownscalePre passes only run when the picture would
  * otherwise be upscaled past the window, so the chain fits any window size.

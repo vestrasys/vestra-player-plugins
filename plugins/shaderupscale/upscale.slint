@@ -157,7 +157,8 @@ export component UpscaleWindow inherits Window {
                 clicked => { root.toggle(); }
             }
         }
-        Paragraph { text: root.detail; }
+        // Only when there is something to say: an empty one would still take the layout's spacing.
+        if root.detail != "": Paragraph { text: root.detail; }
         Rectangle { height: 1px; background: Theme.line; }
         Paragraph {
             text: @tr("Shaders run on the GPU while the picture is drawn: only with GPU rendering, and exported videos and pictures do not contain them. If playback stutters, choose a preset that is not marked demanding.");

@@ -309,7 +309,11 @@ export default async function activate(plugin: Plugin) {
                 "Mode {} (demanding)",
                 [mode],
               )
-            : text("Mode {}", [mode]),
+            : text(
+                // TRANSLATORS: {} is the mode (A, B or C).
+                "Mode {}",
+                [mode],
+              ),
         ),
         paramAIndex: ANIME4K_MODES.indexOf(s.anime4k.mode),
         paramBLabel: text("Quality"),
@@ -434,16 +438,9 @@ export default async function activate(plugin: Plugin) {
     }
   }
 
-  plugin.commands.add({
-    id: "shaderupscale.window",
-    path: ["@video", WINDOW_TITLE],
-    order: 463,
-    group: "video-rendering",
-    run: openWindow,
-  });
-
   // A crash while the shaders ran: start with them off. Session storage tells a restart of the
   // plugin within one player run (the player kept running: nothing to undo) from a new player run.
+  // Decided before the menu item exists, so an early Turn On cannot be taken for a leftover flag.
   const sameRun = (await plugin.storage.session.get<boolean>("running").catch(() => undefined)) === true;
   await plugin.storage.session.set("running", true).catch(() => {});
   if (guard.value.active) {
@@ -454,6 +451,14 @@ export default async function activate(plugin: Plugin) {
       void osd(text("Shader Upscaling turned off: the player did not close normally"));
     }
   }
+
+  plugin.commands.add({
+    id: "shaderupscale.window",
+    path: ["@video", WINDOW_TITLE],
+    order: 463,
+    group: "video-rendering",
+    run: openWindow,
+  });
 
   // The saved choice: the shaders go to the player now and apply when a video plays.
   await apply();

@@ -60,6 +60,25 @@ const held = (host: TestHost) => host.videoShaders.handles.get(HANDLE);
 const paths = (files: string[]) => files.map(shaderPath);
 const saved = async (data: string) => JSON.parse(await readFile(join(data, "upscaling.json"), "utf8"));
 
+/**
+ * Retry `check` until it passes, 20 ms at a time for up to 2 s, then fail
+ * with its last error. Turning shaders on writes `guard.json` before they are
+ * sent: the plugin's own file I/O, which `host.settle()` does not wait for
+ * (testing.d.ts, `settle`). Every assertion that follows such a write polls.
+ */
+async function eventually(host: TestHost, check: () => unknown) {
+  const end = Date.now() + 2000;
+  for (;;) {
+    try {
+      await check();
+      return;
+    } catch (error) {
+      if (Date.now() > end) throw error;
+    }
+    await host.settle(20);
+  }
+}
+
 // ------------------------------------------------------------------ presets
 
 test("presets: every chain is Anime4K's own template, and every file is bundled", () => {
@@ -170,18 +189,20 @@ test("window: the defaults, one click on, the status says what is applied, one c
     assert.equal(window.props["can-toggle"], true);
 
     window.emit("toggle");
-    await host.settle();
-    assert.deepEqual(held(host), paths(anime4kFiles("A", "fast")));
-    assert.equal(window.props.on, true);
-    assert.equal(window.props.status, "On: Anime4K mode A (Fast)");
-    assert.equal(window.props.tone, 1);
-    assert.equal(host.osd.at(-1), "Shader Upscaling: On, Anime4K mode A (Fast)");
+    await eventually(host, () => {
+      assert.deepEqual(held(host), paths(anime4kFiles("A", "fast")));
+      assert.equal(window.props.on, true);
+      assert.equal(window.props.status, "On: Anime4K mode A (Fast)");
+      assert.equal(window.props.tone, 1);
+      assert.equal(host.osd.at(-1), "Shader Upscaling: On, Anime4K mode A (Fast)");
+    });
 
     window.emit("toggle");
-    await host.settle();
-    assert.equal(held(host), undefined);
-    assert.equal(window.props.status, "Off");
-    assert.equal(host.osd.at(-1), "Shader Upscaling: Off");
+    await eventually(host, () => {
+      assert.equal(held(host), undefined);
+      assert.equal(window.props.status, "Off");
+      assert.equal(host.osd.at(-1), "Shader Upscaling: Off");
+    });
     // Off and the window closed: the handle is gone, nothing keeps the plugin running.
     window.userClose();
     await host.settle();
@@ -196,16 +217,17 @@ test("window: a new mode, quality or model applies at once while on, and is reme
   const { host, window, stop } = await opened(windowsGpu(), "en", data);
   try {
     window.emit("toggle");
-    await host.settle();
+    await eventually(host, () => assert.deepEqual(held(host), paths(anime4kFiles("A", "fast"))));
     window.emit("pickA", 3); // A+A
     window.emit("pickB", 1); // HQ
-    await host.settle();
-    assert.deepEqual(held(host), paths(anime4kFiles("A+A", "hq")));
-    assert.equal(window.props["param-a-index"], 3);
-    assert.equal(window.props.status, "On: Anime4K mode A+A (HQ)");
+    await eventually(host, () => {
+      assert.deepEqual(held(host), paths(anime4kFiles("A+A", "hq")));
+      assert.equal(window.props["param-a-index"], 3);
+      assert.equal(window.props.status, "On: Anime4K mode A+A (HQ)");
+    });
 
     window.emit("pickModel", 1); // ArtCNN
-    await host.settle();
+    await eventually(host, () => assert.deepEqual(held(host), paths(["artcnn/ArtCNN_C4F16.glsl"])));
     assert.equal(window.props["param-a-label"], "Size");
     assert.equal(window.props["param-b-label"], "Variant");
     assert.deepEqual(window.props["param-b-items"], ["Neutral", "Denoise and sharpen", "Denoise and soften"]);
@@ -213,20 +235,19 @@ test("window: a new mode, quality or model applies at once while on, and is reme
       "C4F16: light on the GPU",
       "C4F32 (demanding): more detail, needs a faster GPU",
     ]);
-    assert.deepEqual(held(host), paths(["artcnn/ArtCNN_C4F16.glsl"]));
     window.emit("pickA", 1);
     window.emit("pickB", 1);
-    await host.settle();
-    assert.deepEqual(held(host), paths(["artcnn/ArtCNN_C4F32_DS.glsl"]));
-    assert.equal(window.props.status, "On: ArtCNN C4F32 (Denoise and sharpen)");
+    await eventually(host, () => {
+      assert.deepEqual(held(host), paths(["artcnn/ArtCNN_C4F32_DS.glsl"]));
+      assert.equal(window.props.status, "On: ArtCNN C4F32 (Denoise and sharpen)");
+    });
     assert.match(String(window.props.description), /\nC4F32 \(demanding\) runs/);
 
     // Back to Anime4K: its own parameters are as they were.
     window.emit("pickModel", 0);
-    await host.settle();
+    await eventually(host, () => assert.deepEqual(held(host), paths(anime4kFiles("A+A", "hq"))));
     assert.equal(window.props["param-a-index"], 3);
     assert.equal(window.props["param-b-index"], 1);
-    assert.deepEqual(held(host), paths(anime4kFiles("A+A", "hq")));
     // An index out of range changes nothing.
     window.emit("pickA", 99);
     await host.settle();
@@ -250,8 +271,7 @@ test("while off, a choice is only saved; on applies it", async () => {
     assert.equal(held(host), undefined);
     assert.equal(window.props.status, "Off");
     window.emit("toggle");
-    await host.settle();
-    assert.deepEqual(held(host), paths(anime4kFiles("C", "fast")));
+    await eventually(host, () => assert.deepEqual(held(host), paths(anime4kFiles("C", "fast"))));
   } finally {
     await stop();
   }
@@ -262,7 +282,7 @@ test("restart: the saved choice is applied again at once, without opening the wi
   const first = await opened(windowsGpu(), "en", data);
   first.window.emit("pickModel", 1);
   first.window.emit("toggle");
-  await first.host.settle();
+  await eventually(first.host, () => assert.deepEqual(held(first.host), paths(["artcnn/ArtCNN_C4F16.glsl"])));
   await first.stop();
 
   const { host, stop } = await start(windowsGpu(), "en", data);
@@ -284,14 +304,16 @@ test("crash safety: the flag is set while shaders are applied and cleared when w
   const { host, window, stop } = await opened(windowsGpu(), "en", data);
   try {
     window.emit("toggle");
-    await host.settle();
-    assert.deepEqual(await guardFile(data), { active: true }); // on disk before the shaders were sent
+    await eventually(host, () => assert.deepEqual(held(host), paths(anime4kFiles("A", "fast"))));
+    // On disk before the shaders were sent.
+    assert.deepEqual(await guardFile(data), { active: true });
     window.emit("toggle");
-    await host.settle();
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    assert.deepEqual(await guardFile(data), { active: false });
+    await eventually(host, async () => {
+      assert.equal(held(host), undefined);
+      assert.deepEqual(await guardFile(data), { active: false });
+    });
     window.emit("toggle");
-    await host.settle();
+    await eventually(host, () => assert.deepEqual(held(host), paths(anime4kFiles("A", "fast"))));
     assert.deepEqual(await guardFile(data), { active: true });
   } finally {
     await stop();
@@ -323,11 +345,12 @@ test("crash safety: after the player did not close normally with shaders on, it 
     // The choice is kept; turning on again applies it and the note goes.
     assert.equal(window.props["param-a-index"], 3);
     window.emit("toggle");
-    await host.settle();
-    assert.deepEqual(held(host), paths(anime4kFiles("A+A", "hq")));
+    await eventually(host, () => assert.deepEqual(held(host), paths(anime4kFiles("A+A", "hq"))));
     window.emit("toggle");
-    await host.settle();
-    assert.equal(window.props.detail, "");
+    await eventually(host, () => {
+      assert.equal(held(host), undefined);
+      assert.equal(window.props.detail, "");
+    });
   } finally {
     await stop();
   }
@@ -339,7 +362,7 @@ test("crash safety: a restart of the plugin within one player run keeps the shad
   const data = await mkdtemp(join(tmpdir(), "shaderupscale-"));
   const first = await opened(windowsGpu(), "en", data);
   first.window.emit("toggle");
-  await first.host.settle();
+  await eventually(first.host, () => assert.deepEqual(held(first.host), paths(anime4kFiles("A", "fast"))));
   const session = first.host.sessionStorage;
   await first.stop();
   // The plugin's process ended without its clean stop (a crash of the plugin, not of the player).
@@ -397,7 +420,7 @@ test("software rendering with a saved 'on': nothing sent, the button turns it of
   const data = await mkdtemp(join(tmpdir(), "shaderupscale-"));
   const first = await opened(windowsGpu(), "en", data);
   first.window.emit("toggle");
-  await first.host.settle();
+  await eventually(first.host, () => assert.deepEqual(held(first.host), paths(anime4kFiles("A", "fast"))));
   await first.stop();
 
   const { host, window, stop } = await opened(windowsSoftware(), "en", data);
@@ -420,7 +443,7 @@ test("a switch to software rendering during the run: the status says to restart"
   const { host, window, stop } = await opened();
   try {
     window.emit("toggle");
-    await host.settle();
+    await eventually(host, () => assert.deepEqual(held(host), paths(anime4kFiles("A", "fast"))));
     host.failVideoRender("unsupported", "the player switched to software rendering");
     await host.settle();
     assert.equal(held(host), undefined);
@@ -437,11 +460,9 @@ test("macOS: Anime4K runs; ArtCNN (compute shaders) is greyed out with the reaso
   const { window, stop } = await opened(host);
   try {
     window.emit("toggle");
-    await host.settle();
-    assert.deepEqual(held(host), paths(anime4kFiles("A", "fast")));
+    await eventually(host, () => assert.deepEqual(held(host), paths(anime4kFiles("A", "fast"))));
     window.emit("pickModel", 1);
-    await host.settle();
-    assert.equal(held(host), undefined); // withdrawn
+    await eventually(host, () => assert.equal(held(host), undefined)); // withdrawn
     assert.equal(window.props.status, "Not available");
     assert.match(String(window.props.detail), /^ArtCNN needs compute shaders/);
     assert.equal(window.props["can-toggle"], true); // on: can be turned off
@@ -461,7 +482,7 @@ test("a shader that does not compile: the status and the OSD say so, once", asyn
   const { host, window, stop } = await opened();
   try {
     window.emit("toggle");
-    await host.settle();
+    await eventually(host, () => assert.deepEqual(held(host), paths(anime4kFiles("A", "fast"))));
     host.failVideoShaders(HANDLE, "shader compile failed: ERROR: 0:39: 'x' : undeclared identifier");
     await host.settle();
     assert.equal(window.props.status, "On, but a shader did not compile");
@@ -482,14 +503,14 @@ test("other plugins hold most of the 16 shaders: the status says there is no roo
   const { window, stop } = await opened(host);
   try {
     window.emit("toggle");
-    await host.settle();
-    assert.equal(window.props.status, "On, but not applied");
+    await eventually(host, () => assert.equal(window.props.status, "On, but not applied"));
     assert.match(String(window.props.detail), /^Other plugins' shaders leave no room/);
     // ArtCNN is one shader: it fits.
     window.emit("pickModel", 1);
-    await host.settle();
-    assert.deepEqual(held(host), paths(["artcnn/ArtCNN_C4F16.glsl"]));
-    assert.equal(window.props.status, "On: ArtCNN C4F16 (Neutral)");
+    await eventually(host, () => {
+      assert.deepEqual(held(host), paths(["artcnn/ArtCNN_C4F16.glsl"]));
+      assert.equal(window.props.status, "On: ArtCNN C4F16 (Neutral)");
+    });
   } finally {
     await stop();
   }
@@ -516,9 +537,10 @@ test("Simplified Chinese: the menu, the window and the OSD are translated", asyn
     assert.equal(window.props.status, "关");
     assert.equal(window.props["param-a-label"], "模式");
     window.emit("toggle");
-    await host.settle();
-    assert.equal(window.props.status, "开：Anime4K 模式 A（快速）");
-    assert.equal(host.osd.at(-1), "着色器超分辨率：开，Anime4K 模式 A（快速）");
+    await eventually(host, () => {
+      assert.equal(window.props.status, "开：Anime4K 模式 A（快速）");
+      assert.equal(host.osd.at(-1), "着色器超分辨率：开，Anime4K 模式 A（快速）");
+    });
   } finally {
     await stop();
   }
@@ -532,14 +554,17 @@ for (const locale of ["en", "zh-Hans"] as const) {
     gpuRun.window.emit("pickA", 3);
     gpuRun.window.emit("pickB", 1);
     gpuRun.window.emit("toggle");
-    await gpuRun.host.settle();
+    await eventually(gpuRun.host, () => assert.deepEqual(held(gpuRun.host), paths(anime4kFiles("A+A", "hq"))));
     gpuRun.window.emit("pickModel", 1);
     gpuRun.window.emit("pickB", 1);
     gpuRun.window.emit("toggle");
     gpuRun.window.emit("toggle");
-    await gpuRun.host.settle();
+    await eventually(gpuRun.host, () => {
+      assert.deepEqual(held(gpuRun.host), paths(["artcnn/ArtCNN_C4F16_DS.glsl"]));
+      assert.equal(gpuRun.host.osd.length, 3); // on, off, on
+    });
     gpuRun.host.failVideoShaders(HANDLE, "broken");
-    await gpuRun.host.settle();
+    await eventually(gpuRun.host, () => assert.equal(gpuRun.host.osd.length, 4));
     const lines = [...gpuRun.host.osd];
     await gpuRun.stop();
     const soft = await opened(windowsSoftware(), locale);

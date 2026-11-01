@@ -9,7 +9,7 @@
 ## 0.1.0
 
 - First release: Video ▸ Shader Upscaling… opens a window to choose the model and its parameters, turn shader upscaling on and off, and see what is applied. No other menu items.
-- Anime4K 4.0.1 (MIT): modes A, B, C, A+A, B+B and C+A, each Fast or HQ, as Anime4K's own mpv templates define them.
+- Anime4K 4.0.1 (MIT; its two AutoDownscalePre passes under the Unlicense): modes A, B, C, A+A, B+B and C+A, each Fast or HQ, as Anime4K's own mpv templates define them.
 - ArtCNN (MIT): C4F16 or C4F32, Neutral, Denoise and sharpen, or Denoise and soften.
 - The shaders ship in the package with their licence texts; nothing is downloaded.
 - Remembers the model, each model's parameters and on/off; applied again at every start.
