@@ -21,6 +21,7 @@ Hosted third-party plugin (`plugins/<name>/`), see [CONTRIBUTING.md](https://git
 - [ ] the id is `<owner>.<name>` with the owner from `plugins/owners.toml` (never `vestra.`)
 - [ ] `version` in `manifest.json` bumped and a `CHANGELOG.md` entry added
 - [ ] `npm run check`, `npm run boundaries`, `npm run portability`, `npm test` pass
+- [ ] if the plugin runs programs, downloads or runs code, uses hard-coded hosts or touches files outside its directories, this description says why (the [security scan](https://github.com/vestrasys/vestra-player-plugins/blob/main/CONTRIBUTING.md#security-review) flags it for review)
 
 Revocation (`revoked.json`):
 

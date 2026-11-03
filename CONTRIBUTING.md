@@ -130,8 +130,11 @@ scripts/          plugin.mjs (runs the SDK's vestra-plugin CLI), plugin-deps.mjs
                   sign-index.mjs, verify-index.mjs, generate-signing-key.mjs
 .github/workflows ci.yml (checks), publish.yml (Releases, index, Pages),
                   weekly.yml (plugins against the latest SDK), registry.yml
-                  (owner check for registry pull requests), and the reusable
-                  _static.yml, _plugin.yml, _index-dryrun.yml (see [CI](#ci))
+                  (owner check for registry pull requests), security-scan.yml,
+                  codeql.yml and scorecard.yml (see [Security review](#security-review)),
+                  and the reusable _static.yml, _plugin.yml, _index-dryrun.yml
+                  (see [CI](#ci))
+.semgrep/         the plugin risk rules (plugin-risk.yml) and their samples (tests/)
 ```
 
 Plugins are independent: a plugin never imports another plugin or anything
@@ -192,7 +195,9 @@ reusable workflow:
   dependencies (`plugin-deps.mjs install --all`), `tsc` over the
   repository, prettier, `boundaries`, `portability`, `registry` (with
   `revoked.json` append-only against the pull request's base or the commit
-  before the push), the script tests, typos, actionlint and zizmor.
+  before the push), the script tests, typos, actionlint and zizmor, the
+  semgrep rule samples, and osv-scanner over every lockfile
+  ([Security review](#security-review)).
 - [`_plugin.yml`](.github/workflows/_plugin.yml), one plugin: its npm
   dependencies ([rules](#npm-dependencies)), strict type check, tests,
   `vestra-plugin pack` (every CLI command validates `manifest.json`), then
@@ -213,7 +218,8 @@ and manual run:
 changes ─────────────────────┐
                              ▼
 static ──┬──────────▶ plugin × N ──┬──▶ ci-ok
-         └──▶ index-dryrun ────────┘
+         └──▶ index-dryrun ────────┤
+dependency-review (pull requests) ─┘
 ```
 
 `changes` (`scripts/ci-plugins.mjs`) lists the plugins with changed files,
@@ -232,10 +238,96 @@ Hardening: every workflow has `permissions: {}` at the top and grants the
 minimum per job; actions are pinned by commit SHA with the version in a
 comment; every job has a timeout; publish.yml uses no npm cache. Pull
 requests from forks run `ci.yml` without secrets (`pull_request`).
-[`registry.yml`](.github/workflows/registry.yml) is the one
-`pull_request_target` workflow: it runs the base branch's script, reads the
-pull request's files as data (`git show`) and never checks out or runs its
-code.
+[`registry.yml`](.github/workflows/registry.yml) and
+[`security-scan.yml`](.github/workflows/security-scan.yml) are the two
+`pull_request_target` workflows: they run the base branch's scripts, read
+the pull request's files as data (`git show`, `git cat-file`) and never
+check out or run its code.
+
+## Security review
+
+The player runs plugins as ordinary Node processes, without a sandbox: a
+plugin can do whatever its user can. Review in this repository is the main
+defence, so every pull request that changes a hosted plugin is scanned, and
+risky code is read by a maintainer before it is merged. (Third-party
+repositories and sideloaded plugins are their users' own risk.)
+
+| Scan | What it looks at | On a finding |
+| --- | --- | --- |
+| [Plugin security scan](.github/workflows/security-scan.yml) (semgrep CE with [`.semgrep/plugin-risk.yml`](.semgrep/plugin-risk.yml)) | The code of each plugin the pull request changes, without its `tests/` | Labels the pull request `security-review` and comments; does not fail |
+| [CodeQL](.github/workflows/codeql.yml) (`security-extended`) | `plugins/` and `scripts/`: data flow such as injection, path traversal, unsafe downloads | Code scanning alerts and pull request annotations |
+| Dependency review ([`ci.yml`](.github/workflows/ci.yml)) | npm packages a pull request adds or updates | Fails on high or critical vulnerabilities and on a license outside the [allowlist](#npm-dependencies) |
+| osv-scanner ([`_static.yml`](.github/workflows/_static.yml), [`weekly.yml`](.github/workflows/weekly.yml)) | Every lockfile: the repository's and each plugin's | Fails on any known vulnerability or malicious package (OSV includes the OpenSSF malicious-packages feed) |
+| [Scorecard](.github/workflows/scorecard.yml) (weekly) | The repository's own supply chain practices | Code scanning alerts |
+
+### The plugin risk rules
+
+`.semgrep/plugin-risk.yml` marks code a reviewer must read:
+
+| Rule | Marks |
+| --- | --- |
+| `vestra-child-process` | `child_process` or `cluster`: running other programs |
+| `vestra-dynamic-code` | `eval`, `new Function`, `vm`, a `Worker` with `eval: true`, a string passed to `setTimeout`/`setInterval` |
+| `vestra-dynamic-import` | `import()` or `require()` of a path that is not a string literal, `createRequire` |
+| `vestra-native-addon` | `.node` addons, `process.dlopen`, `process.binding`, `wasi`, `inspector` |
+| `vestra-raw-network` | `net`, `tls`, `dgram`, `http2`, servers |
+| `vestra-network-host` | hard-coded URLs and IP addresses |
+| `vestra-path-outside-plugin` | absolute system paths, `..` segments, the home directory, profile directory variables (`APPDATA`, `HOME`, …) |
+| `vestra-credentials` | SSH, cloud and npm credentials, browser profiles and cookies, wallets, token variables, enumerating `process.env` |
+| `vestra-obfuscation` | long base64 or hex literals, `eval(atob(…))`, long `String.fromCharCode` lists |
+
+A finding is a place to read, not a verdict: VestraBili runs yt-dlp and
+downloads it (with the user's consent, checking the release's signed
+checksums), and VestraTube runs YouTube's player script in a worker; both
+are legitimate and reviewed. The scan reports only **new** findings, those
+not already on the base branch (same rule, file and matched code; moved
+lines do not count), so an update to a reviewed plugin is flagged only for
+what it adds. A new plugin is flagged for everything. The scan also lists
+files it could not read: binaries, archives, scripts for other
+interpreters, and files semgrep skipped or failed on.
+
+How the scan stays trustworthy: it runs from the base branch
+(`pull_request_target`), so a pull request cannot change the rules, the
+script or the workflow that judge it; `nosemgrep` comments and
+`.semgrepignore` files in a pull request are ignored; the pull request's
+files are read as data and never run; semgrep runs in a container without
+network; no secrets are involved, and only the job that writes the label
+and the comment has a write token. The rules' samples
+(`.semgrep/tests/plugin-risk/bad.ts` must trigger every rule, `good.ts`
+none) run in `_static.yml`, so a change to the rules is tested in its own
+pull request; the scan uses the changed rules once they are on `main`.
+
+### `security-review`
+
+- The label means that a maintainer must read the flagged code before the
+  pull request is merged. The comment lists each finding with a link.
+- **Who clears it:** a maintainer who is not the pull request's author. They
+  read every finding and check that the code does what the plugin's README
+  says, that it only touches the network hosts, programs and files it
+  needs, and that anything downloaded or run is verified (pinned host,
+  checksum or signature) and happens with the user's consent. Then they
+  remove the label and leave a short review comment saying what was
+  checked.
+- The label stays when a later push has no new findings; a later push with
+  new findings adds it again and updates the comment.
+- Code that must not be merged gets a review asking for changes. A plugin
+  version found to be harmful after its release is
+  [revoked](#revoking-a-version).
+- Authors: say in the pull request description why the plugin needs what
+  the scan flags. That makes the review fast.
+
+Run the rules locally (semgrep CE: `pipx run semgrep`, or the
+`semgrep/semgrep` image):
+
+```sh
+semgrep scan --metrics=off --disable-nosem --config .semgrep/plugin-risk.yml plugins/<name>
+semgrep --test --config .semgrep/plugin-risk.yml .semgrep/tests/plugin-risk/bad.ts
+```
+
+[`scripts/security-scan.mjs`](scripts/security-scan.mjs) is what CI runs
+around semgrep (extract the changed plugins at the base and head commits,
+compare, write the report); its tests are
+`scripts/tests/security-scan.test.mjs`.
 
 ## Registered third-party plugins: ids and owners
 

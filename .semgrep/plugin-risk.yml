@@ -1,0 +1,231 @@
+# Risk markers in hosted plugin code, for the security review of pull
+# requests (.github/workflows/security-scan.yml, CONTRIBUTING.md "Security
+# review"). The player runs plugins as ordinary Node processes without a
+# sandbox, so the review of this repository is the main defence.
+#
+# A finding is not a verdict: it marks code a maintainer must read before
+# merging (a plugin may legitimately run a program or download a file). The
+# scan labels the pull request `security-review` and comments; it does not
+# fail the pull request. Inline `nosemgrep` comments are ignored by the scan
+# (--disable-nosem).
+#
+# Tests: .semgrep/tests/ (semgrep --test, run by _static.yml); every rule has
+# a positive (`ruleid:`) and a negative (`ok:`) case there.
+
+rules:
+  - id: vestra-child-process
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: >-
+      Runs other programs (child_process or cluster). Check what is run,
+      where the program comes from and how its arguments are built.
+    metadata:
+      category: process
+    patterns:
+      - pattern-either:
+          - pattern: import "$MOD"
+          - pattern: require("$MOD")
+          - pattern: import("$MOD")
+      - metavariable-regex:
+          metavariable: $MOD
+          regex: ^(node:)?(child_process|cluster)$
+
+  - id: vestra-dynamic-code
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: >-
+      Runs code built at run time (eval, Function, vm, a Worker with
+      eval: true, or a string timer). Check where the code comes from.
+    metadata:
+      category: code
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: new Function(...)
+      - pattern: Function(...)
+      - pattern: setTimeout("...", ...)
+      - pattern: setInterval("...", ...)
+      - pattern: 'new $W(..., {..., eval: true, ...})'
+      - patterns:
+          - pattern-either:
+              - pattern: import "$MOD"
+              - pattern: require("$MOD")
+              - pattern: import("$MOD")
+          - metavariable-regex:
+              metavariable: $MOD
+              regex: ^(node:)?vm$
+
+  - id: vestra-dynamic-import
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: >-
+      Loads a module whose path is not a string literal (or creates its own
+      require). The reviewer cannot see what is loaded.
+    metadata:
+      category: code
+    pattern-either:
+      - patterns:
+          - pattern: import($X)
+          - pattern-not: import("...")
+      - patterns:
+          - pattern: require($X)
+          - pattern-not: require("...")
+      - pattern: $M.createRequire(...)
+      - pattern: createRequire(...)
+
+  - id: vestra-native-addon
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Loads native code (a .node addon, process.dlopen or an internal
+      binding). Hosted plugins ship no native code.
+    metadata:
+      category: native
+    pattern-either:
+      - pattern: process.dlopen(...)
+      - pattern: process.binding(...)
+      - pattern: process._linkedBinding(...)
+      - patterns:
+          - pattern-either:
+              - pattern: import "$MOD"
+              - pattern: require("$MOD")
+              - pattern: import("$MOD")
+          - metavariable-regex:
+              metavariable: $MOD
+              regex: ^(.*\.node|(node:)?(wasi|inspector))$
+
+  - id: vestra-raw-network
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: >-
+      Opens raw sockets or servers (net, tls, dgram, http2 or an
+      http/https server). Check the destination and what is sent.
+    metadata:
+      category: network
+    pattern-either:
+      - patterns:
+          - pattern-either:
+              - pattern: import "$MOD"
+              - pattern: require("$MOD")
+              - pattern: import("$MOD")
+          - metavariable-regex:
+              metavariable: $MOD
+              regex: ^(node:)?(net|tls|dgram|http2)$
+      - pattern: $HTTP.createServer(...)
+      - pattern: createServer(...)
+
+  - id: vestra-network-host
+    languages: [typescript, javascript]
+    severity: INFO
+    message: >-
+      A hard-coded network address. Check that the plugin's README names
+      this service and that the request is what the user asked for.
+    # A literal pattern only matches the literal itself, not every
+    # variable that holds it.
+    options:
+      constant_propagation: false
+    metadata:
+      category: network
+    patterns:
+      - pattern-either:
+          - pattern: '"$S"'
+          - pattern: "`$S`"
+      - metavariable-regex:
+          metavariable: $S
+          regex: (?i)^((https?|wss?|ftp)://|(\d{1,3}\.){3}\d{1,3}(:\d+)?(/|$)|\[[0-9a-f:]+\](:\d+)?(/|$))
+
+  - id: vestra-path-outside-plugin
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: >-
+      A path outside the plugin's own and data directories (an absolute
+      path, the home directory, a profile directory variable, or `..`).
+      Plugins keep files in the directories the SDK gives them.
+    # A literal pattern only matches the literal itself, not every
+    # variable that holds it.
+    options:
+      constant_propagation: false
+    metadata:
+      category: filesystem
+    pattern-either:
+      - pattern: $OS.homedir()
+      - pattern: homedir()
+      - pattern: $OS.userInfo(...)
+      - pattern: userInfo(...)
+      - patterns:
+          - pattern: process.env.$VAR
+          - metavariable-regex:
+              metavariable: $VAR
+              regex: ^(HOME|USERPROFILE|HOMEDRIVE|HOMEPATH|APPDATA|LOCALAPPDATA|PROGRAMDATA|ALLUSERSPROFILE|XDG_[A-Z_]+|TMPDIR|TEMP|TMP|SystemRoot|WINDIR)$
+      - patterns:
+          - pattern: process.env["$VAR"]
+          - metavariable-regex:
+              metavariable: $VAR
+              regex: ^(HOME|USERPROFILE|HOMEDRIVE|HOMEPATH|APPDATA|LOCALAPPDATA|PROGRAMDATA|ALLUSERSPROFILE|XDG_[A-Z_]+|TMPDIR|TEMP|TMP|SystemRoot|WINDIR)$
+      - patterns:
+          - pattern-either:
+              - pattern: '"$S"'
+              - pattern: "`$S`"
+          - metavariable-regex:
+              metavariable: $S
+              # A Unix system or home path, a Windows drive path, ~/, or a
+              # `..` path segment.
+              regex: ^(/(etc|home|Users|usr|var|root|tmp|proc|sys|dev|opt|Library|Applications|System|private|Volumes)(/|$)|[A-Za-z]:[\\/]|~[\\/]|(.*[\\/])?\.\.([\\/]|$))
+
+  - id: vestra-credentials
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Refers to credentials, keys or browser profile data (or enumerates
+      the whole environment). A plugin has no reason to read them.
+    # A literal pattern only matches the literal itself, not every
+    # variable that holds it.
+    options:
+      constant_propagation: false
+    metadata:
+      category: credentials
+    pattern-either:
+      - pattern: Object.keys(process.env)
+      - pattern: Object.entries(process.env)
+      - pattern: Object.values(process.env)
+      - pattern: JSON.stringify(process.env, ...)
+      - patterns:
+          - pattern-either:
+              - pattern: process.env.$VAR
+              - pattern: process.env["$VAR"]
+          - metavariable-regex:
+              metavariable: $VAR
+              regex: (?i)^(.*(token|secret|passw|credential|api_?key|private_?key|session|cookie)|(AWS|AZURE|GH|GITHUB|NPM|SSH)_|GOOGLE_APPLICATION)
+      - patterns:
+          - pattern-either:
+              - pattern: '"$S"'
+              - pattern: "`$S`"
+          - metavariable-regex:
+              metavariable: $S
+              regex: (?i)^.*(\.ssh([\\/]|$)|id_(rsa|dsa|ecdsa|ed25519)|\.aws[\\/]|\.azure[\\/]|\.kube[\\/]|\.docker[\\/]config|\.npmrc|\.pypirc|\.netrc|\.git-credentials|\.gnupg|gcloud[\\/]|[\\/]gh[\\/]hosts|Login Data|Web Data|Local State|Cookies(\.sqlite)?$|key[34]\.db|logins\.json|cert[89]\.db|User Data[\\/]|Firefox[\\/]Profiles|Mozilla[\\/]Firefox|Google[\\/]Chrome|Microsoft[\\/]Edge|BraveSoftware|Keychains|login\.keychain|wallet\.dat|Exodus|Electrum|MetaMask|discord[\\/]Local Storage|Telegram Desktop)
+
+  - id: vestra-obfuscation
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: >-
+      A long encoded blob or decoded code. Check what it decodes to; code
+      must be readable source, and data should be a reviewable file.
+    # A literal pattern only matches the literal itself, not every
+    # variable that holds it.
+    options:
+      constant_propagation: false
+    metadata:
+      category: obfuscation
+    pattern-either:
+      - patterns:
+          - pattern-either:
+              - pattern: '"$S"'
+              - pattern: "`$S`"
+          - metavariable-regex:
+              metavariable: $S
+              # 200+ characters of base64 or 128+ of hex in one literal.
+              regex: ^\s*([A-Za-z0-9+/_-]{200,}={0,2}|(0x)?[0-9a-fA-F]{128,}|(\\x[0-9a-fA-F]{2}){32,})\s*$
+      - pattern: eval(atob(...))
+      - pattern: eval(Buffer.from(...).toString(...))
+      - pattern: new Function(atob(...))
+      - pattern: new Function(Buffer.from(...).toString(...))
+      - pattern: String.fromCharCode($A, $B, $C, $D, $E, $F, $G, $H, ...)
