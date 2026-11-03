@@ -38,7 +38,7 @@ export interface Settings {
   model: ModelId;
   /** Anime4K's parameters (kept while FSR is chosen). */
   anime4k: { mode: Anime4kMode; quality: Anime4kQuality };
-  /** Add-on: chroma from luma prediction (CfL) upscales the colour planes, before the upscaler. */
+  /** Add-on: chroma from luma prediction (CfL) upscales the colour planes (before Anime4K; after FSR, from its luma). */
   chroma: boolean;
   /** Add-on: adaptive sharpening of the final picture, after the upscaler. */
   sharpen: boolean;
@@ -148,8 +148,10 @@ export function upscalerFiles(settings: Settings): string[] {
 /**
  * The shader files (relative to `shaders/`, with `/`) the settings run, in
  * order: the chroma add-on, the upscaler, the sharpen add-on. mpv runs each
- * at its own hook point (CHROMA, then LUMA or MAIN, then OUTPUT), so the
- * order only documents the flow of the picture.
+ * at its own hook point, not in list order: the plane hooks in plane order
+ * (LUMA, then CHROMA), then MAIN, then OUTPUT. So FSR (LUMA) runs before CfL
+ * (CHROMA), which then predicts the colour from FSR's enlarged luma; CfL runs
+ * before Anime4K (MAIN); sharpen (OUTPUT) always runs last.
  */
 export function shaderFiles(settings: Settings): string[] {
   return [...(settings.chroma ? [CHROMA_FILE] : []), ...upscalerFiles(settings), ...(settings.sharpen ? [SHARPEN_FILE] : [])];

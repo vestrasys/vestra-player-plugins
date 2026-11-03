@@ -73,7 +73,7 @@ export component UpscaleWindow inherits Window {
     in property <string> param-b-label;
     in property <[string]> param-b-items;
     in-out property <int> param-b-index;
-    // The add-ons: chroma from luma prediction before the upscaler, adaptive sharpening after it.
+    // The add-ons: chroma from luma prediction on the colour planes, adaptive sharpening of the final picture.
     in property <bool> chroma;
     in property <bool> sharpen;
     // What the preset does, one part per line.

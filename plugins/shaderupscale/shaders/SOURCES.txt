@@ -2,11 +2,11 @@ Third-party shaders in this package
 ===================================
 
 The plugin's own code is Apache-2.0. The mpv GLSL shaders under shaders/ are
-third-party files, redistributed under their own permissive licences, with
-line endings normalised to LF: MIT (Anime4K, CfL), the Unlicense (the two
-Anime4K AutoDownscalePre files), AMD's MIT licence (FSR) and BSD-2-Clause
-(adaptive-sharpen). Every file keeps its copyright and licence notice in its
-header, and each directory holds the licence text as LICENSE. All of them are
+third-party files, redistributed under their own permissive licences: MIT
+(Anime4K, CfL), the Unlicense (the two Anime4K AutoDownscalePre files),
+AMD's MIT licence (FSR) and BSD-2-Clause (adaptive-sharpen). Every file
+keeps its copyright and licence notice in its header, and each directory
+holds the licence text as LICENSE. All of them are
 unchanged except CfL_Prediction_Lite.glsl (see cfl/ below).
 
 anime4k/
@@ -31,7 +31,6 @@ fsr/
   Version: gist revision 2623d743b9c23f500ba086f05b385dcb1557e15d
     (2022-03-06), file FSR.glsl,
     sha256 of the upstream file 56d8597fc6b7bf6d13f8c3b2bdf1cdc43b06175d51746aab44cf1dca16929b9e
-    (with its CRLF line endings)
   Licence: MIT, Copyright (c) 2021 Advanced Micro Devices, Inc. (fsr/LICENSE,
     the text of AMD's https://github.com/GPUOpen-Effects/FidelityFX-FSR
     license.txt, which the port repeats in its header). The port adds no
@@ -46,7 +45,6 @@ cfl/
     includes "Gate regression by luma extrapolation distance", the fix for
     blue artifacts on flat-luma chroma detail), file CfL_Prediction_Lite.glsl,
     sha256 of the upstream file 159c1dad4daab10eddaae822a5d0fb0b94a38e85a2825fb7df9d7feb509ad4f7
-    (with its CRLF line endings)
   Licence: MIT, Copyright (c) 2023 João Chrisóstomo (cfl/LICENSE, the
     repository's LICENSE)
   Files: CfL_Prediction_Lite.glsl
@@ -63,7 +61,6 @@ adaptive-sharpen/
   Version: gist revision 572f59099cd0e3eb5e321a6da0a3d90a7382e2dc
     (2022-06-19), file adaptive-sharpen.glsl,
     sha256 of the upstream file 827fb3d662ac9a91b4075e9117fe6e1dbc1c06d85959ba719cdb954dfb7fb8e4
-    (with its CRLF line endings)
   Licence: BSD-2-Clause, Copyright (c) 2015-2021, bacondither
     (adaptive-sharpen/LICENSE, the notice from the file's header)
   Files: adaptive-sharpen.glsl (unchanged)

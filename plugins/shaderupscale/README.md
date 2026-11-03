@@ -39,7 +39,7 @@ Anime4K's six modes, exactly as its own mpv templates define them. Each runs up 
 
 ### How the add-ons combine
 
-- **Chroma** runs first, on the colour planes, before the upscaler. With Anime4K, Anime4K then works on the picture with the improved colour. With FSR, which enlarges only the brightness plane, the colour is predicted at FSR's enlarged size from FSR's result. It does nothing for 4:4:4 and RGB video, whose colour is already at full size.
+- **Chroma** works on the colour planes. With Anime4K it runs first, and Anime4K then works on the picture with the improved colour. With FSR, which enlarges only the brightness plane, the colour is predicted at FSR's enlarged size from FSR's result. It does nothing for 4:4:4 and RGB video, whose colour is already at full size.
 - **Sharpen** runs last, on the final picture at window size. FSR already sharpens a little (RCAS) and Anime4K's restore modes sharpen lines, so with them Sharpen adds to that: on clean sources it can bring out halos or noise. It is most useful with FSR on soft live action, or to taste.
 
 ## Requirements
