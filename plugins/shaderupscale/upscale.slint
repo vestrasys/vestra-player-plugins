@@ -3,8 +3,8 @@
 // on and off, and the status line (what is applied, or why not).
 // Width 400 (content 400 − 28 = 372): label column 90 + 8 + drop-down 274. Height: the content's
 // (min = max = the layout's preferred height, as the About window), so the window follows the
-// wrapped texts (the description, the status detail) as they change after it opens and nothing in
-// it stretches.
+// wrapped texts (the description, the status line, the status detail) as they change after it opens
+// and nothing in it stretches.
 // Texts are @tr (English source; locales/<lang>.po translate them); the drop-down labels, the
 // description and the status come translated from main.ts.
 import { Theme } from "@vestra/theme.slint";
@@ -169,32 +169,42 @@ export component UpscaleWindow inherits Window {
         }
         Paragraph { text: root.description; }
         Rectangle { height: 1px; background: Theme.line; }
-        // The status line: a dot in the tone's colour, what is applied, and the one-click switch.
+        // The status line: a dot in the tone's colour, what is applied, and the one-click switch. The
+        // text wraps (the longest preset with both add-ons, the refusal, do not fit one line beside the
+        // button): the row grows with it, and the dot and the button stay beside its first line.
         HorizontalLayout {
             spacing: 8px;
-            height: Theme.button-height;
             VerticalLayout {
-                alignment: center;
+                alignment: start;
                 Rectangle {
                     width: 8px;
-                    height: 8px;
-                    border-radius: 4px;
-                    background: root.tone == 1 ? Theme.playing : root.tone == 2 ? Theme.accent : root.tone == 3 ? Theme.danger : Theme.icon-disabled;
+                    height: Theme.button-height;
+                    Rectangle {
+                        width: 8px;
+                        height: 8px;
+                        border-radius: 4px;
+                        background: root.tone == 1 ? Theme.playing : root.tone == 2 ? Theme.accent : root.tone == 3 ? Theme.danger : Theme.icon-disabled;
+                    }
                 }
             }
             Text {
                 horizontal-stretch: 1;
+                min-height: Theme.button-height;
                 text: root.status;
                 color: Theme.text;
                 font-size: Theme.font-title;
                 font-weight: 700;
                 vertical-alignment: center;
-                overflow: elide;
+                wrap: word-wrap;
             }
-            Button {
-                text: root.on ? @tr("Turn Off") : @tr("Turn On");
-                enabled: root.can-toggle;
-                clicked => { root.toggle(); }
+            VerticalLayout {
+                alignment: start;
+                Button {
+                    height: Theme.button-height;
+                    text: root.on ? @tr("Turn Off") : @tr("Turn On");
+                    enabled: root.can-toggle;
+                    clicked => { root.toggle(); }
+                }
             }
         }
         // Only when there is something to say: an empty one would still take the layout's spacing.

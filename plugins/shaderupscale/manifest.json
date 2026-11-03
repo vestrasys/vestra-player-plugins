@@ -1,6 +1,6 @@
 {
   "id": "zysilm.shaderupscale",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "apiVersion": "vestra/1",
   "entry": "main.ts",
   "capabilities": ["commands", "events", "playback.read", "processing.video", "ui.osd", "ui.window"],
