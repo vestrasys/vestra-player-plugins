@@ -6,7 +6,21 @@ import { join } from "node:path";
 import test from "node:test";
 import { HostError, startPlugin, TestHost } from "@vestra-player/sdk/testing";
 import activate, { OSD_BUDGET, shaderPath, WINDOW_TITLE } from "../main.ts";
-import { ANIME4K_MODES, ANIME4K_QUALITIES, anime4kFiles, DEFAULT_SETTINGS, isSettings, MODELS, readSettings } from "../presets.ts";
+import {
+  ANIME4K_MODES,
+  ANIME4K_QUALITIES,
+  anime4kFiles,
+  CHROMA_FILE,
+  DEFAULT_SETTINGS,
+  FSR_FILES,
+  isSettings,
+  MAX_SHADERS,
+  MODELS,
+  readSettings,
+  type Settings,
+  SHARPEN_FILE,
+  shaderFiles,
+} from "../presets.ts";
 
 const directory = new URL("..", import.meta.url);
 const SHADERS = new URL("../shaders/", import.meta.url);
@@ -103,25 +117,126 @@ test("presets: every chain is Anime4K's own template, and every file is bundled"
   ]);
 });
 
-test("presets: the package ships exactly the shaders the presets use, each with its licence", async () => {
-  const used = new Set<string>();
-  for (const mode of ANIME4K_MODES)
-    for (const quality of ANIME4K_QUALITIES) {
-      const files = anime4kFiles(mode, quality);
-      assert.ok(files.length <= 16 && new Set(files).size === files.length, `${mode} ${quality}`);
-      files.forEach((file) => used.add(file));
-    }
-  const shipped = new Set<string>();
-  const names = await readdir(new URL("anime4k/", SHADERS));
-  assert.ok(names.includes("LICENSE"), "anime4k: licence text");
-  names.filter((name) => name.endsWith(".glsl")).forEach((name) => shipped.add(`anime4k/${name}`));
-  assert.deepEqual([...used].sort(), [...shipped].sort());
-  // Anime4K only: ArtCNN needs mpv's gpu-next, which the player's libmpv does not use.
-  assert.deepEqual((await readdir(SHADERS)).sort(), ["SOURCES.txt", "anime4k"].sort());
-  assert.deepEqual(MODELS, ["anime4k"]);
-  assert.doesNotMatch(await readFile(new URL("SOURCES.txt", SHADERS), "utf8"), /artcnn/i);
-  for (const file of used) assert.ok(existsSync(shaderPath(file)), file);
-  assert.ok(existsSync(new URL("SOURCES.txt", SHADERS)));
+/** Every combination of choices the window offers. */
+function allSettings(): Settings[] {
+  const result: Settings[] = [];
+  for (const model of MODELS)
+    for (const mode of ANIME4K_MODES)
+      for (const quality of ANIME4K_QUALITIES)
+        for (const chroma of [false, true])
+          for (const sharpen of [false, true]) result.push({ on: true, model, anime4k: { mode, quality }, chroma, sharpen });
+  return result;
+}
+
+/**
+ * The shader directories: the licence notice each file carries in its header
+ * (before the first `//!` pass), and how the directory's LICENSE file starts.
+ */
+const LICENCES: Record<string, { header: RegExp; licence: RegExp }> = {
+  anime4k: { header: /MIT License|unencumbered software released into the public domain/, licence: /^MIT License\n\nCopyright \(c\) 2019 bloc97/ },
+  fsr: {
+    header: /Copyright \(c\) 2021 Advanced Micro Devices, Inc\. All rights reserved\.\n\/\/\n\/\/ Permission is hereby granted/,
+    licence: /^Copyright \(c\) 2021 Advanced Micro Devices, Inc\. All rights reserved\.\n\nPermission is hereby granted/,
+  },
+  cfl: { header: /MIT License\n\n\/\/ Copyright \(c\) 2023 João Chrisóstomo/, licence: /^MIT License\n\nCopyright \(c\) 2023 João Chrisóstomo/ },
+  "adaptive-sharpen": {
+    header: /Copyright \(c\) 2015-2021, bacondither\n\/\/ All rights reserved\.\n\/\/\n\/\/ Redistribution and use/,
+    licence: /^Copyright \(c\) 2015-2021, bacondither\nAll rights reserved\.\n\nRedistribution and use/,
+  },
+};
+
+/** Every shipped `.glsl`, relative to `shaders/` with `/`. */
+async function shippedShaders() {
+  const files: string[] = [];
+  for (const entry of await readdir(SHADERS, { withFileTypes: true }))
+    if (entry.isDirectory())
+      for (const name of await readdir(new URL(`${entry.name}/`, SHADERS))) if (name.endsWith(".glsl")) files.push(`${entry.name}/${name}`);
+  return files.sort();
+}
+
+test("presets: FSR is one file; the add-ons go before (chroma) and after (sharpen) the upscaler", () => {
+  const anime = { ...DEFAULT_SETTINGS, on: true };
+  assert.deepEqual(shaderFiles(anime), anime4kFiles("A", "fast"));
+  assert.deepEqual(FSR_FILES, ["fsr/FSR.glsl"]);
+  assert.deepEqual(shaderFiles({ ...anime, model: "fsr" }), ["fsr/FSR.glsl"]);
+  assert.deepEqual(shaderFiles({ ...anime, model: "fsr", chroma: true }), [CHROMA_FILE, "fsr/FSR.glsl"]);
+  assert.deepEqual(shaderFiles({ ...anime, model: "fsr", sharpen: true }), ["fsr/FSR.glsl", SHARPEN_FILE]);
+  assert.deepEqual(shaderFiles({ ...anime, model: "fsr", chroma: true, sharpen: true }), [CHROMA_FILE, "fsr/FSR.glsl", SHARPEN_FILE]);
+  assert.deepEqual(shaderFiles({ ...anime, chroma: true }), [CHROMA_FILE, ...anime4kFiles("A", "fast")]);
+  assert.deepEqual(shaderFiles({ ...anime, anime4k: { mode: "B+B", quality: "hq" }, chroma: true, sharpen: true }), [
+    CHROMA_FILE,
+    ...anime4kFiles("B+B", "hq"),
+    SHARPEN_FILE,
+  ]);
+  // FSR keeps Anime4K's parameters for when Anime4K is chosen again.
+  assert.deepEqual(shaderFiles({ ...anime, model: "fsr", anime4k: { mode: "C+A", quality: "hq" } }), ["fsr/FSR.glsl"]);
+  assert.equal(CHROMA_FILE, "cfl/CfL_Prediction_Lite.glsl");
+  assert.equal(SHARPEN_FILE, "adaptive-sharpen/adaptive-sharpen.glsl");
+});
+
+test("presets: every combination stays within the player's 16 shaders, with no file twice", () => {
+  assert.equal(MAX_SHADERS, 16);
+  const combinations = allSettings();
+  assert.equal(combinations.length, 2 * 6 * 2 * 4);
+  let most = 0;
+  for (const settings of combinations) {
+    const files = shaderFiles(settings);
+    assert.ok(files.length > 0 && files.length <= MAX_SHADERS, JSON.stringify(settings));
+    assert.equal(new Set(files).size, files.length, JSON.stringify(settings));
+    most = Math.max(most, files.length);
+  }
+  // Anime4K's longest chain (7, modes A+A and B+B) with both add-ons.
+  assert.equal(most, 9);
+});
+
+test("presets: the package ships exactly the shaders the presets use, each with its licence header, LICENSE and SOURCES entry", async () => {
+  const used = new Set(allSettings().flatMap(shaderFiles));
+  const shipped = await shippedShaders();
+  assert.deepEqual([...used].sort(), shipped);
+  assert.deepEqual((await readdir(SHADERS)).sort(), ["SOURCES.txt", ...Object.keys(LICENCES)].sort());
+  assert.deepEqual([...MODELS], ["anime4k", "fsr"]);
+  const sources = await readFile(new URL("SOURCES.txt", SHADERS), "utf8");
+  assert.doesNotMatch(sources, /artcnn/i);
+  for (const [directory, { licence }] of Object.entries(LICENCES)) {
+    const names = await readdir(new URL(`${directory}/`, SHADERS));
+    assert.ok(names.includes("LICENSE"), `${directory}: licence text`);
+    assert.match(await readFile(new URL(`${directory}/LICENSE`, SHADERS), "utf8"), licence, `${directory}/LICENSE`);
+    assert.match(sources, new RegExp(`^${directory}/$`, "m"), `SOURCES.txt: ${directory}/`);
+  }
+  for (const file of shipped) {
+    const [directory, name] = file.split("/") as [string, string];
+    const glsl = await readFile(new URL(file, SHADERS), "utf8");
+    const header = glsl.slice(0, glsl.indexOf("//!"));
+    assert.match(header, LICENCES[directory]!.header, `licence header: ${file}`);
+    // Named in SOURCES.txt: Anime4K's by the part after "Anime4K_" (written as "Restore_CNN_{VL,M,S}" there).
+    const stem = name.replace(/^Anime4K_/, "").replace(/\.glsl$/, "").replace(/_(VL|M|S|x2|x4)$/, "");
+    assert.ok(sources.includes(stem), `SOURCES.txt: ${file}`);
+    assert.ok(existsSync(shaderPath(file)), file);
+  }
+});
+
+test("presets: no shipped shader uses //!COMPUTE or //!PARAM, or GLSL beyond 4.10 (macOS OpenGL 4.1, mpv vo_gpu)", async () => {
+  const shipped = await shippedShaders();
+  assert.ok(shipped.length >= 17);
+  for (const file of shipped) {
+    const glsl = await readFile(new URL(file, SHADERS), "utf8");
+    assert.doesNotMatch(glsl, /^\s*\/\/!\s*(COMPUTE|PARAM)\b/m, file);
+    // An mpv user shader: fragment passes with a hook point and a hook() function.
+    assert.match(glsl, /^\/\/!HOOK [A-Z]+$/m, file);
+    assert.match(glsl, /\bvec4 hook\(\)/, file);
+    assert.doesNotMatch(glsl, /\r/, file);
+    // GLSL 4.10 has neither C-style initializer lists (4.20) nor arrays of arrays (4.30).
+    assert.doesNotMatch(glsl, /=\s*\{/, file);
+    assert.doesNotMatch(glsl, /^\s*(const\s+)?\w+\s+\w+\s*\[\w*\]\s*\[/m, file);
+  }
+});
+
+test("presets: CfL is marked as modified; FSR and adaptive-sharpen are upstream's files unchanged", async () => {
+  const cfl = await readFile(new URL(CHROMA_FILE, SHADERS), "utf8");
+  assert.match(cfl, /^\/\/ Modified for Shader Upscale for Vestra Player/m);
+  const sources = await readFile(new URL("SOURCES.txt", SHADERS), "utf8");
+  assert.match(sources, /CfL_Prediction_Lite\.glsl[^]*Modified/);
+  for (const file of [...FSR_FILES, SHARPEN_FILE]) assert.doesNotMatch(await readFile(new URL(file, SHADERS), "utf8"), /Vestra/, file);
 });
 
 test("settings: the defaults are valid; broken or unknown values are refused", () => {
@@ -129,6 +244,11 @@ test("settings: the defaults are valid; broken or unknown values are refused", (
   assert.equal(isSettings({ ...DEFAULT_SETTINGS, model: "fsrcnnx" }), false);
   assert.equal(isSettings({ ...DEFAULT_SETTINGS, anime4k: { mode: "D", quality: "fast" } }), false);
   assert.equal(isSettings({ ...DEFAULT_SETTINGS, model: "artcnn" }), false);
+  assert.equal(isSettings({ ...DEFAULT_SETTINGS, model: "fsr" }), true);
+  assert.equal(isSettings({ ...DEFAULT_SETTINGS, chroma: "yes" }), false);
+  assert.equal(isSettings({ on: false, model: "anime4k", anime4k: { mode: "A", quality: "fast" } }), false);
+  // The defaults: Anime4K mode A in its Fast set, no add-ons.
+  assert.deepEqual(DEFAULT_SETTINGS, { on: false, model: "anime4k", anime4k: { mode: "A", quality: "fast" }, chroma: false, sharpen: false });
   assert.equal(isSettings(null), false);
 });
 
@@ -138,12 +258,26 @@ test("settings: 0.1.0's ArtCNN choice becomes Anime4K mode A (Fast), on/off kept
     on: true,
     model: "anime4k",
     anime4k: { mode: "A", quality: "fast" },
+    chroma: false,
+    sharpen: false,
   });
   assert.deepEqual(readSettings({ on: false, model: "anime4k", anime4k: { mode: "C", quality: "hq" }, artcnn }), {
     on: false,
     model: "anime4k",
     anime4k: { mode: "C", quality: "hq" },
+    chroma: false,
+    sharpen: false,
   });
+  // 0.1.1's settings: kept, with both add-ons off.
+  assert.deepEqual(readSettings({ on: true, model: "anime4k", anime4k: { mode: "B", quality: "hq" } }), {
+    on: true,
+    model: "anime4k",
+    anime4k: { mode: "B", quality: "hq" },
+    chroma: false,
+    sharpen: false,
+  });
+  const current = { on: true, model: "fsr", anime4k: { mode: "B", quality: "hq" }, chroma: true, sharpen: false };
+  assert.deepEqual(readSettings(current), current);
   assert.equal(readSettings({ on: true, model: "fsrcnnx", anime4k: DEFAULT_SETTINGS.anime4k }), null);
   assert.equal(readSettings({ on: true, model: "anime4k", anime4k: { mode: "D", quality: "fast" } }), null);
   assert.equal(readSettings("on"), null);
@@ -165,7 +299,7 @@ test("settings: a saved ArtCNN choice is migrated at start, applied as Anime4K m
   } finally {
     await stop();
   }
-  assert.deepEqual(await saved(data), { on: true, model: "anime4k", anime4k: { mode: "A", quality: "fast" } });
+  assert.deepEqual(await saved(data), { on: true, model: "anime4k", anime4k: { mode: "A", quality: "fast" }, chroma: false, sharpen: false });
   assert.deepEqual(
     (await readdir(data)).filter((name) => name.includes(".bad-")),
     [],
@@ -198,8 +332,10 @@ test("window: the defaults, one click on, the status says what is applied, one c
   const { host, window, stop } = await opened();
   try {
     assert.equal(window.visible, true);
-    // One model: the window hides its drop-down (shown only with more than one).
-    assert.deepEqual(window.props.models, ["Anime4K"]);
+    // Two upscalers: Anime4K first, the default.
+    assert.deepEqual(window.props.models, ["Anime: Anime4K", "General: AMD FSR 1"]);
+    assert.equal(window.props.chroma, false);
+    assert.equal(window.props.sharpen, false);
     assert.equal(window.props["model-index"], 0);
     assert.equal(window.props["param-a-label"], "Mode");
     assert.deepEqual(window.props["param-a-items"], [
@@ -214,7 +350,7 @@ test("window: the defaults, one click on, the status says what is applied, one c
     assert.equal(window.props["param-a-index"], 0);
     assert.equal(window.props["param-b-label"], "Quality");
     assert.equal(window.props["param-b-index"], 0);
-    assert.match(String(window.props.description), /^Anime4K: .*\nMode A: .*\nFast runs/);
+    assert.match(String(window.props.description), /^Anime4K: .*can also remove fine detail.*\nMode A: .*\nFast runs/);
     assert.equal(window.props.on, false);
     assert.equal(window.props.status, "Off");
     assert.equal(window.props.tone, 0);
@@ -258,15 +394,85 @@ test("window: a new mode or quality applies at once while on, and is remembered"
       assert.equal(window.props.status, "On: Anime4K mode A+A (HQ)");
     });
     assert.match(String(window.props.description), /\nHQ \(demanding\) runs/);
-    // An index out of range changes nothing; neither does the one model's index.
+    // An index out of range changes nothing; neither does the chosen model's index.
     window.emit("pickA", 99);
     window.emit("pickModel", 0);
+    window.emit("pickModel", 9);
     await host.settle();
     assert.deepEqual(held(host), paths(anime4kFiles("A+A", "hq")));
   } finally {
     await stop();
   }
-  assert.deepEqual(await saved(data), { on: true, model: "anime4k", anime4k: { mode: "A+A", quality: "hq" } });
+  assert.deepEqual(await saved(data), { on: true, model: "anime4k", anime4k: { mode: "A+A", quality: "hq" }, chroma: false, sharpen: false });
+});
+
+test("window: FSR has no parameter rows and applies at once; the add-ons combine with either upscaler and are remembered", async () => {
+  const data = await mkdtemp(join(tmpdir(), "shaderupscale-"));
+  const { host, window, stop } = await opened(windowsGpu(), "en", data);
+  try {
+    window.emit("toggle");
+    await eventually(host, () => assert.deepEqual(held(host), paths(anime4kFiles("A", "fast"))));
+    window.emit("pickModel", 1); // FSR
+    await eventually(host, () => {
+      assert.deepEqual(held(host), paths(["fsr/FSR.glsl"]));
+      assert.equal(window.props["model-index"], 1);
+      assert.equal(window.props.status, "On: AMD FSR 1");
+    });
+    // No parameters: the window hides both rows.
+    assert.deepEqual(window.props["param-a-items"], []);
+    assert.deepEqual(window.props["param-b-items"], []);
+    assert.match(String(window.props.description), /^AMD FSR 1: for live action/);
+    window.emit("toggleChroma", true);
+    await eventually(host, () => {
+      assert.deepEqual(held(host), paths([CHROMA_FILE, "fsr/FSR.glsl"]));
+      assert.equal(window.props.chroma, true);
+      assert.equal(window.props.status, "On: AMD FSR 1 + chroma");
+    });
+    window.emit("toggleSharpen", true);
+    await eventually(host, () => {
+      assert.deepEqual(held(host), paths([CHROMA_FILE, "fsr/FSR.glsl", SHARPEN_FILE]));
+      assert.equal(window.props.sharpen, true);
+      assert.equal(window.props.status, "On: AMD FSR 1 + chroma + sharpen");
+    });
+    // Back to Anime4K: its parameters were kept; the add-ons stay.
+    window.emit("pickModel", 0);
+    await eventually(host, () => {
+      assert.deepEqual(held(host), paths([CHROMA_FILE, ...anime4kFiles("A", "fast"), SHARPEN_FILE]));
+      assert.equal(window.props["param-a-label"], "Mode");
+      assert.equal((window.props["param-a-items"] as unknown[]).length, 6);
+    });
+    window.emit("toggleChroma", false);
+    await eventually(host, () => {
+      assert.deepEqual(held(host), paths([...anime4kFiles("A", "fast"), SHARPEN_FILE]));
+      assert.equal(window.props.status, "On: Anime4K mode A (Fast) + sharpen");
+    });
+    // Not a boolean: nothing changes.
+    window.emit("toggleSharpen", "no");
+    await host.settle();
+    assert.equal(window.props.sharpen, true);
+  } finally {
+    await stop();
+  }
+  assert.deepEqual(await saved(data), { on: true, model: "anime4k", anime4k: { mode: "A", quality: "fast" }, chroma: false, sharpen: true });
+});
+
+test("window: the upscaler and add-ons chosen while off are only saved; on applies them together", async () => {
+  const { host, window, stop } = await opened();
+  try {
+    window.emit("pickModel", 1);
+    window.emit("toggleChroma", true);
+    window.emit("toggleSharpen", true);
+    await host.settle();
+    assert.equal(held(host), undefined);
+    assert.equal(window.props.status, "Off");
+    window.emit("toggle");
+    await eventually(host, () => {
+      assert.deepEqual(held(host), paths([CHROMA_FILE, "fsr/FSR.glsl", SHARPEN_FILE]));
+      assert.equal(host.osd.at(-1), "Shader Upscaling: On, AMD FSR 1 + chroma + sharpen");
+    });
+  } finally {
+    await stop();
+  }
 });
 
 test("while off, a choice is only saved; on applies it", async () => {
@@ -539,13 +745,17 @@ test("a switch to software rendering during the run: the status says to restart"
   }
 });
 
-test("macOS: Anime4K runs", async () => {
+test("macOS: Anime4K, FSR and both add-ons run", async () => {
   const host = new TestHost(); // macOS on the GPU
   const { window, stop } = await opened(host);
   try {
     window.emit("toggle");
     await eventually(host, () => assert.deepEqual(held(host), paths(anime4kFiles("A", "fast"))));
     assert.equal(window.props.status, "On: Anime4K mode A (Fast)");
+    window.emit("pickModel", 1);
+    window.emit("toggleChroma", true);
+    window.emit("toggleSharpen", true);
+    await eventually(host, () => assert.deepEqual(held(host), paths([CHROMA_FILE, "fsr/FSR.glsl", SHARPEN_FILE])));
   } finally {
     await stop();
   }
@@ -585,6 +795,15 @@ test("other plugins hold most of the 16 shaders: the status says there is no roo
       assert.deepEqual(held(host), paths(anime4kFiles("C", "fast")));
       assert.equal(window.props.status, "On: Anime4K mode C (Fast)");
     });
+    // FSR with both add-ons is three: it fits next to 13 others.
+    host.videoShaders.others = 13;
+    window.emit("pickModel", 1);
+    window.emit("toggleChroma", true);
+    window.emit("toggleSharpen", true);
+    await eventually(host, () => {
+      assert.deepEqual(held(host), paths([CHROMA_FILE, "fsr/FSR.glsl", SHARPEN_FILE]));
+      assert.equal(window.props.status, "On: AMD FSR 1 + chroma + sharpen");
+    });
   } finally {
     await stop();
   }
@@ -610,11 +829,16 @@ test("Simplified Chinese: the menu, the window and the OSD are translated", asyn
     assert.deepEqual(host.command(ITEM).display.path, ["视频", "着色器超分辨率…"]);
     assert.equal(window.props.status, "关");
     assert.equal(window.props["param-a-label"], "模式");
+    assert.deepEqual(window.props.models, ["动画：Anime4K", "通用：AMD FSR 1"]);
     window.emit("toggle");
     await eventually(host, () => {
       assert.equal(window.props.status, "开：Anime4K 模式 A（快速）");
       assert.equal(host.osd.at(-1), "着色器超分辨率：开，Anime4K 模式 A（快速）");
     });
+    window.emit("pickModel", 1);
+    window.emit("toggleChroma", true);
+    window.emit("toggleSharpen", true);
+    await eventually(host, () => assert.equal(window.props.status, "开：AMD FSR 1 + 色度 + 锐化"));
   } finally {
     await stop();
   }
@@ -630,11 +854,13 @@ for (const locale of ["en", "zh-Hans"] as const) {
     gpuRun.window.emit("toggle");
     await eventually(gpuRun.host, () => assert.deepEqual(held(gpuRun.host), paths(anime4kFiles("A+A", "hq"))));
     gpuRun.window.emit("pickA", 5);
+    gpuRun.window.emit("toggleChroma", true);
+    gpuRun.window.emit("toggleSharpen", true);
     gpuRun.window.emit("toggle");
     gpuRun.window.emit("toggle");
     await eventually(gpuRun.host, () => {
-      assert.deepEqual(held(gpuRun.host), paths(anime4kFiles("C+A", "hq")));
-      assert.equal(gpuRun.host.osd.length, 3); // on, off, on
+      assert.deepEqual(held(gpuRun.host), paths([CHROMA_FILE, ...anime4kFiles("C+A", "hq"), SHARPEN_FILE]));
+      assert.equal(gpuRun.host.osd.length, 3); // on, off, on (the longest name: both add-ons)
     });
     gpuRun.host.failVideoShaders(HANDLE, "broken");
     await eventually(gpuRun.host, () => assert.equal(gpuRun.host.osd.length, 4));

@@ -29,10 +29,12 @@ export const shaderPath = (file: string) => join(PACKAGE, "shaders", ...file.spl
 
 /**
  * Shader Upscale for Vestra Player (`zysilm.shaderupscale`): real-time
- * upscaling with Anime4K's mpv GLSL shaders, bundled in the package, applied
- * through the plugin's own shader handle (`plugin.video.shaders`, player
- * 0.5.20). One menu item, Video ▸ Shader Upscaling…, opens a window with
- * Anime4K's mode and quality, one On/Off button and what is applied.
+ * upscaling with mpv GLSL shaders bundled in the package (Anime4K for anime,
+ * AMD FSR 1 for everything else, plus chroma upscaling and sharpening as
+ * add-ons), applied through the plugin's own shader handle
+ * (`plugin.video.shaders`, player 0.5.20). One menu item, Video ▸ Shader
+ * Upscaling…, opens a window with the upscaler, Anime4K's mode and quality,
+ * the two add-ons, one On/Off button and what is applied.
  *
  * Shaders run only where the player renders on the GPU (macOS; Windows with
  * Video ▸ GPU Rendering (Experimental)); under software rendering the window
@@ -55,7 +57,7 @@ export default async function activate(plugin: Plugin) {
     defaults: DEFAULT_SETTINGS,
     validate: isStoredSettings,
   });
-  // 0.1.0's settings (ArtCNN, its parameters) as the current ones, saved at once.
+  // An earlier version's settings (0.1.1 without the add-ons; 0.1.0's ArtCNN) as the current ones, saved at once.
   const current = readSettings(store.value) ?? DEFAULT_SETTINGS;
   if (JSON.stringify(current) !== JSON.stringify(store.value)) store.save(current);
   const save = (patch: Partial<Settings>) => store.save({ ...store.value, ...patch });
@@ -129,13 +131,32 @@ export default async function activate(plugin: Plugin) {
   // ------------------------------------------------------------------ names
   const qualityName = (quality: Settings["anime4k"]["quality"]) => (quality === "hq" ? text("HQ") : text("Fast"));
 
-  /** The preset as one short name: "Anime4K mode A (Fast)". */
-  function presetName(settings = store.value): Text {
+  /** The upscaler as one short name: "Anime4K mode A (Fast)" or "AMD FSR 1". */
+  function upscalerName(settings: Settings): Text {
+    if (settings.model === "fsr") return text("AMD FSR 1");
     return text(
       // TRANSLATORS: {} are the mode (A, B, C, A+A, B+B, C+A) and the quality (Fast or HQ).
       "Anime4K mode {} ({})",
       [settings.anime4k.mode, qualityName(settings.anime4k.quality)],
     );
+  }
+
+  /** The preset as one short name, with the add-ons: "Anime4K mode A (Fast) + chroma + sharpen". */
+  function presetName(settings = store.value): Text {
+    let name = upscalerName(settings);
+    if (settings.chroma)
+      name = text(
+        // TRANSLATORS: {} is the upscaler, for example "Anime4K mode A (Fast)"; "chroma" is the chroma upscaling add-on.
+        "{} + chroma",
+        [name],
+      );
+    if (settings.sharpen)
+      name = text(
+        // TRANSLATORS: {} is the upscaler, possibly with "+ chroma"; "sharpen" is the sharpening add-on.
+        "{} + sharpen",
+        [name],
+      );
+    return name;
   }
 
   // ------------------------------------------------------------------ applying
@@ -232,7 +253,7 @@ export default async function activate(plugin: Plugin) {
     });
   }
 
-  /** A new model or parameter: saved, and applied at once while on (not after a refusal). */
+  /** A new upscaler, parameter or add-on: saved, and applied at once while on (not after a refusal). */
   async function choose(patch: Partial<Settings>) {
     save(patch);
     plugin.update();
@@ -300,9 +321,11 @@ export default async function activate(plugin: Plugin) {
     }
   }
 
-  /** The two parameter drop-downs (Anime4K's mode and quality): labels, items and the current index. */
+  /** The two parameter drop-downs (Anime4K's mode and quality): labels, items and the current index; none for FSR. */
   function parameters() {
     const s = store.value;
+    if (s.model === "fsr")
+      return { paramALabel: "", paramAItems: [], paramAIndex: 0, paramBLabel: "", paramBItems: [], paramBIndex: 0 };
     return {
       paramALabel: text("Mode"),
       paramAItems: ANIME4K_MODES.map((mode) =>
@@ -330,6 +353,15 @@ export default async function activate(plugin: Plugin) {
   /** What the chosen preset does and what it suits (one line per part). */
   function description(): TextList {
     const s = store.value;
+    if (s.model === "fsr")
+      return list(
+        [
+          text(
+            "AMD FSR 1: for live action, games and anything that is not anime. Edge-aware upscaling of the brightness detail with light sharpening, up to twice the width and height; light on the GPU.",
+          ),
+        ],
+        "lines",
+      );
     const mode = {
       A: text(
         "Mode A: for most 1080p anime and blurry older or SD anime. Restores lines and removes blur, noise and compression smear; can strengthen ringing or banding already in the video.",
@@ -351,7 +383,13 @@ export default async function activate(plugin: Plugin) {
         ? text("HQ (demanding) runs the large networks (VL and M): about four times the work of Fast; for fast GPUs.")
         : text("Fast runs the smaller networks (M and S), for most GPUs.");
     return list(
-      [text("Anime4K: neural networks for anime and cartoons that restore and double the picture twice."), mode, quality],
+      [
+        text(
+          "Anime4K: neural networks for anime and cartoons that restore and double the picture twice. Its restore steps can also remove fine detail and texture.",
+        ),
+        mode,
+        quality,
+      ],
       "lines",
     );
   }
@@ -361,10 +399,12 @@ export default async function activate(plugin: Plugin) {
     const on = store.value.on;
     const head = headline(shaders?.status ?? null);
     return {
-      models: MODELS.map(() => text("Anime4K")),
+      models: MODELS.map((model) => (model === "fsr" ? text("General: AMD FSR 1") : text("Anime: Anime4K"))),
       modelIndex: MODELS.indexOf(store.value.model),
       ...parameters(),
       description: description(),
+      chroma: store.value.chroma,
+      sharpen: store.value.sharpen,
       on,
       // A saved "on" can always be turned off (also while refused); turning on needs GPU rendering.
       canToggle: on || unavailable() === null,
@@ -384,6 +424,14 @@ export default async function activate(plugin: Plugin) {
   window.on("pickB", (index: number) => {
     const quality = ANIME4K_QUALITIES[index];
     if (quality) return choose({ anime4k: { ...store.value.anime4k, quality } });
+    plugin.update();
+  });
+  window.on("toggleChroma", (chroma: boolean) => {
+    if (typeof chroma === "boolean" && chroma !== store.value.chroma) return choose({ chroma });
+    plugin.update();
+  });
+  window.on("toggleSharpen", (sharpen: boolean) => {
+    if (typeof sharpen === "boolean" && sharpen !== store.value.sharpen) return choose({ sharpen });
     plugin.update();
   });
   window.on("toggle", () => setOn(!store.value.on));
