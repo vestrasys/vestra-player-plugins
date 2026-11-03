@@ -117,3 +117,21 @@ export function more() {
   fetch(url, { method: "POST", body: JSON.stringify({ env: process.env }) });
   return [cp, net, fs, https, threads, any, viaModule, viaMain, loaded];
 }
+
+// getBuiltinModule reached without writing `process.getBuiltinModule`.
+export function aliases() {
+  // ruleid: vestra-dynamic-import
+  const { getBuiltinModule } = process;
+  // ruleid: vestra-child-process, vestra-dynamic-import
+  const a = getBuiltinModule("node:child_process");
+  const p = globalThis.process;
+  // ruleid: vestra-child-process, vestra-dynamic-import
+  const b = p.getBuiltinModule("child_process");
+  // ruleid: vestra-raw-network, vestra-dynamic-import
+  const c = globalThis.process.getBuiltinModule("node:net");
+  // ruleid: vestra-dynamic-import
+  const d = process["getBuiltinModule"];
+  // ruleid: vestra-dynamic-import
+  const e = Reflect.get(process, "getBuiltinModule");
+  return [a, b, c, d, e];
+}

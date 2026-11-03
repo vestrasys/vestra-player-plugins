@@ -104,12 +104,12 @@ jobs:
   # Labels the pull request when there is something to review and keeps one
   # summary comment up to date. The label stays until a maintainer removes
   # it, also when a later push has no new findings. Fails closed: when the
-  # scan job did not succeed (failed, timed out or cancelled), the pull
-  # request is labelled with a "scan failed" comment; a newer push's run
-  # then updates the comment.
+  # scan job failed or timed out, the pull request is labelled with a "scan
+  # failed" comment. A run cancelled by a newer push writes nothing, so it
+  # cannot overwrite the newer run's comment.
   comment:
     needs: scan
-    if: always() && needs.scan.result != 'skipped'
+    if: ${{ !cancelled() && needs.scan.result != 'skipped' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

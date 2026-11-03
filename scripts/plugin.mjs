@@ -15,7 +15,8 @@
  * --ignore-scripts` in the plugin directory, then the installed rules (no
  * native code, license files). The CLI itself runs with install scripts
  * disabled. After `build` and `pack`, the package must stay within the size
- * limits.
+ * limits, and a bundled entry may contain only the plugin's own files and its
+ * locked dependencies (scripts/lib/bundle.mjs).
  */
 import { spawnSync } from "node:child_process";
 import { readFile, stat } from "node:fs/promises";
@@ -27,6 +28,7 @@ import {
   prepareDependencies,
   sizeProblems,
 } from "./lib/dependencies.mjs";
+import { bundleProblems } from "./lib/bundle.mjs";
 import { labelOf, pluginDirectories } from "./plugins.mjs";
 
 const root = resolve(import.meta.dirname, "..");
@@ -109,4 +111,6 @@ if (command === "build" || command === "pack")
     stop(
       sizeProblems(label, packed, await directorySize(join(directory, "dist"))),
     );
+    // Nothing from outside the plugin and its locked dependencies is bundled.
+    stop(await bundleProblems(root, directory, label));
   }

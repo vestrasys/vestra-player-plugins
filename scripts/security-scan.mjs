@@ -137,6 +137,8 @@ export function classify(entry) {
   if (parts.includes("node_modules"))
     return "tracked node_modules: dependencies are installed from the lockfile, never committed";
   if (entry.size > MAX_BLOB) return "larger than 16 MiB: not read";
+  if (/^(tsconfig(\..+)?|jsconfig)\.json$/i.test(parts.at(-1)))
+    return "compiler configuration: paths, baseUrl or extends can make the bundle include files from outside the plugin";
   if (CODE.test(entry.path)) return "code";
   if (DATA.test(entry.path) || NOTICE.test(entry.path)) return "data";
   return "not code the scan reads and not a known data type";

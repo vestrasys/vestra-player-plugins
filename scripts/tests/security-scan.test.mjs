@@ -113,6 +113,12 @@ test("classify: code, data, and everything a reviewer must read", () => {
     "plugins/a/.semgrepignore",
   ])
     assert.match(blob(other), /not code/, other);
+  for (const config of [
+    "plugins/a/tsconfig.json",
+    "plugins/a/tsconfig.build.json",
+    "plugins/a/lib/jsconfig.json",
+  ])
+    assert.match(blob(config), /compiler configuration/, config);
   assert.match(blob("plugins/a/node_modules/x/index.js"), /node_modules/);
   assert.match(blob("plugins/a/lib", { mode: "120000" }), /symbolic link/);
   assert.match(

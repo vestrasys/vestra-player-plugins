@@ -86,6 +86,7 @@ signs the index users trust, so every dependency is held to these rules
 | **Size.** A package (every plugin's, with or without dependencies) is at most 4 MiB as a `.vxp` and 16 MiB unpacked | `build`, `pack`, the package check |
 | Code imports only Node built-ins, the SDK, its own files and the packages in its own `dependencies` (nothing from the repository's `node_modules`) | `boundaries` |
 | `node_modules` is never committed (a committed one with a matching install stamp would skip `npm ci` and the installed checks) | `boundaries`, `build` |
+| The bundle holds only the plugin's own files and its locked packages (esbuild's metafile, from the same build options as the SDK; the output must equal the shipped `dist/` file) | `build`, `pack` (so CI and publishing) |
 
 Adding or updating a dependency:
 
@@ -143,8 +144,14 @@ Plugins are independent: a plugin never imports another plugin or anything
 outside its own directory. Code imports only `@vestra-player/sdk` (types);
 tests may also import `@vestra-player/sdk/testing`. Runtime code never
 imports from the plugin's own `tests/` (the bundle would ship it), and a
-plugin directory holds real files only: no symbolic links, no submodules and
-no committed `node_modules`. `npm run boundaries` enforces all of this.
+plugin directory holds real files only: no symbolic links, no submodules, no
+committed `node_modules`, and no `tsconfig*.json` or `jsconfig.json` of its
+own (the repository's `tsconfig.json`, which may not use `paths`, `baseUrl`,
+`rootDirs` or `extends`, applies to every plugin). `npm run boundaries`
+enforces all of this. After every `build` and `pack`, `scripts/lib/bundle.mjs`
+also checks what a bundled entry is made of: every input esbuild bundled
+must be the plugin's own file or one of its locked dependencies in its own
+`node_modules`, whatever led esbuild there.
 
 ## Build and test
 
@@ -268,14 +275,15 @@ repositories and sideloaded plugins are their users' own risk.)
 
 `.semgrep/plugin-risk.yml` marks code a reviewer must read. The module
 rules match every way Node loads a module by name: `import`,
-`export … from`, `require`, `import()`, `process.getBuiltinModule`,
+`export … from`, `require`, `import()`, `getBuiltinModule` (on `process` or
+an alias),
 `module.require` and the main module's `require`.
 
 | Rule | Marks |
 | --- | --- |
 | `vestra-child-process` | `child_process` or `cluster`: running other programs |
 | `vestra-dynamic-code` | `eval`, `new Function`, `vm`, a `Worker` with `eval` or from a `data:`/`blob:` URL, a string passed to `setTimeout`/`setInterval` |
-| `vestra-dynamic-import` | `import()` or `require()` of a path that is not a string literal, `createRequire`, `module.require`, the main module's `require`, `Module._load`, `process.getBuiltinModule` |
+| `vestra-dynamic-import` | `import()` or `require()` of a path that is not a string literal, `createRequire`, `module.require`, the main module's `require`, `Module._load`, any reference to `getBuiltinModule` (member, destructured name or string) |
 | `vestra-native-addon` | `.node` addons, `process.dlopen`, `process.binding`, `wasi`, `inspector` |
 | `vestra-raw-network` | `net`, `tls`, `dgram`, `http2`, servers |
 | `vestra-network-host` | hard-coded URLs and IP addresses |
@@ -295,7 +303,8 @@ are legitimate and reviewed. The pull request is labelled for:
   collapsed section: changing where `bin` comes from in an existing
   `spawn(bin, args)` is no new finding, but it needs the same review;
 - **files the scan cannot vouch for**, new or changed: symbolic links,
-  submodules, committed `node_modules`, files over 16 MiB, files semgrep
+  submodules, committed `node_modules`, `tsconfig*.json`/`jsconfig.json`,
+  files over 16 MiB, files semgrep
   skipped or failed on, and every file that is neither code nor a known data
   type (JSON, Markdown, text, translations, `.slint`, shaders, images,
   license texts). HTML, `.vue`, binaries, archives, scripts for other

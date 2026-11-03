@@ -13,11 +13,30 @@ import ts from "typescript";
 // bundled into a package. Runtime code never imports the plugin's own
 // tests/ (the bundle would ship test code), and a plugin holds real files
 // only: no symbolic links, submodules or committed node_modules, whose
-// contents the security scan (scripts/security-scan.mjs) does not read.
+// contents the security scan (scripts/security-scan.mjs) does not read, and
+// no tsconfig/jsconfig of its own (paths, baseUrl or extends could redirect
+// an import outside it; neither may the repository's tsconfig.json).
 const source = resolve(import.meta.dirname, "..");
 const SDK = "@vestra-player/sdk";
 const PUBLIC = new Set([SDK]);
 const PUBLIC_IN_TESTS = new Set([SDK, `${SDK}/testing`]);
+/** tsconfig.json, tsconfig.<anything>.json, jsconfig.json. */
+const COMPILER_CONFIG = /^(tsconfig(\..+)?|jsconfig)\.json$/i;
+// The repository's tsconfig.json is found by esbuild for every bundled
+// plugin: it must not map imports anywhere (scripts/lib/bundle.mjs checks
+// the bundles themselves as well).
+{
+  const { compilerOptions = {}, ...config } = JSON.parse(
+    await readFile(resolve(source, "tsconfig.json"), "utf8"),
+  );
+  for (const key of ["paths", "baseUrl", "rootDirs"])
+    if (key in compilerOptions)
+      throw new Error(
+        `tsconfig.json: compilerOptions.${key} is not allowed (it would redirect plugin imports)`,
+      );
+  if ("extends" in config)
+    throw new Error("tsconfig.json: extends is not allowed");
+}
 async function files(directory) {
   const items = await readdir(directory, { withFileTypes: true });
   return (
@@ -29,6 +48,13 @@ async function files(directory) {
         if (item.isSymbolicLink())
           throw new Error(
             `${relative(source, path)} is a symbolic link; plugins hold real files only`,
+          );
+        // A plugin's own compiler configuration could redirect imports
+        // (paths, baseUrl, extends) to files outside it; the repository's
+        // tsconfig.json applies to every plugin.
+        if (item.isFile() && COMPILER_CONFIG.test(item.name))
+          throw new Error(
+            `${relative(source, path)}: plugins have no tsconfig or jsconfig of their own (the repository's tsconfig.json applies)`,
           );
         // Third-party and generated trees are not plugin-authored source.
         if (item.isDirectory())
@@ -170,6 +196,10 @@ function inside(path, root) {
       if (path.split("/").includes("node_modules"))
         throw new Error(
           `${path}: node_modules must not be committed (dependencies are installed from the lockfile)`,
+        );
+      if (COMPILER_CONFIG.test(path.split("/").pop()))
+        throw new Error(
+          `${path}: plugins have no tsconfig or jsconfig of their own (the repository's tsconfig.json applies)`,
         );
     }
 }

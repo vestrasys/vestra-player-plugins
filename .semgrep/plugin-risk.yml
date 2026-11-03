@@ -14,8 +14,8 @@
 
 # Every module rule matches the ways Node loads a module by name: import,
 # `export … from` (semgrep's `import` pattern covers `export { x } from`),
-# require, dynamic import(), process.getBuiltinModule, module.require and
-# the main module's require.
+# require, dynamic import(), getBuiltinModule (on process or an alias),
+# module.require and the main module's require.
 rules:
   - id: vestra-child-process
     languages: [typescript, javascript]
@@ -31,7 +31,8 @@ rules:
           - pattern: export * from "$MOD"
           - pattern: require("$MOD")
           - pattern: import("$MOD")
-          - pattern: process.getBuiltinModule("$MOD")
+          - pattern: $P.getBuiltinModule("$MOD")
+          - pattern: getBuiltinModule("$MOD")
           - pattern: module.require("$MOD")
           - pattern: process.mainModule.require("$MOD")
           - pattern: require.main.require("$MOD")
@@ -72,7 +73,8 @@ rules:
               - pattern: export * from "$MOD"
               - pattern: require("$MOD")
               - pattern: import("$MOD")
-              - pattern: process.getBuiltinModule("$MOD")
+              - pattern: $P.getBuiltinModule("$MOD")
+              - pattern: getBuiltinModule("$MOD")
               - pattern: module.require("$MOD")
               - pattern: process.mainModule.require("$MOD")
               - pattern: require.main.require("$MOD")
@@ -87,7 +89,7 @@ rules:
       Loads a module in a way that hides what is loaded: a path that is
       not a string literal, its own require (createRequire,
       module.require, the main module's require, Module._load), or
-      process.getBuiltinModule.
+      getBuiltinModule (by any name or alias).
     metadata:
       category: code
     pattern-either:
@@ -99,10 +101,13 @@ rules:
           - pattern-not: require("...")
       - pattern: $M.createRequire(...)
       - pattern: createRequire(...)
-      - patterns:
-          - pattern: process.getBuiltinModule($X)
-          - pattern-not: process.getBuiltinModule("...")
-      - pattern: process.getBuiltinModule("...")
+      # Every reference to getBuiltinModule, however it is reached: a
+      # member (process., globalThis.process., an alias of process), the
+      # bare name (destructured from process), or the name as a string
+      # (process["…"], Reflect.get).
+      - pattern: $P.getBuiltinModule
+      - pattern: getBuiltinModule
+      - pattern: '"getBuiltinModule"'
       - pattern: module.require(...)
       - pattern: process.mainModule
       - pattern: require.main
@@ -126,7 +131,8 @@ rules:
               - pattern: export * from "$MOD"
               - pattern: require("$MOD")
               - pattern: import("$MOD")
-              - pattern: process.getBuiltinModule("$MOD")
+              - pattern: $P.getBuiltinModule("$MOD")
+              - pattern: getBuiltinModule("$MOD")
               - pattern: module.require("$MOD")
               - pattern: process.mainModule.require("$MOD")
               - pattern: require.main.require("$MOD")
@@ -149,7 +155,8 @@ rules:
               - pattern: export * from "$MOD"
               - pattern: require("$MOD")
               - pattern: import("$MOD")
-              - pattern: process.getBuiltinModule("$MOD")
+              - pattern: $P.getBuiltinModule("$MOD")
+              - pattern: getBuiltinModule("$MOD")
               - pattern: module.require("$MOD")
               - pattern: process.mainModule.require("$MOD")
               - pattern: require.main.require("$MOD")
