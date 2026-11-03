@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0
+
+- A second upscaler, **General: AMD FSR 1** (FidelityFX Super Resolution 1.0.2, EASU + RCAS, agyild's mpv port, MIT): for live action, games and anything that is not anime; light on the GPU. The window's first drop-down, **Upscaler**, now chooses between it and **Anime: Anime4K**; FSR has no Mode or Quality rows.
+- Two add-ons, **Chroma** and **Sharpen**, each a check box that works with either upscaler: chroma from luma prediction (Artoriuz's CfL Lite, MIT, with the 2026-08 fix for blue artefacts) rebuilds the half-size colour planes before the upscaler; adaptive sharpen (bacondither, igv's mpv port, BSD-2-Clause) sharpens the final picture. The status and the OSD name them ("On: AMD FSR 1 + chroma + sharpen"). At most nine shaders run (Anime4K's longest chain with both add-ons).
+- CfL Lite is changed in syntax only so that it compiles with macOS's OpenGL 4.1 (no initializer lists, no arrays of arrays); the file and `shaders/SOURCES.txt` say so. The other shaders are unchanged. None uses compute shaders or `//!PARAM`.
+- Anime4K's description says that its restore steps can also remove fine detail and texture; the README says when to prefer mode C or FSR. Anime4K mode A, Fast, stays the default.
+- Settings saved by 0.1.x are kept, with both add-ons off.
+- The README lists what each choice is for, how the add-ons combine with the upscalers, the licences, and the shaders not included yet (ArtCNN, NIS, SGSR).
+
 ## 0.1.1
 
 - Anime4K only: ArtCNN is removed. Its shaders need mpv's gpu-next renderer, which the player does not use yet; with the player's renderer they cost GPU time without taking effect, and took about a minute to compile. A saved ArtCNN choice becomes Anime4K mode A (Fast), with on/off kept. The Model drop-down is hidden while Anime4K is the only model.

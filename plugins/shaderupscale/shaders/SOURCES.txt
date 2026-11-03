@@ -2,10 +2,12 @@ Third-party shaders in this package
 ===================================
 
 The plugin's own code is Apache-2.0. The mpv GLSL shaders under shaders/ are
-third-party files, redistributed unchanged (line endings normalised to LF)
-under their own licences: MIT, except the two Anime4K AutoDownscalePre files,
-which are under the Unlicense (public domain). Each file also carries its
-copyright and licence notice in its header.
+third-party files, redistributed under their own permissive licences, with
+line endings normalised to LF: MIT (Anime4K, CfL), the Unlicense (the two
+Anime4K AutoDownscalePre files), AMD's MIT licence (FSR) and BSD-2-Clause
+(adaptive-sharpen). Every file keeps its copyright and licence notice in its
+header, and each directory holds the licence text as LICENSE. All of them are
+unchanged except CfL_Prediction_Lite.glsl (see cfl/ below).
 
 anime4k/
   Anime4K by bloc97 and contributors
@@ -21,3 +23,47 @@ anime4k/
   branch (the v4.0.1 tag does not contain them):
   md/Template/GLSL_Mac_Linux_High-end/input.conf (HQ) and
   md/Template/GLSL_Mac_Linux_Low-end/input.conf (Fast).
+
+fsr/
+  AMD FidelityFX Super Resolution 1 (FSR) v1.0.2, EASU and RCAS, by AMD;
+  ported to mpv by agyild
+  https://gist.github.com/agyild/82219c545228d70c5604f865ce0b0ce5
+  Version: gist revision 2623d743b9c23f500ba086f05b385dcb1557e15d
+    (2022-03-06), file FSR.glsl,
+    sha256 of the upstream file 56d8597fc6b7bf6d13f8c3b2bdf1cdc43b06175d51746aab44cf1dca16929b9e
+    (with its CRLF line endings)
+  Licence: MIT, Copyright (c) 2021 Advanced Micro Devices, Inc. (fsr/LICENSE,
+    the text of AMD's https://github.com/GPUOpen-Effects/FidelityFX-FSR
+    license.txt, which the port repeats in its header). The port adds no
+    licence of its own.
+  Files: FSR.glsl (unchanged)
+
+cfl/
+  Chroma from Luma (CfL) Prediction, Lite variant, by Artoriuz (João
+  Chrisóstomo)
+  https://github.com/Artoriuz/glsl-chroma-from-luma-prediction
+  Version: commit 066dff964b83aa34e893de25d590874bf8c8e94f (2026-08-15,
+    includes "Gate regression by luma extrapolation distance", the fix for
+    blue artifacts on flat-luma chroma detail), file CfL_Prediction_Lite.glsl,
+    sha256 of the upstream file 159c1dad4daab10eddaae822a5d0fb0b94a38e85a2825fb7df9d7feb509ad4f7
+    (with its CRLF line endings)
+  Licence: MIT, Copyright (c) 2023 João Chrisóstomo (cfl/LICENSE, the
+    repository's LICENSE)
+  Files: CfL_Prediction_Lite.glsl
+  Modified for this plugin, syntax only, so that it compiles as GLSL 4.10
+    (macOS OpenGL 4.1 with mpv's vo_gpu): the C-style initializer lists became
+    array constructors (initializer lists need GLSL 4.20) and the array of
+    arrays chroma_quads[4][2] became chroma_quads_u[4] and chroma_quads_v[4]
+    (arrays of arrays need GLSL 4.30). The computation is unchanged. A note
+    after the licence header in the file says so.
+
+adaptive-sharpen/
+  Adaptive sharpen, version 2021-10-17, by bacondither; mpv port by igv
+  https://gist.github.com/igv/8a77e4eb8276753b54bb94c1c50c317e
+  Version: gist revision 572f59099cd0e3eb5e321a6da0a3d90a7382e2dc
+    (2022-06-19), file adaptive-sharpen.glsl,
+    sha256 of the upstream file 827fb3d662ac9a91b4075e9117fe6e1dbc1c06d85959ba719cdb954dfb7fb8e4
+    (with its CRLF line endings)
+  Licence: BSD-2-Clause, Copyright (c) 2015-2021, bacondither
+    (adaptive-sharpen/LICENSE, the notice from the file's header)
+  Files: adaptive-sharpen.glsl (unchanged)

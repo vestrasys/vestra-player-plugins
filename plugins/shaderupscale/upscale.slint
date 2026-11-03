@@ -1,5 +1,6 @@
-// The Shader Upscaling window: the model (only with more than one), its two parameters, what the preset does, one button that
-// turns upscaling on and off, and the status line (what is applied, or why not).
+// The Shader Upscaling window: the upscaler (only with more than one), its two parameters (only when it has them: Anime4K's
+// mode and quality, none for FSR), the two add-ons (chroma, sharpen), what the preset does, one button that turns upscaling
+// on and off, and the status line (what is applied, or why not).
 // Width 400 (content 400 − 28 = 372): label column 90 + 8 + drop-down 274. Height: the content's
 // (min = max = the layout's preferred height, as the About window), so the window follows the
 // wrapped texts (the description, the status detail) as they change after it opens and nothing in
@@ -7,7 +8,7 @@
 // Texts are @tr (English source; locales/<lang>.po translate them); the drop-down labels, the
 // description and the status come translated from main.ts.
 import { Theme } from "@vestra/theme.slint";
-import { Button, Choice } from "@vestra/widgets.slint";
+import { Button, Check, Choice } from "@vestra/widgets.slint";
 
 // A paragraph that wraps; its height follows the text (0 when empty).
 component Paragraph {
@@ -62,16 +63,19 @@ export component UpscaleWindow inherits Window {
     min-height: body.preferred-height;
     max-height: body.preferred-height;
     background: Theme.bg-panel;
-    // The models and the chosen one; the drop-down shows only with more than one (Anime4K alone in 0.1.1).
+    // The upscalers and the chosen one; the drop-down shows only with more than one (Anime4K and FSR since 0.2.0).
     in property <[string]> models;
     in-out property <int> model-index;
-    // The chosen model's two parameters: label, items and the chosen item.
+    // The chosen upscaler's two parameters: label, items and the chosen item; no items = no row (FSR).
     in property <string> param-a-label;
     in property <[string]> param-a-items;
     in-out property <int> param-a-index;
     in property <string> param-b-label;
     in property <[string]> param-b-items;
     in-out property <int> param-b-index;
+    // The add-ons: chroma from luma prediction before the upscaler, adaptive sharpening after it.
+    in property <bool> chroma;
+    in property <bool> sharpen;
     // What the preset does, one part per line.
     in property <string> description;
     // The user's choice, and whether the button works (a saved "on" can always be turned off).
@@ -85,6 +89,8 @@ export component UpscaleWindow inherits Window {
     callback pick-model(int);
     callback pick-a(int);
     callback pick-b(int);
+    callback toggle-chroma(bool);
+    callback toggle-sharpen(bool);
     callback toggle();
     callback close-window();
 
@@ -94,9 +100,10 @@ export component UpscaleWindow inherits Window {
         width: 0;
         height: 0;
         label-measure := VerticalLayout {
-            Text { text: root.models.length > 1 ? @tr("Model") : ""; font-size: Theme.font-body; }
+            Text { text: root.models.length > 1 ? @tr("Upscaler") : ""; font-size: Theme.font-body; }
             Text { text: root.param-a-label; font-size: Theme.font-body; }
             Text { text: root.param-b-label; font-size: Theme.font-body; }
+            Text { text: @tr("Add-ons"); font-size: Theme.font-body; }
         }
     }
 
@@ -104,14 +111,14 @@ export component UpscaleWindow inherits Window {
         padding: Theme.dialog-padding;
         spacing: 8px;
         if root.models.length > 1: ChoiceRow {
-            label: @tr("Model");
+            label: @tr("Upscaler");
             label-width: root.label-width;
             model: root.models;
             current-index <=> root.model-index;
             window-height: root.height;
             selected(index) => { root.pick-model(index); }
         }
-        ChoiceRow {
+        if root.param-a-items.length > 0: ChoiceRow {
             label: root.param-a-label;
             label-width: root.label-width;
             model: root.param-a-items;
@@ -119,13 +126,46 @@ export component UpscaleWindow inherits Window {
             window-height: root.height;
             selected(index) => { root.pick-a(index); }
         }
-        ChoiceRow {
+        if root.param-b-items.length > 0: ChoiceRow {
             label: root.param-b-label;
             label-width: root.label-width;
             model: root.param-b-items;
             current-index <=> root.param-b-index;
             window-height: root.height;
             selected(index) => { root.pick-b(index); }
+        }
+        // The add-ons, as checks the plugin owns (it saves the choice and sends the new list).
+        HorizontalLayout {
+            spacing: 8px;
+            // The label beside the first check, as the drop-down rows' labels.
+            VerticalLayout {
+                width: root.label-width;
+                alignment: start;
+                Text {
+                    height: Theme.checkbox-row-height;
+                    text: @tr("Add-ons");
+                    color: Theme.text-dim;
+                    font-size: Theme.font-body;
+                    horizontal-alignment: right;
+                    vertical-alignment: center;
+                    overflow: elide;
+                }
+            }
+            VerticalLayout {
+                horizontal-stretch: 1;
+                Check {
+                    text: @tr("Chroma: sharper colour edges (CfL)");
+                    checked: root.chroma;
+                    self-toggle: false;
+                    toggled(on) => { root.toggle-chroma(on); }
+                }
+                Check {
+                    text: @tr("Sharpen: adaptive sharpening of the final picture");
+                    checked: root.sharpen;
+                    self-toggle: false;
+                    toggled(on) => { root.toggle-sharpen(on); }
+                }
+            }
         }
         Paragraph { text: root.description; }
         Rectangle { height: 1px; background: Theme.line; }
