@@ -29,6 +29,7 @@ const SHARED = [
   "scripts/plugins.mjs",
   "scripts/plugin-deps.mjs",
   "scripts/lib/dependencies.mjs",
+  "scripts/lib/bundle.mjs",
   "scripts/ci-plugins.mjs",
   "scripts/check-package.mjs",
   ".github/workflows/ci.yml",

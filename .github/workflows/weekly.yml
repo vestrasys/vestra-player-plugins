@@ -2,7 +2,8 @@ name: Weekly
 
 # Every plugin against the latest published @vestra-player/sdk (installed
 # in the job over the locked version, never committed), to catch an SDK
-# change that breaks a plugin before a plugin release needs it.
+# change that breaks a plugin before a plugin release needs it; and scans
+# the lockfiles for newly published advisories (osv-scanner).
 
 on:
   schedule:
@@ -45,3 +46,19 @@ jobs:
     with:
       plugin: ${{ matrix.plugin }}
       sdk: latest
+
+  # Advisories published since the last change: the same lockfile scan as
+  # _static.yml, on unchanged code.
+  osv-scanner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: osv-scanner
+        uses: docker://ghcr.io/google/osv-scanner@sha256:4f3b7e2c64b9d38a5febc5a7e4a3dfef1d1362f726dea7a2ef4762b46469fcd0 # v2.7.0
+        with:
+          args: scan source --config osv-scanner.toml --lockfile package-lock.json --recursive plugins

@@ -125,6 +125,8 @@ Every change that should reach users bumps `version` and adds a `CHANGELOG.md` e
 
 `index.json` is signed with Ed25519 (`index.json.sig` next to it); the player's store embeds the public key ([`keys/`](keys)) and rejects an unsigned, tampered or replayed index. Every package carries its sha256 in the index, and building and signing run in separate jobs, so plugin code never runs where the signing key is. Details: [CONTRIBUTING.md](CONTRIBUTING.md#publishing).
 
+Plugins run without a sandbox, so review is the main defence: pull requests that change a plugin are scanned (semgrep risk rules, CodeQL, dependency review, osv-scanner), and risky code is labelled `security-review` and read by a maintainer before merging. See [Security review](CONTRIBUTING.md#security-review).
+
 ## License
 
 The repository, including the plugins in `plugins/`, is [Apache-2.0](LICENSE). Registered plugins keep their own licenses.

@@ -608,6 +608,17 @@ export async function prepareDependencies(directory, label) {
     inventory: false,
   });
   if (problems.length) return problems;
+  // A committed node_modules (with a matching stamp) would skip npm ci and
+  // every check of what is installed: refuse it. Outside a git checkout
+  // (git fails) there is nothing tracked.
+  const tracked = spawnSync("git", ["ls-files", "-z", "--", "node_modules"], {
+    cwd: directory,
+    encoding: "utf8",
+  });
+  if (tracked.status === 0 && tracked.stdout)
+    return [
+      `${label}: node_modules is tracked by git; dependencies are installed from the lockfile, never committed`,
+    ];
   const stamp = createHash("sha256")
     .update(await readFile(join(directory, "package.json")))
     .update(await readFile(join(directory, "package-lock.json")))

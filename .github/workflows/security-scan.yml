@@ -1,0 +1,154 @@
+name: Plugin security scan
+
+# Reads the code of every hosted plugin a pull request changes with the
+# risk rules in .semgrep/plugin-risk.yml (child processes, run-time code,
+# non-literal imports, native addons, raw sockets, hard-coded hosts, paths
+# outside the plugin, credentials and browser profiles, obfuscation). New
+# findings (not already on the base branch) and files the scan cannot read
+# label the pull request `security-review` and get one summary comment that
+# is updated on each push. Findings do not fail the pull request: a
+# maintainer reads the code and removes the label (CONTRIBUTING.md,
+# "Security review").
+#
+# Why pull_request_target, and why it is safe here (same design as
+# registry.yml):
+# - The workflow, scripts/security-scan.mjs and the rules run as they are on
+#   the base branch, so a pull request cannot weaken the scan that judges it
+#   (edit the rules, add `nosemgrep` comments or .semgrepignore files: the
+#   scan ignores both).
+# - The pull request's files are read as data: git fetch, then git cat-file
+#   into a scratch directory. None of its code runs: no npm ci, no build, no
+#   checkout of the head into the workspace. semgrep parses the files in a
+#   container without network.
+# - No secrets are used. `scan` has a read-only token; only `comment` can
+#   write (pull-requests: write, for the label and the comment), and it runs
+#   no repository code: it reads the report the scan job wrote, whose
+#   paths, lines and rule ids are validated by security-scan.mjs.
+#
+#   scan (read-only) ──▶ comment (label + comment)
+
+on:
+  # zizmor: ignore[dangerous-triggers] the pull request's code is never
+  # checked out or run (see above); its files are read as data with git.
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "plugins/**"
+
+permissions: {}
+
+concurrency:
+  group: security-scan-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      findings: ${{ steps.report.outputs.findings }}
+    env:
+      # semgrep CE (LGPL-2.1), the CLI only: no account, no registry rules.
+      SEMGREP: semgrep/semgrep:1.183.0@sha256:2e45517a85e13a9cca14a2a00df6bb48affd66b8ebfae1b0991cd57578362fb0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "26"
+      # The exact commit of this event, not whatever the pull request's ref
+      # points at by now: a newer push gets its own run (and cancels this
+      # one), and a commit that is gone fails the scan, which then labels
+      # the pull request anyway (fail closed).
+      - name: Fetch the pull request head (as data)
+        env:
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git fetch --no-tags "https://github.com/$GITHUB_REPOSITORY.git" "$HEAD"
+          git cat-file -e "$HEAD^{commit}"
+      - name: Extract the changed plugins' code (as data)
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/security-scan.mjs extract --base "$BASE" --head "$HEAD" --out "$RUNNER_TEMP/scan"
+      # --project-root . makes semgrep use the extracted tree's own empty
+      # .semgrepignore instead of its default ignores (tests/, *.min.js, …);
+      # any file it still skips is reported by `report`.
+      - name: semgrep (.semgrep/plugin-risk.yml from the base branch)
+        run: |
+          for tree in head base; do
+            docker run --rm --network none \
+              -v "$RUNNER_TEMP/scan:/scan" -v "$GITHUB_WORKSPACE/.semgrep:/rules:ro" -w "/scan/$tree" \
+              "$SEMGREP" semgrep scan --config /rules/plugin-risk.yml \
+              --metrics=off --disable-version-check --disable-nosem --no-git-ignore --project-root . \
+              --max-target-bytes 0 --timeout 0 --quiet --json --output "/scan/$tree.json" plugins
+          done
+      - id: report
+        name: Report
+        env:
+          REPOSITORY: ${{ github.repository }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/security-scan.mjs report --dir "$RUNNER_TEMP/scan" --repo "$REPOSITORY" --sha "$HEAD"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: security-scan
+          path: ${{ runner.temp }}/scan/report.*
+          if-no-files-found: error
+          retention-days: 7
+
+  # Labels the pull request when there is something to review and keeps one
+  # summary comment up to date. The label stays until a maintainer removes
+  # it, also when a later push has no new findings. Fails closed: when the
+  # scan job failed or timed out, the pull request is labelled with a "scan
+  # failed" comment. A run cancelled by a newer push writes nothing, so it
+  # cannot overwrite the newer run's comment.
+  comment:
+    needs: scan
+    if: ${{ !cancelled() && needs.scan.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write # the label and the comment
+    steps:
+      - if: needs.scan.result == 'success'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: security-scan
+          path: ${{ runner.temp }}/report
+      - name: Label and comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number }}
+          FINDINGS: ${{ needs.scan.outputs.findings }}
+          RESULT: ${{ needs.scan.result }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          body="$RUNNER_TEMP/report/report.md"
+          marker='<!-- vestra-plugin-security-scan -->'
+          if [[ "$RESULT" != success || ! "$FINDINGS" =~ ^[0-9]+$ ]]; then
+            FINDINGS=failed
+            mkdir -p "$(dirname "$body")"
+            {
+              echo "$marker"
+              echo "## Plugin security scan"
+              echo
+              echo "**The scan failed** ([run]($RUN)), so this pull request is labelled \`security-review\`: a maintainer reads the changed plugin code by hand, or reruns the scan, before merging (CONTRIBUTING.md, \"Security review\")."
+            } > "$body"
+          fi
+          if [[ "$FINDINGS" != 0 ]]; then
+            gh api --method POST "repos/$REPOSITORY/issues/$NUMBER/labels" -f "labels[]=security-review" > /dev/null
+          fi
+          id=$(gh api --paginate "repos/$REPOSITORY/issues/$NUMBER/comments" \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id" | tail -n 1)
+          if [[ -n "$id" ]]; then
+            gh api --method PATCH "repos/$REPOSITORY/issues/comments/$id" -F "body=@$body" > /dev/null
+          elif [[ "$FINDINGS" != 0 ]]; then
+            gh api --method POST "repos/$REPOSITORY/issues/$NUMBER/comments" -F "body=@$body" > /dev/null
+          fi
+          echo "findings: $FINDINGS"
