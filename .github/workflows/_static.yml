@@ -91,8 +91,10 @@ jobs:
 
   # Known vulnerabilities and malicious packages (OSV, which includes the
   # OpenSSF malicious-packages feed) in every lockfile: the repository's
-  # and each plugin's. Fails on any match; a reviewed exception goes into
-  # osv-scanner.toml with a reason and an expiry date.
+  # and each plugin's. Fails on any match, whatever the severity (publish.yml
+  # runs this too, so nothing known to be vulnerable is released); a
+  # reviewed exception goes into the root osv-scanner.toml (passed with
+  # --config, so it covers every lockfile) with a reason and an expiry date.
   osv-scanner:
     name: osv-scanner
     runs-on: ubuntu-latest
@@ -106,7 +108,7 @@ jobs:
       - name: osv-scanner
         uses: docker://ghcr.io/google/osv-scanner@sha256:4f3b7e2c64b9d38a5febc5a7e4a3dfef1d1362f726dea7a2ef4762b46469fcd0 # v2.7.0
         with:
-          args: scan source --lockfile package-lock.json --recursive plugins
+          args: scan source --config osv-scanner.toml --lockfile package-lock.json --recursive plugins
 
   typos:
     runs-on: ubuntu-latest

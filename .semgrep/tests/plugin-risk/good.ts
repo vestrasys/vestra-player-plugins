@@ -37,3 +37,14 @@ export async function activate(): Promise<void> {
   const label = "http is mentioned here, not a URL";
   helper(parts, nested, here, strings, short, lang, label);
 }
+
+export function settings(): unknown {
+  // ok: vestra-dynamic-code
+  const worker = new Worker(new URL("./worker.ts", import.meta.url), { eval: false });
+  // ok: vestra-dynamic-code
+  const icon = "data:image/png;base64,iVBORw0KGgo=";
+  // ok: vestra-credentials
+  const options = { ...defaults(), lang: process.env.LANG };
+  return [worker, icon, options];
+}
+declare function defaults(): Record<string, string>;

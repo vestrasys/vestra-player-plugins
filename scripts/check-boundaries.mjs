@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { readdir, readFile } from "node:fs/promises";
 import { builtinModules } from "node:module";
 import { resolve, dirname, extname, relative, sep } from "node:path";
@@ -9,7 +10,10 @@ import ts from "typescript";
 // part of the package interface. Any other package must be a Node built-in
 // or one of the plugin's own `dependencies` (plugins/<name>/package.json),
 // so that nothing from the repository's own node_modules (build tools) is
-// bundled into a package.
+// bundled into a package. Runtime code never imports the plugin's own
+// tests/ (the bundle would ship test code), and a plugin holds real files
+// only: no symbolic links, submodules or committed node_modules, whose
+// contents the security scan (scripts/security-scan.mjs) does not read.
 const source = resolve(import.meta.dirname, "..");
 const SDK = "@vestra-player/sdk";
 const PUBLIC = new Set([SDK]);
@@ -20,6 +24,12 @@ async function files(directory) {
     await Promise.all(
       items.map(async (item) => {
         const path = resolve(directory, item.name);
+        // esbuild follows a symbolic link to whatever it points at, outside
+        // the plugin and outside what the security scan reads.
+        if (item.isSymbolicLink())
+          throw new Error(
+            `${relative(source, path)} is a symbolic link; plugins hold real files only`,
+          );
         // Third-party and generated trees are not plugin-authored source.
         if (item.isDirectory())
           return ["node_modules", "vendor", ".typecheck", ".cache"].includes(
@@ -76,6 +86,12 @@ function inside(path, root) {
             throw new Error(
               `${relative(source, path)} imports outside its package: ${target}`,
             );
+          // The bundle holds everything the entry imports: test code would
+          // ship with the plugin.
+          if (inside(resolved, tests) && !inside(path, tests))
+            throw new Error(
+              `${relative(source, path)} imports from the plugin's tests/: ${target}; runtime code may not use test code`,
+            );
         } else if (target === SDK || target.startsWith(`${SDK}/`)) {
           const allowed = inside(path, tests) ? PUBLIC_IN_TESTS : PUBLIC;
           if (!allowed.has(target))
@@ -108,11 +124,54 @@ function inside(path, root) {
           node.expression.kind === ts.SyntaxKind.ImportKeyword
         )
           check(node.arguments[0]);
+        // require("…") with a literal path follows the same rules (a
+        // nonliteral one is the security scan's: vestra-dynamic-import).
+        if (
+          ts.isCallExpression(node) &&
+          ts.isIdentifier(node.expression) &&
+          node.expression.text === "require" &&
+          node.arguments.length === 1 &&
+          ts.isStringLiteralLike(node.arguments[0])
+        )
+          check(node.arguments[0]);
         ts.forEachChild(node, visit);
       }
       visit(parsed);
     }
   }
+}
+// What git tracks under plugins/: no symbolic links or submodules (esbuild
+// would bundle what they point at, which the security scan does not read)
+// and no node_modules (dependencies come from the lockfile through npm ci;
+// committed ones, with a matching install stamp, would skip it and every
+// dependency check). The checkout itself is checked above.
+{
+  const listed = spawnSync("git", ["ls-files", "-s", "-z", "--", "plugins"], {
+    cwd: source,
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  if (listed.status !== 0)
+    console.log(
+      "Not a git checkout: tracked symbolic links and node_modules not checked.",
+    );
+  else
+    for (const line of listed.stdout.split("\0").filter(Boolean)) {
+      const [meta, path] = line.split("\t");
+      const mode = meta.split(" ")[0];
+      if (mode === "120000")
+        throw new Error(
+          `${path} is a symbolic link; plugins hold real files only`,
+        );
+      if (mode === "160000")
+        throw new Error(
+          `${path} is a git submodule; plugins hold real files only`,
+        );
+      if (path.split("/").includes("node_modules"))
+        throw new Error(
+          `${path}: node_modules must not be committed (dependencies are installed from the lockfile)`,
+        );
+    }
 }
 console.log(
   "Plugin import boundaries pass (static imports; trusted runtime is not a sandbox).",

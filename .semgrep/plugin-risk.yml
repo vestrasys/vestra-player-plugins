@@ -12,6 +12,10 @@
 # Tests: .semgrep/tests/ (semgrep --test, run by _static.yml); every rule has
 # a positive (`ruleid:`) and a negative (`ok:`) case there.
 
+# Every module rule matches the ways Node loads a module by name: import,
+# `export … from` (semgrep's `import` pattern covers `export { x } from`),
+# require, dynamic import(), process.getBuiltinModule, module.require and
+# the main module's require.
 rules:
   - id: vestra-child-process
     languages: [typescript, javascript]
@@ -24,8 +28,13 @@ rules:
     patterns:
       - pattern-either:
           - pattern: import "$MOD"
+          - pattern: export * from "$MOD"
           - pattern: require("$MOD")
           - pattern: import("$MOD")
+          - pattern: process.getBuiltinModule("$MOD")
+          - pattern: module.require("$MOD")
+          - pattern: process.mainModule.require("$MOD")
+          - pattern: require.main.require("$MOD")
       - metavariable-regex:
           metavariable: $MOD
           regex: ^(node:)?(child_process|cluster)$
@@ -35,7 +44,8 @@ rules:
     severity: WARNING
     message: >-
       Runs code built at run time (eval, Function, vm, a Worker with
-      eval: true, or a string timer). Check where the code comes from.
+      eval or from a data:/blob: URL, or a string timer). Check where the
+      code comes from.
     metadata:
       category: code
     pattern-either:
@@ -44,12 +54,28 @@ rules:
       - pattern: Function(...)
       - pattern: setTimeout("...", ...)
       - pattern: setInterval("...", ...)
-      - pattern: 'new $W(..., {..., eval: true, ...})'
+      - patterns:
+          - pattern: 'new $W(..., {..., eval: $V, ...})'
+          - pattern-not: 'new $W(..., {..., eval: false, ...})'
+      - pattern: URL.createObjectURL(...)
+      - patterns:
+          - pattern-either:
+              - pattern: '"$S"'
+              - pattern: "`$S`"
+          - metavariable-regex:
+              metavariable: $S
+              # A script as a data: URL (for a Worker or import()).
+              regex: (?i)^\s*data:\s*(text|application)/(x-)?(java|ecma)script
       - patterns:
           - pattern-either:
               - pattern: import "$MOD"
+              - pattern: export * from "$MOD"
               - pattern: require("$MOD")
               - pattern: import("$MOD")
+              - pattern: process.getBuiltinModule("$MOD")
+              - pattern: module.require("$MOD")
+              - pattern: process.mainModule.require("$MOD")
+              - pattern: require.main.require("$MOD")
           - metavariable-regex:
               metavariable: $MOD
               regex: ^(node:)?vm$
@@ -58,8 +84,10 @@ rules:
     languages: [typescript, javascript]
     severity: WARNING
     message: >-
-      Loads a module whose path is not a string literal (or creates its own
-      require). The reviewer cannot see what is loaded.
+      Loads a module in a way that hides what is loaded: a path that is
+      not a string literal, its own require (createRequire,
+      module.require, the main module's require, Module._load), or
+      process.getBuiltinModule.
     metadata:
       category: code
     pattern-either:
@@ -71,6 +99,14 @@ rules:
           - pattern-not: require("...")
       - pattern: $M.createRequire(...)
       - pattern: createRequire(...)
+      - patterns:
+          - pattern: process.getBuiltinModule($X)
+          - pattern-not: process.getBuiltinModule("...")
+      - pattern: process.getBuiltinModule("...")
+      - pattern: module.require(...)
+      - pattern: process.mainModule
+      - pattern: require.main
+      - pattern: $M._load(...)
 
   - id: vestra-native-addon
     languages: [typescript, javascript]
@@ -87,8 +123,13 @@ rules:
       - patterns:
           - pattern-either:
               - pattern: import "$MOD"
+              - pattern: export * from "$MOD"
               - pattern: require("$MOD")
               - pattern: import("$MOD")
+              - pattern: process.getBuiltinModule("$MOD")
+              - pattern: module.require("$MOD")
+              - pattern: process.mainModule.require("$MOD")
+              - pattern: require.main.require("$MOD")
           - metavariable-regex:
               metavariable: $MOD
               regex: ^(.*\.node|(node:)?(wasi|inspector))$
@@ -105,8 +146,13 @@ rules:
       - patterns:
           - pattern-either:
               - pattern: import "$MOD"
+              - pattern: export * from "$MOD"
               - pattern: require("$MOD")
               - pattern: import("$MOD")
+              - pattern: process.getBuiltinModule("$MOD")
+              - pattern: module.require("$MOD")
+              - pattern: process.mainModule.require("$MOD")
+              - pattern: require.main.require("$MOD")
           - metavariable-regex:
               metavariable: $MOD
               regex: ^(node:)?(net|tls|dgram|http2)$
@@ -175,8 +221,8 @@ rules:
     languages: [typescript, javascript]
     severity: ERROR
     message: >-
-      Refers to credentials, keys or browser profile data (or enumerates
-      the whole environment). A plugin has no reason to read them.
+      Refers to credentials, keys or browser profile data, or copies or
+      sends the whole environment. A plugin has no reason to read them.
     # A literal pattern only matches the literal itself, not every
     # variable that holds it.
     options:
@@ -188,6 +234,13 @@ rules:
       - pattern: Object.entries(process.env)
       - pattern: Object.values(process.env)
       - pattern: JSON.stringify(process.env, ...)
+      - pattern: '{..., ...process.env, ...}'
+      - pattern: 'Object.assign(..., process.env, ...)'
+      - pattern: 'fetch(..., {..., body: <... process.env ...>, ...})'
+      - pattern: $X.send(..., <... process.env ...>, ...)
+      - pattern: $X.write(..., <... process.env ...>, ...)
+      - pattern: $X.end(..., <... process.env ...>, ...)
+      - pattern: $X.postMessage(..., <... process.env ...>, ...)
       - patterns:
           - pattern-either:
               - pattern: process.env.$VAR

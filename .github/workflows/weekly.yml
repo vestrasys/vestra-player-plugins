@@ -61,4 +61,4 @@ jobs:
       - name: osv-scanner
         uses: docker://ghcr.io/google/osv-scanner@sha256:4f3b7e2c64b9d38a5febc5a7e4a3dfef1d1362f726dea7a2ef4762b46469fcd0 # v2.7.0
         with:
-          args: scan source --lockfile package-lock.json --recursive plugins
+          args: scan source --config osv-scanner.toml --lockfile package-lock.json --recursive plugins
