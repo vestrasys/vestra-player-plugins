@@ -1,0 +1,53 @@
+name: CodeQL
+
+# CodeQL code scanning of the plugins and the repository scripts
+# (JavaScript/TypeScript, the security-extended queries; configuration in
+# .github/codeql/codeql-config.yml). Results go to the repository's code
+# scanning alerts (Security tab) and, on a pull request, to its checks and
+# annotations. CodeQL is free for public repositories; this workflow is the
+# "advanced setup", so CodeQL's "default setup" must stay off.
+#
+# Pull requests from forks run here too (pull_request: read-only token, no
+# secrets); code scanning accepts their results for the pull request.
+# Nothing is built: CodeQL reads JavaScript and TypeScript without a build
+# (build-mode: none).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "plugins/**"
+      - "scripts/**"
+      - ".github/codeql/**"
+      - ".github/workflows/codeql.yml"
+  schedule:
+    - cron: "41 3 * * 1" # Mondays 03:41 UTC: new queries on unchanged code
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: codeql-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  analyze:
+    name: javascript-typescript
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write # upload the results to code scanning
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@1fc58d04a4d4374f921bdac573c3811c240f9c26 # v4.39.2
+        with:
+          languages: javascript-typescript
+          build-mode: none
+          config-file: ./.github/codeql/codeql-config.yml
+      - uses: github/codeql-action/analyze@1fc58d04a4d4374f921bdac573c3811c240f9c26 # v4.39.2
+        with:
+          category: /language:javascript-typescript

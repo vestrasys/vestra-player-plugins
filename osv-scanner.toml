@@ -1,0 +1,15 @@
+# osv-scanner configuration for every lockfile in the repository (the
+# repository's and each plugin's; CI passes it with --config, see
+# CONTRIBUTING.md "Security review"). osv-scanner fails CI on any known
+# vulnerability or malicious package in a locked dependency.
+#
+# A reviewed exception, when a fixed version does not exist yet and the
+# vulnerable code is not reachable from the plugin, goes here with a reason
+# and an expiry date (after which CI fails again):
+#
+# [[IgnoredVulns]]
+# id = "GHSA-xxxx-xxxx-xxxx"
+# ignoreUntil = 2026-12-31
+# reason = "plugins/<name>: <package> <version>; the vulnerable <function> is not used. Remove when <package> <fixed version> is out."
+#
+# Never add a MAL- (malicious package) id: remove the package instead.

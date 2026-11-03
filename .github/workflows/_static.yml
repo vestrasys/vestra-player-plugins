@@ -60,6 +60,56 @@ jobs:
       # Tests of the repository scripts: index build, signing, registry.
       - run: npm run test:scripts
 
+  # The plugin risk rules (.semgrep/plugin-risk.yml) against their samples:
+  # every rule fires on the bad sample (semgrep --test checks each `ruleid:`
+  # line) and nothing fires on the good one. The pull request scan itself
+  # is security-scan.yml.
+  semgrep-rules:
+    name: semgrep rules
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      # semgrep CE (LGPL-2.1), the CLI only: no account, no registry rules.
+      # The same image as security-scan.yml.
+      SEMGREP: semgrep/semgrep:1.183.0@sha256:2e45517a85e13a9cca14a2a00df6bb48affd66b8ebfae1b0991cd57578362fb0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: The rules fire on the bad sample
+        run: >-
+          docker run --rm --network none -v "$GITHUB_WORKSPACE:/src:ro" -w /src "$SEMGREP"
+          semgrep --test --metrics=off --disable-version-check
+          --config .semgrep/plugin-risk.yml .semgrep/tests/plugin-risk/bad.ts
+      - name: The rules stay quiet on the good sample
+        run: >-
+          docker run --rm --network none -v "$GITHUB_WORKSPACE:/src:ro" -w /src "$SEMGREP"
+          semgrep scan --metrics=off --disable-version-check --disable-nosem --error
+          --config .semgrep/plugin-risk.yml .semgrep/tests/plugin-risk/good.ts
+
+  # Known vulnerabilities and malicious packages (OSV, which includes the
+  # OpenSSF malicious-packages feed) in every lockfile: the repository's
+  # and each plugin's. Fails on any match, whatever the severity (publish.yml
+  # runs this too, so nothing known to be vulnerable is released); a
+  # reviewed exception goes into the root osv-scanner.toml (passed with
+  # --config, so it covers every lockfile) with a reason and an expiry date.
+  osv-scanner:
+    name: osv-scanner
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: osv-scanner
+        uses: docker://ghcr.io/google/osv-scanner@sha256:4f3b7e2c64b9d38a5febc5a7e4a3dfef1d1362f726dea7a2ef4762b46469fcd0 # v2.7.0
+        with:
+          args: scan source --config osv-scanner.toml --lockfile package-lock.json --recursive plugins
+
   typos:
     runs-on: ubuntu-latest
     timeout-minutes: 5

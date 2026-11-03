@@ -1,0 +1,17 @@
+# CodeQL configuration (.github/workflows/codeql.yml).
+name: vestra-player-plugins
+
+# The default queries plus the extended security suite (more queries, a few
+# more false positives).
+queries:
+  - uses: security-extended
+
+# The hosted plugins and the repository scripts. Test fixtures and the
+# semgrep rule samples (.semgrep/tests: deliberately bad code) are left out.
+paths:
+  - plugins
+  - scripts
+paths-ignore:
+  - "**/node_modules/**"
+  - "**/dist/**"
+  - scripts/tests/fixtures
