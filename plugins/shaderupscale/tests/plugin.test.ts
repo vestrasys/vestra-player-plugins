@@ -877,6 +877,42 @@ for (const locale of ["en", "zh-Hans"] as const) {
   });
 }
 
+// The longest status line of each language, left in the window when the test ends (`ui:shots` draws that state): the
+// longest mode (A+A; B+B and C+A are as long), HQ, both add-ons. It is wider than the room beside the button at 400 px.
+const LONGEST_STATUS: Record<Locale, string> = {
+  en: "On: Anime4K mode A+A (HQ) + chroma + sharpen",
+  "zh-Hans": "开：Anime4K 模式 A+A（高画质） + 色度 + 锐化",
+};
+
+for (const locale of ["en", "zh-Hans"] as const) {
+  test(`${locale}: the longest status line (Anime4K A+A HQ, both add-ons) is shown whole`, async () => {
+    const { host, window, stop } = await opened(windowsGpu(), locale);
+    try {
+      window.emit("pickA", 3); // A+A
+      window.emit("pickB", 1); // HQ
+      window.emit("toggleChroma", true);
+      window.emit("toggleSharpen", true);
+      window.emit("toggle");
+      await eventually(host, () => {
+        assert.deepEqual(held(host), paths([CHROMA_FILE, ...anime4kFiles("A+A", "hq"), SHARPEN_FILE]));
+        assert.equal(window.props.status, LONGEST_STATUS[locale]);
+      });
+    } finally {
+      await stop();
+    }
+  });
+}
+
+test("window: the status line wraps instead of eliding, and the row grows with it", async () => {
+  const slint = await readFile(new URL("upscale.slint", directory), "utf8");
+  const row = slint.slice(slint.indexOf("// The status line:"), slint.indexOf("if root.detail"));
+  const status = row.slice(row.indexOf("text: root.status;"));
+  assert.match(status.slice(0, status.indexOf("}")), /wrap: word-wrap;/);
+  assert.doesNotMatch(row, /overflow: elide/);
+  // A fixed row height would cut the second line off.
+  assert.doesNotMatch(row.slice(0, row.indexOf("VerticalLayout")), /height:/);
+});
+
 // ------------------------------------------------------------------ the store listing
 
 test("store listing: the id of the directory, the name, a 256×256 icon, the player version", async () => {

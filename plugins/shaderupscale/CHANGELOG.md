@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1
+
+- The window's status line wraps instead of being cut off: with Anime4K and both add-ons it read "On: Anime4K mode A (Fast) + chroma + sh…" at the window's width. The whole state now shows on two lines (the longest, "On: Anime4K mode A+A (HQ) + chroma + sharpen", in English and Simplified Chinese), and so does the longer "Not running" reason; the window grows with it. The OSD line is unchanged.
+
 ## 0.2.0
 
 - A second upscaler, **General: AMD FSR 1** (FidelityFX Super Resolution 1.0.2, EASU + RCAS, agyild's mpv port, MIT): for live action, games and anything that is not anime; light on the GPU. The window's first drop-down, **Upscaler**, now chooses between it and **Anime: Anime4K**; FSR has no Mode or Quality rows.
