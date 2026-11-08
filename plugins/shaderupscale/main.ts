@@ -15,10 +15,10 @@ import {
 
 export { DEFAULT_SETTINGS, isSettings, shaderFiles } from "./presets.ts";
 
-/** The one menu item: it opens the window (Video menu, after RTX Upscale's "AI Upscaling…" when that is installed). */
+/** The one menu item: it opens the window (Video menu, after the player's own Picture ▸ Rendering ▸ AI Upscaling). */
 export const WINDOW_TITLE = "Shader Upscaling…";
 
-/** What fits the OSD's single line in a default-size window (as RTX Upscale), in characters. */
+/** What fits the OSD's single line in a default-size window (as the player's AI Upscaling panel), in characters. */
 export const OSD_BUDGET = { en: 80, zh: 40 };
 
 /** The package directory: `main.ts` in development, the built `main.js` in the package, both at its top. */
@@ -112,7 +112,7 @@ export default async function activate(plugin: Plugin) {
     return gpu() ? null : renderingAdvice();
   }
 
-  /** Why GPU rendering is off and what to do, following the player's own order of checks (as RTX Upscale). */
+  /** Why GPU rendering is off and what to do, following the player's own order of checks (as the player's AI Upscaling panel). */
   function renderingAdvice(): Text {
     const r = rendering;
     if (!r) return text("Shader upscaling needs GPU rendering: turn on Video ▸ GPU Rendering (Experimental), then restart the player.");
