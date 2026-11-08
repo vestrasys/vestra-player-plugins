@@ -39,7 +39,7 @@ Detect Again says on the video why it did not crop.
 ## Limits
 
 - **Local files only**, for now: links, streams and generated video are not read.
-- **While a crop is on, RTX Upscale waits.** A crop is a video filter, and filters need the decoded picture in memory, so the player decodes with a copy back to memory instead of keeping the frames on the GPU. NVIDIA RTX Video Super Resolution (the RTX Upscale plugin) needs the frames on the GPU, so it waits until the crop is gone. A video that is not cropped keeps zero-copy decoding.
+- **While a crop is on, AI Upscaling waits.** A crop is a video filter, and filters need the decoded picture in memory, so the player decodes with a copy back to memory instead of keeping the frames on the GPU. The player's built-in NVIDIA RTX Video Super Resolution (**Picture ▸ Rendering ▸ AI Upscaling**) needs the frames on the GPU, so it waits until the crop is gone. A video that is not cropped keeps zero-copy decoding.
 - **Other picture changes.** When the player's own **Video ▸ Crop/Stretch** or a rotation changes the picture, the crop would land in the wrong place: the plugin does not crop then, and says so on the video. While its crop is on, it checks the size the player shows every second and undoes the crop (with a note) when such a change comes later. Turn the other change off and pick **Detect Again**.
 - Only eight frames are read. Something that appears in the border area only at other times, such as subtitles burned in below the picture, is cut away if no sampled frame shows it; pick **Show Full Picture for This File** for such a video.
 - A video whose picture changes size during playback is cropped to the area the picture covers in the sampled frames, when that area is stable enough (above).
