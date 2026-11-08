@@ -3,7 +3,6 @@
 # reserved for the player's built-in plugins. See CONTRIBUTING.md.
 
 autoframe = "zysilm"
-rtxupscale = "zysilm"
 shaderupscale = "zysilm"
 vestrabili = "zysilm"
 vestranes = "zysilm"
