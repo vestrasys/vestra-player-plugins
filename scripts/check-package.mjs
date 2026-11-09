@@ -15,6 +15,13 @@
  * dependencies ships its dependency-inventory.json and every license file it
  * lists under licenses/, byte for byte as in the plugin directory
  * (scripts/lib/dependencies.mjs).
+ *
+ * Every shader listed in the plugin's shaders/SOURCES.txt, the SOURCES.txt
+ * itself and, next to an LGPL shader, COPYING.LESSER and COPYING are in the
+ * package byte for byte as in the plugin directory; no other packed file
+ * (the bundle included) carries a GPL, AGPL or LGPL notice, so LGPL shader
+ * text is never concatenated into the plugin's code
+ * (scripts/lib/file-licenses.mjs).
  */
 import { readdir, readFile } from "node:fs/promises";
 import { join, posix } from "node:path";
@@ -27,6 +34,12 @@ import {
   NATIVE_FILE,
   sizeProblems,
 } from "./lib/dependencies.mjs";
+import {
+  copyleftNotice,
+  scanned,
+  shaderSources,
+  SOURCES,
+} from "./lib/file-licenses.mjs";
 
 /**
  * Entries of a zip archive: Map<name, () => Buffer>, with `unpacked` (the sum
@@ -147,6 +160,38 @@ try {
           problems.push(`${path} differs from the plugin's`);
       }
   }
+  // Vendored shaders: shipped as listed, with their license texts; copyleft
+  // notices nowhere else.
+  const shaders = await shaderSources(pluginDirectory, "plugin");
+  problems.push(...shaders.problems);
+  const listed = new Set();
+  const same = async (path) => {
+    if (!entries.has(path)) problems.push(`${path} is not in the package`);
+    else if (
+      !entries
+        .get(path)()
+        .equals(await readFile(join(pluginDirectory, ...path.split("/"))))
+    )
+      problems.push(`${path} differs from the plugin's`);
+  };
+  if (shaders.records.length) await same(SOURCES);
+  for (const record of shaders.records) {
+    if (!record.target) continue;
+    listed.add(record.target);
+    await same(record.target);
+    if (record.lgpl)
+      for (const text of ["COPYING.LESSER", "COPYING"])
+        await same(posix.join(posix.dirname(record.target), text));
+  }
+  for (const [name, read] of entries)
+    if (
+      !listed.has(name) &&
+      scanned(name) &&
+      copyleftNotice(read().toString("utf8"))
+    )
+      problems.push(
+        `${name}: carries a GPL/AGPL/LGPL license notice; LGPL shaders ship as separate files listed in ${SOURCES}, never inside the plugin's code`,
+      );
 
   if (problems.length) {
     for (const problem of problems) console.error(`✖ ${asset}: ${problem}`);

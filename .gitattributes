@@ -1,1 +1,9 @@
 * text=auto eol=lf
+
+# Vendored shaders and their license texts are stored byte for byte, so a
+# file keeps the SHA256 of its upstream bytes (CRLF included) that
+# shaders/SOURCES.txt lists (scripts/lib/file-licenses.mjs).
+plugins/*/shaders/**/*.glsl -text
+plugins/*/shaders/**/*.hook -text
+plugins/*/shaders/**/COPYING -text
+plugins/*/shaders/**/COPYING.LESSER -text

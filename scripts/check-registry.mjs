@@ -17,7 +17,9 @@
  *
  * The first form also applies the static npm dependency rules to every
  * hosted plugin with a package.json (lockfile, sources, licenses, inventory;
- * scripts/lib/dependencies.mjs). The installed rules (native code, license
+ * scripts/lib/dependencies.mjs) and the license rules of every hosted
+ * plugin's own files (LGPL only for unmodified shaders listed in
+ * shaders/SOURCES.txt; scripts/lib/file-licenses.mjs). The installed rules (native code, license
  * texts) run where the dependencies are installed: scripts/plugin.mjs.
  *
  * The second form is the pull request check: it reads registry/ from the
@@ -184,7 +186,7 @@ try {
           `registry/${entry.id}.toml: the id belongs to plugins/${ids.get(entry.id.toLowerCase())}`,
         );
     console.log(
-      `${hosted.plugins.length} hosted plugin(s) in plugins/, ${entries.length} registration(s), revoked.json and npm dependencies checked${values["revoked-base"] ? ` (append-only against ${values["revoked-base"]})` : ""}`,
+      `${hosted.plugins.length} hosted plugin(s) in plugins/, ${entries.length} registration(s), revoked.json, file licenses and npm dependencies checked${values["revoked-base"] ? ` (append-only against ${values["revoked-base"]})` : ""}`,
     );
   }
 } catch (error) {
