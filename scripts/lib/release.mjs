@@ -20,8 +20,8 @@
  *   whose sha256 and size are the ones in the index, and the site holds
  *   nothing else (index.json and the referenced assets only).
  */
-import { existsSync } from "node:fs";
-import { lstat, readdir, readFile } from "node:fs/promises";
+import { constants, existsSync } from "node:fs";
+import { open, readdir, readFile } from "node:fs/promises";
 import { isDeepStrictEqual } from "node:util";
 import { join, relative, sep } from "node:path";
 import { revokedAppendProblems } from "./revoked.mjs";
@@ -37,19 +37,54 @@ import {
   tagOf,
 } from "./publishing.mjs";
 
-/** Every file below `directory`, as `/`-separated paths relative to it. */
+/**
+ * Every file below `directory` (anything but a directory), as a map from its
+ * `/`-separated path relative to `directory` to whether it is a regular
+ * file (a symbolic link is not).
+ */
 async function listFiles(directory) {
   const entries = await readdir(directory, {
     recursive: true,
     withFileTypes: true,
   });
-  return entries
-    .filter((entry) => !entry.isDirectory())
-    .map((entry) =>
-      relative(directory, join(entry.parentPath, entry.name))
-        .split(sep)
-        .join("/"),
+  return new Map(
+    entries
+      .filter((entry) => !entry.isDirectory())
+      .map((entry) => [
+        relative(directory, join(entry.parentPath, entry.name))
+          .split(sep)
+          .join("/"),
+        entry.isFile(),
+      ]),
+  );
+}
+
+/**
+ * The bytes of `file` if it is a regular file, else null. The check and the
+ * read use one open handle, so the file cannot be swapped in between; where
+ * the platform has O_NOFOLLOW, a symbolic link is refused when it is opened
+ * (`listFiles` refuses it on the others), and O_NONBLOCK keeps a FIFO from
+ * blocking the open.
+ */
+async function readRegularFile(file) {
+  let handle;
+  try {
+    handle = await open(
+      file,
+      constants.O_RDONLY |
+        (constants.O_NOFOLLOW ?? 0) |
+        (constants.O_NONBLOCK ?? 0),
     );
+  } catch (error) {
+    if (error.code === "ELOOP" || error.code === "EMLINK") return null;
+    throw error;
+  }
+  try {
+    if (!(await handle.stat()).isFile()) return null;
+    return await handle.readFile();
+  } finally {
+    await handle.close();
+  }
 }
 
 /**
@@ -89,7 +124,7 @@ export async function checkArtifact({
     problems.push("index extensions must be {}");
 
   const site = join(artifact, "site");
-  const siteFiles = new Set(await listFiles(site));
+  const siteFiles = await listFiles(site);
   const deployed = new Set(["index.json"]);
 
   const referenced = new Set();
@@ -115,12 +150,13 @@ export async function checkArtifact({
         continue;
       }
       deployed.add(path);
-      const file = join(site, path);
-      if (!(await lstat(file)).isFile()) {
+      const bytes = siteFiles.get(path)
+        ? await readRegularFile(join(site, path))
+        : null;
+      if (!bytes) {
         problems.push(`site/${path}: not a regular file`);
         continue;
       }
-      const bytes = await readFile(file);
       if (
         sha256(bytes) !== plugin[`${name}Sha256`] ||
         bytes.length !== plugin[`${name}Size`]
@@ -190,7 +226,7 @@ export async function checkArtifact({
   for (const name of packages)
     if (!referenced.has(name))
       problems.push(`releases/${name}: not referenced by the index`);
-  for (const path of siteFiles)
+  for (const path of siteFiles.keys())
     if (!deployed.has(path))
       problems.push(
         `site/${path}: unexpected file in the Pages site (not referenced by the index)`,

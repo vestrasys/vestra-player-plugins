@@ -31,9 +31,12 @@ jobs:
     permissions:
       contents: read
     steps:
+      # The base branch (github.sha of a pull_request_target event, also the
+      # default): this workflow's own scripts and rules, never the pull
+      # request's. fetch-depth 0 brings the pull request's base commit.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0

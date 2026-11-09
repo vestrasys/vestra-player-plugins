@@ -1,0 +1,33 @@
+# Dependabot version updates: the pinned actions in .github/workflows and the
+# repository's own npm tooling (package.json). Each plugin's own
+# dependencies (plugins/<name>/package.json) belong to its author and are
+# not updated here; osv-scanner and dependency review check them.
+#
+# Weekly, grouped into one pull request per ecosystem, and only for
+# releases at least 7 days old (cooldown), so a compromised release is
+# usually found and pulled before it is proposed.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "CI"
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      npm:
+        patterns: ["*"]
+    commit-message:
+      prefix: "Tooling"

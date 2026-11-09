@@ -15,12 +15,9 @@ name: CodeQL
 on:
   push:
     branches: [main]
+  # Every pull request, whatever it changes, so every merged commit has been
+  # analysed (Scorecard SAST counts the merged pull requests with a run).
   pull_request:
-    paths:
-      - "plugins/**"
-      - "scripts/**"
-      - ".github/codeql/**"
-      - ".github/workflows/codeql.yml"
   schedule:
     - cron: "41 3 * * 1" # Mondays 03:41 UTC: new queries on unchanged code
   workflow_dispatch:
