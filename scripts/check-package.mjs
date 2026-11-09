@@ -20,8 +20,8 @@
  * itself and, next to an LGPL shader, COPYING.LESSER and COPYING are in the
  * package byte for byte as in the plugin directory; no other packed file
  * (the bundle included) carries a GPL, AGPL or LGPL notice, so LGPL shader
- * text is never concatenated into the plugin's code
- * (scripts/lib/file-licenses.mjs).
+ * text is never concatenated into the plugin's code, and no packed file
+ * exempt from that scan hides a shader (scripts/lib/file-licenses.mjs).
  */
 import { readdir, readFile } from "node:fs/promises";
 import { join, posix } from "node:path";
@@ -36,6 +36,7 @@ import {
 } from "./lib/dependencies.mjs";
 import {
   copyleftNotice,
+  exemptFileProblem,
   scanned,
   shaderSources,
   SOURCES,
@@ -183,15 +184,16 @@ try {
       for (const text of ["COPYING.LESSER", "COPYING"])
         await same(posix.join(posix.dirname(record.target), text));
   }
-  for (const [name, read] of entries)
-    if (
-      !listed.has(name) &&
-      scanned(name) &&
-      copyleftNotice(read().toString("utf8"))
-    )
+  for (const [name, read] of entries) {
+    if (listed.has(name)) continue;
+    if (!scanned(name)) {
+      const exempt = exemptFileProblem(name, read());
+      if (exempt) problems.push(exempt);
+    } else if (copyleftNotice(read().toString("utf8")))
       problems.push(
         `${name}: carries a GPL/AGPL/LGPL license notice; LGPL shaders ship as separate files listed in ${SOURCES}, never inside the plugin's code`,
       );
+  }
 
   if (problems.length) {
     for (const problem of problems) console.error(`✖ ${asset}: ${problem}`);

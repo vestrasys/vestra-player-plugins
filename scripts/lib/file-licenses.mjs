@@ -43,12 +43,17 @@
  * file name; no Asset).
  *
  * Every file is scanned for notices, whatever its extension, except
- * README.md, CHANGELOG.md, shaders/SOURCES.txt, locales/, and license texts
- * under shaders/ or licenses/ (LICENSE, LICENCE, COPYING, NOTICE, with no
- * extension, .txt or .md, COPYING.LESSER, or a "-<name>" suffix such as
- * LICENSE-MIT). node_modules/ and dist/ are not read here (the npm rules in
- * scripts/lib/dependencies.mjs cover them; the package check scans the
- * built package with the same rule).
+ * README.md, CHANGELOG.md, shaders/SOURCES.txt, .po and .pot files under
+ * locales/, and license texts under shaders/ or licenses/ (LICENSE,
+ * LICENCE, COPYING, NOTICE, with no extension, .txt or .md, COPYING.LESSER,
+ * or a "-<name>" suffix such as LICENSE-MIT). node_modules/ and dist/ are
+ * not read here (the npm rules in scripts/lib/dependencies.mjs cover them;
+ * the package check scans the built package with the same rule).
+ *
+ * mpv loads a shader whatever its file name, so an exempt file must not be
+ * one (`exemptFileProblem`): it holds no shader directive line (//!HOOK,
+ * //!DESC, ...), and every COPYING or COPYING.LESSER under shaders/ is the
+ * FSF's text (pinned by SHA256), with or without an LGPL shader next to it.
  *
  * Review still has to catch what text matching cannot: a stripped notice,
  * shorthand such as "LGPLv3", shader text pasted into a string in code, and
@@ -69,8 +74,15 @@ const SHADER_FILE = /\.(glsl|hook)$/i;
 const LICENSE_TEXT =
   /^(licen[cs]e|copying|notice)(\.lesser|-[a-z0-9-]+)?(\.(txt|md))?$/i;
 const NOT_SCANNED_PATHS = new Set(["README.md", "CHANGELOG.md", SOURCES]);
+const LOCALE_FILE = /^locales\/.*\.pot?$/i;
+/** A line mpv reads as a shader header. */
+const SHADER_DIRECTIVE =
+  /^[ \t]*\/\/![ \t]*(HOOK|DESC|BIND|SAVE|TEXTURE|BUFFER|PARAM|COMPUTE)\b/im;
 const SKIPPED_DIRECTORIES = new Set(["node_modules", "dist"]);
-const GITHUB = /^https:\/\/github\.com\/[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/;
+// The repository name is never "." or ".." (also with ".git"): the URL would
+// name another path.
+const GITHUB =
+  /^https:\/\/github\.com\/[A-Za-z0-9-]+\/(?!\.{0,2}(\.git)?$)[A-Za-z0-9._-]+$/;
 const GIST = /^https:\/\/gist\.github\.com\/[A-Za-z0-9-]+\/[0-9a-f]+$/;
 
 // Words may be split across comment lines ("GNU Lesser General\n// Public").
@@ -188,12 +200,28 @@ async function walk(directory, base = directory) {
 
 /** Whether a package or plugin path (relative, with /) is read for notices. */
 export function scanned(path) {
-  if (NOT_SCANNED_PATHS.has(path) || path.startsWith("locales/")) return false;
+  if (NOT_SCANNED_PATHS.has(path) || LOCALE_FILE.test(path)) return false;
   const name = path.slice(path.lastIndexOf("/") + 1);
   return !(
     (path.startsWith(`${SHADERS}/`) || path.startsWith("licenses/")) &&
     LICENSE_TEXT.test(name)
   );
+}
+
+/**
+ * Why a file that is not scanned for notices (`scanned`) is refused, or
+ * undefined: it holds a shader directive line, or it is a COPYING or
+ * COPYING.LESSER under shaders/ that is not the FSF's text byte for byte.
+ */
+export function exemptFileProblem(path, bytes) {
+  if (scanned(path)) return undefined;
+  const name = path.slice(path.lastIndexOf("/") + 1).toUpperCase();
+  const text = LICENSE_TEXTS[name];
+  if (path.startsWith(`${SHADERS}/`) && text && sha256(bytes) !== text.sha256)
+    return `${path} is not the FSF's ${text.name} text byte for byte (${text.url}, sha256 ${text.sha256})`;
+  if (SHADER_DIRECTIVE.test(bytes.toString("utf8")))
+    return `${path}: has a shader directive line (//!HOOK, //!DESC, ...); mpv loads a shader whatever the file's name, so documentation, license and locale files may not hold one`;
+  return undefined;
 }
 
 /**
@@ -339,10 +367,13 @@ export async function fileLicenseProblems(directory, label) {
   );
   const textDirectories = new Set();
   for (const file of await walk(directory)) {
-    if (!scanned(file)) continue;
-    const notice = copyleftNotice(
-      (await readFile(join(directory, ...file.split("/")))).toString("utf8"),
-    );
+    const bytes = await readFile(join(directory, ...file.split("/")));
+    if (!scanned(file)) {
+      const exempt = exemptFileProblem(file, bytes);
+      if (exempt) problem(exempt);
+      continue;
+    }
+    const notice = copyleftNotice(bytes.toString("utf8"));
     if (!notice) continue;
     if (notice === "copyleft") {
       problem(
@@ -364,20 +395,16 @@ export async function fileLicenseProblems(directory, label) {
   for (const folder of textDirectories)
     for (const [name, text] of Object.entries(LICENSE_TEXTS)) {
       const path = `${folder}/${name}`;
-      let bytes;
+      // Its bytes are checked with every other COPYING under shaders/
+      // (exemptFileProblem).
       try {
-        bytes = await readFile(join(directory, ...path.split("/")));
+        await readFile(join(directory, ...path.split("/")));
       } catch (error) {
         if (error.code !== "ENOENT") throw error;
         problem(
           `${path} is missing: an LGPL shader ships with the full ${text.name} text next to it (${text.url})`,
         );
-        continue;
       }
-      if (sha256(bytes) !== text.sha256)
-        problem(
-          `${path} is not the FSF's ${text.name} text byte for byte (${text.url}, sha256 ${text.sha256})`,
-        );
     }
   return problems;
 }
