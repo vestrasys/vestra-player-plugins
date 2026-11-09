@@ -2,35 +2,52 @@ Third-party shaders in this package
 ===================================
 
 The plugin's own code is Apache-2.0. The mpv GLSL shaders under shaders/ are
-third-party files, redistributed under their own permissive licences: MIT
-(Anime4K, CfL), the Unlicense (the two Anime4K AutoDownscalePre files),
-AMD's MIT licence (FSR) and BSD-2-Clause (adaptive-sharpen). Every file
-keeps its copyright and licence notice in its header, and each directory
-holds the licence text as LICENSE. All of them are
-unchanged except CfL_Prediction_Lite.glsl (see cfl/ below).
+third-party files, redistributed under their own licences: MIT (Anime4K,
+CfL), the Unlicense (the two Anime4K AutoDownscalePre files), AMD's MIT
+licence (FSR), BSD-2-Clause (adaptive-sharpen) and, since 0.3.0, LGPL-3.0
+(RAVU, FSRCNNX, SSimDownscaler). Every file keeps its copyright and licence
+notice in its header. The directories of the permissive ones hold their
+licence text as LICENSE; every directory with LGPL-3.0 shaders holds the
+full LGPL-3.0 text as COPYING.LESSER and the GPL-3.0 text, which the LGPL
+supplements, as COPYING. All of them are unchanged, byte for byte as
+upstream published them, except CfL_Prediction_Lite.glsl (see cfl/ below).
+The LGPL-3.0 files are separate files the plugin hands to the player's mpv
+as they are; they are never combined with the plugin's code.
+
+The records at the end ("File:" ... "License:") name, for every shader but
+the modified CfL file, its upstream repository, commit, path (or, for a
+release asset, its download URL) and the sha256 of its bytes, which the
+shipped file has too.
 
 anime4k/
   Anime4K by bloc97 and contributors
   https://github.com/bloc97/Anime4K
-  Version: release v4.0.1, asset Anime4K_v4.0.zip
+  Version: release v4.0.1 (tag v4.0.1, commit
+    4029bf701ecaa15f163cdc49cffe5501c1acf410); the files are those of the
+    release asset Anime4K_v4.0.zip, the same bytes as glsl/ at that commit
   Licence: MIT, Copyright (c) 2019-2021 bloc97 (anime4k/LICENSE), except
     Anime4K_AutoDownscalePre_x2 and _x4: the Unlicense (public domain; the
     text is in each file's header)
   Files: Anime4K_Clamp_Highlights, Anime4K_AutoDownscalePre_x2/_x4,
-    Anime4K_Restore_CNN_{VL,M,S}, Anime4K_Restore_CNN_Soft_{VL,M,S},
-    Anime4K_Upscale_CNN_x2_{VL,M,S}, Anime4K_Upscale_Denoise_CNN_x2_{VL,M}
+    Anime4K_Restore_CNN_{UL,VL,M,S}, Anime4K_Restore_CNN_Soft_{UL,VL,M,S},
+    Anime4K_Upscale_CNN_x2_{UL,VL,M,S},
+    Anime4K_Upscale_Denoise_CNN_x2_{UL,VL,M} (the UL ones since 0.3.0, for
+    Ultra)
   The presets follow the upstream mpv templates, taken from the master
-  branch (the v4.0.1 tag does not contain them):
+  branch (commit 7684e9586f8dcc738af08a1cdceb024cc184f426; the v4.0.1 tag
+  does not contain them):
   md/Template/GLSL_Mac_Linux_High-end/input.conf (HQ) and
-  md/Template/GLSL_Mac_Linux_Low-end/input.conf (Fast).
+  md/Template/GLSL_Mac_Linux_Low-end/input.conf (Fast). Upstream has no
+  template for the UL networks; Ultra is the High-end template with UL in
+  place of VL, as md/GLSL_Instructions_Advanced.md allows ("Shader
+  variants (S/M/L/VL/UL) can be chosen at will").
 
 fsr/
   AMD FidelityFX Super Resolution 1 (FSR) v1.0.2, EASU and RCAS, by AMD;
   ported to mpv by agyild
   https://gist.github.com/agyild/82219c545228d70c5604f865ce0b0ce5
   Version: gist revision 2623d743b9c23f500ba086f05b385dcb1557e15d
-    (2022-03-06), file FSR.glsl,
-    sha256 of the upstream file 56d8597fc6b7bf6d13f8c3b2bdf1cdc43b06175d51746aab44cf1dca16929b9e
+    (2022-03-06), file FSR.glsl
   Licence: MIT, Copyright (c) 2021 Advanced Micro Devices, Inc. (fsr/LICENSE,
     the text of AMD's https://github.com/GPUOpen-Effects/FidelityFX-FSR
     license.txt, which the port repeats in its header). The port adds no
@@ -54,13 +71,241 @@ cfl/
     arrays chroma_quads[4][2] became chroma_quads_u[4] and chroma_quads_v[4]
     (arrays of arrays need GLSL 4.30). The computation is unchanged. A note
     after the licence header in the file says so.
+    sha256 of the shipped, modified file 817c43f5c8dfbe81e01d4ac4fc03f9c7f8fd266276459bfda9fa119b17c9fe34
 
 adaptive-sharpen/
   Adaptive sharpen, version 2021-10-17, by bacondither; mpv port by igv
   https://gist.github.com/igv/8a77e4eb8276753b54bb94c1c50c317e
   Version: gist revision 572f59099cd0e3eb5e321a6da0a3d90a7382e2dc
-    (2022-06-19), file adaptive-sharpen.glsl,
-    sha256 of the upstream file 827fb3d662ac9a91b4075e9117fe6e1dbc1c06d85959ba719cdb954dfb7fb8e4
+    (2022-06-19), file adaptive-sharpen.glsl
   Licence: BSD-2-Clause, Copyright (c) 2015-2021, bacondither
     (adaptive-sharpen/LICENSE, the notice from the file's header)
   Files: adaptive-sharpen.glsl (unchanged)
+
+ravu/
+  RAVU-lite-AR (radius 3), by bjin (Bin Jin), since 0.3.0
+  https://github.com/bjin/mpv-prescalers
+  Licence: LGPL-3.0-or-later, as each file's header says (the repository's
+    README: "Shaders in this repo are licensed under terms of LGPLv3"). The
+    header names no copyright holder. Texts: COPYING.LESSER and COPYING
+    next to each file.
+  Files (both unchanged; the plugin picks one per platform):
+    ravu/rgba16hf/gather/ravu-lite-ar-r3.hook, for Windows (mpv's vo_gpu
+      with Direct3D 11 has no rgba16f texture format): branch rgba16hf,
+      path gather/ravu-lite-ar-r3.hook
+    ravu/master/gather/ravu-lite-ar-r3.hook, for macOS and the others
+      (OpenGL; rgba16f texture): branch master, path
+      gather/ravu-lite-ar-r3.hook
+  The gather/ variants use textureGather (GLSL 4.00), upstream's first
+  recommendation for luma prescalers; no compute shaders. The generator of
+  these files is on the repository's source branch.
+
+fsrcnnx/
+  FSRCNNX x2, 16 and 8 feature channels, by igv, since 0.3.0
+  https://github.com/igv/FSRCNN-TensorFlow
+  Licence: LGPL-3.0-or-later, Copyright (C) 2017-2021 igv, as each file's
+    header says. (The repository's own LICENSE, for its TensorFlow training
+    code, is GPL-3.0; the released shaders carry the LGPL-3.0 header.)
+    Texts: fsrcnnx/COPYING.LESSER and fsrcnnx/COPYING.
+  Version: release 1.1 (2017-11-09), release assets
+  Files: FSRCNNX_x2_16-0-4-1.glsl, FSRCNNX_x2_8-0-4-1.glsl (unchanged).
+  Their source (the trained weights and the script that writes the shader)
+  is in the repository at that tag.
+
+ssim-downscaler/
+  SSimDownscaler, by igv, since 0.3.0
+  https://gist.github.com/igv/36508af3ffc84410fe39761d6969be10
+  Version: gist revision 38992bce7f9ff844f800820df0908692b65bb74a
+    (2024-09-05), file SSimDownscaler.glsl
+  Licence: LGPL-3.0-or-later, as the file's header says ("This library is
+    free software ... version 3.0 of the License, or (at your option) any
+    later version"); the header names no copyright holder. Texts:
+    ssim-downscaler/COPYING.LESSER and ssim-downscaler/COPYING.
+  Files: SSimDownscaler.glsl (unchanged). The gist says it is tuned for
+  mpv's linear-downscaling=no.
+
+Licence texts
+  COPYING.LESSER: the GNU Lesser General Public License, version 3, from
+    https://www.gnu.org/licenses/lgpl-3.0.txt,
+    sha256 e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118
+  COPYING: the GNU General Public License, version 3, from
+    https://www.gnu.org/licenses/gpl-3.0.txt,
+    sha256 3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986
+
+Records
+=======
+
+File: anime4k/Anime4K_AutoDownscalePre_x2.glsl
+Repository: https://github.com/bloc97/Anime4K
+Commit: 4029bf701ecaa15f163cdc49cffe5501c1acf410
+Path: glsl/Upscale/Anime4K_AutoDownscalePre_x2.glsl
+SHA256: 8c58291740146bd766a4d73f132775a797fe80f7d07919b5d767e27a5dc85656
+License: Unlicense
+
+File: anime4k/Anime4K_AutoDownscalePre_x4.glsl
+Repository: https://github.com/bloc97/Anime4K
+Commit: 4029bf701ecaa15f163cdc49cffe5501c1acf410
+Path: glsl/Upscale/Anime4K_AutoDownscalePre_x4.glsl
+SHA256: 5af62d8cd844916dc1126613e13bad3beab195787f93a71200b47c6ec78f2e41
+License: Unlicense
+
+File: anime4k/Anime4K_Clamp_Highlights.glsl
+Repository: https://github.com/bloc97/Anime4K
+Commit: 4029bf701ecaa15f163cdc49cffe5501c1acf410
+Path: glsl/Restore/Anime4K_Clamp_Highlights.glsl
+SHA256: a2a9bf7fbc1d75d09660ca2e701e4d7fb0cf5457b94da47e1825032fa2b3671a
+License: MIT
+
+File: anime4k/Anime4K_Restore_CNN_UL.glsl
+Repository: https://github.com/bloc97/Anime4K
+Commit: 4029bf701ecaa15f163cdc49cffe5501c1acf410
+Path: glsl/Restore/Anime4K_Restore_CNN_UL.glsl
+SHA256: 81ec48ff700108c8e1571ed82d4527006ee200c05e94f8b7f836c02179169b40
+License: MIT
+
+File: anime4k/Anime4K_Restore_CNN_VL.glsl
+Repository: https://github.com/bloc97/Anime4K
+Commit: 4029bf701ecaa15f163cdc49cffe5501c1acf410
+Path: glsl/Restore/Anime4K_Restore_CNN_VL.glsl
+SHA256: 35036722733305cd4d4e57660b883bbe2569ba2914033c254327107d7b77e35e
+License: MIT
+
+File: anime4k/Anime4K_Restore_CNN_M.glsl
+Repository: https://github.com/bloc97/Anime4K
+Commit: 4029bf701ecaa15f163cdc49cffe5501c1acf410
+Path: glsl/Restore/Anime4K_Restore_CNN_M.glsl
+SHA256: 67ea3ed26539e8de3b7d307688535d2ff17e8d147e11dda0247da7770dbecf41
+License: MIT
+
+File: anime4k/Anime4K_Restore_CNN_S.glsl
+Repository: https://github.com/bloc97/Anime4K
+Commit: 4029bf701ecaa15f163cdc49cffe5501c1acf410
+Path: glsl/Restore/Anime4K_Restore_CNN_S.glsl
+SHA256: 97c24dc370ab300c108bfaa09db7f175aeff343674842c299cf3940a3d330427
+License: MIT
+
+File: anime4k/Anime4K_Restore_CNN_Soft_UL.glsl
+Repository: https://github.com/bloc97/Anime4K
+Commit: 4029bf701ecaa15f163cdc49cffe5501c1acf410
+Path: glsl/Restore/Anime4K_Restore_CNN_Soft_UL.glsl
+SHA256: 41d71cad7b2f3af9086852fca70046f763272d2cb49dd83de9647d942866cac8
+License: MIT
+
+File: anime4k/Anime4K_Restore_CNN_Soft_VL.glsl
+Repository: https://github.com/bloc97/Anime4K
+Commit: 4029bf701ecaa15f163cdc49cffe5501c1acf410
+Path: glsl/Restore/Anime4K_Restore_CNN_Soft_VL.glsl
+SHA256: 094334b0e20c1a201fe4941c7c68de72451e5aee9efb5524d7fb82b12dca64b9
+License: MIT
+
+File: anime4k/Anime4K_Restore_CNN_Soft_M.glsl
+Repository: https://github.com/bloc97/Anime4K
+Commit: 4029bf701ecaa15f163cdc49cffe5501c1acf410
+Path: glsl/Restore/Anime4K_Restore_CNN_Soft_M.glsl
+SHA256: a78a2c76898e08e09e442a9628c64208c26e8e15789649b8755223f009794c02
+License: MIT
+
+File: anime4k/Anime4K_Restore_CNN_Soft_S.glsl
+Repository: https://github.com/bloc97/Anime4K
+Commit: 4029bf701ecaa15f163cdc49cffe5501c1acf410
+Path: glsl/Restore/Anime4K_Restore_CNN_Soft_S.glsl
+SHA256: 9f6867f2ef42786729522d86fe24147cb4ea145418e3974df70496acf52dc392
+License: MIT
+
+File: anime4k/Anime4K_Upscale_CNN_x2_UL.glsl
+Repository: https://github.com/bloc97/Anime4K
+Commit: 4029bf701ecaa15f163cdc49cffe5501c1acf410
+Path: glsl/Upscale/Anime4K_Upscale_CNN_x2_UL.glsl
+SHA256: fa7cf0ecc1cca84d8291bbff5a42b60f5816d57b4e97d42bc377235ac8db02e8
+License: MIT
+
+File: anime4k/Anime4K_Upscale_CNN_x2_VL.glsl
+Repository: https://github.com/bloc97/Anime4K
+Commit: 4029bf701ecaa15f163cdc49cffe5501c1acf410
+Path: glsl/Upscale/Anime4K_Upscale_CNN_x2_VL.glsl
+SHA256: 5638fe31c37c151a3443fea3451a3ef91af073f4dbb9615f6c0d1e29db11493d
+License: MIT
+
+File: anime4k/Anime4K_Upscale_CNN_x2_M.glsl
+Repository: https://github.com/bloc97/Anime4K
+Commit: 4029bf701ecaa15f163cdc49cffe5501c1acf410
+Path: glsl/Upscale/Anime4K_Upscale_CNN_x2_M.glsl
+SHA256: 716e02098a68f0d648761f2b96b4dd139e1cb09b174bb369fca3aa34328fff7e
+License: MIT
+
+File: anime4k/Anime4K_Upscale_CNN_x2_S.glsl
+Repository: https://github.com/bloc97/Anime4K
+Commit: 4029bf701ecaa15f163cdc49cffe5501c1acf410
+Path: glsl/Upscale/Anime4K_Upscale_CNN_x2_S.glsl
+SHA256: 4c53ec2e287908f7ee7bcb266b0170421626d663576468b7d7dafc62962649a4
+License: MIT
+
+File: anime4k/Anime4K_Upscale_Denoise_CNN_x2_UL.glsl
+Repository: https://github.com/bloc97/Anime4K
+Commit: 4029bf701ecaa15f163cdc49cffe5501c1acf410
+Path: glsl/Upscale+Denoise/Anime4K_Upscale_Denoise_CNN_x2_UL.glsl
+SHA256: 38bd11e7e92ff1a615a274be912d6f2cfe67f5b43771f0383a91c6ab3d0f8cb6
+License: MIT
+
+File: anime4k/Anime4K_Upscale_Denoise_CNN_x2_VL.glsl
+Repository: https://github.com/bloc97/Anime4K
+Commit: 4029bf701ecaa15f163cdc49cffe5501c1acf410
+Path: glsl/Upscale+Denoise/Anime4K_Upscale_Denoise_CNN_x2_VL.glsl
+SHA256: 359c48fe5a317fbc6b706ce368401eef496e84ed98abac7a43efebca2b65d79b
+License: MIT
+
+File: anime4k/Anime4K_Upscale_Denoise_CNN_x2_M.glsl
+Repository: https://github.com/bloc97/Anime4K
+Commit: 4029bf701ecaa15f163cdc49cffe5501c1acf410
+Path: glsl/Upscale+Denoise/Anime4K_Upscale_Denoise_CNN_x2_M.glsl
+SHA256: 8c72b042e2301fe66a45c3089720459148e2504cd72af16f9c0d5017ff14181e
+License: MIT
+
+File: fsr/FSR.glsl
+Repository: https://gist.github.com/agyild/82219c545228d70c5604f865ce0b0ce5
+Commit: 2623d743b9c23f500ba086f05b385dcb1557e15d
+Path: FSR.glsl
+SHA256: 56d8597fc6b7bf6d13f8c3b2bdf1cdc43b06175d51746aab44cf1dca16929b9e
+License: MIT
+
+File: adaptive-sharpen/adaptive-sharpen.glsl
+Repository: https://gist.github.com/igv/8a77e4eb8276753b54bb94c1c50c317e
+Commit: 572f59099cd0e3eb5e321a6da0a3d90a7382e2dc
+Path: adaptive-sharpen.glsl
+SHA256: 827fb3d662ac9a91b4075e9117fe6e1dbc1c06d85959ba719cdb954dfb7fb8e4
+License: BSD-2-Clause
+
+File: ravu/rgba16hf/gather/ravu-lite-ar-r3.hook
+Repository: https://github.com/bjin/mpv-prescalers
+Commit: 8d12e5ade4a075b5aa30f6bb277bdefa4a203060
+Path: gather/ravu-lite-ar-r3.hook
+SHA256: 7d305c620937b849fff6342b388ead55084b03d28dd36dc0f88521fc69a6e7be
+License: LGPL-3.0-or-later
+
+File: ravu/master/gather/ravu-lite-ar-r3.hook
+Repository: https://github.com/bjin/mpv-prescalers
+Commit: b3f0a59d68f33b7162051ea5970a5169558f0ea2
+Path: gather/ravu-lite-ar-r3.hook
+SHA256: 59c7a71f24f1dc666f5a3865f180616fac564cc20f2223b0fb74db98bab0136d
+License: LGPL-3.0-or-later
+
+File: fsrcnnx/FSRCNNX_x2_16-0-4-1.glsl
+Repository: https://github.com/igv/FSRCNN-TensorFlow
+Commit: 1aa11ab0e1fc12741fdb84cef31da5619a478670
+Asset: https://github.com/igv/FSRCNN-TensorFlow/releases/download/1.1/FSRCNNX_x2_16-0-4-1.glsl
+SHA256: d5a24a271e5d9a3f7f7a053b150c460a44c25b3cf7f770857d57cc3a2e1c9965
+License: LGPL-3.0-or-later
+
+File: fsrcnnx/FSRCNNX_x2_8-0-4-1.glsl
+Repository: https://github.com/igv/FSRCNN-TensorFlow
+Commit: 1aa11ab0e1fc12741fdb84cef31da5619a478670
+Asset: https://github.com/igv/FSRCNN-TensorFlow/releases/download/1.1/FSRCNNX_x2_8-0-4-1.glsl
+SHA256: e800dbc5c1c95185cc82216c597724533ff5f2880179f256eef600f03e8dc2ae
+License: LGPL-3.0-or-later
+
+File: ssim-downscaler/SSimDownscaler.glsl
+Repository: https://gist.github.com/igv/36508af3ffc84410fe39761d6969be10
+Commit: 38992bce7f9ff844f800820df0908692b65bb74a
+Path: SSimDownscaler.glsl
+SHA256: f46f4710a162d17058b9d82ed8610588b0c04d7be07cef6bf2a8c4077828f804
+License: LGPL-3.0-or-later

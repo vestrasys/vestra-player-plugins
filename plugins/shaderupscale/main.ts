@@ -5,9 +5,13 @@ import {
   ANIME4K_MODES,
   ANIME4K_QUALITIES,
   DEFAULT_SETTINGS,
+  demandingFsrcnnx,
+  FSRCNNX_SIZES,
   isStoredSettings,
+  type ModelId,
   MODELS,
   demandingMode,
+  platformOf,
   readSettings,
   type Settings,
   shaderFiles,
@@ -30,11 +34,12 @@ export const shaderPath = (file: string) => join(PACKAGE, "shaders", ...file.spl
 /**
  * Shader Upscale for Vestra Player (`zysilm.shaderupscale`): real-time
  * upscaling with mpv GLSL shaders bundled in the package (Anime4K for anime,
- * AMD FSR 1 for everything else, plus chroma upscaling and sharpening as
- * add-ons), applied through the plugin's own shader handle
- * (`plugin.video.shaders`, player 0.5.20). One menu item, Video ▸ Shader
- * Upscaling…, opens a window with the upscaler, Anime4K's mode and quality,
- * the two add-ons, one On/Off button and what is applied.
+ * AMD FSR 1 for everything else, RAVU and FSRCNNX for live action, plus
+ * chroma upscaling, sharpening and SSIM downscaling as add-ons), applied
+ * through the plugin's own shader handle (`plugin.video.shaders`, player
+ * 0.5.20). One menu item, Video ▸ Shader Upscaling…, opens a window with the
+ * upscaler, its parameters (Anime4K's mode and quality, FSRCNNX's network),
+ * the three add-ons, one On/Off button and what is applied.
  *
  * Shaders run only where the player renders on the GPU (macOS; Windows with
  * Video ▸ GPU Rendering (Experimental)); under software rendering the window
@@ -102,6 +107,8 @@ export default async function activate(plugin: Plugin) {
 
   // ------------------------------------------------------------------ where shaders can run
   const system = await plugin.app.system().catch(() => null);
+  /** RAVU's file differs between Windows and the other systems. */
+  const platform = platformOf(system?.os);
   /** The rendering state behind the advice for software rendering; read when the window opens. */
   let rendering: RenderingState | null = null;
 
@@ -129,19 +136,28 @@ export default async function activate(plugin: Plugin) {
   }
 
   // ------------------------------------------------------------------ names
-  const qualityName = (quality: Settings["anime4k"]["quality"]) => (quality === "hq" ? text("HQ") : text("Fast"));
+  const qualityName = (quality: Settings["anime4k"]["quality"]) =>
+    quality === "ultra" ? text("Ultra") : quality === "hq" ? text("HQ") : text("Fast");
 
-  /** The upscaler as one short name: "Anime4K mode A (Fast)" or "AMD FSR 1". */
+  /** The upscaler as one short name: "Anime4K mode A (Fast)", "AMD FSR 1", "RAVU-lite-AR r3" or "FSRCNNX x2 16". */
   function upscalerName(settings: Settings): Text {
-    if (settings.model === "fsr") return text("AMD FSR 1");
-    return text(
-      // TRANSLATORS: {} are the mode (A, B, C, A+A, B+B, C+A) and the quality (Fast or HQ).
-      "Anime4K mode {} ({})",
-      [settings.anime4k.mode, qualityName(settings.anime4k.quality)],
-    );
+    switch (settings.model) {
+      case "fsr":
+        return text("AMD FSR 1");
+      case "ravu":
+        return text("RAVU-lite-AR r3");
+      case "fsrcnnx":
+        return settings.fsrcnnx.size === "16" ? text("FSRCNNX x2 16") : text("FSRCNNX x2 8");
+      case "anime4k":
+        return text(
+          // TRANSLATORS: {} are the mode (A, B, C, A+A, B+B, C+A) and the quality (Fast, HQ or Ultra).
+          "Anime4K mode {} ({})",
+          [settings.anime4k.mode, qualityName(settings.anime4k.quality)],
+        );
+    }
   }
 
-  /** The preset as one short name, with the add-ons: "Anime4K mode A (Fast) + chroma + sharpen". */
+  /** The preset as one short name, with the add-ons: "Anime4K mode A (Fast) + chroma + downscale + sharpen". */
   function presetName(settings = store.value): Text {
     let name = upscalerName(settings);
     if (settings.chroma)
@@ -150,9 +166,15 @@ export default async function activate(plugin: Plugin) {
         "{} + chroma",
         [name],
       );
+    if (settings.downscale)
+      name = text(
+        // TRANSLATORS: {} is the upscaler, possibly with "+ chroma"; "downscale" is the SSIM downscaling add-on.
+        "{} + downscale",
+        [name],
+      );
     if (settings.sharpen)
       name = text(
-        // TRANSLATORS: {} is the upscaler, possibly with "+ chroma"; "sharpen" is the sharpening add-on.
+        // TRANSLATORS: {} is the upscaler, possibly with "+ chroma" and "+ downscale"; "sharpen" is the sharpening add-on.
         "{} + sharpen",
         [name],
       );
@@ -167,7 +189,7 @@ export default async function activate(plugin: Plugin) {
   }
 
   async function applyNow() {
-    const want = store.value.on && refused === null && unavailable() === null ? shaderFiles(store.value).map(shaderPath) : [];
+    const want = store.value.on && refused === null && unavailable() === null ? shaderFiles(store.value, platform).map(shaderPath) : [];
     if (want.length === sent.length && want.every((path, i) => path === sent[i])) return;
     sent = want;
     toldFailure = false;
@@ -261,6 +283,20 @@ export default async function activate(plugin: Plugin) {
   }
 
   // ------------------------------------------------------------------ the window
+  /** An upscaler as the drop-down shows it: what it is for, then its name. */
+  function modelName(model: ModelId): Text {
+    switch (model) {
+      case "anime4k":
+        return text("Anime: Anime4K");
+      case "fsr":
+        return text("General: AMD FSR 1");
+      case "ravu":
+        return text("Live action · Light: RAVU");
+      case "fsrcnnx":
+        return text("Live action · High: FSRCNNX");
+    }
+  }
+
   /** The headline and its tone (upscale.slint): 0 off, 1 applied, 2 on but waiting, 3 not available or failed. */
   function headline(status: FilterStatus | null): { status: Text; tone: number; detail: Text | string } {
     const why = unavailable();
@@ -321,11 +357,23 @@ export default async function activate(plugin: Plugin) {
     }
   }
 
-  /** The two parameter drop-downs (Anime4K's mode and quality): labels, items and the current index; none for FSR. */
+  /**
+   * The two parameter drop-downs: labels, items and the current index. Anime4K has its mode and quality, FSRCNNX
+   * its network (one row); FSR and RAVU have none.
+   */
   function parameters() {
     const s = store.value;
-    if (s.model === "fsr")
-      return { paramALabel: "", paramAItems: [], paramAIndex: 0, paramBLabel: "", paramBItems: [], paramBIndex: 0 };
+    const none = { paramALabel: "", paramAItems: [], paramAIndex: 0, paramBLabel: "", paramBItems: [], paramBIndex: 0 };
+    if (s.model === "fsr" || s.model === "ravu") return none;
+    if (s.model === "fsrcnnx")
+      return {
+        ...none,
+        paramALabel: text("Network"),
+        paramAItems: FSRCNNX_SIZES.map((size) =>
+          demandingFsrcnnx(size) ? text("x2 16 (demanding): the most detail, fast GPU") : text("x2 8: lighter, about half the work"),
+        ),
+        paramAIndex: FSRCNNX_SIZES.indexOf(s.fsrcnnx.size),
+      };
     return {
       paramALabel: text("Mode"),
       paramAItems: ANIME4K_MODES.map((mode) =>
@@ -344,7 +392,11 @@ export default async function activate(plugin: Plugin) {
       paramAIndex: ANIME4K_MODES.indexOf(s.anime4k.mode),
       paramBLabel: text("Quality"),
       paramBItems: ANIME4K_QUALITIES.map((quality) =>
-        quality === "hq" ? text("HQ (demanding): large networks, fast GPU") : text("Fast: smaller networks, most GPUs"),
+        quality === "ultra"
+          ? text("Ultra (demanding): largest networks, fastest GPUs")
+          : quality === "hq"
+            ? text("HQ (demanding): large networks, fast GPU")
+            : text("Fast: smaller networks, most GPUs"),
       ),
       paramBIndex: ANIME4K_QUALITIES.indexOf(s.anime4k.quality),
     };
@@ -359,6 +411,27 @@ export default async function activate(plugin: Plugin) {
           text(
             "AMD FSR 1: for live action, games and anything that is not anime. Edge-aware upscaling of the brightness detail with light sharpening, up to twice the width and height; light on the GPU.",
           ),
+        ],
+        "lines",
+      );
+    if (s.model === "ravu")
+      return list(
+        [
+          text(
+            "RAVU-lite-AR r3: for live action. Enlarges the brightness detail twice the width and height with a filter learned from video, with anti-ringing for sharp edges; light on the GPU. Runs when the video is enlarged more than about 1.4×.",
+          ),
+        ],
+        "lines",
+      );
+    if (s.model === "fsrcnnx")
+      return list(
+        [
+          text(
+            "FSRCNNX: for live action. A small neural network that enlarges the brightness detail twice the width and height and recovers fine detail; more work than RAVU or FSR. Runs when the video is enlarged more than 1.3×.",
+          ),
+          s.fsrcnnx.size === "16"
+            ? text("x2 16 (demanding) runs the larger network: the most detail; for fast GPUs.")
+            : text("x2 8 runs the smaller network: about half the work of x2 16, for most GPUs."),
         ],
         "lines",
       );
@@ -379,9 +452,11 @@ export default async function activate(plugin: Plugin) {
       "C+A": text("Mode C+A (demanding): mode C with a restore pass after it. Only when the video is enlarged 2× or more."),
     }[s.anime4k.mode];
     const quality =
-      s.anime4k.quality === "hq"
-        ? text("HQ (demanding) runs the large networks (VL and M): about four times the work of Fast; for fast GPUs.")
-        : text("Fast runs the smaller networks (M and S), for most GPUs.");
+      s.anime4k.quality === "ultra"
+        ? text("Ultra (demanding) runs the largest networks (UL and M): about twice the work of HQ; for the fastest GPUs.")
+        : s.anime4k.quality === "hq"
+          ? text("HQ (demanding) runs the large networks (VL and M): about four times the work of Fast; for fast GPUs.")
+          : text("Fast runs the smaller networks (M and S), for most GPUs.");
     return list(
       [
         text(
@@ -399,12 +474,13 @@ export default async function activate(plugin: Plugin) {
     const on = store.value.on;
     const head = headline(shaders?.status ?? null);
     return {
-      models: MODELS.map((model) => (model === "fsr" ? text("General: AMD FSR 1") : text("Anime: Anime4K"))),
+      models: MODELS.map(modelName),
       modelIndex: MODELS.indexOf(store.value.model),
       ...parameters(),
       description: description(),
       chroma: store.value.chroma,
       sharpen: store.value.sharpen,
+      downscale: store.value.downscale,
       on,
       // A saved "on" can always be turned off (also while refused); turning on needs GPU rendering.
       canToggle: on || unavailable() === null,
@@ -416,14 +492,20 @@ export default async function activate(plugin: Plugin) {
     if (model && model !== store.value.model) choose({ model });
     else plugin.update();
   });
+  // The first row is Anime4K's mode or FSRCNNX's network, the second Anime4K's quality.
   window.on("pickA", (index: number) => {
-    const mode = ANIME4K_MODES[index];
-    if (mode) return choose({ anime4k: { ...store.value.anime4k, mode } });
+    if (store.value.model === "fsrcnnx") {
+      const size = FSRCNNX_SIZES[index];
+      if (size) return choose({ fsrcnnx: { size } });
+    } else if (store.value.model === "anime4k") {
+      const mode = ANIME4K_MODES[index];
+      if (mode) return choose({ anime4k: { ...store.value.anime4k, mode } });
+    }
     plugin.update();
   });
   window.on("pickB", (index: number) => {
     const quality = ANIME4K_QUALITIES[index];
-    if (quality) return choose({ anime4k: { ...store.value.anime4k, quality } });
+    if (quality && store.value.model === "anime4k") return choose({ anime4k: { ...store.value.anime4k, quality } });
     plugin.update();
   });
   window.on("toggleChroma", (chroma: boolean) => {
@@ -432,6 +514,10 @@ export default async function activate(plugin: Plugin) {
   });
   window.on("toggleSharpen", (sharpen: boolean) => {
     if (typeof sharpen === "boolean" && sharpen !== store.value.sharpen) return choose({ sharpen });
+    plugin.update();
+  });
+  window.on("toggleDownscale", (downscale: boolean) => {
+    if (typeof downscale === "boolean" && downscale !== store.value.downscale) return choose({ downscale });
     plugin.update();
   });
   window.on("toggle", () => setOn(!store.value.on));

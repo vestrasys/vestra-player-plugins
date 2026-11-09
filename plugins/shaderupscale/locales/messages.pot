@@ -1,193 +1,258 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: zysilm.shaderupscale 0.2.1\n"
+"Project-Id-Version: zysilm.shaderupscale 0.3.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: main.ts:118 main.ts:128
+#: main.ts:125 main.ts:135
 msgid "Shader upscaling needs GPU rendering: turn on Video ▸ GPU Rendering (Experimental), then restart the player."
 msgstr ""
 
 #. {} is the player's own message, in English.
-#: main.ts:122
+#: main.ts:129
 msgid "Shader upscaling needs GPU rendering, which cannot be turned on here: {}"
 msgstr ""
 
-#: main.ts:126
+#: main.ts:133
 msgid "GPU rendering stopped during this run: restart the player to use shader upscaling."
 msgstr ""
 
-#: main.ts:127
+#: main.ts:134
 msgid "GPU rendering is on from the next start: restart the player to use shader upscaling."
 msgstr ""
 
-#: main.ts:132
+#: main.ts:140
+msgid "Ultra"
+msgstr ""
+
+#: main.ts:140
 msgid "HQ"
 msgstr ""
 
-#: main.ts:132
+#: main.ts:140
 msgid "Fast"
 msgstr ""
 
-#: main.ts:136
+#: main.ts:146
 msgid "AMD FSR 1"
 msgstr ""
 
-#. {} are the mode (A, B, C, A+A, B+B, C+A) and the quality (Fast or HQ).
-#: main.ts:139
+#: main.ts:148
+msgid "RAVU-lite-AR r3"
+msgstr ""
+
+#: main.ts:150
+msgid "FSRCNNX x2 16"
+msgstr ""
+
+#: main.ts:150
+msgid "FSRCNNX x2 8"
+msgstr ""
+
+#. {} are the mode (A, B, C, A+A, B+B, C+A) and the quality (Fast, HQ or Ultra).
+#: main.ts:154
 msgid "Anime4K mode {} ({})"
 msgstr ""
 
 #. {} is the upscaler, for example "Anime4K mode A (Fast)"; "chroma" is the chroma upscaling add-on.
-#: main.ts:150
+#: main.ts:166
 msgid "{} + chroma"
 msgstr ""
 
-#. {} is the upscaler, possibly with "+ chroma"; "sharpen" is the sharpening add-on.
-#: main.ts:156
+#. {} is the upscaler, possibly with "+ chroma"; "downscale" is the SSIM downscaling add-on.
+#: main.ts:172
+msgid "{} + downscale"
+msgstr ""
+
+#. {} is the upscaler, possibly with "+ chroma" and "+ downscale"; "sharpen" is the sharpening add-on.
+#: main.ts:178
 msgid "{} + sharpen"
 msgstr ""
 
-#: main.ts:215
+#: main.ts:237
 msgid "Shader Upscaling: a shader did not compile"
 msgstr ""
 
-#: main.ts:226
+#: main.ts:248
 msgid "Shader Upscaling: Off"
 msgstr ""
 
 #. {} is the preset, for example "Anime4K mode A (Fast)".
-#: main.ts:235
+#: main.ts:257
 msgid "Shader Upscaling: On, {}"
 msgstr ""
 
-#: main.ts:238
+#: main.ts:260
 msgid "Shader Upscaling needs GPU rendering"
 msgstr ""
 
-#: main.ts:267
+#: main.ts:290
+msgid "Anime: Anime4K"
+msgstr ""
+
+#: main.ts:292
+msgid "General: AMD FSR 1"
+msgstr ""
+
+#: main.ts:294
+msgid "Live action · Light: RAVU"
+msgstr ""
+
+#: main.ts:296
+msgid "Live action · High: FSRCNNX"
+msgstr ""
+
+#: main.ts:303
 msgid "Not available"
 msgstr ""
 
-#: main.ts:268
+#: main.ts:304
 msgid "Off"
 msgstr ""
 
-#: main.ts:271
+#: main.ts:307
 msgid "Not running: the player ended abnormally while shaders were drawing"
 msgstr ""
 
 #. {} is the player's own message, in English; it says for how long.
-#: main.ts:275
+#: main.ts:311
 msgid "Your choice applies when the player allows shaders again; consider a preset that is not marked demanding. The player says: {}"
 msgstr ""
 
 #. {} is the preset, for example "Anime4K mode A (Fast)".
-#: main.ts:284
+#: main.ts:320
 msgid "On: {}"
 msgstr ""
 
-#: main.ts:293
+#: main.ts:329
 msgid "On, but a shader did not compile"
 msgstr ""
 
 #. {} is mpv's compiler message, in English.
-#: main.ts:297
+#: main.ts:333
 msgid "The player cannot tell whose shader failed when other plugins add shaders too. Its message: {}"
 msgstr ""
 
-#: main.ts:303 main.ts:312
+#: main.ts:339 main.ts:348
 msgid "On, but not applied"
 msgstr ""
 
 #. {} is the player's own message, in English.
-#: main.ts:307
+#: main.ts:343
 msgid "Other plugins' shaders leave no room: at most 16 shaders run at once. {}"
 msgstr ""
 
-#: main.ts:318
+#: main.ts:354
 msgid "On: applying…"
 msgstr ""
 
-#: main.ts:320
+#: main.ts:356
 msgid "On: applies when a video plays"
 msgstr ""
 
-#: main.ts:330
+#: main.ts:371
+msgid "Network"
+msgstr ""
+
+#: main.ts:373
+msgid "x2 16 (demanding): the most detail, fast GPU"
+msgstr ""
+
+#: main.ts:373
+msgid "x2 8: lighter, about half the work"
+msgstr ""
+
+#: main.ts:378
 msgid "Mode"
 msgstr ""
 
 #. {} is the mode (A+A, B+B or C+A).
-#: main.ts:335
+#: main.ts:383
 msgid "Mode {} (demanding)"
 msgstr ""
 
 #. {} is the mode (A, B or C).
-#: main.ts:340
+#: main.ts:388
 msgid "Mode {}"
 msgstr ""
 
-#: main.ts:345
+#: main.ts:393
 msgid "Quality"
 msgstr ""
 
-#: main.ts:347
+#: main.ts:396
+msgid "Ultra (demanding): largest networks, fastest GPUs"
+msgstr ""
+
+#: main.ts:398
 msgid "HQ (demanding): large networks, fast GPU"
 msgstr ""
 
-#: main.ts:347
+#: main.ts:399
 msgid "Fast: smaller networks, most GPUs"
 msgstr ""
 
-#: main.ts:360
+#: main.ts:412
 msgid "AMD FSR 1: for live action, games and anything that is not anime. Edge-aware upscaling of the brightness detail with light sharpening, up to twice the width and height; light on the GPU."
 msgstr ""
 
-#: main.ts:367
+#: main.ts:421
+msgid "RAVU-lite-AR r3: for live action. Enlarges the brightness detail twice the width and height with a filter learned from video, with anti-ringing for sharp edges; light on the GPU. Runs when the video is enlarged more than about 1.4×."
+msgstr ""
+
+#: main.ts:430
+msgid "FSRCNNX: for live action. A small neural network that enlarges the brightness detail twice the width and height and recovers fine detail; more work than RAVU or FSR. Runs when the video is enlarged more than 1.3×."
+msgstr ""
+
+#: main.ts:433
+msgid "x2 16 (demanding) runs the larger network: the most detail; for fast GPUs."
+msgstr ""
+
+#: main.ts:434
+msgid "x2 8 runs the smaller network: about half the work of x2 16, for most GPUs."
+msgstr ""
+
+#: main.ts:440
 msgid "Mode A: for most 1080p anime and blurry older or SD anime. Restores lines and removes blur, noise and compression smear; can strengthen ringing or banding already in the video."
 msgstr ""
 
-#: main.ts:370
+#: main.ts:443
 msgid "Mode B: for most 720p anime and anime downscaled from 1080p. A softer restore that also reduces ringing and aliasing; some blur may stay."
 msgstr ""
 
-#: main.ts:373
+#: main.ts:446
 msgid "Mode C: for clean sources with little blur, such as anime downscaled to 480p. Upscales with denoising and stays closest to the source."
 msgstr ""
 
-#: main.ts:376
+#: main.ts:449
 msgid "Mode A+A (demanding): mode A with a second restore pass: the sharpest lines, but it can ring, band or alias. Only when the video is enlarged 2× or more."
 msgstr ""
 
-#: main.ts:378
+#: main.ts:451
 msgid "Mode B+B (demanding): mode B with a second soft restore pass. Only when the video is enlarged 2× or more."
 msgstr ""
 
-#: main.ts:379
+#: main.ts:452
 msgid "Mode C+A (demanding): mode C with a restore pass after it. Only when the video is enlarged 2× or more."
 msgstr ""
 
-#: main.ts:383
+#: main.ts:456
+msgid "Ultra (demanding) runs the largest networks (UL and M): about twice the work of HQ; for the fastest GPUs."
+msgstr ""
+
+#: main.ts:458
 msgid "HQ (demanding) runs the large networks (VL and M): about four times the work of Fast; for fast GPUs."
 msgstr ""
 
-#: main.ts:384
+#: main.ts:459
 msgid "Fast runs the smaller networks (M and S), for most GPUs."
 msgstr ""
 
-#: main.ts:388
+#: main.ts:463
 msgid "Anime4K: neural networks for anime and cartoons that restore and double the picture twice. Its restore steps can also remove fine detail and texture."
 msgstr ""
 
-#: main.ts:402
-msgid "General: AMD FSR 1"
-msgstr ""
-
-#: main.ts:402
-msgid "Anime: Anime4K"
-msgstr ""
-
-#: main.ts:454
+#: main.ts:540
 msgid "Shader Upscaling…"
 msgstr ""
 
@@ -196,11 +261,11 @@ msgid "Shader Upscale for Vestra Player"
 msgstr ""
 
 #: manifest.json
-msgid "Real-time GPU upscaling with mpv GLSL shaders: Anime4K for anime, AMD FSR 1 for everything else"
+msgid "Real-time GPU upscaling with mpv GLSL shaders: Anime4K for anime; AMD FSR 1, RAVU and FSRCNNX for live action"
 msgstr ""
 
 #: manifest.json
-msgid "Sharpens and enlarges the video on the GPU while it plays, with mpv shaders bundled in the plugin: Anime4K for anime (six modes, Fast or HQ) and AMD FSR 1 for live action and everything else, plus two add-ons, chroma upscaling (CfL) and adaptive sharpening. Video ▸ Shader Upscaling… opens a window to choose them, turn upscaling on and off, and see what is applied. Needs GPU rendering: macOS, or Windows with Video ▸ GPU Rendering (Experimental). Remembers your choice."
+msgid "Sharpens and enlarges the video on the GPU while it plays, with mpv shaders bundled in the plugin: Anime4K for anime (six modes, Fast, HQ or Ultra), AMD FSR 1 for everything else, and RAVU (light) or FSRCNNX (high) for live action, plus three add-ons: chroma upscaling (CfL), SSIM downscaling for videos larger than the window, and adaptive sharpening. Video ▸ Shader Upscaling… opens a window to choose them, turn upscaling on and off, and see what is applied. Needs GPU rendering: macOS, or Windows with Video ▸ GPU Rendering (Experimental). Remembers your choice."
 msgstr ""
 
 #: manifest.json
@@ -227,34 +292,38 @@ msgstr ""
 msgid "Shader Upscaling"
 msgstr ""
 
-#: upscale.slint:103 upscale.slint:114
+#: upscale.slint:106 upscale.slint:117
 msgid "Upscaler"
 msgstr ""
 
-#: upscale.slint:106 upscale.slint:146
+#: upscale.slint:109 upscale.slint:149
 msgid "Add-ons"
 msgstr ""
 
-#: upscale.slint:157
+#: upscale.slint:160
 msgid "Chroma: sharper colour edges (CfL)"
 msgstr ""
 
-#: upscale.slint:163
+#: upscale.slint:166
+msgid "Downscale: sharper when the video is larger than the window (SSIM)"
+msgstr ""
+
+#: upscale.slint:172
 msgid "Sharpen: adaptive sharpening of the final picture"
 msgstr ""
 
-#: upscale.slint:195
+#: upscale.slint:213
 msgid "Turn Off"
 msgstr ""
 
-#: upscale.slint:195
+#: upscale.slint:213
 msgid "Turn On"
 msgstr ""
 
-#: upscale.slint:204
+#: upscale.slint:223
 msgid "Shaders run on the GPU while the picture is drawn: only with GPU rendering, and exported videos and pictures do not contain them. If playback stutters, choose a preset that is not marked demanding."
 msgstr ""
 
-#: upscale.slint:210
+#: upscale.slint:229
 msgid "Close"
 msgstr ""
