@@ -12,4 +12,8 @@ clen = "clen"
 # LICENSE files) are never edited here, so typos does not read them.
 # Only the upstream subdirectories: the plugin's own shaders/SOURCES.txt is
 # still checked.
-extend-exclude = ["plugins/shaderupscale/shaders/*/"]
+extend-exclude = [
+  "plugins/shaderupscale/shaders/*/",
+  # Translated catalogs are not English (a German "oder" is no typo); messages.pot, the English source, is still checked.
+  "plugins/*/locales/*.po",
+]
