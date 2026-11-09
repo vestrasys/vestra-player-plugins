@@ -72,7 +72,7 @@ The plugin follows the player's interface language (English and Simplified Chine
 
 ## Not included (yet)
 
-- **ArtCNN**, **NVIDIA Image Scaling (NIS)** and **Snapdragon Game Super Resolution (SGSR)**: their mpv ports use compute shaders, shader parameters (`//!PARAM`) or mpv's gpu-next renderer. The player draws with mpv's vo_gpu, and macOS has OpenGL 4.1, which has no compute shaders. They are candidates for a later version.
+- **ArtCNN**, **NVIDIA Image Scaling (NIS)** and **Snapdragon Game Super Resolution (SGSR)**: their mpv ports use compute shaders, shader parameters (`PARAM` headers) or mpv's gpu-next renderer. The player draws with mpv's vo_gpu, and macOS has OpenGL 4.1, which has no compute shaders. They are candidates for a later version.
 - **KrigBilateral** chroma upscaling and **NNEDI3**: not offered; chroma stays CfL Lite.
 - Your own shader files: the plugin runs only the shaders bundled with it.
 
