@@ -458,7 +458,7 @@ test("refused: a near copy of a license text (snippets, other line endings)", as
     );
 });
 
-test("only README.md, CHANGELOG.md, SOURCES.txt, locales/ and license texts under shaders/ or licenses/ are not scanned", () => {
+test("only README.md, CHANGELOG.md, SOURCES.txt, locale catalogs and license texts under shaders/ or licenses/ are not scanned", () => {
   for (const path of [
     "README.md",
     "CHANGELOG.md",
@@ -651,4 +651,204 @@ test("package check: an LGPL notice in a packed license.js is refused", async ()
     result.stderr,
     /license\.js: carries a GPL\/AGPL\/LGPL license notice/,
   );
+});
+
+// mpv loads a shader whatever its file name: the files exempt from the
+// notice scan may not hide one.
+const STRIPPED = RAVU.replaceAll("GNU Lesser General Public License", "terms");
+const literal = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const EXEMPT_PATHS = [
+  "shaders/x/LICENSE-ravu",
+  "shaders/x/NOTICE",
+  "shaders/x/NOTICE.md",
+  "shaders/x/LICENSE.txt",
+  "licenses/a/LICENSE",
+  "README.md",
+  "CHANGELOG.md",
+  "locales/zh.po",
+  "locales/zh.pot",
+];
+
+test("refused: a shader hidden in a license, notice, readme or locale file", async () => {
+  for (const path of EXEMPT_PATHS)
+    for (const text of [RAVU, STRIPPED])
+      assert.match(
+        await problemsOf(await plugin({ [path]: text })),
+        new RegExp(`${literal(path)}: contains "//!"`),
+        path,
+      );
+});
+
+test('refused: "//!" anywhere in an exempt file (mpv finds the first one anywhere, keywords by prefix)', async () => {
+  const body = "\nvec4 hook() { return vec4(1.0); }\n";
+  for (const text of [
+    "//!HOOK MAIN",
+    "  //!BIND HOOKED",
+    "Notice\r\n//!SAVE x\r\n",
+    "//!TEXTURE t",
+    "//!BUFFER b",
+    "//!PARAM p",
+    "//!COMPUTE 8 8",
+    "//!DESC x",
+    "\v//!HOOK MAIN",
+    "\f//!HOOK MAIN",
+    "﻿//!HOOK MAIN",
+    "See docs //!HOOK MAIN",
+    "//!HOOKMAIN",
+    "//!BINDHOOKED",
+    "// //!HOOK MAIN",
+    "Shaders start with `//!HOOK MAIN`.",
+    "```glsl\n//!HOOK MAIN\n```",
+  ])
+    for (const path of [
+      "README.md",
+      "shaders/x/NOTICE",
+      "locales/zh.po",
+      "licenses/a/LICENSE",
+    ])
+      assert.match(
+        await problemsOf(await plugin({ [path]: text + body })),
+        new RegExp(`${literal(path)}: contains "//!"`),
+        `${path}: ${JSON.stringify(text)}`,
+      );
+  // Without "//!" mpv finds no header: comments and prose are fine.
+  assert.equal(
+    await problemsOf(
+      await plugin({
+        "README.md":
+          "Shaders start with header lines (`// !` without the space).\n",
+        "locales/zh.po": 'msgid "Upscale"\nmsgstr ""\n',
+      }),
+    ),
+    "",
+  );
+});
+
+test("refused: a COPYING or COPYING.LESSER under shaders/ that is not the FSF's text, LGPL shader next to it or not", async () => {
+  for (const [path, name] of [
+    ["shaders/evil/COPYING.LESSER", "LGPL-3.0"],
+    ["shaders/evil/COPYING", "GPL-3.0"],
+    ["shaders/evil/copying.lesser", "LGPL-3.0"],
+    ["shaders/COPYING", "GPL-3.0"],
+  ])
+    for (const text of [STRIPPED, "GNU GENERAL PUBLIC LICENSE (abridged)\n"])
+      assert.match(
+        await problemsOf(await plugin({ [path]: text })),
+        new RegExp(
+          `${literal(path)} is not the FSF's ${name} text byte for byte`,
+        ),
+        path,
+      );
+  // The FSF's texts alone are accepted; elsewhere a COPYING is read for
+  // notices, not pinned.
+  assert.equal(
+    await problemsOf(
+      await plugin({
+        "shaders/x/COPYING.LESSER": LGPL_TEXT,
+        "shaders/x/COPYING": GPL_TEXT,
+        "licenses/foo/COPYING": "Copyright (c) someone. MIT License.\n",
+      }),
+    ),
+    "",
+  );
+  // A wrong text next to an LGPL shader is reported once.
+  const problems = await problemsOf(
+    await ravuPlugin({ "shaders/ravu/COPYING": "GPL\n" }),
+  );
+  assert.equal(problems.split("\n").length, 1, problems);
+});
+
+test("locales/ exempts only .po and .pot files", async () => {
+  for (const path of ["locales/zh.po", "locales/zh-Hans.pot", "locales/a/b.PO"])
+    assert.equal(scanned(path), false, path);
+  for (const path of [
+    "locales/ravu.hook",
+    "locales/ravu.glsl",
+    "locales/notes.txt",
+    "locales/zh.po.js",
+    "locales/LICENSE",
+  ])
+    assert.equal(scanned(path), true, path);
+  assert.match(
+    await problemsOf(await plugin({ "locales/ravu.hook": RAVU })),
+    /locales\/ravu\.hook: has an LGPL license notice/,
+  );
+});
+
+test("refused: a GitHub repository named . or ..", async () => {
+  for (const name of [".", "..", ".git", "..git"])
+    assert.match(
+      await problemsOf(
+        await ravuPlugin({
+          "shaders/SOURCES.txt": record("ravu/ravu-lite-r3.hook", RAVU).replace(
+            "https://github.com/bjin/mpv-prescalers",
+            `https://github.com/bjin/${name}`,
+          ),
+        }),
+      ),
+      /Repository must be https:\/\/github\.com\/<owner>\/<repo>/,
+      name,
+    );
+  for (const name of [".github", "a.b", "mpv-prescalers.git", "..."])
+    assert.equal(
+      await problemsOf(
+        await ravuPlugin({
+          "shaders/SOURCES.txt": record("ravu/ravu-lite-r3.hook", RAVU).replace(
+            "https://github.com/bjin/mpv-prescalers",
+            `https://github.com/bjin/${name}`,
+          ),
+        }),
+      ),
+      "",
+      name,
+    );
+});
+
+test("package check: a shader hidden in an exempt packed file is refused", async () => {
+  for (const [path, pattern] of [
+    ["shaders/ravu/NOTICE.md", /NOTICE\.md: contains "\/\/!"/],
+    ["licenses/foo/LICENSE", /LICENSE: contains "\/\/!"/],
+    ["locales/zh.po", /zh\.po: contains "\/\/!"/],
+    [
+      "locales/ravu.hook",
+      /locales\/ravu\.hook: carries a GPL\/AGPL\/LGPL license notice/,
+    ],
+    [
+      "shaders/evil/COPYING.LESSER",
+      /shaders\/evil\/COPYING\.LESSER is not the FSF's LGPL-3\.0 text/,
+    ],
+  ]) {
+    const result = await checkPackage({ ...packedFiles, [path]: RAVU });
+    assert.equal(result.status, 1, path);
+    assert.match(result.stderr, pattern, path);
+  }
+  const plain = await checkPackage({
+    ...packedFiles,
+    "locales/zh.po": 'msgid "Upscale"\nmsgstr ""\n',
+  });
+  assert.equal(plain.status, 0, plain.stderr);
+});
+
+test("package check: an entry name not in normal form is refused", async () => {
+  for (const name of [
+    "licenses/../shaders/evil/COPYING",
+    "shaders/./evil/COPYING",
+    "shaders//evil/COPYING",
+    "licenses/a/../../x.js",
+    "./main2.js",
+    "a/..",
+  ]) {
+    const result = await checkPackage({ ...packedFiles, [name]: "x\n" });
+    assert.equal(result.status, 1, name);
+    assert.match(
+      result.stderr,
+      new RegExp(
+        `${literal(name)}: path outside the package or not in normal form`,
+      ),
+      name,
+    );
+  }
+  // A directory entry ends with "/".
+  const directory = await checkPackage({ ...packedFiles, "locales/": "" });
+  assert.equal(directory.status, 0, directory.stderr);
 });

@@ -8,7 +8,8 @@
  * manifest.json. The package is read as a zip: its manifest.json must have
  * the source manifest's id, version, apiVersion and capabilities, its entry
  * must be a .js file inside the package, and no entry may be a .ts file, a
- * test, an absolute path or leave the package.
+ * test, an absolute path, leave the package or be other than in normal
+ * form (".", ".." or empty segments).
  *
  * Every package also stays within the size limits (the .vxp and its files
  * unpacked) and holds no node_modules/ and no native code. A plugin with npm
@@ -20,8 +21,8 @@
  * itself and, next to an LGPL shader, COPYING.LESSER and COPYING are in the
  * package byte for byte as in the plugin directory; no other packed file
  * (the bundle included) carries a GPL, AGPL or LGPL notice, so LGPL shader
- * text is never concatenated into the plugin's code
- * (scripts/lib/file-licenses.mjs).
+ * text is never concatenated into the plugin's code, and no packed file
+ * exempt from that scan hides a shader (scripts/lib/file-licenses.mjs).
  */
 import { readdir, readFile } from "node:fs/promises";
 import { join, posix } from "node:path";
@@ -36,6 +37,7 @@ import {
 } from "./lib/dependencies.mjs";
 import {
   copyleftNotice,
+  exemptFileProblem,
   scanned,
   shaderSources,
   SOURCES,
@@ -103,13 +105,19 @@ try {
   const entries = readZip(bytes);
   const problems = sizeProblems("size", bytes.length, entries.unpacked);
   for (const name of entries.keys()) {
-    const normal = posix.normalize(name);
+    // One spelling per file: a name such as licenses/../shaders/x/COPYING
+    // would escape the rules keyed on its directory. A directory entry may
+    // end with "/".
+    const file = name.endsWith("/") ? name.slice(0, -1) : name;
     if (
       name.startsWith("/") ||
       /^[a-zA-Z]:/.test(name) ||
-      normal.startsWith("..")
+      posix.normalize(file) !== file ||
+      file.split("/").some((part) => !part || part === "." || part === "..")
     )
-      problems.push(`${name}: path outside the package`);
+      problems.push(
+        `${name}: path outside the package or not in normal form (no ".", ".." or empty segments)`,
+      );
     if (name.includes("\\")) problems.push(`${name}: backslash in path`);
     if (name.endsWith(".ts")) problems.push(`${name}: TypeScript source`);
     if (/^tests\//.test(name)) problems.push(`${name}: test file`);
@@ -183,15 +191,16 @@ try {
       for (const text of ["COPYING.LESSER", "COPYING"])
         await same(posix.join(posix.dirname(record.target), text));
   }
-  for (const [name, read] of entries)
-    if (
-      !listed.has(name) &&
-      scanned(name) &&
-      copyleftNotice(read().toString("utf8"))
-    )
+  for (const [name, read] of entries) {
+    if (listed.has(name)) continue;
+    if (!scanned(name)) {
+      const exempt = exemptFileProblem(name, read());
+      if (exempt) problems.push(exempt);
+    } else if (copyleftNotice(read().toString("utf8")))
       problems.push(
         `${name}: carries a GPL/AGPL/LGPL license notice; LGPL shaders ship as separate files listed in ${SOURCES}, never inside the plugin's code`,
       );
+  }
 
   if (problems.length) {
     for (const problem of problems) console.error(`✖ ${asset}: ${problem}`);
