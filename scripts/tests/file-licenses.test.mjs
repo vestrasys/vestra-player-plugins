@@ -385,3 +385,59 @@ test(".gitattributes stores shaders and their license texts byte for byte", () =
   for (const path of paths.slice(0, 4)) assert.equal(text[path], "unset", path);
   assert.equal(text["plugins/x/main.ts"], "auto");
 });
+
+// FSRCNNX is published only as release assets of igv/FSRCNN-TensorFlow.
+const FSRCNNX = RAVU.replace("Bin Jin", "igv");
+const assetRecord = (
+  asset,
+  extra = "",
+) => `File: fsrcnnx/FSRCNNX_x2_8-0-4-1.glsl
+Repository: https://github.com/igv/FSRCNN-TensorFlow
+Commit: ${"b".repeat(40)}
+Asset: ${asset}
+SHA256: ${sha256(FSRCNNX)}
+License: LGPL-3.0-or-later
+${extra}`;
+const ASSET =
+  "https://github.com/igv/FSRCNN-TensorFlow/releases/download/1.1/FSRCNNX_x2_8-0-4-1.glsl";
+const assetPlugin = (sources) =>
+  plugin({
+    "shaders/SOURCES.txt": sources,
+    "shaders/fsrcnnx/FSRCNNX_x2_8-0-4-1.glsl": FSRCNNX,
+    "shaders/fsrcnnx/COPYING.LESSER": LGPL_TEXT,
+    "shaders/fsrcnnx/COPYING": GPL_TEXT,
+  });
+
+test("accepted: a release asset record (Asset instead of Path)", async () => {
+  assert.equal(await problemsOf(await assetPlugin(assetRecord(ASSET))), "");
+});
+
+test("refused: a release asset outside the record's repository", async () => {
+  for (const asset of [
+    "https://github.com/someone/FSRCNN-TensorFlow/releases/download/1.1/FSRCNNX_x2_8-0-4-1.glsl",
+    "https://github.com/igv/FSRCNN-TensorFlow-fork/releases/download/1.1/x.glsl",
+    "https://github.com/igv/FSRCNN-TensorFlow/blob/master/x.glsl",
+    "https://github.com/igv/FSRCNN-TensorFlow/releases/download/1.1/../../../other/x.glsl",
+    "http://github.com/igv/FSRCNN-TensorFlow/releases/download/1.1/x.glsl",
+  ])
+    assert.match(
+      await problemsOf(await assetPlugin(assetRecord(asset))),
+      /Asset must be a release asset of the Repository/,
+      asset,
+    );
+});
+
+test("refused: both Path and Asset, or neither", async () => {
+  assert.match(
+    await problemsOf(
+      await assetPlugin(assetRecord(ASSET, "Path: FSRCNNX_x2_8-0-4-1.glsl\n")),
+    ),
+    /exactly one of Path .* or Asset/,
+  );
+  assert.match(
+    await problemsOf(
+      await assetPlugin(assetRecord(ASSET).replace(/^Asset: .*\n/m, "")),
+    ),
+    /exactly one of Path .* or Asset/,
+  );
+});

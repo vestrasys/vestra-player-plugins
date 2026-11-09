@@ -130,7 +130,7 @@ conditions (`scripts/lib/file-licenses.mjs`):
 | Rule | Checked by |
 | --- | --- |
 | The file is a shader (`.glsl`, `.hook`) under the plugin's `shaders/`, shipped **unmodified** from a named upstream commit, as a **separate file**: never concatenated into, embedded in or derived inside the plugin's code | `registry`, `build`, the package check (no packed file other than a listed shader, the bundle included, may carry a GPL, AGPL or LGPL notice) |
-| `shaders/SOURCES.txt` has a record for it (below) whose `SHA256` equals the file's bytes; a modified file (hash mismatch) is refused | `registry`, `build`, the package check (the listed files and `SOURCES.txt` ship byte for byte) |
+| `shaders/SOURCES.txt` has a record for it (below: the upstream commit, and the path in it or the release asset) whose `SHA256` equals the file's bytes; a modified file (hash mismatch) is refused | `registry`, `build`, the package check (the listed files and `SOURCES.txt` ship byte for byte) |
 | Its license is `LGPL-3.0-only` or `LGPL-3.0-or-later`, and the full license texts lie in the same directory: `COPYING.LESSER` (LGPL-3.0) and `COPYING` (GPL-3.0, which LGPL-3.0 incorporates), both packed | `registry`, `build`, the package check |
 | LGPL anywhere else is refused: in code (`.ts`, `.js`, `.slint`, ... with an LGPL notice), in a shader outside `shaders/` or not listed, and in npm dependencies ([npm dependencies](#npm-dependencies)). GPL and AGPL notices are refused in every file | `registry`, `build`, the package check |
 
@@ -147,7 +147,22 @@ License: LGPL-3.0-or-later
 ```
 
 `File` is relative to `shaders/`; `Path` is the file's path in the
-upstream repository at `Commit`. The SHA256 is of the file's bytes as
+upstream repository at `Commit`. A shader published only as a release asset
+(in no commit, such as FSRCNNX on `igv/FSRCNN-TensorFlow` release 1.1)
+has `Asset:` instead of `Path:`: the asset's https URL under the record's
+repository, `<Repository>/releases/download/<tag>/<file>`, with `Commit`
+the commit that tag points to. A record has exactly one of `Path` and
+`Asset`; an asset URL outside the repository is refused.
+
+```text
+File: fsrcnnx/FSRCNNX_x2_8-0-4-1.glsl
+Repository: https://github.com/igv/FSRCNN-TensorFlow
+Commit: <full commit id the tag 1.1 points to>
+Asset: https://github.com/igv/FSRCNN-TensorFlow/releases/download/1.1/FSRCNNX_x2_8-0-4-1.glsl
+SHA256: <sha256 of the asset, lowercase hex>
+License: LGPL-3.0-or-later
+```
+ The SHA256 is of the file's bytes as
 committed, which must be the upstream bytes: `.gitattributes` stores
 `plugins/*/shaders/**/*.glsl`, `*.hook`, `COPYING` and `COPYING.LESSER`
 with `-text` (no line-ending conversion), so an upstream file with CRLF

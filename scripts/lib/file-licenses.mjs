@@ -32,6 +32,9 @@
  *   License: LGPL-3.0-or-later
  *
  * `File:` starts at the beginning of a line; the record ends at a blank line.
+ * A file that is only a release asset (in no commit) has
+ * `Asset: <Repository>/releases/download/<tag>/<file>` instead of `Path:`,
+ * with `Commit:` the commit the tag points to; exactly one of the two.
  *
  * Not scanned: documentation and translations (.md, .txt, .po, .pot),
  * license texts (LICENSE*, LICENCE*, COPYING*, NOTICE*), images, and the
@@ -103,13 +106,14 @@ const FIELDS = {
   repository: "Repository",
   commit: "Commit",
   path: "Path",
+  asset: "Asset",
   sha256: "SHA256",
   license: "License",
 };
 
 /**
  * The records of a SOURCES.txt text: [{ line, file, repository, commit,
- * path, sha256, license }] (missing fields undefined).
+ * path, asset, sha256, license }] (missing fields undefined).
  */
 export function parseSources(text) {
   const records = [];
@@ -214,7 +218,33 @@ export async function shaderSources(directory, label) {
     record.target = `${SHADERS}/${file}`;
     if (record.unknown) where("unknown fields in the record");
     for (const [key, name] of Object.entries(FIELDS))
-      if (!record[key]) where(`${name} is missing`);
+      if (key !== "path" && key !== "asset" && !record[key])
+        where(`${name} is missing`);
+    if (!record.path === !record.asset)
+      where(
+        "exactly one of Path (a file in the commit) or Asset (a release asset)",
+      );
+    if (record.asset && record.repository) {
+      const releases = `${record.repository.replace(/(\.git)?\/*$/, "")}/releases/download/`;
+      let href;
+      try {
+        href = new URL(record.asset).href;
+      } catch {
+        href = undefined;
+      }
+      const rest = record.asset.slice(releases.length);
+      if (
+        href !== record.asset ||
+        !record.asset.startsWith("https://") ||
+        !record.asset.startsWith(releases) ||
+        /[?#]/.test(rest) ||
+        !/^[^/]+\/[^/]+$/.test(rest) ||
+        rest.split("/").some((part) => part === "." || part === "..")
+      )
+        where(
+          `Asset must be a release asset of the Repository: ${releases}<tag>/<file>`,
+        );
+    }
     if (record.repository && !/^https:\/\/\S+$/.test(record.repository))
       where("Repository must be an https URL");
     if (record.commit && !/^([0-9a-f]{40}|[0-9a-f]{64})$/.test(record.commit))
@@ -269,7 +299,7 @@ export async function fileLicenseProblems(directory, label) {
     if (!record) {
       problem(
         SHADER_FILE.test(file) && file.startsWith(`${SHADERS}/`)
-          ? `${file}: an LGPL shader needs a record in ${SOURCES} (File, Repository, Commit, Path, SHA256, License) whose SHA256 matches it`
+          ? `${file}: an LGPL shader needs a record in ${SOURCES} (File, Repository, Commit, Path or Asset, SHA256, License) whose SHA256 matches it`
           : `${file}: has an LGPL license notice; LGPL is allowed only for unmodified mpv shaders (.glsl, .hook) under shaders/ listed in ${SOURCES}, never in code`,
       );
       continue;
