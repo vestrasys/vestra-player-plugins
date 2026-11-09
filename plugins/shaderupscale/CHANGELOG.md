@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0
+
+- Two upscalers for live action next to AMD FSR 1: **Live action · Light: RAVU** (RAVU-lite-AR r3, bjin's mpv-prescalers) and **Live action · High: FSRCNNX** (igv's FSRCNNX x2), whose new **Network** row chooses x2 16 (the default, marked demanding) or the lighter x2 8. Like FSR they enlarge the brightness plane 2×, so only one of the three runs; the chroma add-on stays CfL Lite and predicts the colour from their result.
+- Anime4K's **Quality** gains **Ultra** (demanding): the UL networks for the first steps, M for the last (the High-end template with UL in place of VL), about twice HQ's work.
+- A third add-on, **Downscale** (igv's SSimDownscaler), off by default: keeps detail and contrast when the video is larger than the window. At most ten shaders run (Anime4K's longest chain with the three add-ons).
+- RAVU's file depends on the system: on Windows the `rgba16hf` branch's (mpv's Direct3D 11 renderer has no `rgba16f`), elsewhere the master branch's. All new shaders are fragment shaders, without `//!COMPUTE` or `//!PARAM`, for macOS's OpenGL 4.1.
+- RAVU, FSRCNNX and SSimDownscaler are LGPL-3.0-or-later. They ship unchanged as separate files, each directory with the full LGPL-3.0 (`COPYING.LESSER`) and GPL-3.0 (`COPYING`) texts; `shaders/SOURCES.txt` now has a record per shader (repository, commit, path or release asset, SHA-256, licence), except the modified CfL, documented in SOURCES.txt.
+- In Simplified Chinese the preset name joins the add-ons with "＋" without spaces ("AMD FSR 1＋色度＋锐化"), so the longest one still fits the OSD line.
+- Settings saved by 0.2.x and earlier are kept, with FSRCNNX x2 16 for when it is chosen and the downscale add-on off.
+
 ## 0.2.1
 
 - The window's status line wraps instead of being cut off: with Anime4K and both add-ons it read "On: Anime4K mode A (Fast) + chroma + sh…" at the window's width. The whole state now shows on two lines (the longest, "On: Anime4K mode A+A (HQ) + chroma + sharpen", in English and Simplified Chinese), and so does the longer "Not running" reason; the window grows with it. The OSD line is unchanged.

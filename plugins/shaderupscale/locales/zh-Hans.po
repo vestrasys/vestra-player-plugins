@@ -1,194 +1,259 @@
 msgid ""
 msgstr ""
 "Language: zh-Hans\n"
-"Project-Id-Version: zysilm.shaderupscale 0.2.1\n"
+"Project-Id-Version: zysilm.shaderupscale 0.3.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: main.ts:118 main.ts:128
+#: main.ts:125 main.ts:135
 msgid "Shader upscaling needs GPU rendering: turn on Video ▸ GPU Rendering (Experimental), then restart the player."
 msgstr "着色器超分辨率需要 GPU 渲染：请打开“视频 ▸ GPU 渲染（实验性）”，然后重启播放器。"
 
 #. {} is the player's own message, in English.
-#: main.ts:122
+#: main.ts:129
 msgid "Shader upscaling needs GPU rendering, which cannot be turned on here: {}"
 msgstr "着色器超分辨率需要 GPU 渲染，但本机无法开启 GPU 渲染：{}"
 
-#: main.ts:126
+#: main.ts:133
 msgid "GPU rendering stopped during this run: restart the player to use shader upscaling."
 msgstr "GPU 渲染在本次运行中已停止：请重启播放器以使用着色器超分辨率。"
 
-#: main.ts:127
+#: main.ts:134
 msgid "GPU rendering is on from the next start: restart the player to use shader upscaling."
 msgstr "GPU 渲染将在下次启动时开启：请重启播放器以使用着色器超分辨率。"
 
-#: main.ts:132
+#: main.ts:140
+msgid "Ultra"
+msgstr "超高画质"
+
+#: main.ts:140
 msgid "HQ"
 msgstr "高画质"
 
-#: main.ts:132
+#: main.ts:140
 msgid "Fast"
 msgstr "快速"
 
-#: main.ts:136
+#: main.ts:146
 msgid "AMD FSR 1"
 msgstr "AMD FSR 1"
 
-#. {} are the mode (A, B, C, A+A, B+B, C+A) and the quality (Fast or HQ).
-#: main.ts:139
+#: main.ts:148
+msgid "RAVU-lite-AR r3"
+msgstr "RAVU-lite-AR r3"
+
+#: main.ts:150
+msgid "FSRCNNX x2 16"
+msgstr "FSRCNNX x2 16"
+
+#: main.ts:150
+msgid "FSRCNNX x2 8"
+msgstr "FSRCNNX x2 8"
+
+#. {} are the mode (A, B, C, A+A, B+B, C+A) and the quality (Fast, HQ or Ultra).
+#: main.ts:154
 msgid "Anime4K mode {} ({})"
 msgstr "Anime4K 模式 {}（{}）"
 
 #. {} is the upscaler, for example "Anime4K mode A (Fast)"; "chroma" is the chroma upscaling add-on.
-#: main.ts:150
+#: main.ts:166
 msgid "{} + chroma"
-msgstr "{} + 色度"
+msgstr "{}＋色度"
 
-#. {} is the upscaler, possibly with "+ chroma"; "sharpen" is the sharpening add-on.
-#: main.ts:156
+#. {} is the upscaler, possibly with "+ chroma"; "downscale" is the SSIM downscaling add-on.
+#: main.ts:172
+msgid "{} + downscale"
+msgstr "{}＋缩小"
+
+#. {} is the upscaler, possibly with "+ chroma" and "+ downscale"; "sharpen" is the sharpening add-on.
+#: main.ts:178
 msgid "{} + sharpen"
-msgstr "{} + 锐化"
+msgstr "{}＋锐化"
 
-#: main.ts:215
+#: main.ts:237
 msgid "Shader Upscaling: a shader did not compile"
 msgstr "着色器超分辨率：有着色器编译失败"
 
-#: main.ts:226
+#: main.ts:248
 msgid "Shader Upscaling: Off"
 msgstr "着色器超分辨率：关"
 
 #. {} is the preset, for example "Anime4K mode A (Fast)".
-#: main.ts:235
+#: main.ts:257
 msgid "Shader Upscaling: On, {}"
 msgstr "着色器超分辨率：开，{}"
 
-#: main.ts:238
+#: main.ts:260
 msgid "Shader Upscaling needs GPU rendering"
 msgstr "着色器超分辨率需要 GPU 渲染"
 
-#: main.ts:267
+#: main.ts:290
+msgid "Anime: Anime4K"
+msgstr "动画：Anime4K"
+
+#: main.ts:292
+msgid "General: AMD FSR 1"
+msgstr "通用：AMD FSR 1"
+
+#: main.ts:294
+msgid "Live action · Light: RAVU"
+msgstr "真人 · 轻量：RAVU"
+
+#: main.ts:296
+msgid "Live action · High: FSRCNNX"
+msgstr "真人 · 高画质：FSRCNNX"
+
+#: main.ts:303
 msgid "Not available"
 msgstr "无法使用"
 
-#: main.ts:268
+#: main.ts:304
 msgid "Off"
 msgstr "关"
 
-#: main.ts:271
+#: main.ts:307
 msgid "Not running: the player ended abnormally while shaders were drawing"
 msgstr "未运行：播放器上次在着色器绘制时异常结束"
 
 #. {} is the player's own message, in English; it says for how long.
-#: main.ts:275
+#: main.ts:311
 msgid "Your choice applies when the player allows shaders again; consider a preset that is not marked demanding. The player says: {}"
 msgstr "你的选择会在播放器重新允许着色器时生效；可以考虑选择一个未标为“高负载”的预设。播放器的说明：{}"
 
 #. {} is the preset, for example "Anime4K mode A (Fast)".
-#: main.ts:284
+#: main.ts:320
 msgid "On: {}"
 msgstr "开：{}"
 
-#: main.ts:293
+#: main.ts:329
 msgid "On, but a shader did not compile"
 msgstr "开，但有着色器编译失败"
 
 #. {} is mpv's compiler message, in English.
-#: main.ts:297
+#: main.ts:333
 msgid "The player cannot tell whose shader failed when other plugins add shaders too. Its message: {}"
 msgstr "其他插件也添加了着色器时，播放器无法判断是谁的着色器失败。播放器的消息：{}"
 
-#: main.ts:303 main.ts:312
+#: main.ts:339 main.ts:348
 msgid "On, but not applied"
 msgstr "开，但未生效"
 
 #. {} is the player's own message, in English.
-#: main.ts:307
+#: main.ts:343
 msgid "Other plugins' shaders leave no room: at most 16 shaders run at once. {}"
 msgstr "其他插件的着色器已占满：同时最多运行 16 个着色器。{}"
 
-#: main.ts:318
+#: main.ts:354
 msgid "On: applying…"
 msgstr "开：正在应用…"
 
-#: main.ts:320
+#: main.ts:356
 msgid "On: applies when a video plays"
 msgstr "开：播放视频时生效"
 
-#: main.ts:330
+#: main.ts:371
+msgid "Network"
+msgstr "模型规模"
+
+#: main.ts:373
+msgid "x2 16 (demanding): the most detail, fast GPU"
+msgstr "x2 16（高负载）：细节最多，需要较快的 GPU"
+
+#: main.ts:373
+msgid "x2 8: lighter, about half the work"
+msgstr "x2 8：较轻，计算量约为一半"
+
+#: main.ts:378
 msgid "Mode"
 msgstr "模式"
 
 #. {} is the mode (A+A, B+B or C+A).
-#: main.ts:335
+#: main.ts:383
 msgid "Mode {} (demanding)"
 msgstr "模式 {}（高负载）"
 
 #. {} is the mode (A, B or C).
-#: main.ts:340
+#: main.ts:388
 msgid "Mode {}"
 msgstr "模式 {}"
 
-#: main.ts:345
+#: main.ts:393
 msgid "Quality"
 msgstr "画质"
 
-#: main.ts:347
+#: main.ts:396
+msgid "Ultra (demanding): largest networks, fastest GPUs"
+msgstr "超高画质（高负载）：最大网络，需要最快的 GPU"
+
+#: main.ts:398
 msgid "HQ (demanding): large networks, fast GPU"
 msgstr "高画质（高负载）：大网络，需要较快的 GPU"
 
-#: main.ts:347
+#: main.ts:399
 msgid "Fast: smaller networks, most GPUs"
 msgstr "快速：小网络，适合大多数 GPU"
 
-#: main.ts:360
+#: main.ts:412
 msgid "AMD FSR 1: for live action, games and anything that is not anime. Edge-aware upscaling of the brightness detail with light sharpening, up to twice the width and height; light on the GPU."
 msgstr "AMD FSR 1：适合真人影像、游戏以及动画以外的内容。按边缘方向放大亮度细节并轻度锐化，宽高最多放大一倍；GPU 负担小。"
 
-#: main.ts:367
+#: main.ts:421
+msgid "RAVU-lite-AR r3: for live action. Enlarges the brightness detail twice the width and height with a filter learned from video, with anti-ringing for sharp edges; light on the GPU. Runs when the video is enlarged more than about 1.4×."
+msgstr "RAVU-lite-AR r3：适合真人影像。用从视频中学习得到的滤波器把亮度细节的宽高放大一倍，并抑制锐利边缘的振铃；GPU 负担小。视频放大超过约 1.4 倍时才运行。"
+
+#: main.ts:430
+msgid "FSRCNNX: for live action. A small neural network that enlarges the brightness detail twice the width and height and recovers fine detail; more work than RAVU or FSR. Runs when the video is enlarged more than 1.3×."
+msgstr "FSRCNNX：适合真人影像。一个小型神经网络，把亮度细节的宽高放大一倍并恢复细微细节；计算量大于 RAVU 和 FSR。视频放大超过 1.3 倍时才运行。"
+
+#: main.ts:433
+msgid "x2 16 (demanding) runs the larger network: the most detail; for fast GPUs."
+msgstr "x2 16（高负载）运行较大的网络：细节最多，适合较快的 GPU。"
+
+#: main.ts:434
+msgid "x2 8 runs the smaller network: about half the work of x2 16, for most GPUs."
+msgstr "x2 8 运行较小的网络：计算量约为 x2 16 的一半，适合大多数 GPU。"
+
+#: main.ts:440
 msgid "Mode A: for most 1080p anime and blurry older or SD anime. Restores lines and removes blur, noise and compression smear; can strengthen ringing or banding already in the video."
 msgstr "模式 A：适合大多数 1080p 动画，以及模糊的老动画或标清动画。修复线条，去除模糊、噪点和压缩涂抹；视频中已有的振铃或色带可能被加强。"
 
-#: main.ts:370
+#: main.ts:443
 msgid "Mode B: for most 720p anime and anime downscaled from 1080p. A softer restore that also reduces ringing and aliasing; some blur may stay."
 msgstr "模式 B：适合大多数 720p 动画和由 1080p 缩小的动画。修复较柔和，同时减少振铃和锯齿；可能残留一些模糊。"
 
-#: main.ts:373
+#: main.ts:446
 msgid "Mode C: for clean sources with little blur, such as anime downscaled to 480p. Upscales with denoising and stays closest to the source."
 msgstr "模式 C：适合模糊很少的干净片源，例如缩小到 480p 的动画。放大时降噪，最接近原片。"
 
-#: main.ts:376
+#: main.ts:449
 msgid "Mode A+A (demanding): mode A with a second restore pass: the sharpest lines, but it can ring, band or alias. Only when the video is enlarged 2× or more."
 msgstr "模式 A+A（高负载）：模式 A 再加一遍修复：线条最锐利，但可能出现振铃、色带或锯齿。仅在视频放大 2 倍或以上时使用。"
 
-#: main.ts:378
+#: main.ts:451
 msgid "Mode B+B (demanding): mode B with a second soft restore pass. Only when the video is enlarged 2× or more."
 msgstr "模式 B+B（高负载）：模式 B 再加一遍柔和修复。仅在视频放大 2 倍或以上时使用。"
 
-#: main.ts:379
+#: main.ts:452
 msgid "Mode C+A (demanding): mode C with a restore pass after it. Only when the video is enlarged 2× or more."
 msgstr "模式 C+A（高负载）：模式 C 之后再加一遍修复。仅在视频放大 2 倍或以上时使用。"
 
-#: main.ts:383
+#: main.ts:456
+msgid "Ultra (demanding) runs the largest networks (UL and M): about twice the work of HQ; for the fastest GPUs."
+msgstr "超高画质（高负载）运行最大网络（UL 和 M）：计算量约为高画质的两倍，适合最快的 GPU。"
+
+#: main.ts:458
 msgid "HQ (demanding) runs the large networks (VL and M): about four times the work of Fast; for fast GPUs."
 msgstr "高画质（高负载）运行大网络（VL 和 M）：计算量约为快速的四倍，适合较快的 GPU。"
 
-#: main.ts:384
+#: main.ts:459
 msgid "Fast runs the smaller networks (M and S), for most GPUs."
 msgstr "快速运行较小的网络（M 和 S），适合大多数 GPU。"
 
-#: main.ts:388
+#: main.ts:463
 msgid "Anime4K: neural networks for anime and cartoons that restore and double the picture twice. Its restore steps can also remove fine detail and texture."
 msgstr "Anime4K：面向动画和卡通的神经网络，修复画面并两次放大一倍。其修复步骤也可能抹掉细小的细节和纹理。"
 
-#: main.ts:402
-msgid "General: AMD FSR 1"
-msgstr "通用：AMD FSR 1"
-
-#: main.ts:402
-msgid "Anime: Anime4K"
-msgstr "动画：Anime4K"
-
-#: main.ts:454
+#: main.ts:540
 msgid "Shader Upscaling…"
 msgstr "着色器超分辨率…"
 
@@ -197,12 +262,12 @@ msgid "Shader Upscale for Vestra Player"
 msgstr "Vestra Player 着色器超分辨率"
 
 #: manifest.json
-msgid "Real-time GPU upscaling with mpv GLSL shaders: Anime4K for anime, AMD FSR 1 for everything else"
-msgstr "用 mpv GLSL 着色器在 GPU 上实时超分辨率：动画用 Anime4K，其他内容用 AMD FSR 1"
+msgid "Real-time GPU upscaling with mpv GLSL shaders: Anime4K for anime; AMD FSR 1, RAVU and FSRCNNX for live action"
+msgstr "用 mpv GLSL 着色器在 GPU 上实时超分辨率：动画用 Anime4K；真人影像用 AMD FSR 1、RAVU 和 FSRCNNX"
 
 #: manifest.json
-msgid "Sharpens and enlarges the video on the GPU while it plays, with mpv shaders bundled in the plugin: Anime4K for anime (six modes, Fast or HQ) and AMD FSR 1 for live action and everything else, plus two add-ons, chroma upscaling (CfL) and adaptive sharpening. Video ▸ Shader Upscaling… opens a window to choose them, turn upscaling on and off, and see what is applied. Needs GPU rendering: macOS, or Windows with Video ▸ GPU Rendering (Experimental). Remembers your choice."
-msgstr "播放时在 GPU 上锐化并放大视频，使用插件自带的 mpv 着色器：动画用 Anime4K（六种模式，快速或高画质），真人影像及其他内容用 AMD FSR 1，另有两个附加项：色度放大（CfL）和自适应锐化。“视频 ▸ 着色器超分辨率…”打开一个窗口，可进行选择、开关超分辨率，并查看当前应用的内容。需要 GPU 渲染：macOS，或在 Windows 上打开“视频 ▸ GPU 渲染（实验性）”。会记住你的选择。"
+msgid "Sharpens and enlarges the video on the GPU while it plays, with mpv shaders bundled in the plugin: Anime4K for anime (six modes, Fast, HQ or Ultra), AMD FSR 1 for everything else, and RAVU (light) or FSRCNNX (high) for live action, plus three add-ons: chroma upscaling (CfL), SSIM downscaling for videos larger than the window, and adaptive sharpening. Video ▸ Shader Upscaling… opens a window to choose them, turn upscaling on and off, and see what is applied. Needs GPU rendering: macOS, or Windows with Video ▸ GPU Rendering (Experimental). Remembers your choice."
+msgstr "播放时在 GPU 上锐化并放大视频，使用插件自带的 mpv 着色器：动画用 Anime4K（六种模式，快速、高画质或超高画质），其他内容用 AMD FSR 1，真人影像还可用 RAVU（轻量）或 FSRCNNX（高画质），另有三个附加项：色度放大（CfL）、视频大于窗口时的 SSIM 缩小，以及自适应锐化。“视频 ▸ 着色器超分辨率…”打开一个窗口，可进行选择、开关超分辨率，并查看当前应用的内容。需要 GPU 渲染：macOS，或在 Windows 上打开“视频 ▸ GPU 渲染（实验性）”。会记住你的选择。"
 
 #: manifest.json
 msgid "video"
@@ -228,34 +293,38 @@ msgstr "锐化"
 msgid "Shader Upscaling"
 msgstr "着色器超分辨率"
 
-#: upscale.slint:103 upscale.slint:114
+#: upscale.slint:106 upscale.slint:117
 msgid "Upscaler"
 msgstr "放大算法"
 
-#: upscale.slint:106 upscale.slint:146
+#: upscale.slint:109 upscale.slint:149
 msgid "Add-ons"
 msgstr "附加项"
 
-#: upscale.slint:157
+#: upscale.slint:160
 msgid "Chroma: sharper colour edges (CfL)"
 msgstr "色度：更清晰的色彩边缘（CfL）"
 
-#: upscale.slint:163
+#: upscale.slint:166
+msgid "Downscale: sharper when the video is larger than the window (SSIM)"
+msgstr "缩小：视频大于窗口时更清晰（SSIM）"
+
+#: upscale.slint:172
 msgid "Sharpen: adaptive sharpening of the final picture"
 msgstr "锐化：对最终画面自适应锐化"
 
-#: upscale.slint:195
+#: upscale.slint:213
 msgid "Turn Off"
 msgstr "停用"
 
-#: upscale.slint:195
+#: upscale.slint:213
 msgid "Turn On"
 msgstr "启用"
 
-#: upscale.slint:204
+#: upscale.slint:223
 msgid "Shaders run on the GPU while the picture is drawn: only with GPU rendering, and exported videos and pictures do not contain them. If playback stutters, choose a preset that is not marked demanding."
 msgstr "着色器在绘制画面时于 GPU 上运行：仅在 GPU 渲染下生效，导出的视频和图片不包含其效果。如果播放卡顿，请选择未标为“高负载”的预设。"
 
-#: upscale.slint:210
+#: upscale.slint:229
 msgid "Close"
 msgstr "关闭"

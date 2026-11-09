@@ -1,6 +1,6 @@
-// The Shader Upscaling window: the upscaler (only with more than one), its two parameters (only when it has them: Anime4K's
-// mode and quality, none for FSR), the two add-ons (chroma, sharpen), what the preset does, one button that turns upscaling
-// on and off, and the status line (what is applied, or why not).
+// The Shader Upscaling window: the upscaler (only with more than one), its parameters (only when it has them: Anime4K's
+// mode and quality, FSRCNNX's network, none for FSR and RAVU), the three add-ons (chroma, downscale, sharpen), what the
+// preset does, one button that turns upscaling on and off, and the status line (what is applied, or why not).
 // Width 400 (content 400 − 28 = 372): label column 90 + 8 + drop-down 274. Height: the content's
 // (min = max = the layout's preferred height, as the About window), so the window follows the
 // wrapped texts (the description, the status line, the status detail) as they change after it opens
@@ -73,8 +73,10 @@ export component UpscaleWindow inherits Window {
     in property <string> param-b-label;
     in property <[string]> param-b-items;
     in-out property <int> param-b-index;
-    // The add-ons: chroma from luma prediction on the colour planes, adaptive sharpening of the final picture.
+    // The add-ons: chroma from luma prediction on the colour planes, SSIM downscaling when the picture is drawn smaller
+    // than the video, adaptive sharpening of the final picture.
     in property <bool> chroma;
+    in property <bool> downscale;
     in property <bool> sharpen;
     // What the preset does, one part per line.
     in property <string> description;
@@ -91,6 +93,7 @@ export component UpscaleWindow inherits Window {
     callback pick-b(int);
     callback toggle-chroma(bool);
     callback toggle-sharpen(bool);
+    callback toggle-downscale(bool);
     callback toggle();
     callback close-window();
 
@@ -158,6 +161,12 @@ export component UpscaleWindow inherits Window {
                     checked: root.chroma;
                     self-toggle: false;
                     toggled(on) => { root.toggle-chroma(on); }
+                }
+                Check {
+                    text: @tr("Downscale: sharper when the video is larger than the window (SSIM)");
+                    checked: root.downscale;
+                    self-toggle: false;
+                    toggled(on) => { root.toggle-downscale(on); }
                 }
                 Check {
                     text: @tr("Sharpen: adaptive sharpening of the final picture");
