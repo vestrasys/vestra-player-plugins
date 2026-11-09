@@ -1,0 +1,713 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: zysilm.clipexport 0.1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: main.ts:103 main.ts:108 ui/parts.slint:25
+msgid "Enter a time such as 1:02:03.450, or seconds."
+msgstr ""
+
+#: main.ts:103 main.ts:108 ui/parts.slint:26
+msgid "The end must be after the start."
+msgstr ""
+
+#: main.ts:103 main.ts:108 ui/parts.slint:27
+msgid "No free file name found."
+msgstr ""
+
+#: main.ts:103 main.ts:108 ui/parts.slint:28
+msgid "Nothing to export. Open a local video file first."
+msgstr ""
+
+#: main.ts:103 main.ts:108 ui/parts.slint:29
+msgid "Clips need a known media duration."
+msgstr ""
+
+#: main.ts:103 main.ts:108 ui/parts.slint:30
+msgid "The selected range is past the end of the media."
+msgstr ""
+
+#: main.ts:103 main.ts:108 ui/parts.slint:31
+msgid "The selected audio track cannot be exported. Choose another track or No Audio."
+msgstr ""
+
+#: main.ts:103 main.ts:108 ui/parts.slint:32
+msgid "The media changed; nothing was started."
+msgstr ""
+
+#: main.ts:103 main.ts:108 ui/parts.slint:33
+msgid "The player is busy. Try again later."
+msgstr ""
+
+#: main.ts:103 main.ts:108 ui/parts.slint:34
+msgid "This video cannot be exported now."
+msgstr ""
+
+#: main.ts:103 main.ts:108 ui/parts.slint:35
+msgid "Could not read the video for the export."
+msgstr ""
+
+#: main.ts:103 main.ts:108 ui/parts.slint:36
+msgid "One export is running and four are queued. Please wait."
+msgstr ""
+
+#: main.ts:103 main.ts:108 ui/parts.slint:37
+msgid "The kept input has expired. Retry with the current video."
+msgstr ""
+
+#: main.ts:103 main.ts:108 ui/parts.slint:38
+msgid "The kept input was released."
+msgstr ""
+
+#: main.ts:103 main.ts:108 ui/parts.slint:39
+msgid "Cancelled."
+msgstr ""
+
+#: main.ts:103 main.ts:108 ui/parts.slint:40
+msgid "Not enough disk space"
+msgstr ""
+
+#: main.ts:103 main.ts:108 ui/parts.slint:41
+msgid "The target file already exists"
+msgstr ""
+
+#: main.ts:103 main.ts:108 ui/parts.slint:42
+msgid "No write permission"
+msgstr ""
+
+#: main.ts:103 main.ts:108 ui/parts.slint:43
+msgid "This media cannot be encoded"
+msgstr ""
+
+#: main.ts:103 main.ts:108 ui/parts.slint:44
+msgid "Export failed"
+msgstr ""
+
+#: main.ts:103 main.ts:108 ui/parts.slint:45
+msgid "This task has no output file yet."
+msgstr ""
+
+#: main.ts:103 main.ts:108 ui/parts.slint:46
+msgid "Could not open the folder."
+msgstr ""
+
+#: main.ts:103 main.ts:108 ui/parts.slint:47
+msgid "The clip folder is unavailable. Please choose it again."
+msgstr ""
+
+#: main.ts:103 main.ts:108 ui/parts.slint:48
+msgid "Clips need a local file."
+msgstr ""
+
+#: main.ts:103 main.ts:108 ui/parts.slint:49
+msgid "Set A and B with A-B Loop (Chapters tab)."
+msgstr ""
+
+#: main.ts:103 main.ts:108 ui/parts.slint:50
+msgid "Nothing has played before the current position yet."
+msgstr ""
+
+#: main.ts:103 main.ts:108 ui/parts.slint:51
+msgid "Fast cut is not possible for this file. Use Precise."
+msgstr ""
+
+#: main.ts:103 main.ts:108 ui/parts.slint:52
+msgid "The bitrate of this file is unknown. Choose another quality."
+msgstr ""
+
+#: main.ts:103 main.ts:108 ui/parts.slint:53
+msgid "The file or folder was moved or deleted."
+msgstr ""
+
+#: main.ts:108 ui/parts.slint:72
+msgid "Export failed: {}"
+msgstr ""
+
+#: main.ts:112 ui/tab.slint:687 ui/tab.slint:1079
+msgid "Clip"
+msgstr ""
+
+#: main.ts:154 ui/tab.slint:585
+msgid "Show in Folder"
+msgstr ""
+
+#: main.ts:155
+msgid "Show in Tab"
+msgstr ""
+
+#: main.ts:264
+msgid "Choose Clip Folder"
+msgstr ""
+
+#: main.ts:266
+msgid "Please choose an existing folder."
+msgstr ""
+
+#: main.ts:269
+msgid "Clip folder: {}"
+msgstr ""
+
+#: main.ts:402
+msgid "Export Clip"
+msgstr ""
+
+#: main.ts:437
+msgid "Exporting the last {} seconds"
+msgstr ""
+
+#: main.ts:471 manifest.json
+msgid "Clip Export"
+msgstr ""
+
+#: main.ts:589 main.ts:796
+msgid "The Clip Export tab could not open."
+msgstr ""
+
+#: main.ts:767
+msgid "Export Clip…"
+msgstr ""
+
+#: main.ts:767 main.ts:768 main.ts:836 ui/tab.slint:992
+msgid "Export"
+msgstr ""
+
+#: main.ts:767 main.ts:768 main.ts:841 ui/tab.slint:779
+msgid "Nothing to export"
+msgstr ""
+
+#: main.ts:768
+msgid "Clip Export Tab"
+msgstr ""
+
+#: main.ts:768
+msgid "Export Clip Range"
+msgstr ""
+
+#: main.ts:768 ui/tab.slint:829
+msgid "Set Clip Start"
+msgstr ""
+
+#: main.ts:768 ui/tab.slint:841
+msgid "Set Clip End"
+msgstr ""
+
+#: main.ts:768
+msgid "Export Tasks…"
+msgstr ""
+
+#: main.ts:768
+msgid "Clip Export Settings…"
+msgstr ""
+
+#: main.ts:768
+msgid "Clip Folder…"
+msgstr ""
+
+#: main.ts:768 ui/tab.slint:1046
+msgid "Open Clip Folder"
+msgstr ""
+
+#: main.ts:768
+msgid "Show Last Clip in Folder"
+msgstr ""
+
+#: main.ts:819
+msgid "Clip start: {}"
+msgstr ""
+
+#: main.ts:824
+msgid "Clip end: {}"
+msgstr ""
+
+#. {} is 10, 30, 60 or 120.
+#: main.ts:835 ui/tab.slint:865
+msgid "Export Last {} Seconds"
+msgstr ""
+
+#: manifest.json
+msgid "Cut part of a video into a new file: a lossless stream copy or a re-encoded MP4"
+msgstr ""
+
+#: manifest.json
+msgid ""
+"Exports part of the local video playing as a new file, from a sidebar tab, Clip Export. Fast copies the streams (lossless, about as fast as the disk, from the keyframe at or before the start); Precise re-encodes an MP4 from the exact frame, with a quality preset or your own settings, and can include the video effects and burned-in subtitles. Set the range by typing it, with Now, from the A-B loop, or export the last 10–120 seconds with one key. The range shows on the seek bar while the tab is open; running exports show their progress, and the last twenty clips stay in Results.\n"
+"Video ▸ Export Clip… opens the tab."
+msgstr ""
+
+#: manifest.json
+msgid "video"
+msgstr ""
+
+#: manifest.json
+msgid "clip"
+msgstr ""
+
+#: manifest.json
+msgid "export"
+msgstr ""
+
+#: model.ts:192 ui/tab.slint:118
+msgid "No Audio"
+msgstr ""
+
+#: model.ts:193 ui/tab.slint:118
+msgid "Current Track"
+msgstr ""
+
+#: model.ts:194
+msgid "Track {} · {}"
+msgstr ""
+
+#: model.ts:194
+msgid "Track {}"
+msgstr ""
+
+#: seams.ts:82
+msgid "Clip exported as {}"
+msgstr ""
+
+#: ui/parts.slint:59
+msgid "Queued"
+msgstr ""
+
+#: ui/parts.slint:60
+msgid "Preparing"
+msgstr ""
+
+#: ui/parts.slint:61
+msgid "Exporting"
+msgstr ""
+
+#: ui/parts.slint:62
+msgid "Cancelling"
+msgstr ""
+
+#: ui/parts.slint:63
+msgid "Completed"
+msgstr ""
+
+#: ui/parts.slint:64
+msgid "Failed"
+msgstr ""
+
+#: ui/parts.slint:65
+msgid "Cancelled"
+msgstr ""
+
+#: ui/parts.slint:71
+msgid "Exported {}"
+msgstr ""
+
+#: ui/parts.slint:73
+msgid "No save location chosen."
+msgstr ""
+
+#: ui/parts.slint:74
+msgid "Export started. Follow it in Results."
+msgstr ""
+
+#: ui/parts.slint:75
+msgid "Restarted."
+msgstr ""
+
+#: ui/parts.slint:81 ui/tab.slint:796
+msgid "Fast"
+msgstr ""
+
+#: ui/parts.slint:82 ui/tab.slint:804
+msgid "Precise"
+msgstr ""
+
+#: ui/parts.slint:88 ui/tab.slint:906 ui/tab.slint:907
+msgid "Same as source"
+msgstr ""
+
+#: ui/parts.slint:89 ui/tab.slint:882 ui/tab.slint:906 ui/tab.slint:907
+msgid "High quality"
+msgstr ""
+
+#: ui/parts.slint:90 ui/tab.slint:906 ui/tab.slint:907
+msgid "Small file"
+msgstr ""
+
+#: ui/parts.slint:91 ui/tab.slint:906
+msgid "Custom"
+msgstr ""
+
+#: ui/parts.slint:97
+msgid "just now"
+msgstr ""
+
+#. {} is a number of minutes (1–59).
+#: ui/parts.slint:99
+msgid "{} min ago"
+msgstr ""
+
+#. {} is a number of hours (1–23).
+#: ui/parts.slint:101
+msgid "{} h ago"
+msgstr ""
+
+#. {} is a number of days.
+#: ui/parts.slint:103
+msgid "{} d ago"
+msgstr ""
+
+#. {} is a number of seconds.
+#. {} is a clip's length in seconds ("3.5").
+#: ui/parts.slint:110 ui/tab.slint:515 ui/tab.slint:1112
+msgid "{} s"
+msgstr ""
+
+#. {0} and {1} are numbers of seconds.
+#: ui/parts.slint:112
+msgid "{0}–{1} s"
+msgstr ""
+
+#. {} is a number of minutes.
+#: ui/parts.slint:115
+msgid "{} min"
+msgstr ""
+
+#. {0} and {1} are numbers of minutes.
+#: ui/parts.slint:117
+msgid "about {0}–{1} min"
+msgstr ""
+
+#. {0} is the time a Fast cut starts at (the keyframe), {1} how many seconds before the typed start.
+#: ui/tab.slint:431
+msgid "{0} (−{1} s)"
+msgstr ""
+
+#: ui/tab.slint:466
+msgid "Default name"
+msgstr ""
+
+#: ui/tab.slint:537
+msgid "File moved or deleted"
+msgstr ""
+
+#: ui/tab.slint:538
+msgid "Failed: {}"
+msgstr ""
+
+#. {} is a time range.
+#: ui/tab.slint:541
+msgid "Queued · {}"
+msgstr ""
+
+#. {} is a percentage.
+#: ui/tab.slint:543 ui/tab.slint:762
+msgid "Finishing…"
+msgstr ""
+
+#. {0} is a percentage, {1} seconds.
+#: ui/tab.slint:546
+msgid "Exporting · {0} % · about {1} s left"
+msgstr ""
+
+#. {} is a percentage.
+#: ui/tab.slint:548
+msgid "Exporting · {} %"
+msgstr ""
+
+#. {0} is a task state (Exporting), {1} the time spent (0:12).
+#. what the closed Advanced rows hold now: an audio choice and a quality.
+#: ui/tab.slint:550 ui/tab.slint:881
+msgid "{0} · {1}"
+msgstr ""
+
+#: ui/tab.slint:552
+msgid "{} MB"
+msgstr ""
+
+#: ui/tab.slint:570 ui/tab.slint:743
+msgid "Cancel"
+msgstr ""
+
+#: ui/tab.slint:575
+msgid "Retry"
+msgstr ""
+
+#: ui/tab.slint:580
+msgid "Open"
+msgstr ""
+
+#: ui/tab.slint:590
+msgid "Remove from List"
+msgstr ""
+
+#: ui/tab.slint:650
+msgid "Fast cut copies the streams: lossless and done in seconds, but a clip can only start on a keyframe."
+msgstr ""
+
+#. {0} and {2} are times, {1} seconds.
+#: ui/tab.slint:654
+msgid "It will start at {0}, {1} s before your start, and end at {2}."
+msgstr ""
+
+#. {0} and {1} are times.
+#: ui/tab.slint:656
+msgid "It will start at {0} and end at {1}."
+msgstr ""
+
+#: ui/tab.slint:657
+msgid "It starts on the keyframe at or before your start."
+msgstr ""
+
+#: ui/tab.slint:658
+msgid "Its streams do not fit in MP4, so it is saved as MKV."
+msgstr ""
+
+#: ui/tab.slint:659
+msgid "Pick Precise to start on the exact frame."
+msgstr ""
+
+#: ui/tab.slint:660
+msgid "Precise re-encodes from the exact frame, and can include video effects and subtitles."
+msgstr ""
+
+#. {0} and {1} are times.
+#: ui/tab.slint:662
+msgid "Precise re-encodes from the exact frame {0} to {1}, and can include video effects and subtitles."
+msgstr ""
+
+#. {0} seconds of media, {1} megabytes ("46" or "55–80"), {2} a time span ("2 s", "about 1–3 min").
+#: ui/tab.slint:667
+msgid "Length {0} s · ≈ {1} MB · ≈ {2}"
+msgstr ""
+
+#. {0} seconds of media, {1} a time span ("2 s", "about 1–3 min").
+#: ui/tab.slint:669
+msgid "Length {0} s · ≈ {1}"
+msgstr ""
+
+#: ui/tab.slint:687
+msgid "Results ({})"
+msgstr ""
+
+#: ui/tab.slint:687
+msgid "Results"
+msgstr ""
+
+#: ui/tab.slint:687
+msgid "Settings"
+msgstr ""
+
+#: ui/tab.slint:697
+msgid "Show or hide this tab"
+msgstr ""
+
+#. {} is the file or folder name.
+#: ui/tab.slint:740
+msgid "Exporting {}"
+msgstr ""
+
+#: ui/tab.slint:763
+msgid "{} %"
+msgstr ""
+
+#. {} is a number of seconds.
+#: ui/tab.slint:765
+msgid "about {} s left"
+msgstr ""
+
+#. {} is the number of exports waiting (1–4).
+#: ui/tab.slint:768
+msgid "+{} queued"
+msgstr ""
+
+#: ui/tab.slint:778
+msgid "This picture is made by a plugin"
+msgstr ""
+
+#: ui/tab.slint:783
+msgid "There is no file to cut."
+msgstr ""
+
+#: ui/tab.slint:784
+msgid "Open a local file to cut clips."
+msgstr ""
+
+#: ui/tab.slint:785
+msgid "Open a local video file to cut clips."
+msgstr ""
+
+#: ui/tab.slint:797
+msgid "lossless"
+msgstr ""
+
+#: ui/tab.slint:797
+msgid "no re-encode · lossless"
+msgstr ""
+
+#: ui/tab.slint:805
+msgid "re-encode"
+msgstr ""
+
+#: ui/tab.slint:805
+msgid "re-encode · any frame"
+msgstr ""
+
+#: ui/tab.slint:821
+msgid "Start"
+msgstr ""
+
+#: ui/tab.slint:829 ui/tab.slint:841
+msgid "Now"
+msgstr ""
+
+#: ui/tab.slint:833
+msgid "End"
+msgstr ""
+
+#: ui/tab.slint:848
+msgid "Use A-B range"
+msgstr ""
+
+#: ui/tab.slint:851
+msgid "Copy the A-B loop into Start and End"
+msgstr ""
+
+#. {0} and {1} are the A and B times of the loop.
+#: ui/tab.slint:853
+msgid "A {0} · B {1}"
+msgstr ""
+
+#. {} is 10, 30, 60 or 120.
+#: ui/tab.slint:859
+msgid "Last {} s"
+msgstr ""
+
+#: ui/tab.slint:878
+msgid "Advanced"
+msgstr ""
+
+#: ui/tab.slint:882 ui/tab.slint:903
+msgid "Same as source (stream copy)"
+msgstr ""
+
+#: ui/tab.slint:893 ui/tab.slint:956
+msgid "Audio"
+msgstr ""
+
+#: ui/tab.slint:902
+msgid "Quality"
+msgstr ""
+
+#: ui/tab.slint:911
+msgid "High quality (H.264 + AAC in MP4)"
+msgstr ""
+
+#: ui/tab.slint:917
+msgid "Resolution"
+msgstr ""
+
+#: ui/tab.slint:919 ui/tab.slint:929
+msgid "Source"
+msgstr ""
+
+#: ui/tab.slint:926
+msgid "Frame rate"
+msgstr ""
+
+#: ui/tab.slint:929
+msgid "{} fps"
+msgstr ""
+
+#: ui/tab.slint:936
+msgid "Source bitrate"
+msgstr ""
+
+#: ui/tab.slint:936
+msgid "Quality number {}"
+msgstr ""
+
+#: ui/tab.slint:947
+msgid "Speed"
+msgstr ""
+
+#: ui/tab.slint:949
+msgid "Faster"
+msgstr ""
+
+#: ui/tab.slint:949
+msgid "Balanced"
+msgstr ""
+
+#: ui/tab.slint:949
+msgid "Smaller"
+msgstr ""
+
+#: ui/tab.slint:959
+msgid "AAC {} kb/s"
+msgstr ""
+
+#: ui/tab.slint:968
+msgid "Reset"
+msgstr ""
+
+#: ui/tab.slint:974
+msgid "Include video effects"
+msgstr ""
+
+#: ui/tab.slint:980
+msgid "Burn in subtitles"
+msgstr ""
+
+#: ui/tab.slint:985
+msgid "Effects and subtitles: Precise only"
+msgstr ""
+
+#: ui/tab.slint:999
+msgid "Export as {} into the clip folder"
+msgstr ""
+
+#: ui/tab.slint:1000
+msgid "Export the range into the clip folder"
+msgstr ""
+
+#: ui/tab.slint:1006
+msgid "Export As…"
+msgstr ""
+
+#: ui/tab.slint:1008
+msgid "Export the range into a file you choose"
+msgstr ""
+
+#: ui/tab.slint:1021
+msgid "Use Precise"
+msgstr ""
+
+#: ui/tab.slint:1038
+msgid "No clips yet."
+msgstr ""
+
+#: ui/tab.slint:1048
+msgid "Clear Finished"
+msgstr ""
+
+#: ui/tab.slint:1065
+msgid "Save to"
+msgstr ""
+
+#: ui/tab.slint:1072
+msgid "Save to the media folder when possible"
+msgstr ""
+
+#: ui/tab.slint:1077
+msgid "File name"
+msgstr ""
+
+#: ui/tab.slint:1086
+msgid "Click a variable to add it to the file name. Existing files are never overwritten: a number is added."
+msgstr ""
+
+#: ui/tab.slint:1106
+msgid "Last N s"
+msgstr ""
+
+#: ui/tab.slint:1109
+msgid "Last clip length"
+msgstr ""

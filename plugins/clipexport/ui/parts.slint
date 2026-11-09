@@ -1,0 +1,119 @@
+// Shared parts of the Clip Export tab: data structs and the words for the plugin's data.
+import { Theme } from "@vestra/theme.slint";
+
+// Plain body text that never wraps.
+export component Note inherits Text {
+    color: Theme.text-list;
+    font-size: Theme.font-body;
+    vertical-alignment: center;
+    overflow: elide;
+}
+
+// A status line as the plugin passes it (main.ts `Status`): data only.
+export struct Status {
+    kind: string,
+    reason: string,
+    raw: string,
+    name: string,
+}
+
+// The tab's words for the plugin's data. The reasons are the same texts as
+// model.ts `REASON` (a test keeps the two lists equal).
+export global Words {
+    // A reason code of the plugin, or (code "") the player's or system's own message.
+    public pure function reason(code: string, raw: string) -> string {
+        if (code == "time") { return @tr("Enter a time such as 1:02:03.450, or seconds."); }
+        if (code == "endBeforeStart") { return @tr("The end must be after the start."); }
+        if (code == "noName") { return @tr("No free file name found."); }
+        if (code == "unexportable") { return @tr("Nothing to export. Open a local video file first."); }
+        if (code == "needDuration") { return @tr("Clips need a known media duration."); }
+        if (code == "outOfRange") { return @tr("The selected range is past the end of the media."); }
+        if (code == "track") { return @tr("The selected audio track cannot be exported. Choose another track or No Audio."); }
+        if (code == "changed") { return @tr("The media changed; nothing was started."); }
+        if (code == "busy") { return @tr("The player is busy. Try again later."); }
+        if (code == "unavailable") { return @tr("This video cannot be exported now."); }
+        if (code == "captureFailed") { return @tr("Could not read the video for the export."); }
+        if (code == "queueFull") { return @tr("One export is running and four are queued. Please wait."); }
+        if (code == "expired") { return @tr("The kept input has expired. Retry with the current video."); }
+        if (code == "released") { return @tr("The kept input was released."); }
+        if (code == "cancelled") { return @tr("Cancelled."); }
+        if (code == "space") { return @tr("Not enough disk space"); }
+        if (code == "exists") { return @tr("The target file already exists"); }
+        if (code == "permission") { return @tr("No write permission"); }
+        if (code == "encoder") { return @tr("This media cannot be encoded"); }
+        if (code == "exportFailed") { return @tr("Export failed"); }
+        if (code == "noOutput") { return @tr("This task has no output file yet."); }
+        if (code == "cannotOpen") { return @tr("Could not open the folder."); }
+        if (code == "folderUnavailable") { return @tr("The clip folder is unavailable. Please choose it again."); }
+        if (code == "needLocal") { return @tr("Clips need a local file."); }
+        if (code == "noLoop") { return @tr("Set A and B with A-B Loop (Chapters tab)."); }
+        if (code == "tooEarly") { return @tr("Nothing has played before the current position yet."); }
+        if (code == "fastImpossible") { return @tr("Fast cut is not possible for this file. Use Precise."); }
+        if (code == "noSourceBitrate") { return @tr("The bitrate of this file is unknown. Choose another quality."); }
+        if (code == "folderGone") { return @tr("The file or folder was moved or deleted."); }
+        return raw;
+    }
+
+    // The name of a task state; another state shows as it is.
+    public pure function state(status: string) -> string {
+        if (status == "queued") { return @tr("Queued"); }
+        if (status == "preparing") { return @tr("Preparing"); }
+        if (status == "running") { return @tr("Exporting"); }
+        if (status == "cancelling") { return @tr("Cancelling"); }
+        if (status == "completed") { return @tr("Completed"); }
+        if (status == "failed") { return @tr("Failed"); }
+        if (status == "cancelled") { return @tr("Cancelled"); }
+        return status;
+    }
+
+    public pure function status(s: Status) -> string {
+        if (s.kind == "error") { return Words.reason(s.reason, s.raw); }
+        if (s.kind == "exported") { return @tr("Exported {}", s.name); }
+        if (s.kind == "clip-failed") { return @tr("Export failed: {}", Words.reason(s.reason, s.raw)); }
+        if (s.kind == "no-destination") { return @tr("No save location chosen."); }
+        if (s.kind == "clip-started") { return @tr("Export started. Follow it in Results."); }
+        if (s.kind == "restarted") { return @tr("Restarted."); }
+        return "";
+    }
+
+    // A clip method's name.
+    public pure function method(m: string) -> string {
+        if (m == "fast") { return @tr("Fast"); }
+        if (m == "precise") { return @tr("Precise"); }
+        return "";
+    }
+
+    // A Precise preset's name.
+    public pure function preset(p: string) -> string {
+        if (p == "source") { return @tr("Same as source"); }
+        if (p == "high") { return @tr("High quality"); }
+        if (p == "small") { return @tr("Small file"); }
+        if (p == "custom") { return @tr("Custom"); }
+        return "";
+    }
+
+    // How long ago, from minutes: "just now", "5 min ago", "3 h ago", "2 d ago".
+    public pure function ago(minutes: int) -> string {
+        if (minutes < 1) { return @tr("just now"); }
+        // TRANSLATORS: {} is a number of minutes (1–59).
+        if (minutes < 60) { return @tr("{} min ago", minutes); }
+        // TRANSLATORS: {} is a number of hours (1–23).
+        if (minutes < 1440) { return @tr("{} h ago", floor(minutes / 60)); }
+        // TRANSLATORS: {} is a number of days.
+        return @tr("{} d ago", floor(minutes / 1440));
+    }
+
+    // A time span from seconds: "2 s", "4–30 s", "about 1–3 min", "2 min".
+    public pure function span(low: int, high: int) -> string {
+        if (high < 90) {
+            // TRANSLATORS: {} is a number of seconds.
+            if (low == high) { return @tr("{} s", low); }
+            // TRANSLATORS: {0} and {1} are numbers of seconds.
+            return @tr("{0}–{1} s", low, high);
+        }
+        // TRANSLATORS: {} is a number of minutes.
+        if (round(low / 60) == round(high / 60)) { return @tr("{} min", max(1, round(high / 60))); }
+        // TRANSLATORS: {0} and {1} are numbers of minutes.
+        return @tr("about {0}–{1} min", max(1, round(low / 60)), max(1, round(high / 60)));
+    }
+}
