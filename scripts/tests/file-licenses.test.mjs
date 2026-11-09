@@ -3,11 +3,13 @@
 // shaders/SOURCES.txt with a matching SHA256 and the license texts next to
 // them; refused in code, npm dependencies and anywhere else. Synthetic
 // plugins in a temporary directory; the package check on hand-made .vxp
-// files.
+// files; the upstream comparison (scripts/verify-shader-sources.mjs) with a
+// stand-in download. fixtures/licenses/ holds the FSF's LGPL-3.0 and
+// GPL-3.0 texts as published on gnu.org.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { after, before, test } from "node:test";
@@ -15,7 +17,11 @@ import { dependencyProblems } from "../lib/dependencies.mjs";
 import {
   copyleftNotice,
   fileLicenseProblems,
+  LICENSE_TEXTS,
   parseSources,
+  scanned,
+  upstreamUrl,
+  verifyUpstream,
 } from "../lib/file-licenses.mjs";
 
 const repository = resolve(import.meta.dirname, "../..");
@@ -40,22 +46,14 @@ const RAVU = `// Copyright (C) 2017-2021 Bin Jin
 //!HOOK LUMA
 vec4 hook() { return LUMA_tex(LUMA_pos); }
 `;
-// Stand-ins with the passages the check recognises the full texts by.
-const LGPL_TEXT = `                   GNU LESSER GENERAL PUBLIC LICENSE
-                       Version 3, 29 June 2007
-  4. Combined Works.
-  6. Revised Versions of the GNU Lesser General Public License.
-`;
-const GPL_TEXT = `                    GNU GENERAL PUBLIC LICENSE
-                       Version 3, 29 June 2007
-                       TERMS AND CONDITIONS
-                     END OF TERMS AND CONDITIONS
-`;
+const texts = join(import.meta.dirname, "fixtures/licenses");
+const LGPL_TEXT = await readFile(join(texts, "COPYING.LESSER"), "utf8");
+const GPL_TEXT = await readFile(join(texts, "COPYING"), "utf8");
 const sha256 = (text) => createHash("sha256").update(text).digest("hex");
 const record = (file, text, extra = "") => `File: ${file}
 Repository: https://github.com/bjin/mpv-prescalers
 Commit: ${"a".repeat(40)}
-Path: compute/${file.slice(file.lastIndexOf("/") + 1)}
+Path: gather/${file.slice(file.lastIndexOf("/") + 1)}
 SHA256: ${sha256(text)}
 License: LGPL-3.0-or-later
 ${extra}`;
@@ -123,7 +121,7 @@ test("refused: a modified LGPL shader (SHA256 mismatch)", async () => {
       "shaders/ravu/ravu-lite-r3.hook": RAVU.replace("r3", "r3 tweaked"),
     }),
   );
-  assert.match(problems, /SHA256 is [0-9a-f]{64}, not the upstream file's/);
+  assert.match(problems, /SHA256 is [0-9a-f]{64}, not the one in the record/);
   assert.match(problems, /an LGPL shader needs a record/);
 });
 
@@ -212,7 +210,7 @@ test("refused: unlisted or misplaced LGPL shaders, GPL shaders, missing license 
         "shaders/ravu/COPYING.LESSER": "LGPL, see gnu.org\n",
       }),
     ),
-    /COPYING\.LESSER is not the full LGPL-3\.0 text/,
+    /COPYING\.LESSER is not the FSF's LGPL-3\.0 text byte for byte/,
   );
   assert.match(
     await problemsOf(
@@ -356,7 +354,7 @@ test("the SHA256 is of the bytes as committed: CRLF stays CRLF", async () => {
         "shaders/ravu/ravu-lite-r3.hook": RAVU,
       }),
     ),
-    /SHA256 is [0-9a-f]{64}, not the upstream file's/,
+    /SHA256 is [0-9a-f]{64}, not the one in the record/,
   );
 });
 
@@ -439,5 +437,218 @@ test("refused: both Path and Asset, or neither", async () => {
       await assetPlugin(assetRecord(ASSET).replace(/^Asset: .*\n/m, "")),
     ),
     /exactly one of Path .* or Asset/,
+  );
+});
+
+test("the license texts are the FSF's files, pinned by SHA256", () => {
+  assert.equal(sha256(LGPL_TEXT), LICENSE_TEXTS["COPYING.LESSER"].sha256);
+  assert.equal(sha256(GPL_TEXT), LICENSE_TEXTS.COPYING.sha256);
+});
+
+test("refused: a near copy of a license text (snippets, other line endings)", async () => {
+  for (const text of [
+    "GNU LESSER GENERAL PUBLIC LICENSE\nVersion 3, 29 June 2007\n4. Combined Works.\n6. Revised Versions of the GNU Lesser General Public License.\n",
+    LGPL_TEXT.replaceAll("\n", "\r\n"),
+  ])
+    assert.match(
+      await problemsOf(
+        await ravuPlugin({ "shaders/ravu/COPYING.LESSER": text }),
+      ),
+      /COPYING\.LESSER is not the FSF's LGPL-3\.0 text byte for byte/,
+    );
+});
+
+test("only README.md, CHANGELOG.md, SOURCES.txt, locales/ and license texts under shaders/ or licenses/ are not scanned", () => {
+  for (const path of [
+    "README.md",
+    "CHANGELOG.md",
+    "shaders/SOURCES.txt",
+    "locales/zh-Hans.po",
+    "shaders/ravu/COPYING",
+    "shaders/ravu/COPYING.LESSER",
+    "shaders/x/LICENSE",
+    "shaders/x/LICENSE.txt",
+    "licenses/a/LICENSE-MIT",
+    "licenses/a/license.md",
+  ])
+    assert.equal(scanned(path), false, path);
+  for (const path of [
+    "license.ts",
+    "notice.js",
+    "shaders/copying.glsl",
+    "shaders/ravu/license.ts",
+    "licenses/a/notice.js",
+    "LICENSE",
+    "assets/COPYING",
+    "DESIGN.md",
+    "assets/ravu.md",
+    "ravu.txt",
+    "shaders/ravu/notes.txt",
+    "assets/icon.png",
+  ])
+    assert.equal(scanned(path), true, path);
+});
+
+test("refused: an LGPL file named like a license text or documentation", async () => {
+  const modified = RAVU.replace("r3", "r3 tweaked");
+  for (const [path, pattern] of [
+    ["license.ts", /license\.ts: has an LGPL license notice/],
+    ["notice.js", /notice\.js: has an LGPL license notice/],
+    [
+      "shaders/ravu/copying.glsl",
+      /copying\.glsl: an LGPL shader needs a record/,
+    ],
+    ["ravu.txt", /ravu\.txt: has an LGPL license notice/],
+    ["assets/ravu.md", /assets\/ravu\.md: has an LGPL license notice/],
+    ["shaders/ravu/ravu.txt", /shaders\/ravu\/ravu\.txt: has an LGPL/],
+  ])
+    assert.match(
+      await problemsOf(await ravuPlugin({ [path]: modified })),
+      pattern,
+      path,
+    );
+  // A license text outside shaders/ and licenses/ is read like any file.
+  assert.match(
+    await problemsOf(await plugin({ "assets/COPYING": GPL_TEXT })),
+    // (the GPL text also names the Lesser GPL)
+    /assets\/COPYING: has an? (LGPL|GPL\/AGPL) license notice/,
+  );
+  assert.equal(
+    await problemsOf(
+      await plugin({
+        "locales/zh-Hans.po": 'msgid "GNU Lesser General Public License"\n',
+      }),
+    ),
+    "",
+  );
+});
+
+test("refused: a Repository other than github.com or gist.github.com, a gist Asset, a bad Path", async () => {
+  for (const repository of [
+    "https://gitlab.com/someone/shaders",
+    "https://github.com/someone",
+    "https://github.com.evil.example/a/b",
+    "http://github.com/bjin/mpv-prescalers",
+  ])
+    assert.match(
+      await problemsOf(
+        await ravuPlugin({
+          "shaders/SOURCES.txt": record("ravu/ravu-lite-r3.hook", RAVU).replace(
+            "https://github.com/bjin/mpv-prescalers",
+            repository,
+          ),
+        }),
+      ),
+      /Repository must be https:\/\/github\.com\/<owner>\/<repo> or https:\/\/gist\.github\.com/,
+      repository,
+    );
+  assert.match(
+    await problemsOf(
+      await assetPlugin(
+        assetRecord(
+          "https://gist.github.com/igv/abc/releases/download/1/x.glsl",
+        ).replace(
+          "https://github.com/igv/FSRCNN-TensorFlow",
+          "https://gist.github.com/igv/0123abcd",
+        ),
+      ),
+    ),
+    /a gist has no release assets/,
+  );
+  assert.match(
+    await problemsOf(
+      await ravuPlugin({
+        "shaders/SOURCES.txt": record("ravu/ravu-lite-r3.hook", RAVU).replace(
+          "Path: gather/",
+          "Path: ../",
+        ),
+      }),
+    ),
+    /Path must be a relative path in the repository/,
+  );
+});
+
+test("upstream URLs: raw file at the commit, release asset, gist revision", () => {
+  const commit = "a".repeat(40);
+  assert.equal(
+    upstreamUrl({
+      repository: "https://github.com/bjin/mpv-prescalers",
+      commit,
+      path: "gather/ravu-lite-ar-r4.hook",
+    }),
+    `https://raw.githubusercontent.com/bjin/mpv-prescalers/${commit}/gather/ravu-lite-ar-r4.hook`,
+  );
+  assert.equal(
+    upstreamUrl({
+      repository: "https://github.com/igv/FSRCNN-TensorFlow",
+      commit,
+      asset: ASSET,
+    }),
+    ASSET,
+  );
+  assert.equal(
+    upstreamUrl({
+      repository:
+        "https://gist.github.com/igv/a8e2fbd31a3cd1e1d8d1b4b7c88e7b29",
+      commit,
+      path: "SSimDownscaler.glsl",
+    }),
+    `https://gist.githubusercontent.com/igv/a8e2fbd31a3cd1e1d8d1b4b7c88e7b29/raw/${commit}/SSimDownscaler.glsl`,
+  );
+  assert.equal(
+    upstreamUrl({ repository: "https://gitlab.com/a/b", commit, path: "x" }),
+    undefined,
+  );
+});
+
+test("upstream: a file changed together with its SHA256 passes offline and fails against upstream", async () => {
+  const tweaked = RAVU.replace("r3", "r3 tweaked");
+  const directory = await ravuPlugin({
+    "shaders/SOURCES.txt": record("ravu/ravu-lite-r3.hook", tweaked),
+    "shaders/ravu/ravu-lite-r3.hook": tweaked,
+  });
+  assert.equal(await problemsOf(directory), "");
+  const urls = [];
+  const upstream = async (url) => {
+    urls.push(url);
+    return sha256(RAVU);
+  };
+  const { checked, problems } = await verifyUpstream(directory, "p", {
+    download: upstream,
+  });
+  assert.equal(checked, 1);
+  assert.deepEqual(urls, [
+    `https://raw.githubusercontent.com/bjin/mpv-prescalers/${"a".repeat(40)}/gather/ravu-lite-r3.hook`,
+  ]);
+  assert.match(
+    problems.join("\n"),
+    /the upstream file .* has SHA256 [0-9a-f]{64}, the record \(and the shipped file\) [0-9a-f]{64}: the shipped shader is not the upstream file/,
+  );
+  // Unmodified: the same upstream bytes.
+  const clean = await verifyUpstream(await ravuPlugin(), "p", {
+    download: upstream,
+  });
+  assert.deepEqual(clean.problems, []);
+  // A failed download fails the check.
+  const offline = await verifyUpstream(await ravuPlugin(), "p", {
+    download: async () => {
+      throw new Error("HTTP 404");
+    },
+  });
+  assert.match(
+    offline.problems.join("\n"),
+    /could not download the upstream file .*: HTTP 404/,
+  );
+});
+
+test("package check: an LGPL notice in a packed license.js is refused", async () => {
+  const result = await checkPackage({
+    ...packedFiles,
+    "license.js": RAVU,
+  });
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /license\.js: carries a GPL\/AGPL\/LGPL license notice/,
   );
 });

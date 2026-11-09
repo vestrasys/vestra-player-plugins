@@ -129,10 +129,11 @@ conditions (`scripts/lib/file-licenses.mjs`):
 
 | Rule | Checked by |
 | --- | --- |
-| The file is a shader (`.glsl`, `.hook`) under the plugin's `shaders/`, shipped **unmodified** from a named upstream commit, as a **separate file**: never concatenated into, embedded in or derived inside the plugin's code | `registry`, `build`, the package check (no packed file other than a listed shader, the bundle included, may carry a GPL, AGPL or LGPL notice) |
-| `shaders/SOURCES.txt` has a record for it (below: the upstream commit, and the path in it or the release asset) whose `SHA256` equals the file's bytes; a modified file (hash mismatch) is refused | `registry`, `build`, the package check (the listed files and `SOURCES.txt` ship byte for byte) |
-| Its license is `LGPL-3.0-only` or `LGPL-3.0-or-later`, and the full license texts lie in the same directory: `COPYING.LESSER` (LGPL-3.0) and `COPYING` (GPL-3.0, which LGPL-3.0 incorporates), both packed | `registry`, `build`, the package check |
-| LGPL anywhere else is refused: in code (`.ts`, `.js`, `.slint`, ... with an LGPL notice), in a shader outside `shaders/` or not listed, and in npm dependencies ([npm dependencies](#npm-dependencies)). GPL and AGPL notices are refused in every file | `registry`, `build`, the package check |
+| The file is a shader (`.glsl`, `.hook`) under the plugin's `shaders/`, shipped as a **separate file**: never concatenated into, embedded in or derived inside the plugin's code | `registry`, `build`, the package check (no packed file other than a listed shader, the bundle included, may carry a GPL, AGPL or LGPL notice) |
+| `shaders/SOURCES.txt` has a record for it (below) whose `SHA256` equals the file's bytes as committed. Offline this proves only that the file and its record agree | `registry`, `build`, the package check (the listed files and `SOURCES.txt` ship byte for byte) |
+| The file is the upstream file, **unmodified**: CI downloads each record's upstream bytes (`raw.githubusercontent.com/<owner>/<repo>/<commit>/<path>`, the release asset, or the gist's raw file at the revision) and compares their SHA256 with the record's. A record whose `Repository` is not `https://github.com/<owner>/<repo>` or `https://gist.github.com/<owner>/<id>` is refused (by the offline checks too) | CI: `node scripts/verify-shader-sources.mjs plugins/<name>` in [`_plugin.yml`](.github/workflows/_plugin.yml) (needs the network; not part of the local checks) |
+| Its license is `LGPL-3.0-only` or `LGPL-3.0-or-later`, and the full license texts lie in the same directory, byte for byte the FSF's files (pinned by SHA256): `COPYING.LESSER` = [lgpl-3.0.txt](https://www.gnu.org/licenses/lgpl-3.0.txt) (`e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118`), `COPYING` = [gpl-3.0.txt](https://www.gnu.org/licenses/gpl-3.0.txt), which LGPL-3.0 incorporates (`3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986`); both packed | `registry`, `build`, the package check |
+| LGPL anywhere else is refused: in code (any file with an LGPL notice, whatever its name or extension: `license.ts`, `notice.js`, `ravu.txt`, `assets/ravu.md` are all read), in a shader outside `shaders/` or not listed, and in npm dependencies ([npm dependencies](#npm-dependencies)). GPL and AGPL notices are refused in every file. Not read for notices: `README.md`, `CHANGELOG.md`, `shaders/SOURCES.txt`, `locales/`, and license texts under `shaders/` or `licenses/` (`LICENSE`, `LICENCE`, `COPYING`, `NOTICE`, with no extension, `.txt` or `.md`, `COPYING.LESSER`, or a `-<name>` suffix such as `LICENSE-MIT`) | `registry`, `build`, the package check |
 
 A record in `shaders/SOURCES.txt` (the rest of the file is free text for
 readers; `File:` starts a line, a blank line ends the record):
@@ -141,15 +142,17 @@ readers; `File:` starts a line, a blank line ends the record):
 File: ravu/ravu-lite-ar-r4.hook
 Repository: https://github.com/bjin/mpv-prescalers
 Commit: <full 40-character commit id>
-Path: compute/ravu-lite-ar-r4.hook
+Path: gather/ravu-lite-ar-r4.hook
 SHA256: <sha256 of the file, lowercase hex>
 License: LGPL-3.0-or-later
 ```
 
 `File` is relative to `shaders/`; `Path` is the file's path in the
-upstream repository at `Commit`. A shader published only as a release asset
-(in no commit, such as FSRCNNX on `igv/FSRCNN-TensorFlow` release 1.1)
-has `Asset:` instead of `Path:`: the asset's https URL under the record's
+upstream repository at `Commit`. For a gist, `Repository` is
+`https://gist.github.com/<owner>/<id>`, `Commit` the gist revision and
+`Path` the file name. A shader published only as a release asset (in no
+commit, such as FSRCNNX on `igv/FSRCNN-TensorFlow` release 1.1) has
+`Asset:` instead of `Path:`: the asset's https URL under the record's
 repository, `<Repository>/releases/download/<tag>/<file>`, with `Commit`
 the commit that tag points to. A record has exactly one of `Path` and
 `Asset`; an asset URL outside the repository is refused.
@@ -162,19 +165,37 @@ Asset: https://github.com/igv/FSRCNN-TensorFlow/releases/download/1.1/FSRCNNX_x2
 SHA256: <sha256 of the asset, lowercase hex>
 License: LGPL-3.0-or-later
 ```
- The SHA256 is of the file's bytes as
-committed, which must be the upstream bytes: `.gitattributes` stores
-`plugins/*/shaders/**/*.glsl`, `*.hook`, `COPYING` and `COPYING.LESSER`
-with `-text` (no line-ending conversion), so an upstream file with CRLF
-endings keeps them and its hash. Copy the file as downloaded (for example
-from `https://raw.githubusercontent.com/<owner>/<repo>/<commit>/<path>`),
-not through an editor that rewrites line endings. An LGPL file someone modified would
+
+The SHA256 is of the file's bytes as committed, which must be the
+upstream bytes: `.gitattributes` stores `plugins/*/shaders/**/*.glsl`,
+`*.hook`, `COPYING` and `COPYING.LESSER` with `-text` (no line-ending
+conversion), so an upstream file with CRLF endings keeps them and its
+hash. Copy the file as downloaded (from the URL above), not through an
+editor that rewrites line endings. An LGPL file someone modified would
 itself stay LGPL and would have to be marked as modified; hosted plugins
 ship upstream files only, so no modified LGPL file is accepted here. The
 plugin's manifest `license` stays its own code's license; its README names
-the bundled LGPL shaders. Documentation (`.md`, `.txt`), translations and
-license texts are not scanned for notices. Tests:
-`scripts/tests/file-licenses.test.mjs`.
+the bundled LGPL shaders.
+
+**What review must still catch.** The checks match license notices as
+text, so a reviewer reads every pull request that adds or changes a
+shader or `SOURCES.txt` for what they cannot see:
+
+- a copyleft file whose notice was stripped or reworded (it then passes as
+  an unlisted, permissive file);
+- shorthand such as "LGPLv3", "(L)GPL" or a link to gnu.org instead of the
+  full notice, which the text match does not recognise;
+- shader text embedded in code, for example a GLSL string in a `.ts` file
+  without its header;
+- a `License` field that does not match the file's own notice or the
+  upstream repository's license (the field is not cross-checked against
+  the file);
+- that `Repository` and `Commit` are really the shader's upstream (CI
+  proves the bytes match that commit, not that the commit is the original
+  author's).
+
+Tests: `scripts/tests/file-licenses.test.mjs` (the FSF texts it uses are in
+`scripts/tests/fixtures/licenses/`).
 
 ## Layout
 
@@ -190,7 +211,7 @@ scripts/          plugin.mjs (runs the SDK's vestra-plugin CLI), plugin-deps.mjs
                   lib/dependencies.mjs (npm dependencies of plugins), lib/file-licenses.mjs
                   (licenses of plugin files, LGPL shaders), check-boundaries.mjs,
                   check-portability.mjs, check-registry.mjs, the CI helpers
-                  ci-plugins.mjs and check-package.mjs, and the publishing scripts:
+                  ci-plugins.mjs, check-package.mjs and verify-shader-sources.mjs, and the publishing scripts:
                   query-releases.mjs, build-index.mjs, publish-releases.mjs,
                   sign-index.mjs, verify-index.mjs, generate-signing-key.mjs
 .github/workflows ci.yml (checks), publish.yml (Releases, index, Pages),

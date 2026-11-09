@@ -9,14 +9,17 @@
  *   License", "GNU Library General Public License" or an SPDX identifier
  *   naming LGPL) is accepted only as a shader (`.glsl`, `.hook`) under the
  *   plugin's `shaders/` directory that has a record in `shaders/SOURCES.txt`
- *   whose SHA256 equals the file's bytes: shipped as upstream published it,
- *   as a separate file, never edited, concatenated or derived.
+ *   whose SHA256 equals the file's bytes, as a separate file, never
+ *   concatenated into or embedded in code. Offline this proves only that
+ *   the file and its record agree; that the record names the upstream bytes
+ *   (unmodified) is checked by downloading them in CI
+ *   (scripts/verify-shader-sources.mjs, `upstreamUrl`).
  *   The hash is of the bytes as committed: .gitattributes stores shaders
  *   and their COPYING files under each plugin's shaders/ with -text, so
  *   upstream CRLF endings survive checkout.
- * - Next to every LGPL shader (same directory) lie the license texts:
- *   `COPYING.LESSER` (LGPL-3.0) and `COPYING` (GPL-3.0, which LGPL-3.0
- *   incorporates).
+ * - Next to every LGPL shader (same directory) lie the license texts, the
+ *   FSF's files byte for byte (pinned by SHA256): `COPYING.LESSER`
+ *   (LGPL-3.0) and `COPYING` (GPL-3.0, which LGPL-3.0 incorporates).
  * - Any other GPL/AGPL notice (or an LGPL one anywhere else: code, a shader
  *   outside shaders/ or not listed) is refused.
  * - Every record in SOURCES.txt is checked, LGPL or not: the file exists,
@@ -27,7 +30,7 @@
  *   File: ravu/ravu-lite-ar-r4.hook
  *   Repository: https://github.com/bjin/mpv-prescalers
  *   Commit: <full commit id>
- *   Path: compute/ravu-lite-ar-r4.hook
+ *   Path: gather/ravu-lite-ar-r4.hook
  *   SHA256: <sha256 of the file, lowercase hex>
  *   License: LGPL-3.0-or-later
  *
@@ -35,12 +38,21 @@
  * A file that is only a release asset (in no commit) has
  * `Asset: <Repository>/releases/download/<tag>/<file>` instead of `Path:`,
  * with `Commit:` the commit the tag points to; exactly one of the two.
+ * Repository is https://github.com/<owner>/<repo> or
+ * https://gist.github.com/<owner>/<id> (Commit: the gist revision, Path: the
+ * file name; no Asset).
  *
- * Not scanned: documentation and translations (.md, .txt, .po, .pot),
- * license texts (LICENSE*, LICENCE*, COPYING*, NOTICE*), images, and the
- * npm dependencies' licenses/, node_modules/ and dist/ (the npm rules in
- * scripts/lib/dependencies.mjs cover those; the package check scans the
- * built package).
+ * Every file is scanned for notices, whatever its extension, except
+ * README.md, CHANGELOG.md, shaders/SOURCES.txt, locales/, and license texts
+ * under shaders/ or licenses/ (LICENSE, LICENCE, COPYING, NOTICE, with no
+ * extension, .txt or .md, COPYING.LESSER, or a "-<name>" suffix such as
+ * LICENSE-MIT). node_modules/ and dist/ are not read here (the npm rules in
+ * scripts/lib/dependencies.mjs cover them; the package check scans the
+ * built package with the same rule).
+ *
+ * Review still has to catch what text matching cannot: a stripped notice,
+ * shorthand such as "LGPLv3", shader text pasted into a string in code, and
+ * a License field that differs from the file's notice.
  */
 import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
@@ -54,10 +66,12 @@ export const SHADER_LGPL_LICENSES = new Set([
   "LGPL-3.0-or-later",
 ]);
 const SHADER_FILE = /\.(glsl|hook)$/i;
-const LICENSE_TEXT = /^(licen[cs]e|copying|notice)([.-].*)?$/i;
-const NOT_SCANNED =
-  /\.(md|txt|po|pot|png|jpe?g|gif|webp|ico|svg|woff2?|ttf|otf)$/i;
-const SKIPPED_DIRECTORIES = new Set(["node_modules", "dist", "licenses"]);
+const LICENSE_TEXT =
+  /^(licen[cs]e|copying|notice)(\.lesser|-[a-z0-9-]+)?(\.(txt|md))?$/i;
+const NOT_SCANNED_PATHS = new Set(["README.md", "CHANGELOG.md", SOURCES]);
+const SKIPPED_DIRECTORIES = new Set(["node_modules", "dist"]);
+const GITHUB = /^https:\/\/github\.com\/[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/;
+const GIST = /^https:\/\/gist\.github\.com\/[A-Za-z0-9-]+\/[0-9a-f]+$/;
 
 // Words may be split across comment lines ("GNU Lesser General\n// Public").
 const GAP = String.raw`[\s/*#;!-]+`;
@@ -86,20 +100,21 @@ export function copyleftNotice(text) {
   return null;
 }
 
-/** The LGPL-3.0 and GPL-3.0 texts, recognised by their fixed passages. */
-const TEXTS = {
-  "COPYING.LESSER": [
-    "GNU LESSER GENERAL PUBLIC LICENSE",
-    "Version 3, 29 June 2007",
-    "4. Combined Works.",
-    "6. Revised Versions of the GNU Lesser General Public License.",
-  ],
-  COPYING: [
-    "GNU GENERAL PUBLIC LICENSE",
-    "Version 3, 29 June 2007",
-    "TERMS AND CONDITIONS",
-    "END OF TERMS AND CONDITIONS",
-  ],
+/**
+ * SHA256 of the FSF's texts: https://www.gnu.org/licenses/lgpl-3.0.txt and
+ * https://www.gnu.org/licenses/gpl-3.0.txt (LF line endings).
+ */
+export const LICENSE_TEXTS = {
+  "COPYING.LESSER": {
+    name: "LGPL-3.0",
+    url: "https://www.gnu.org/licenses/lgpl-3.0.txt",
+    sha256: "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118",
+  },
+  COPYING: {
+    name: "GPL-3.0",
+    url: "https://www.gnu.org/licenses/gpl-3.0.txt",
+    sha256: "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+  },
 };
 
 const FIELDS = {
@@ -171,10 +186,33 @@ async function walk(directory, base = directory) {
   return out;
 }
 
-/** Whether a package or plugin path is read for license notices. */
+/** Whether a package or plugin path (relative, with /) is read for notices. */
 export function scanned(path) {
+  if (NOT_SCANNED_PATHS.has(path) || path.startsWith("locales/")) return false;
   const name = path.slice(path.lastIndexOf("/") + 1);
-  return !LICENSE_TEXT.test(name) && !NOT_SCANNED.test(name);
+  return !(
+    (path.startsWith(`${SHADERS}/`) || path.startsWith("licenses/")) &&
+    LICENSE_TEXT.test(name)
+  );
+}
+
+/**
+ * Where CI downloads a record's upstream bytes: raw.githubusercontent.com at
+ * the commit, the release asset, or the gist's raw file at the revision.
+ * undefined for a record that names none of them.
+ */
+export function upstreamUrl(record) {
+  const segments = (path) => path.split("/").map(encodeURIComponent).join("/");
+  if (GITHUB.test(record.repository ?? "")) {
+    if (record.asset) return record.asset;
+    const [owner, repo] = record.repository.split("/").slice(3);
+    return `https://raw.githubusercontent.com/${owner}/${repo.replace(/\.git$/, "")}/${record.commit}/${segments(record.path)}`;
+  }
+  if (GIST.test(record.repository ?? "")) {
+    const [owner, id] = record.repository.split("/").slice(3);
+    return `https://gist.githubusercontent.com/${owner}/${id}/raw/${record.commit}/${segments(record.path)}`;
+  }
+  return undefined;
 }
 
 /**
@@ -245,8 +283,25 @@ export async function shaderSources(directory, label) {
           `Asset must be a release asset of the Repository: ${releases}<tag>/<file>`,
         );
     }
-    if (record.repository && !/^https:\/\/\S+$/.test(record.repository))
-      where("Repository must be an https URL");
+    if (
+      record.repository &&
+      !GITHUB.test(record.repository) &&
+      !GIST.test(record.repository)
+    )
+      where(
+        "Repository must be https://github.com/<owner>/<repo> or https://gist.github.com/<owner>/<id>",
+      );
+    if (record.asset && GIST.test(record.repository ?? ""))
+      where("a gist has no release assets: use Path (the file name)");
+    if (
+      record.path &&
+      (record.path.startsWith("/") ||
+        record.path.includes("\\") ||
+        record.path
+          .split("/")
+          .some((part) => !part || part === "." || part === ".."))
+    )
+      where("Path must be a relative path in the repository, with /");
     if (record.commit && !/^([0-9a-f]{40}|[0-9a-f]{64})$/.test(record.commit))
       where("Commit must be a full commit id (lowercase hex)");
     if (record.sha256 && !/^[0-9a-f]{64}$/.test(record.sha256))
@@ -261,7 +316,7 @@ export async function shaderSources(directory, label) {
     }
     if (record.sha256 && sha256(bytes) !== record.sha256)
       where(
-        `the file's SHA256 is ${sha256(bytes)}, not the upstream file's: hosted plugins ship upstream files unmodified`,
+        `the file's SHA256 is ${sha256(bytes)}, not the one in the record: hosted plugins ship upstream files unmodified`,
       );
     record.lgpl = copyleftNotice(bytes.toString("utf8")) === "lgpl";
     if (record.lgpl && !SHADER_LGPL_LICENSES.has(record.license))
@@ -307,23 +362,57 @@ export async function fileLicenseProblems(directory, label) {
     textDirectories.add(posix.dirname(file));
   }
   for (const folder of textDirectories)
-    for (const [name, passages] of Object.entries(TEXTS)) {
+    for (const [name, text] of Object.entries(LICENSE_TEXTS)) {
       const path = `${folder}/${name}`;
-      let text;
+      let bytes;
       try {
-        text = await readFile(join(directory, ...path.split("/")), "utf8");
+        bytes = await readFile(join(directory, ...path.split("/")));
       } catch (error) {
         if (error.code !== "ENOENT") throw error;
         problem(
-          `${path} is missing: an LGPL shader ships with the full ${name === "COPYING" ? "GPL-3.0" : "LGPL-3.0"} text next to it`,
+          `${path} is missing: an LGPL shader ships with the full ${text.name} text next to it (${text.url})`,
         );
         continue;
       }
-      const flat = text.replace(/\s+/g, " ");
-      if (!passages.every((passage) => flat.includes(passage)))
+      if (sha256(bytes) !== text.sha256)
         problem(
-          `${path} is not the full ${name === "COPYING" ? "GPL-3.0" : "LGPL-3.0"} text`,
+          `${path} is not the FSF's ${text.name} text byte for byte (${text.url}, sha256 ${text.sha256})`,
         );
     }
   return problems;
+}
+
+/**
+ * Compares each SOURCES.txt record's SHA256 with its upstream file's:
+ * `download(url)` returns the downloaded bytes' SHA256 (or throws). Records
+ * the offline rules refuse are reported as such and not downloaded.
+ * { checked, problems }.
+ */
+export async function verifyUpstream(directory, label, { download }) {
+  const { records, problems } = await shaderSources(directory, label);
+  let checked = 0;
+  for (const record of records) {
+    if (!record.ok) continue;
+    const where = `${label}: ${SOURCES}:${record.line}: ${record.file}`;
+    const url = upstreamUrl(record);
+    if (!url) {
+      problems.push(`${where}: no upstream URL for ${record.repository}`);
+      continue;
+    }
+    let upstream;
+    try {
+      upstream = await download(url);
+    } catch (error) {
+      problems.push(
+        `${where}: could not download the upstream file ${url}: ${error.message}`,
+      );
+      continue;
+    }
+    checked++;
+    if (upstream !== record.sha256)
+      problems.push(
+        `${where}: the upstream file ${url} has SHA256 ${upstream}, the record (and the shipped file) ${record.sha256}: the shipped shader is not the upstream file; ship it unmodified from that commit or asset`,
+      );
+  }
+  return { checked, problems };
 }
