@@ -129,4 +129,4 @@ Plugins run without a sandbox, so review is the main defence: pull requests that
 
 ## License
 
-The repository, including the plugins in `plugins/`, is [Apache-2.0](LICENSE). Registered plugins keep their own licenses.
+The repository, including the plugins in `plugins/`, is [Apache-2.0](LICENSE). Registered plugins keep their own licenses. Third-party files bundled in a plugin keep theirs: unmodified LGPL-3.0 mpv shaders (for example RAVU) may ship as separate files under a plugin's `shaders/`, with the LGPL-3.0 and GPL-3.0 texts and a source note; LGPL code and npm packages are not accepted ([rules](CONTRIBUTING.md#third-party-files-and-licenses)).

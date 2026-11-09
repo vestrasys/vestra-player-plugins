@@ -51,7 +51,9 @@ the publish pipeline, the index format and the signing key.
   `tests/`, a short user-facing `README.md` (what it does, how to use it,
   requirements, limits; shown in the store) and `CHANGELOG.md`. A plugin
   with npm dependencies also has `package.json`, `package-lock.json`,
-  `dependency-inventory.json` and `licenses/` ([npm dependencies](#npm-dependencies)).
+  `dependency-inventory.json` and `licenses/` ([npm dependencies](#npm-dependencies));
+  a plugin with third-party shaders has `shaders/` with `SOURCES.txt`
+  ([Third-party files and licenses](#third-party-files-and-licenses)).
 - The manifest carries the display fields (`name`, `author`, `punchline`,
   `description`, `tags`, optionally `icon`, `sourceUrl`, `license`) and
   `minPlayerVersion` when the plugin needs API newer than player 0.1.
@@ -81,7 +83,7 @@ signs the index users trust, so every dependency is held to these rules
 | `package-lock.json` is committed (lockfileVersion 2 or 3) and matches `package.json`; installs are `npm ci --ignore-scripts`, so no install script ever runs | `registry`, `build` |
 | Every locked package comes from `https://registry.npmjs.org/` with a sha512 `integrity`: no git, file, link or URL sources | `registry`, `build` |
 | **No native code.** A locked package must not have an install script (`hasInstallScript`, which npm also sets for `binding.gyp`) or an `os`/`cpu`/`libc` restriction (prebuilt binaries), and must not be optional. After the install, no package may contain `binding.gyp`, `.node`, `.dll`, `.dylib`, `.so`, `.exe`, `.a`, `.lib`, `.o` or `.obj` files, declare `gypfile` or an install script in its own `package.json` (the lockfile is the author's file and is checked against what was installed) | `registry`, `build`; the package check refuses such files in the `.vxp` too |
-| **Licenses.** Every locked package's license (the SPDX expression in the lockfile, which must equal the package's own `package.json`) is satisfied by the allowlist: `MIT`, `MIT-0`, `ISC`, `0BSD`, `BSD-2-Clause`, `BSD-3-Clause`, `Apache-2.0`, `Zlib`, `BlueOak-1.0.0`, `BSL-1.0`, `CC0-1.0`, `Unlicense` (`A OR B` needs one side, `A AND B` both). GPL, AGPL, LGPL, MPL and anything unlisted are refused; adding a license to the list needs a maintainer's review | `registry`, `build` |
+| **Licenses.** Every locked package's license (the SPDX expression in the lockfile, which must equal the package's own `package.json`) is satisfied by the allowlist: `MIT`, `MIT-0`, `ISC`, `0BSD`, `BSD-2-Clause`, `BSD-3-Clause`, `Apache-2.0`, `Zlib`, `BlueOak-1.0.0`, `BSL-1.0`, `CC0-1.0`, `Unlicense` (`A OR B` needs one side, `A AND B` both). GPL, AGPL, LGPL, MPL and anything unlisted are refused (an LGPL npm package too: LGPL is allowed only for [vendored shader files](#third-party-files-and-licenses)); adding a license to the list needs a maintainer's review | `registry`, `build` |
 | **License texts ship in the package.** `dependency-inventory.json` lists every locked package (`name`, `version`, `license`, `licenseFiles`), and `licenses/<name>/` (a scoped `@scope/pkg` as `@scope__pkg`) holds its `LICENSE*`/`LICENCE*`/`COPYING*`/`NOTICE*` files byte for byte as the package ships them. For a package that ships none, put its license text from its source repository into `licenses/<name>/LICENSE` yourself; the reviewer checks it | `registry` (inventory against the lockfile), `build` (against the installed files), the package check (inside the `.vxp`) |
 | **Size.** A package (every plugin's, with or without dependencies) is at most 4 MiB as a `.vxp` and 16 MiB unpacked | `build`, `pack`, the package check |
 | Code imports only Node built-ins, the SDK, its own files and the packages in its own `dependencies` (nothing from the repository's `node_modules`) | `boundaries` |
@@ -114,6 +116,87 @@ and a native one that are refused) are in
 `scripts/tests/dependencies.test.mjs` through build, pack, the package
 check and the index build; those tests download from the npm registry.
 
+### Third-party files and licenses
+
+A plugin's own code (its `.ts`, `.slint` and the bundle built from them)
+keeps the plugin's permissive license. Third-party files that are not npm
+packages, such as mpv GLSL shaders, ship as separate files with their
+license texts and a source note. Permissive ones (MIT, BSD, the
+Unlicense, ...) follow the plugin's own conventions (see
+`plugins/shaderupscale/shaders/SOURCES.txt`). **LGPL-licensed mpv shaders**
+(for example RAVU, FSRCNNX, SSimDownscaler) are allowed only under these
+conditions (`scripts/lib/file-licenses.mjs`):
+
+| Rule | Checked by |
+| --- | --- |
+| The file is a shader (`.glsl`, `.hook`) under the plugin's `shaders/`, shipped as a **separate file**: never concatenated into, embedded in or derived inside the plugin's code | `registry`, `build`, the package check (no packed file other than a listed shader, the bundle included, may carry a GPL, AGPL or LGPL notice) |
+| `shaders/SOURCES.txt` has a record for it (below) whose `SHA256` equals the file's bytes as committed. Offline this proves only that the file and its record agree | `registry`, `build`, the package check (the listed files and `SOURCES.txt` ship byte for byte) |
+| The file is the upstream file, **unmodified**: CI downloads each record's upstream bytes (`raw.githubusercontent.com/<owner>/<repo>/<commit>/<path>`, the release asset, or the gist's raw file at the revision) and compares their SHA256 with the record's. A record whose `Repository` is not `https://github.com/<owner>/<repo>` or `https://gist.github.com/<owner>/<id>` is refused (by the offline checks too) | CI: `node scripts/verify-shader-sources.mjs plugins/<name>` in [`_plugin.yml`](.github/workflows/_plugin.yml) (needs the network; not part of the local checks) |
+| Its license is `LGPL-3.0-only` or `LGPL-3.0-or-later`, and the full license texts lie in the same directory, byte for byte the FSF's files (pinned by SHA256): `COPYING.LESSER` = [lgpl-3.0.txt](https://www.gnu.org/licenses/lgpl-3.0.txt) (`e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118`), `COPYING` = [gpl-3.0.txt](https://www.gnu.org/licenses/gpl-3.0.txt), which LGPL-3.0 incorporates (`3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986`); both packed | `registry`, `build`, the package check |
+| LGPL anywhere else is refused: in code (any file with an LGPL notice, whatever its name or extension: `license.ts`, `notice.js`, `ravu.txt`, `assets/ravu.md` are all read), in a shader outside `shaders/` or not listed, and in npm dependencies ([npm dependencies](#npm-dependencies)). GPL and AGPL notices are refused in every file. Not read for notices: `README.md`, `CHANGELOG.md`, `shaders/SOURCES.txt`, `locales/`, and license texts under `shaders/` or `licenses/` (`LICENSE`, `LICENCE`, `COPYING`, `NOTICE`, with no extension, `.txt` or `.md`, `COPYING.LESSER`, or a `-<name>` suffix such as `LICENSE-MIT`) | `registry`, `build`, the package check |
+
+A record in `shaders/SOURCES.txt` (the rest of the file is free text for
+readers; `File:` starts a line, a blank line ends the record):
+
+```text
+File: ravu/ravu-lite-ar-r4.hook
+Repository: https://github.com/bjin/mpv-prescalers
+Commit: <full 40-character commit id>
+Path: gather/ravu-lite-ar-r4.hook
+SHA256: <sha256 of the file, lowercase hex>
+License: LGPL-3.0-or-later
+```
+
+`File` is relative to `shaders/`; `Path` is the file's path in the
+upstream repository at `Commit`. For a gist, `Repository` is
+`https://gist.github.com/<owner>/<id>`, `Commit` the gist revision and
+`Path` the file name. A shader published only as a release asset (in no
+commit, such as FSRCNNX on `igv/FSRCNN-TensorFlow` release 1.1) has
+`Asset:` instead of `Path:`: the asset's https URL under the record's
+repository, `<Repository>/releases/download/<tag>/<file>`, with `Commit`
+the commit that tag points to. A record has exactly one of `Path` and
+`Asset`; an asset URL outside the repository is refused.
+
+```text
+File: fsrcnnx/FSRCNNX_x2_8-0-4-1.glsl
+Repository: https://github.com/igv/FSRCNN-TensorFlow
+Commit: <full commit id the tag 1.1 points to>
+Asset: https://github.com/igv/FSRCNN-TensorFlow/releases/download/1.1/FSRCNNX_x2_8-0-4-1.glsl
+SHA256: <sha256 of the asset, lowercase hex>
+License: LGPL-3.0-or-later
+```
+
+The SHA256 is of the file's bytes as committed, which must be the
+upstream bytes: `.gitattributes` stores `plugins/*/shaders/**/*.glsl`,
+`*.hook`, `COPYING` and `COPYING.LESSER` with `-text` (no line-ending
+conversion), so an upstream file with CRLF endings keeps them and its
+hash. Copy the file as downloaded (from the URL above), not through an
+editor that rewrites line endings. An LGPL file someone modified would
+itself stay LGPL and would have to be marked as modified; hosted plugins
+ship upstream files only, so no modified LGPL file is accepted here. The
+plugin's manifest `license` stays its own code's license; its README names
+the bundled LGPL shaders.
+
+**What review must still catch.** The checks match license notices as
+text, so a reviewer reads every pull request that adds or changes a
+shader or `SOURCES.txt` for what they cannot see:
+
+- a copyleft file whose notice was stripped or reworded (it then passes as
+  an unlisted, permissive file);
+- shorthand such as "LGPLv3", "(L)GPL" or a link to gnu.org instead of the
+  full notice, which the text match does not recognise;
+- shader text embedded in code, for example a GLSL string in a `.ts` file
+  without its header;
+- a `License` field that does not match the file's own notice or the
+  upstream repository's license (the field is not cross-checked against
+  the file);
+- that `Repository` and `Commit` are really the shader's upstream (CI
+  proves the bytes match that commit, not that the commit is the original
+  author's).
+
+Tests: `scripts/tests/file-licenses.test.mjs` (the FSF texts it uses are in
+`scripts/tests/fixtures/licenses/`).
+
 ## Layout
 
 ```text
@@ -125,9 +208,10 @@ revoked.json      revoked plugin versions, copied into the index
 keys/             the trusted public keys of the index signature (every *.pub.pem;
                   normally just index-signing.pub.pem)
 scripts/          plugin.mjs (runs the SDK's vestra-plugin CLI), plugin-deps.mjs and
-                  lib/dependencies.mjs (npm dependencies of plugins), check-boundaries.mjs,
+                  lib/dependencies.mjs (npm dependencies of plugins), lib/file-licenses.mjs
+                  (licenses of plugin files, LGPL shaders), check-boundaries.mjs,
                   check-portability.mjs, check-registry.mjs, the CI helpers
-                  ci-plugins.mjs and check-package.mjs, and the publishing scripts:
+                  ci-plugins.mjs, check-package.mjs and verify-shader-sources.mjs, and the publishing scripts:
                   query-releases.mjs, build-index.mjs, publish-releases.mjs,
                   sign-index.mjs, verify-index.mjs, generate-signing-key.mjs
 .github/workflows ci.yml (checks), publish.yml (Releases, index, Pages),

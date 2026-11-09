@@ -35,6 +35,10 @@
  *   package that ships none needs its license text in licenses/ (from its
  *   source repository; reviewed by a maintainer).
  *
+ * The plugin's own files (`dependencyProblems` too): no GPL/AGPL notices,
+ * LGPL only in unmodified mpv shaders listed in shaders/SOURCES.txt
+ * (scripts/lib/file-licenses.mjs).
+ *
  * Size (`sizeProblems`, every plugin): the .vxp at most PACKAGE_LIMIT bytes,
  * its files at most UNPACKED_LIMIT bytes together.
  */
@@ -52,11 +56,13 @@ import {
 } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { isDeepStrictEqual } from "node:util";
+import { fileLicenseProblems } from "./file-licenses.mjs";
 
 /**
  * Licenses a bundled dependency may have: permissive licenses that can be
  * redistributed inside an Apache-2.0 plugin with their notices. Copyleft
- * (GPL, AGPL, LGPL, MPL, EUPL, SSPL, ...) and anything unlisted is refused;
+ * (GPL, AGPL, LGPL, MPL, EUPL, SSPL, ...) and anything unlisted is refused
+ * (LGPL is allowed only for vendored shader files: file-licenses.mjs);
  * adding a license here needs a maintainer's review.
  */
 export const ALLOWED_LICENSES = new Set([
@@ -213,11 +219,20 @@ function expectedInventory(lock) {
 }
 
 /**
- * Static problems of one plugin directory's npm dependencies (no install).
- * `label` prefixes each message (`plugins/<name>`). `inventory: false` skips
- * dependency-inventory.json and licenses/ (written from an install).
+ * Static problems of one plugin directory (no install): the licenses of its
+ * own files (scripts/lib/file-licenses.mjs: LGPL only for unmodified, listed
+ * shaders) and its npm dependencies. `label` prefixes each message
+ * (`plugins/<name>`). `inventory: false` skips dependency-inventory.json and
+ * licenses/ (written from an install).
  */
-export async function dependencyProblems(
+export async function dependencyProblems(directory, label, options) {
+  return [
+    ...(await fileLicenseProblems(directory, label)),
+    ...(await npmDependencyProblems(directory, label, options)),
+  ];
+}
+
+async function npmDependencyProblems(
   directory,
   label,
   { inventory: checkInventory = true } = {},

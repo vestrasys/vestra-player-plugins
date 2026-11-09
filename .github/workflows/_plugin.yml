@@ -68,6 +68,14 @@ jobs:
       # (scripts/lib/dependencies.mjs). scripts/plugin.mjs repeats the checks.
       - name: Plugin npm dependencies
         run: node scripts/plugin-deps.mjs install "$PLUGIN"
+      # Shaders listed in shaders/SOURCES.txt are the upstream files: each
+      # record's upstream (raw file at the commit, release asset, or gist
+      # revision on github.com) is downloaded and its SHA256 compared; the
+      # offline rules only check the file against its record. Once per
+      # plugin, on Ubuntu.
+      - name: Vendored shaders against upstream
+        if: matrix.os == 'ubuntu-latest'
+        run: node scripts/verify-shader-sources.mjs "plugins/$PLUGIN"
       # Every command also checks manifest.json against the player's rules.
       - name: Type check
         run: node scripts/plugin.mjs check "$PLUGIN"

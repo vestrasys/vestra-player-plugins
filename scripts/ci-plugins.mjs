@@ -29,6 +29,8 @@ const SHARED = [
   "scripts/plugins.mjs",
   "scripts/plugin-deps.mjs",
   "scripts/lib/dependencies.mjs",
+  "scripts/lib/file-licenses.mjs",
+  "scripts/verify-shader-sources.mjs",
   "scripts/lib/bundle.mjs",
   "scripts/ci-plugins.mjs",
   "scripts/check-package.mjs",
