@@ -82,7 +82,9 @@ test("a signature verifies only the exact bytes it signed", () => {
 });
 
 test("only Ed25519 keys are accepted, and a bad key is not echoed", () => {
-  const rsa = generateKeyPairSync("rsa", { modulusLength: 1024 });
+  // Any key that is not Ed25519; 2048 bits, so the test does not model a
+  // weak key.
+  const rsa = generateKeyPairSync("rsa", { modulusLength: 2048 });
   assert.throws(
     () => privateKeyFromPem(pem(rsa.privateKey, "pkcs8")),
     /not Ed25519/,

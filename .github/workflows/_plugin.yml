@@ -54,10 +54,14 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: ${{ inputs.cache && 'npm' || '' }}
       - run: npm ci
+      # Deliberately unpinned (weekly.yml: "latest"): this run tests the
+      # plugins against the SDK as published, not as locked. No install
+      # scripts run. The default ("locked") installs from package-lock.json
+      # only. (Scorecard PinnedDependencies reports this step; intended.)
       - name: Install @vestra-player/sdk@${{ inputs.sdk }} (not committed)
         if: inputs.sdk != 'locked'
         run: |
-          npm install --no-save --no-audit --no-fund "@vestra-player/sdk@$SDK"
+          npm install --no-save --ignore-scripts --no-audit --no-fund "@vestra-player/sdk@$SDK"
           npm ls @vestra-player/sdk
       # The plugin's own npm dependencies, if any: lockfile required,
       # npm ci --ignore-scripts, no native code, allowed licenses

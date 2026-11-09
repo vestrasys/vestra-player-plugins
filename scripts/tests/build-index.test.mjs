@@ -7,6 +7,7 @@ import {
   readdir,
   readFile,
   rm,
+  symlink,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -620,6 +621,26 @@ test("the signing job checks generated, revoked and the store assets", async () 
   built = await fresh();
   built.index.plugins[0].readmeUrl = `${pagesUrl}assets/someone.demo/1.1.0/./README.md`;
   await expectProblem(built, /readmeUrl must be under/);
+
+  // A symbolic link in the site is not read, even to a matching file.
+  built = await fresh();
+  const readme = join(built.out, "site/assets/someone.demo/1.1.0/README.md");
+  const real = join(built.out, "README.md");
+  await cp(readme, real);
+  await rm(readme);
+  let linked = true;
+  try {
+    await symlink(real, readme, "file");
+  } catch (error) {
+    // Windows without the symlink privilege (developer mode).
+    if (error.code !== "EPERM") throw error;
+    linked = false;
+  }
+  if (linked)
+    await expectProblem(
+      built,
+      /site\/assets\/someone\.demo\/1\.1\.0\/README\.md: not a regular file/,
+    );
 
   // Nothing on Pages but index.json and the referenced assets.
   built = await fresh();
