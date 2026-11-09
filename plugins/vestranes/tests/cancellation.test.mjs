@@ -51,7 +51,7 @@ for (const [boundary, matches] of Object.entries(pending)) {
 
   test(`a newer ROM while the ${boundary} is pending wins; the old one never starts`, async () => {
     const files = await roms();
-    const { host, stop, window, status, blocked, reached } = await held(matches);
+    const { host, stop, window, status, shows, blocked, reached } = await held(matches);
     try {
       host.dialogAnswers.push([files.blue]);
       await host.command('nes.load').run();
@@ -59,7 +59,7 @@ for (const [boundary, matches] of Object.entries(pending)) {
       host.dialogAnswers.push([files.red]);
       window().emit('load-rom');
       blocked.open();
-      await until(() => status() === running('red.nes') && window().props.running === true, 'newer ROM');
+      await shows(running('red.nes'), { running: true });
       const live = () => [...host.producers.values()].filter(p => !p.released);
       await until(() => host.producers.size === 2 && live().length === 1, 'old producer released');
       await host.settle(50);
@@ -124,7 +124,7 @@ test('a picker failure (another dialog open) is shown, and the next Load works',
   const files = await roms();
   const { HostError } = await import('@vestra-player/sdk/testing');
   let busy = true;
-  const { host, stop, window, status } = await start(async (method, params, next) => {
+  const { host, stop, status, shows } = await start(async (method, params, next) => {
     if (method === 'dialogs.open' && busy) {
       busy = false;
       throw new HostError('busy', 'Another dialog is open.');
@@ -136,7 +136,7 @@ test('a picker failure (another dialog open) is shown, and the next Load works',
     await until(() => status().startsWith('Error: '), 'busy');
     host.dialogAnswers.push([files.blue]);
     await host.command('nes.load').run();
-    await until(() => status() === running('blue.nes') && window().props.running === true, 'ROM');
+    await shows(running('blue.nes'), { running: true });
   } finally {
     await stop();
     await files.remove();
