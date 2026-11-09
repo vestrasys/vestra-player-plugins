@@ -357,6 +357,10 @@ test("normalizes video forms and rejects lookalike domains, credentials, playlis
     assert.equal(normalizeYouTubeUrl(value, zh.error), "https://www.youtube.com/watch?v=BaW_jenozKc");
   for (const value of [
     "https://youtube.com.evil/watch?v=BaW_jenozKc",
+    "https://evil-youtube.com/watch?v=BaW_jenozKc",
+    "https://www.youtube.com.evil.example/watch?v=BaW_jenozKc",
+    "https://evil.example/www.youtube.com/watch?v=BaW_jenozKc",
+    "https://evil.example/?u=https://youtu.be/BaW_jenozKc",
     "https://u:p@youtube.com/watch?v=BaW_jenozKc",
     "https://youtube.com/playlist?list=abc",
     "$(touch /tmp/oops)",
@@ -449,7 +453,11 @@ test("activation: the panel in the sidebar, the resolver, the menu entries and t
   try {
     const declaration = host.resolvers.get("youtube") as { schemes: string[]; hosts: string[] };
     assert.deepEqual(declaration.schemes, ["https"]);
-    assert.ok(declaration.hosts.includes("youtu.be") && declaration.hosts.includes("www.youtube.com"));
+    // The exact allowlist: the host matches whole hostnames, never substrings.
+    assert.deepEqual(
+      [...declaration.hosts].sort(),
+      ["m.youtube.com", "music.youtube.com", "www.youtube.com", "youtu.be", "youtube.com"],
+    );
     const panel = host.mounted();
     assert.equal(panel.slot, "sidebar");
     assert.equal(panel.component, "TubeSidebar");
