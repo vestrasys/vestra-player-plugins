@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import { HostError, startPlugin, TestHost } from '@vestra-player/sdk/testing';
 import activate from '../main.ts';
 import { controllerRom, homebrew } from './homebrew.mjs';
@@ -84,7 +85,22 @@ export async function start(intercept, host = new TestHost(), { retire = true, l
   const window = () => host.windows.get('nes') ?? assert.fail('window not open');
   /** The status line as the user reads it. */
   const status = () => statusText(host, window().props);
-  return { ...started, window, status };
+  /**
+   * Wait until the window shows `text` with `props` (e.g. `{ running: false }`).
+   * Every prop reaches the host as a `ui.set` of its own, so the status line
+   * changing does not mean the props written with it have arrived: wait for
+   * all of them together, never assert one after waiting for another.
+   */
+  const shows = async (text, props = {}) => {
+    const shown = () => ({ status: status(), ...Object.fromEntries(Object.keys(props).map(key => [key, window().props[key]])) });
+    const expected = { status: text, ...props };
+    try {
+      await until(() => isDeepStrictEqual(shown(), expected), text);
+    } catch {
+      assert.deepEqual(shown(), expected); // the diff of what the window shows
+    }
+  };
+  return { ...started, window, status, shows };
 }
 
 /** Poll until `predicate()` holds (stream pacing runs on timers). */

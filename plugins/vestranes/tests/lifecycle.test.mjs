@@ -41,7 +41,7 @@ test('menu entries and window are registered; no file resolver, no drop provider
 
 test('in Simplified Chinese: 游戏 ▸ VestraNES, the picker and the window', async () => {
   const files = await roms();
-  const { host, plugin, stop, window, status } = await start(undefined, undefined, { locale: 'zh-Hans' });
+  const { host, plugin, stop, window, status, shows } = await start(undefined, undefined, { locale: 'zh-Hans' });
   try {
     assert.equal(plugin.i18n.locale, 'zh-Hans');
     assert.deepEqual([...host.commands.values()].map(c => c.display.path), [
@@ -82,8 +82,7 @@ test('in Simplified Chinese: 游戏 ▸ VestraNES, the picker and the window', a
 
     host.dialogAnswers.push([files.missing]);
     await host.command('nes.load').run();
-    await until(() => status() === '错误：找不到 ROM 文件。', 'missing ROM');
-    assert.equal(window().props.running, false);
+    await shows('错误：找不到 ROM 文件。', { running: false });
   } finally {
     await stop();
     await files.remove();
@@ -93,7 +92,7 @@ test('in Simplified Chinese: 游戏 ▸ VestraNES, the picker and the window', a
 test('the menu entry and the window button pick a ROM and play it as a generated stream', async () => {
   const files = await roms();
   const statuses = [];
-  const { host, stop, window, status } = await start();
+  const { host, stop, window, status, shows } = await start();
   try {
     await load(host, window, files.blue);
     assert.equal(status(), running('blue.nes'));
@@ -115,7 +114,7 @@ test('the menu entry and the window button pick a ROM and play it as a generated
     const watch = setInterval(() => statuses.push(status()), 1);
     host.dialogAnswers.push([files.upper]);
     window().emit('load-rom');
-    await until(() => status() === running('GAME.NES') && window().props.running === true, 'button ROM');
+    await shows(running('GAME.NES'), { running: true });
     await until(() => producer.released, 'the first stream released');
     await host.settle(30);
     clearInterval(watch);
@@ -279,7 +278,7 @@ test('stream failures keep the plugin wording', async () => {
   const files = await roms();
   let health = 'deviceLost';
   let lost = null;
-  const { host, stop, window, status } = await start(async (method, params, next) => {
+  const { host, stop, window, shows } = await start(async (method, params, next) => {
     const result = await next();
     if (method !== 'producer.state') return result;
     return { ...result, health: result.active ? result.health : health, error: lost };
@@ -288,15 +287,13 @@ test('stream failures keep the plugin wording', async () => {
     // The audio device is not ready: the start fails, nothing plays.
     host.dialogAnswers.push([files.blue]);
     await host.command('nes.load').run();
-    await until(() => status() === 'Error: the audio device is not ready.', 'device status');
+    await shows('Error: the audio device is not ready.', { running: false });
     await until(() => host.producers.get(1).released, 'released');
-    assert.equal(window().props.running, false);
 
     health = 'ok';
     await load(host, window, files.blue);
     lost = 'audio output lost';
-    await until(() => status() === 'Emulator stopped: audio output lost', 'stream error');
-    await until(() => window().props.running === false, 'running false'); // props are written one by one
+    await shows('Emulator stopped: audio output lost', { running: false });
     await until(() => host.producers.get(2).released, 'released');
   } finally {
     await stop();
@@ -306,15 +303,14 @@ test('stream failures keep the plugin wording', async () => {
 
 test('a running game whose frame fails shows the plugin reason in the window, translated', async () => {
   const files = await roms();
-  const { host, stop, window, status } = await start(undefined, undefined, { locale: 'zh-Hans' });
+  const { host, stop, window, shows } = await start(undefined, undefined, { locale: 'zh-Hans' });
   const frame = NesCore.prototype.frame;
   try {
     await load(host, window, files.blue);
     NesCore.prototype.frame = function () {
       throw this.error('The emulator produced invalid audio data.');
     };
-    await until(() => status() === '模拟器已停止：模拟器音频数据无效。', 'halted');
-    assert.equal(window().props.running, false);
+    await shows('模拟器已停止：模拟器音频数据无效。', { running: false });
   } finally {
     NesCore.prototype.frame = frame;
     await stop();
@@ -385,7 +381,7 @@ test('window keys reach the running game only; focus loss, Stop, closing the win
 test('a ROM too slow to emulate is stopped with its reason (the watchdog), in both languages', async () => {
   for (const locale of ['en', 'zh-Hans']) {
     const files = await roms();
-    const { host, stop, window, status } = await start(undefined, undefined, locale === 'en' ? {} : { locale });
+    const { host, stop, window, shows } = await start(undefined, undefined, locale === 'en' ? {} : { locale });
     const now = timing.now;
     try {
       await load(host, window, files.blue);
@@ -394,8 +390,7 @@ test('a ROM too slow to emulate is stopped with its reason (the watchdog), in bo
       const expected = locale === 'en'
         ? 'Emulator stopped: This ROM is too slow to emulate (it may be damaged).'
         : '模拟器已停止：这个 ROM 模拟起来太慢（文件可能已损坏）。';
-      await until(() => status() === expected, 'watchdog');
-      await until(() => window().props.running === false, 'running false');
+      await shows(expected, { running: false });
       await until(() => host.producers.get(1).released, 'released');
     } finally {
       timing.now = now;
