@@ -1215,7 +1215,7 @@ test("Simplified Chinese: the menu, the window and the OSD are translated", asyn
     window.emit("pickA", 1);
     window.emit("toggleDownscale", true);
     await eventually(host, () => assert.equal(window.props.status, "开：FSRCNNX x2 8＋色度＋缩小＋锐化"));
-    assert.equal(window.props["param-a-label"], "网络");
+    assert.equal(window.props["param-a-label"], "模型规模");
   } finally {
     await stop();
   }

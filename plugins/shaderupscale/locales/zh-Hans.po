@@ -153,7 +153,7 @@ msgstr "开：播放视频时生效"
 
 #: main.ts:371
 msgid "Network"
-msgstr "网络"
+msgstr "模型规模"
 
 #: main.ts:373
 msgid "x2 16 (demanding): the most detail, fast GPU"

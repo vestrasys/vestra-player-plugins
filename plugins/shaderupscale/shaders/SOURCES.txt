@@ -97,8 +97,19 @@ ravu/
       (OpenGL; rgba16f texture): branch master, path
       gather/ravu-lite-ar-r3.hook
   The gather/ variants use textureGather (GLSL 4.00), upstream's first
-  recommendation for luma prescalers; no compute shaders. The generator of
-  these files is on the repository's source branch.
+  recommendation for luma prescalers; no compute shaders.
+  Generator: both files are generated. Their source is the repository's
+    source branch, commit d5d4300948cb98a6803b9c4731c7f1ee60821446
+    (2023-09-13, "antiringing: change shifted range to [0.1,1.1]"), the
+    last commit that changed the RAVU-lite generator: gen.sh (the
+    ravu-lite-ar loop, with --use-gather and --anti-ringing),
+    ravu-lite.py, userhook.py and weights/ravu-lite_weights-r3.py. These
+    files are the same at the source commits the two shipped files were
+    generated from (by the matching commit messages: master b3f0a59 from
+    source 6b9ba842a05a113a75e5a2ac3d0a7f00f21ffbae, rgba16hf 8d12e5a from
+    source ac47303a5bde2d4a74e4852ee3b7ba34f83854b6). master is the output
+    of "gen.sh" (float format float16gl, rgba16f), rgba16hf that of
+    "gen.sh vulkan" (float16vk, rgba16hf).
 
 fsrcnnx/
   FSRCNNX x2, 16 and 8 feature channels, by igv, since 0.3.0
@@ -109,8 +120,13 @@ fsrcnnx/
     Texts: fsrcnnx/COPYING.LESSER and fsrcnnx/COPYING.
   Version: release 1.1 (2017-11-09), release assets
   Files: FSRCNNX_x2_16-0-4-1.glsl, FSRCNNX_x2_8-0-4-1.glsl (unchanged).
-  Their source (the trained weights and the script that writes the shader)
-  is in the repository at that tag.
+  Generator: both files are generated from trained networks. Their source
+    is the repository at the tag 1.1, commit
+    1aa11ab0e1fc12741fdb84cef31da5619a478670: the training code (main.py,
+    model.py, FSRCNN.py, utils.py) and gen.py, which writes the shader
+    from the trained weights. The trained weights themselves are release
+    1.1's asset checkpoints_params.7z
+    (https://github.com/igv/FSRCNN-TensorFlow/releases/download/1.1/checkpoints_params.7z).
 
 ssim-downscaler/
   SSimDownscaler, by igv, since 0.3.0
