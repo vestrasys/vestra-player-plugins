@@ -624,9 +624,13 @@ export async function prepareDependencies(directory, label) {
     .update(await readFile(join(directory, "package-lock.json")))
     .digest("hex");
   const stampFile = join(directory, "node_modules", STAMP);
-  const installed = existsSync(stampFile)
-    ? (await readFile(stampFile, "utf8")).trim()
-    : "";
+  // Read without checking first: no window between a check and the use.
+  let installed = "";
+  try {
+    installed = (await readFile(stampFile, "utf8")).trim();
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
   if (installed !== stamp) {
     console.log(`${label}: npm ci --ignore-scripts`);
     const result = npm(

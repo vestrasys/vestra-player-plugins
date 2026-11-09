@@ -200,8 +200,11 @@ test("package.json: no devDependencies, install scripts or unbundled dependencie
 
 test("locked packages: registry sources, no scripts, no native builds, allowed licenses", async () => {
   const cases = [
-    [{ resolved: "git+https://github.com/a/a.git" }, /registry.npmjs.org/],
-    [{ resolved: "file:../a" }, /registry.npmjs.org/],
+    [
+      { resolved: "git+https://github.com/a/a.git" },
+      /no git, file or URL sources/,
+    ],
+    [{ resolved: "file:../a" }, /no git, file or URL sources/],
     [{ integrity: "sha1-AAAA" }, /sha512 integrity/],
     [{ hasInstallScript: true }, /install script/],
     [{ os: ["win32"] }, /prebuilt native binary/],
@@ -357,6 +360,12 @@ test("native: a lockfile that hides the install script is still refused once ins
   await writeFile(lockFile, JSON.stringify(lock, null, 2));
 
   assert.deepEqual(await prepareDependencies(directory, "hidden"), []);
+  // Installed from this package.json and lockfile (the stamp matches): a
+  // second call does not run npm ci again, which would remove this file.
+  const marker = join(directory, "node_modules", "marker");
+  await writeFile(marker, "");
+  assert.deepEqual(await prepareDependencies(directory, "hidden"), []);
+  assert.equal(await readFile(marker, "utf8"), "");
   const { problems } = await installedProblems(directory, "hidden");
   const text = problems.join("\n");
   assert.match(text, /bufferutil: has an install script "install"/);
