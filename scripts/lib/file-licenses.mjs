@@ -51,9 +51,9 @@
  * the package check scans the built package with the same rule).
  *
  * mpv loads a shader whatever its file name, so an exempt file must not be
- * one (`exemptFileProblem`): it holds no shader directive line (//!HOOK,
- * //!DESC, ...), and every COPYING or COPYING.LESSER under shaders/ is the
- * FSF's text (pinned by SHA256), with or without an LGPL shader next to it.
+ * one (`exemptFileProblem`): it holds no "//!" anywhere, and every COPYING
+ * or COPYING.LESSER under shaders/ is the FSF's text (pinned by SHA256),
+ * with or without an LGPL shader next to it.
  *
  * Review still has to catch what text matching cannot: a stripped notice,
  * shorthand such as "LGPLv3", shader text pasted into a string in code, and
@@ -75,9 +75,10 @@ const LICENSE_TEXT =
   /^(licen[cs]e|copying|notice)(\.lesser|-[a-z0-9-]+)?(\.(txt|md))?$/i;
 const NOT_SCANNED_PATHS = new Set(["README.md", "CHANGELOG.md", SOURCES]);
 const LOCALE_FILE = /^locales\/.*\.pot?$/i;
-/** A line mpv reads as a shader header. */
-const SHADER_DIRECTIVE =
-  /^[ \t]*\/\/![ \t]*(HOOK|DESC|BIND|SAVE|TEXTURE|BUFFER|PARAM|COMPUTE)\b/im;
+// mpv (libplacebo's custom_mpv.c) starts a shader at the first "//!"
+// anywhere in the text and reads its keywords by prefix ("//!HOOKMAIN"); a
+// text without "//!" has no headers and does not load.
+const SHADER_HEADER = "//!";
 const SKIPPED_DIRECTORIES = new Set(["node_modules", "dist"]);
 // The repository name is never "." or ".." (also with ".git"): the URL would
 // name another path.
@@ -210,7 +211,7 @@ export function scanned(path) {
 
 /**
  * Why a file that is not scanned for notices (`scanned`) is refused, or
- * undefined: it holds a shader directive line, or it is a COPYING or
+ * undefined: it holds "//!" anywhere, or it is a COPYING or
  * COPYING.LESSER under shaders/ that is not the FSF's text byte for byte.
  */
 export function exemptFileProblem(path, bytes) {
@@ -219,8 +220,8 @@ export function exemptFileProblem(path, bytes) {
   const text = LICENSE_TEXTS[name];
   if (path.startsWith(`${SHADERS}/`) && text && sha256(bytes) !== text.sha256)
     return `${path} is not the FSF's ${text.name} text byte for byte (${text.url}, sha256 ${text.sha256})`;
-  if (SHADER_DIRECTIVE.test(bytes.toString("utf8")))
-    return `${path}: has a shader directive line (//!HOOK, //!DESC, ...); mpv loads a shader whatever the file's name, so documentation, license and locale files may not hold one`;
+  if (bytes.includes(SHADER_HEADER))
+    return `${path}: contains "//!", which starts a shader header; mpv loads a shader whatever the file's name, so documentation, license and locale files may not contain it`;
   return undefined;
 }
 
@@ -396,7 +397,9 @@ export async function fileLicenseProblems(directory, label) {
     for (const [name, text] of Object.entries(LICENSE_TEXTS)) {
       const path = `${folder}/${name}`;
       // Its bytes are checked with every other COPYING under shaders/
-      // (exemptFileProblem).
+      // (exemptFileProblem). walk() skips symbolic links, so a linked
+      // COPYING counts as missing here; `npm run boundaries` refuses
+      // symbolic links in a plugin outright.
       try {
         await readFile(join(directory, ...path.split("/")));
       } catch (error) {

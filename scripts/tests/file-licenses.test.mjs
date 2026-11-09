@@ -656,48 +656,69 @@ test("package check: an LGPL notice in a packed license.js is refused", async ()
 // mpv loads a shader whatever its file name: the files exempt from the
 // notice scan may not hide one.
 const STRIPPED = RAVU.replaceAll("GNU Lesser General Public License", "terms");
+const literal = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const EXEMPT_PATHS = [
+  "shaders/x/LICENSE-ravu",
+  "shaders/x/NOTICE",
+  "shaders/x/NOTICE.md",
+  "shaders/x/LICENSE.txt",
+  "licenses/a/LICENSE",
+  "README.md",
+  "CHANGELOG.md",
+  "locales/zh.po",
+  "locales/zh.pot",
+];
 
 test("refused: a shader hidden in a license, notice, readme or locale file", async () => {
-  for (const path of [
-    "shaders/x/LICENSE-ravu",
-    "shaders/x/NOTICE.md",
-    "shaders/x/LICENSE.txt",
-    "licenses/foo/LICENSE",
-    "README.md",
-    "CHANGELOG.md",
-    "locales/zh.po",
-    "locales/zh.pot",
-  ])
+  for (const path of EXEMPT_PATHS)
     for (const text of [RAVU, STRIPPED])
       assert.match(
         await problemsOf(await plugin({ [path]: text })),
-        new RegExp(
-          `${path.replaceAll(".", "\.")}: has a shader directive line`,
-        ),
+        new RegExp(`${literal(path)}: contains "//!"`),
         path,
       );
-  // Any directive, indented or not, any line ending.
-  for (const directive of [
+});
+
+test('refused: "//!" anywhere in an exempt file (mpv finds the first one anywhere, keywords by prefix)', async () => {
+  const body = "\nvec4 hook() { return vec4(1.0); }\n";
+  for (const text of [
     "//!HOOK MAIN",
     "  //!BIND HOOKED",
-    "//!SAVE x",
+    "Notice\r\n//!SAVE x\r\n",
     "//!TEXTURE t",
     "//!BUFFER b",
     "//!PARAM p",
     "//!COMPUTE 8 8",
     "//!DESC x",
+    "\v//!HOOK MAIN",
+    "\f//!HOOK MAIN",
+    "﻿//!HOOK MAIN",
+    "See docs //!HOOK MAIN",
+    "//!HOOKMAIN",
+    "//!BINDHOOKED",
+    "// //!HOOK MAIN",
+    "Shaders start with `//!HOOK MAIN`.",
+    "```glsl\n//!HOOK MAIN\n```",
   ])
-    assert.match(
-      await problemsOf(
-        await plugin({ "shaders/x/NOTICE": `Notice\r\n${directive}\r\n` }),
-      ),
-      /NOTICE: has a shader directive line/,
-      directive,
-    );
-  // Prose that mentions a directive is fine.
+    for (const path of [
+      "README.md",
+      "shaders/x/NOTICE",
+      "locales/zh.po",
+      "licenses/a/LICENSE",
+    ])
+      assert.match(
+        await problemsOf(await plugin({ [path]: text + body })),
+        new RegExp(`${literal(path)}: contains "//!"`),
+        `${path}: ${JSON.stringify(text)}`,
+      );
+  // Without "//!" mpv finds no header: comments and prose are fine.
   assert.equal(
     await problemsOf(
-      await plugin({ "README.md": "Shaders start with `//!HOOK MAIN`.\n" }),
+      await plugin({
+        "README.md":
+          "Shaders start with header lines (`// !` without the space).\n",
+        "locales/zh.po": 'msgid "Upscale"\nmsgstr ""\n',
+      }),
     ),
     "",
   );
@@ -714,7 +735,7 @@ test("refused: a COPYING or COPYING.LESSER under shaders/ that is not the FSF's 
       assert.match(
         await problemsOf(await plugin({ [path]: text })),
         new RegExp(
-          `${path.replaceAll(".", "\.")} is not the FSF's ${name} text byte for byte`,
+          `${literal(path)} is not the FSF's ${name} text byte for byte`,
         ),
         path,
       );
@@ -785,9 +806,9 @@ test("refused: a GitHub repository named . or ..", async () => {
 
 test("package check: a shader hidden in an exempt packed file is refused", async () => {
   for (const [path, pattern] of [
-    ["shaders/ravu/NOTICE.md", /NOTICE\.md: has a shader directive line/],
-    ["licenses/foo/LICENSE", /LICENSE: has a shader directive line/],
-    ["locales/zh.po", /zh\.po: has a shader directive line/],
+    ["shaders/ravu/NOTICE.md", /NOTICE\.md: contains "\/\/!"/],
+    ["licenses/foo/LICENSE", /LICENSE: contains "\/\/!"/],
+    ["locales/zh.po", /zh\.po: contains "\/\/!"/],
     [
       "locales/ravu.hook",
       /locales\/ravu\.hook: carries a GPL\/AGPL\/LGPL license notice/,
@@ -806,4 +827,28 @@ test("package check: a shader hidden in an exempt packed file is refused", async
     "locales/zh.po": 'msgid "Upscale"\nmsgstr ""\n',
   });
   assert.equal(plain.status, 0, plain.stderr);
+});
+
+test("package check: an entry name not in normal form is refused", async () => {
+  for (const name of [
+    "licenses/../shaders/evil/COPYING",
+    "shaders/./evil/COPYING",
+    "shaders//evil/COPYING",
+    "licenses/a/../../x.js",
+    "./main2.js",
+    "a/..",
+  ]) {
+    const result = await checkPackage({ ...packedFiles, [name]: "x\n" });
+    assert.equal(result.status, 1, name);
+    assert.match(
+      result.stderr,
+      new RegExp(
+        `${literal(name)}: path outside the package or not in normal form`,
+      ),
+      name,
+    );
+  }
+  // A directory entry ends with "/".
+  const directory = await checkPackage({ ...packedFiles, "locales/": "" });
+  assert.equal(directory.status, 0, directory.stderr);
 });

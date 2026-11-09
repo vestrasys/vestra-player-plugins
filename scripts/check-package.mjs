@@ -8,7 +8,8 @@
  * manifest.json. The package is read as a zip: its manifest.json must have
  * the source manifest's id, version, apiVersion and capabilities, its entry
  * must be a .js file inside the package, and no entry may be a .ts file, a
- * test, an absolute path or leave the package.
+ * test, an absolute path, leave the package or be other than in normal
+ * form (".", ".." or empty segments).
  *
  * Every package also stays within the size limits (the .vxp and its files
  * unpacked) and holds no node_modules/ and no native code. A plugin with npm
@@ -104,13 +105,19 @@ try {
   const entries = readZip(bytes);
   const problems = sizeProblems("size", bytes.length, entries.unpacked);
   for (const name of entries.keys()) {
-    const normal = posix.normalize(name);
+    // One spelling per file: a name such as licenses/../shaders/x/COPYING
+    // would escape the rules keyed on its directory. A directory entry may
+    // end with "/".
+    const file = name.endsWith("/") ? name.slice(0, -1) : name;
     if (
       name.startsWith("/") ||
       /^[a-zA-Z]:/.test(name) ||
-      normal.startsWith("..")
+      posix.normalize(file) !== file ||
+      file.split("/").some((part) => !part || part === "." || part === "..")
     )
-      problems.push(`${name}: path outside the package`);
+      problems.push(
+        `${name}: path outside the package or not in normal form (no ".", ".." or empty segments)`,
+      );
     if (name.includes("\\")) problems.push(`${name}: backslash in path`);
     if (name.endsWith(".ts")) problems.push(`${name}: TypeScript source`);
     if (/^tests\//.test(name)) problems.push(`${name}: test file`);
