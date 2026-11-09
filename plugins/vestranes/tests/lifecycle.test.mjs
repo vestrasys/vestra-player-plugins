@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { NesCore, timing } from '../core.ts';
 import { roms, running, start, statusText, until } from './harness.mjs';
 
@@ -186,6 +188,22 @@ for (const retire of [true, false]) {
     }
   });
 }
+
+test('a FIFO is turned away from its open handle, without waiting for a writer', { skip: process.platform === 'win32' && 'no FIFOs on Windows' }, async () => {
+  const files = await roms();
+  const fifo = path.join(files.folder, 'pipe.nes');
+  execFileSync('mkfifo', [fifo]);
+  const { host, stop, status } = await start();
+  try {
+    host.dialogAnswers.push([fifo]);
+    await host.command('nes.load').run();
+    await until(() => status() === 'Error: This is not an NES ROM in iNES format.', 'FIFO refused');
+    assert.equal(host.producers.size, 0, 'a FIFO never prepares a stream');
+  } finally {
+    await stop();
+    await files.remove();
+  }
+});
 
 test('a bad ROM fails with the plugin wording and leaves the running game alone', async () => {
   const files = await roms();

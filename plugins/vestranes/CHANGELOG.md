@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.2
+
+- A ROM is checked on the file it opened, not by its path beforehand, so a file swapped in between (a FIFO, a folder, a larger file) is still turned away. No visible change.
+
 ## 0.4.1
 
 - Store icon.

@@ -1,4 +1,5 @@
-import { open, stat } from "node:fs/promises";
+import { constants } from "node:fs";
+import { open } from "node:fs/promises";
 import { basename } from "node:path";
 import type { Plugin, PluginError, Stream, StreamStartError, Text, TextError } from "@vestra-player/sdk";
 import { type Fail, NesCore } from "./core.ts";
@@ -119,14 +120,17 @@ export default async function activate(plugin: Plugin) {
 async function readRom(path: string, signal: AbortSignal, error: Fail) {
   const tooLarge = () => error("The ROM file is larger than the 16 MiB limit.");
   try {
-    const info = await stat(path);
-    if (info.isDirectory()) throw error("This is a folder, not a ROM file.");
-    // A FIFO or a device reports size 0 and may never end: only regular files.
-    if (!info.isFile()) throw error("This is not an NES ROM in iNES format.");
-    if (info.size > MAX_ROM) throw tooLarge();
-    // Read at most MAX_ROM + 1 bytes, whatever the size said: the file may grow.
-    const file = await open(path, "r");
+    // Open once and check the handle, not the path: the path may be replaced
+    // between a check and the open. O_NONBLOCK (POSIX only) keeps a FIFO from
+    // blocking the open; the check below turns it away before any read.
+    const file = await open(path, constants.O_RDONLY | (constants.O_NONBLOCK ?? 0));
     try {
+      const info = await file.stat();
+      if (info.isDirectory()) throw error("This is a folder, not a ROM file.");
+      // A FIFO or a device reports size 0 and may never end: only regular files.
+      if (!info.isFile()) throw error("This is not an NES ROM in iNES format.");
+      if (info.size > MAX_ROM) throw tooLarge();
+      // Read at most MAX_ROM + 1 bytes, whatever the size said: the file may grow.
       const bytes = new Uint8Array(MAX_ROM + 1);
       let length = 0;
       while (length < bytes.length) {
