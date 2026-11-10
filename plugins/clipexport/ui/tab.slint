@@ -37,6 +37,30 @@ export struct PartRow {
     current: bool,
     state: string,
     selected: bool,
+    // The junction below it: its transition into the next part (none below the last part).
+    join: bool,
+    // "cut", "crossfade", "fadeBlack", "fadeWhite", "wipe", "slide"; "left", "right", "up", "down"; seconds ("1.0").
+    kind: string,
+    dir: string,
+    duration: string,
+    // Fast joins with cuts: the transition is kept, greyed and struck.
+    off: bool,
+}
+
+// The transition picker of one junction (part `from` into part `to`), while it is open.
+export struct Picker {
+    shown: bool,
+    id: string,
+    from: int,
+    to: int,
+    kind: string,
+    dir: string,
+    duration: string,
+    // The longest transition here ("8.2"): half of the shorter part.
+    cap: string,
+    // The duration is none of the presets (typed).
+    custom: bool,
+    joins: int,
 }
 
 // The Collection page's Add from: the file playing, its duration, the marked range's length ("16.7", "" when none).
@@ -53,9 +77,14 @@ export struct AddFrom {
 // The Collection's count and total length ("1:02.2"); `undo`: Undo Clear is offered.
 export struct CollectionInfo {
     count: int,
+    // The written length: the overlaps taken off (unless Fast joins with cuts).
     total: string,
     checked: bool,
     undo: bool,
+    // How many junctions have a transition, the seconds they take off ("2.5"), and whether Fast leaves them out.
+    transitions: int,
+    saved: string,
+    off: bool,
 }
 
 // What stops the merged export: the part (from 1) and the check's problem.
@@ -144,6 +173,9 @@ export struct Card {
     // A merged export: the part being written (from 1) of how many, and ticks at the joins (a 1000×10 path).
     part: int,
     parts: int,
+    // The plugin's step of a merged export with transitions: the transition reached (from 1) of how many.
+    transition: int,
+    transitions: int,
     ticks: string,
 }
 
@@ -234,6 +266,9 @@ export global ClipBridge {
     in property <bool> collection-busy;
     in-out property <string> collection-template;
     in property <string> collection-preview;
+    in property <Picker> picker;
+    // The thumbnails of the two parts for the tile previews: the upper part, then the lower one.
+    in property <[image]> picker-pictures;
 
     callback set-page(int);
     callback set-method(int);
@@ -280,6 +315,12 @@ export global ClipBridge {
     callback collection-template-edited(string);
     callback insert-collection-variable(string);
     callback reset-collection-template();
+    // Transitions: the picker of the junction below a part opens and closes; a pick applies at once.
+    callback open-join(string);
+    callback close-join();
+    // (part id, kind, direction, duration as typed or a preset)
+    callback set-transition(string, string, string, string);
+    callback apply-all(string);
 }
 
 // Glyphs of this tab only, in the V-Line style of @vestra/icons.slint (1.5px round-capped lines), 14×12 boxes.
@@ -816,8 +857,10 @@ component ProgressCard inherits Rectangle {
         Line {
             text: (root.card.method != "" ? Words.method(root.card.method)
                     + (root.card.preset != "" ? " · " + Words.preset(root.card.preset) : "") + " · " : "")
-                // TRANSLATORS: {0} is the part being written, {1} how many parts the merged export has.
-                + (root.card.parts > 0 && root.card.part > 0 ? @tr("part {0} / {1}", root.card.part, root.card.parts) + " · " : "")
+                // TRANSLATORS: {0} is the transition being written, {1} how many the merged export has.
+                + (root.card.transitions > 0 && root.card.transition > 0 ? @tr("transition {0} / {1}", root.card.transition, root.card.transitions) + " · "
+                    // TRANSLATORS: {0} is the part being written, {1} how many parts the merged export has.
+                    : root.card.parts > 0 && root.card.part > 0 ? @tr("part {0} / {1}", root.card.part, root.card.parts) + " · " : "")
                 // TRANSLATORS: {} is a percentage.
                 + (root.card.percent >= 100 ? @tr("Finishing…")
                 : root.card.percent >= 0 ? @tr("{} %", root.card.percent)
@@ -843,14 +886,23 @@ component PartItem inherits Rectangle {
     // The pointer moved this far from where the drag started.
     callback drag-moved(length);
     callback drag-ended();
+    // The junction's chip was clicked: where its bottom is in the window (the picker opens under it).
+    callback chip-clicked(length, length);
     private property <bool> bad: root.entry.state != "ok";
     private property <bool> locatable: root.entry.state == "missing" || root.entry.state == "changed";
-    height: 46px;
-    background: root.dragging ? Theme.selected-bg : root.entry.selected ? Theme.selected-bg : area.has-hover ? Theme.hover-bg : transparent;
+    // The part (46 px) and, unless it is the last, the junction row under it (17 px).
+    height: root.entry.join ? 63px : 46px;
     opacity: root.dragging ? 0.6 : 1;
+    Rectangle {
+        height: 46px;
+        y: 0px;
+        background: root.dragging ? Theme.selected-bg : root.entry.selected ? Theme.selected-bg : area.has-hover ? Theme.hover-bg : transparent;
+    }
     // The whole row drags (the handle shows that it can): a press that moves more than a few pixels reorders;
     // a click selects, a double-click plays the part.
     area := TouchArea {
+        height: 46px;
+        y: 0px;
         mouse-cursor: self.pressed && root.dragging ? grabbing : default;
         pointer-event(event) => {
             if event.kind == PointerEventKind.down { root.pressed(); }
@@ -866,6 +918,8 @@ component PartItem inherits Rectangle {
         }
     }
     HorizontalLayout {
+        height: 46px;
+        y: 0px;
         padding-left: 2px;
         padding-right: 4px;
         spacing: 5px;
@@ -941,7 +995,154 @@ component PartItem inherits Rectangle {
     // Always there, shown while it applies (no element is created or removed during a drag).
     Rectangle { y: 0px; height: 2px; background: Theme.accent; visible: root.line-above; }
     Rectangle { y: parent.height - 2px; height: 2px; background: Theme.accent; visible: root.line-below; }
-    Rectangle { y: parent.height - 1px; height: 1px; background: Theme.line; }
+    Rectangle { y: root.entry.join ? 62px : 45px; height: 1px; background: Theme.line; visible: !root.entry.join; }
+    // The junction: a line from this thumbnail down to the next, a chip on it (kind and length); a click opens the picker.
+    if root.entry.join: Rectangle {
+        y: 46px;
+        height: 17px;
+        // The thumbnail's middle (2 + 14 + 5 + 16 + 5 px in, half of 64 px).
+        Rectangle {
+            x: 73px;
+            width: 2px;
+            background: root.entry.kind == "cut" || root.entry.off ? Theme.line : @linear-gradient(180deg, Theme.accent 0%, Theme.playing 100%);
+        }
+        chip := Rectangle {
+            x: 82px;
+            y: 1px;
+            height: 15px;
+            width: min(chip-row.preferred-width + 10px, root.width - 90px);
+            border-radius: 7px;
+            border-width: root.entry.kind == "cut" || root.entry.off ? 0px : 1px;
+            border-color: chip-touch.has-hover ? Theme.accent : Theme.line;
+            background: root.entry.kind == "cut" ? transparent : chip-touch.has-hover && !root.entry.off ? Theme.hover-bg : Theme.bg-list;
+            opacity: root.entry.off ? 0.5 : 1;
+            ToolTipArea {
+                text: root.entry.off ? @tr("Transitions: Precise only")
+                    : root.entry.kind == "cut" ? Words.kind-name("cut")
+                    // TRANSLATORS: {0} is a transition with its direction ("Slide ←"), {1} its length in seconds ("1.5").
+                    : @tr("{0} · {1} s", Words.kind-name(root.entry.kind) + Words.arrow(root.entry.kind, root.entry.dir), root.entry.duration);
+                // TRANSLATORS: {0} and {1} are part numbers ("Part 2 → 3"); then what happens to the sound.
+                detail: root.entry.off ? "" : @tr("Part {0} → {1}. Click to change.", root.entry.number, root.entry.number + 1) + " " + Words.sound(root.entry.kind);
+                chip-row := HorizontalLayout {
+                    padding-left: 5px;
+                    padding-right: 5px;
+                    spacing: 4px;
+                    // A tiny "A into B" mark: two halves, dim for a cut.
+                    VerticalLayout {
+                        alignment: center;
+                        Rectangle {
+                            width: 12px;
+                            height: 8px;
+                            border-radius: 2px;
+                            clip: true;
+                            Rectangle { x: 0px; width: 6px; background: root.entry.kind == "cut" ? Theme.icon-disabled : Theme.accent-fill; }
+                            Rectangle { x: 6px; width: 6px; background: root.entry.kind == "cut" ? Theme.line : Theme.playing; }
+                        }
+                    }
+                    Text {
+                        text: root.entry.kind == "cut" ? Words.kind-short("cut") : Words.kind-short(root.entry.kind) + Words.arrow(root.entry.kind, root.entry.dir);
+                        color: root.entry.kind == "cut" ? Theme.text-dim : Theme.text-list;
+                        font-size: Theme.font-xs;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+                    if root.entry.kind != "cut": Text {
+                        // TRANSLATORS: {} is a length in seconds ("1.0").
+                        text: @tr("{} s", root.entry.duration);
+                        color: Theme.text-dim;
+                        font-size: Theme.font-xs;
+                        vertical-alignment: center;
+                    }
+                }
+                // Fast joins with cuts: the chip is struck through.
+                Rectangle { y: parent.height / 2; height: 1px; background: Theme.text-dim; visible: root.entry.off; }
+                chip-touch := TouchArea {
+                    mouse-cursor: root.entry.off ? default : pointer;
+                    clicked => {
+                        if !root.entry.off { root.chip-clicked(chip.absolute-position.y + chip.height, chip.absolute-position.y); }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// One tile of the picker: the kind half-way, drawn from the two parts' own pictures, and its name.
+component TransitionTile inherits Rectangle {
+    in property <string> kind;
+    in property <image> a;
+    in property <image> b;
+    in property <bool> selected;
+    in property <bool> lit;
+    callback picked();
+    min-height: 58px;
+    border-radius: Theme.radius-control;
+    border-width: root.selected || root.lit ? 1px : 0px;
+    border-color: root.selected ? Theme.accent : Theme.line;
+    background: root.selected ? Theme.selected-bg : touch.has-hover || root.lit ? Theme.hover-bg : transparent;
+    accessible-role: button;
+    accessible-label: Words.kind-name(root.kind);
+    accessible-checkable: true;
+    accessible-checked: root.selected;
+    accessible-action-default => { root.picked(); }
+    VerticalLayout {
+        padding: 3px;
+        spacing: 2px;
+        preview := Rectangle {
+            height: 38px;
+            border-radius: 3px;
+            clip: true;
+            background: Theme.bg-video;
+            // Cut, Wipe: the old picture on the left half, the new one on the right (a Wipe with its edge).
+            // Crossfade: both, half and half. Through black / white: the middle dips. Slide: the old one pushed out.
+            Image {
+                x: root.kind == "slide" ? -parent.width / 4 : 0px;
+                width: parent.width;
+                height: parent.height;
+                source: root.a;
+                image-fit: cover;
+            }
+            Image {
+                x: root.kind == "crossfade" ? 0px : root.kind == "slide" ? parent.width * 3 / 4 - parent.width / 4 : parent.width / 2;
+                width: root.kind == "crossfade" ? parent.width : parent.width / 2;
+                height: parent.height;
+                source: root.b;
+                image-fit: cover;
+                opacity: root.kind == "crossfade" ? 0.5 : 1;
+            }
+            if root.kind == "fadeBlack" || root.kind == "fadeWhite": Rectangle {
+                background: @linear-gradient(90deg, transparent 15%, (root.kind == "fadeBlack" ? Theme.bg-video : Theme.text) 50%, transparent 85%);
+            }
+            if root.kind == "wipe": Rectangle { x: parent.width / 2 - 1px; width: 2px; background: Theme.text; opacity: 0.6; }
+        }
+        Line { text: Words.kind-name(root.kind); align: center; color: root.selected ? Theme.text : Theme.text-list; }
+    }
+    touch := TouchArea { clicked => { root.picked(); } }
+}
+
+// A segment of the picker's rows (a direction or a preset duration).
+component Segment inherits Rectangle {
+    in property <string> text;
+    in property <bool> on;
+    callback clicked();
+    min-width: 26px;
+    horizontal-stretch: 1;
+    height: Theme.button-height;
+    border-radius: Theme.radius-control;
+    background: root.on ? Theme.selected-bg : touch.has-hover ? Theme.hover-bg : Theme.button-bg;
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-checkable: true;
+    accessible-checked: root.on;
+    accessible-action-default => { root.clicked(); }
+    Text {
+        text: root.text;
+        color: root.on ? Theme.text : Theme.text-list;
+        font-size: Theme.font-body;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    touch := TouchArea { clicked => { root.clicked(); } }
 }
 
 export component ClipExportTab inherits Rectangle {
@@ -1004,6 +1205,20 @@ export component ClipExportTab inherits Rectangle {
     // The template the variable chips add to: the row that had the focus last.
     private property <string> template-target: "clip";
 
+    // The transition picker: where it opens, and the tile the arrow keys light (-1: none).
+    private property <length> picker-y;
+    // Its content: the header, two rows of tiles, the length rows (not for a Cut), the direction row (Wipe, Slide), sound and Apply to All.
+    private property <length> picker-height: 292px + (ClipBridge.picker.kind == "wipe" || ClipBridge.picker.kind == "slide" ? 26px : 0px) - (ClipBridge.picker.kind == "cut" ? 47px : 0px);
+    private property <int> picker-lit: -1;
+    private property <[string]> picker-kinds: ["cut", "crossfade", "fadeBlack", "fadeWhite", "wipe", "slide"];
+    function open-picker(id: string, bottom: length, top: length) {
+        let below = bottom - root.absolute-position.y + 2px;
+        root.picker-y = below + root.picker-height <= root.height ? below : max(0px, top - root.absolute-position.y - root.picker-height - 2px);
+        root.picker-lit = -1;
+        ClipBridge.open-join(id);
+        picker-popup.show();
+    }
+    function pick(kind: string) { ClipBridge.set-transition(ClipBridge.picker.id, kind, ClipBridge.picker.dir, ClipBridge.picker.duration); }
     function show-page(index: int) {
         ClipBridge.page = index;
         ClipBridge.set-page(index);
@@ -1012,7 +1227,8 @@ export component ClipExportTab inherits Rectangle {
     function add-part() { ClipBridge.add-part(ClipBridge.clip-start, ClipBridge.clip-end); }
     function drag-move(index: int, moved: length) {
         root.drag-from = index;
-        root.drag-to = max(0, min(ClipBridge.parts.length - 1, index + round(moved / 46px)));
+        // A part with its junction row is 63 px tall (the last one 46 px).
+        root.drag-to = max(0, min(ClipBridge.parts.length - 1, index + round(moved / 63px)));
     }
     function drag-end() {
         if root.drag-from >= 0 && root.drag-to >= 0 && root.drag-to != root.drag-from {
@@ -1020,6 +1236,102 @@ export component ClipExportTab inherits Rectangle {
         }
         root.drag-from = -1;
         root.drag-to = -1;
+    }
+
+    picker-popup := PopupWindow {
+        x: 8px;
+        y: root.picker-y;
+        width: root.width - 16px;
+        height: root.picker-height;
+        close-policy: close-on-click-outside;
+        forward-focus: picker-keys;
+        Rectangle {
+            background: Theme.bg-panel;
+            border-width: 1px;
+            border-color: Theme.line;
+            border-radius: Theme.radius-control;
+            picker-keys := FocusScope {
+                // Arrows move between the tiles (three a row), Enter picks, Esc closes.
+                key-pressed(event) => {
+                    if event.text == Key.Escape {
+                        picker-popup.close();
+                        ClipBridge.close-join();
+                        return accept;
+                    }
+                    if event.text == Key.RightArrow { root.picker-lit = min(5, root.picker-lit + 1); return accept; }
+                    if event.text == Key.LeftArrow { root.picker-lit = max(0, root.picker-lit - 1); return accept; }
+                    if event.text == Key.DownArrow { root.picker-lit = min(5, root.picker-lit < 0 ? 0 : root.picker-lit + 3); return accept; }
+                    if event.text == Key.UpArrow { root.picker-lit = max(0, root.picker-lit - 3); return accept; }
+                    if event.text == Key.Return && root.picker-lit >= 0 { root.pick(root.picker-kinds[root.picker-lit]); return accept; }
+                    return reject;
+                }
+                VerticalLayout {
+                    padding: 8px;
+                    spacing: 5px;
+                    HorizontalLayout {
+                        // TRANSLATORS: {0} and {1} are part numbers: the transition from part 1 into part 2.
+                        Line { text: @tr("Transition {0} → {1}", ClipBridge.picker.from, ClipBridge.picker.to); color: Theme.text; }
+                        // TRANSLATORS: the Escape key as printed on keyboards (closes the picker).
+                        Text { text: @tr("Esc"); color: Theme.text-dim; font-family: Theme.font-mono; font-size: Theme.font-xs; vertical-alignment: center; }
+                    }
+                    HorizontalLayout {
+                        spacing: 4px;
+                        TransitionTile { kind: "cut"; a: ClipBridge.picker-pictures[0]; b: ClipBridge.picker-pictures[1]; selected: ClipBridge.picker.kind == self.kind; lit: root.picker-lit == 0; picked => { root.pick(self.kind); } }
+                        TransitionTile { kind: "crossfade"; a: ClipBridge.picker-pictures[0]; b: ClipBridge.picker-pictures[1]; selected: ClipBridge.picker.kind == self.kind; lit: root.picker-lit == 1; picked => { root.pick(self.kind); } }
+                        TransitionTile { kind: "fadeBlack"; a: ClipBridge.picker-pictures[0]; b: ClipBridge.picker-pictures[1]; selected: ClipBridge.picker.kind == self.kind; lit: root.picker-lit == 2; picked => { root.pick(self.kind); } }
+                    }
+                    HorizontalLayout {
+                        spacing: 4px;
+                        TransitionTile { kind: "fadeWhite"; a: ClipBridge.picker-pictures[0]; b: ClipBridge.picker-pictures[1]; selected: ClipBridge.picker.kind == self.kind; lit: root.picker-lit == 3; picked => { root.pick(self.kind); } }
+                        TransitionTile { kind: "wipe"; a: ClipBridge.picker-pictures[0]; b: ClipBridge.picker-pictures[1]; selected: ClipBridge.picker.kind == self.kind; lit: root.picker-lit == 4; picked => { root.pick(self.kind); } }
+                        TransitionTile { kind: "slide"; a: ClipBridge.picker-pictures[0]; b: ClipBridge.picker-pictures[1]; selected: ClipBridge.picker.kind == self.kind; lit: root.picker-lit == 5; picked => { root.pick(self.kind); } }
+                    }
+                    // The way the new picture moves (Wipe and Slide only).
+                    if ClipBridge.picker.kind == "wipe" || ClipBridge.picker.kind == "slide": HorizontalLayout {
+                        spacing: 2px;
+                        Label { width: 64px; text: @tr("Direction"); }
+                        Segment { text: "←"; on: ClipBridge.picker.dir == "left"; clicked => { ClipBridge.set-transition(ClipBridge.picker.id, ClipBridge.picker.kind, "left", ClipBridge.picker.duration); } }
+                        Segment { text: "→"; on: ClipBridge.picker.dir == "right"; clicked => { ClipBridge.set-transition(ClipBridge.picker.id, ClipBridge.picker.kind, "right", ClipBridge.picker.duration); } }
+                        Segment { text: "↑"; on: ClipBridge.picker.dir == "up"; clicked => { ClipBridge.set-transition(ClipBridge.picker.id, ClipBridge.picker.kind, "up", ClipBridge.picker.duration); } }
+                        Segment { text: "↓"; on: ClipBridge.picker.dir == "down"; clicked => { ClipBridge.set-transition(ClipBridge.picker.id, ClipBridge.picker.kind, "down", ClipBridge.picker.duration); } }
+                    }
+                    // Presets and a field (0.1 s steps); a larger value is set to the limit. Cut has no length.
+                    if ClipBridge.picker.kind != "cut": HorizontalLayout {
+                        spacing: 2px;
+                        Label { width: 64px; text: @tr("Duration"); }
+                        Segment { text: @tr("{} s", "0.5"); on: !ClipBridge.picker.custom && ClipBridge.picker.duration == "0.5"; clicked => { ClipBridge.set-transition(ClipBridge.picker.id, ClipBridge.picker.kind, ClipBridge.picker.dir, "0.5"); dur-field.text = "0.5"; } }
+                        Segment { text: @tr("{} s", "1"); on: !ClipBridge.picker.custom && ClipBridge.picker.duration == "1.0"; clicked => { ClipBridge.set-transition(ClipBridge.picker.id, ClipBridge.picker.kind, ClipBridge.picker.dir, "1"); dur-field.text = "1.0"; } }
+                        Segment { text: @tr("{} s", "1.5"); on: !ClipBridge.picker.custom && ClipBridge.picker.duration == "1.5"; clicked => { ClipBridge.set-transition(ClipBridge.picker.id, ClipBridge.picker.kind, ClipBridge.picker.dir, "1.5"); dur-field.text = "1.5"; } }
+                        Segment { text: @tr("{} s", "2"); on: !ClipBridge.picker.custom && ClipBridge.picker.duration == "2.0"; clicked => { ClipBridge.set-transition(ClipBridge.picker.id, ClipBridge.picker.kind, ClipBridge.picker.dir, "2"); dur-field.text = "2.0"; } }
+                        // A typed value: the field keeps what was typed until a preset or a new junction writes it again.
+                        dur-field := LineEdit {
+                            min-width: 52px;
+                            max-width: 52px;
+                            height: Theme.input-height;
+                            font-size: Theme.font-body;
+                            font-family: Theme.font-mono;
+                            text: ClipBridge.picker.duration;
+                            accepted(text) => { ClipBridge.set-transition(ClipBridge.picker.id, ClipBridge.picker.kind, ClipBridge.picker.dir, text); }
+                            changed has-focus => { ClipBridge.focus-changed(self.has-focus); }
+                        }
+                    }
+                    // TRANSLATORS: {} is the longest transition at this junction in seconds ("8.2").
+                    if ClipBridge.picker.kind != "cut": Line { text: @tr("Up to {} s here (half of the shorter part)", ClipBridge.picker.cap); }
+                    Line { text: Words.sound(ClipBridge.picker.kind); }
+                    Rectangle { height: 1px; background: Theme.line; }
+                    HorizontalLayout {
+                        Action {
+                            text: @tr("Apply to All");
+                            tip: @tr("Use for every join and for new parts");
+                            clicked => { ClipBridge.apply-all(ClipBridge.picker.id); }
+                        }
+                        Rectangle { horizontal-stretch: 1; }
+                        // TRANSLATORS: {} is the number of junctions (places between two parts).
+                        Text { text: ClipBridge.picker.joins == 1 ? @tr("1 join") : @tr("{} joins", ClipBridge.picker.joins); color: Theme.text-dim; font-size: Theme.font-body; vertical-alignment: center; }
+                    }
+                }
+            }
+        }
     }
 
     VerticalLayout {
@@ -1488,6 +1800,7 @@ export component ClipExportTab inherits Rectangle {
                                 pressed => { list-focus.focus(); }
                                 drag-moved(moved) => { root.drag-move(i, moved); }
                                 drag-ended => { root.drag-end(); }
+                                chip-clicked(bottom, top) => { root.open-picker(row.id, bottom, top); }
                             }
                         }
                     }
@@ -1498,9 +1811,15 @@ export component ClipExportTab inherits Rectangle {
                         Line {
                             color: ClipBridge.collection-info.count > 0 ? Theme.text : Theme.text-dim;
                             // TRANSLATORS: {} is the Collection's total length ("1:02.2").
-                            text: ClipBridge.collection-info.count == 1 ? @tr("1 part · {}", ClipBridge.collection-info.total)
+                            text: (ClipBridge.collection-info.count == 1 ? @tr("1 part · {}", ClipBridge.collection-info.total)
                                 // TRANSLATORS: {0} is a number of parts (2 or more), {1} their total length ("1:02.2").
-                                : @tr("{0} parts · {1}", ClipBridge.collection-info.count, ClipBridge.collection-info.total);
+                                : @tr("{0} parts · {1}", ClipBridge.collection-info.count, ClipBridge.collection-info.total))
+                            + (ClipBridge.collection-info.transitions == 0 ? ""
+                                : " · " + (ClipBridge.collection-info.off ? @tr("transitions off in Fast")
+                                    // TRANSLATORS: {} is the seconds the transition takes off the length ("1.0").
+                                    : ClipBridge.collection-info.transitions == 1 ? @tr("1 transition −{} s", ClipBridge.collection-info.saved)
+                                    // TRANSLATORS: {0} is a number of transitions (2 or more), {1} the seconds they take off ("2.5").
+                                    : @tr("{0} transitions −{1} s", ClipBridge.collection-info.transitions, ClipBridge.collection-info.saved)));
                         }
                     }
                     if ClipBridge.support.fast: HorizontalLayout {
@@ -1541,6 +1860,8 @@ export component ClipExportTab inherits Rectangle {
                     }
                     // Why Fast is not possible: one line (the whole story in the ⓘ tip).
                     if root.fast-why != "": Line { text: root.fast-why; }
+                    // Fast with transitions set: they are kept, the export joins with cuts (as Effects on the Clip page).
+                    if ClipBridge.collection-info.off: Line { text: @tr("Transitions: Precise only. Fast joins with cuts."); }
                     HorizontalLayout {
                         spacing: 4px;
                         Action {

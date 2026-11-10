@@ -1,8 +1,21 @@
 import type { ExportJob, ExportPart, JobState, Scope, Snapshot } from "@vestra-player/sdk";
 import { Failure, jobProblem } from "./model.ts";
 import type { JobReason, Problem, Spec } from "./model.ts";
+import type { Encode } from "./clip.ts";
 import { actualRange, clipExport, jobProgress, partsExport } from "./seams.ts";
 import type { Progress } from "./seams.ts";
+
+/** The plugin's step after the player's export: the work file, what it adds to the progress, the run itself and its cleanup. */
+export interface Finish {
+  merged: string;
+  /** Seconds of output the step writes (the progress adds them to the merge's). */
+  length: number;
+  plan: unknown;
+  /** Writes the destination; resolves with the file written. Reports output seconds through `progress`. */
+  run(state: JobState, signal: AbortSignal, progress: (seconds: number, transition: number, transitions: number) => void): Promise<string>;
+  /** Removes the work files, whatever happened (called on every end). */
+  cleanup(): Promise<void>;
+}
 
 /** An accepted export: one frozen snapshot (a clip) or the Collection's parts (a merged export), one export job. */
 export interface Task {
@@ -13,6 +26,14 @@ export interface Task {
   snapshot?: Snapshot;
   /** A merged export of the Collection: its parts as they were when it started (later edits apply to the next export). */
   parts?: ExportPart[];
+  /**
+   * A merged export with transitions: the player writes the plain merge to
+   * `merged` (the plugin's work folder), then `run` writes the transitions into
+   * the destination (the plugin's ffmpeg). `plan` is kept for a retry.
+   */
+  finish?: Finish;
+  /** Stops the plugin's own step (the transitions). */
+  abort?: AbortController;
   destination: string;
   status: string;
   /** Why it failed. */
@@ -179,7 +200,13 @@ export class Tasks {
           if (task.cancel) task.status = "cancelled";
           else {
             const { state } = await this.#run(task);
-            if (state.status === "completed" && state.outcome && "destination" in state.outcome) {
+            if (state.status === "completed" && task.finish) {
+              // The plain merge is written: the plugin's own step makes the transitions.
+              task.output = await this.#finish(task, task.finish, state);
+              task.actual = { start: 0, end: task.finish.length };
+              task.status = task.output ? "completed" : "cancelled";
+              if (!task.output) task.cancel = true;
+            } else if (state.status === "completed" && state.outcome && "destination" in state.outcome) {
               task.output = state.outcome.destination;
               // A merged file holds the parts' length from 0; a clip the range the player wrote.
               task.actual = task.parts ? { start: task.spec.start, end: task.spec.end } : actualRange(state, { start: task.spec.start, end: task.spec.end });
@@ -194,6 +221,10 @@ export class Tasks {
         } catch (error) {
           task.status = "failed";
           task.error = error instanceof Error ? jobProblem(error) : { reason: "exportFailed", raw: "" };
+        } finally {
+          // Success, failure or cancel: the work files go.
+          await task.finish?.cleanup().catch((error) => console.error(`[clipexport] cleanup: ${error}`));
+          task.abort = undefined;
         }
         task.ended = Date.now();
         task.progress = null;
@@ -211,7 +242,7 @@ export class Tasks {
     const { spec } = task;
     let job: ExportJob;
     if (task.parts) {
-      job = await this.#plugin.media.export(partsExport(task.parts, task.destination, spec.method, spec.encode)).catch((error: { code?: string; message?: string }) => {
+      job = await this.#plugin.media.export(partsExport(task.parts, task.finish ? task.finish.merged : task.destination, spec.method, task.finish ? (task.finish.plan as { merge: Encode }).merge : spec.encode)).catch((error: { code?: string; message?: string }) => {
         // Refused before it started (a token the player no longer has, a part the check did not see): one of the plugin's reasons.
         throw new Failure(jobError({ code: error.code ?? "unknown", message: error.message ?? String(error) }, spec));
       });
@@ -226,6 +257,8 @@ export class Tasks {
       // A job the player has not started yet is still this task's preparation (the task left the plugin's queue).
       task.status = TERMINAL.includes(state.status) ? "running" : state.status === "queued" ? "preparing" : state.status;
       task.progress = jobProgress(state);
+      // A merge with transitions: the plugin's step comes after it, its seconds count too.
+      if (task.progress && task.finish) task.progress = { ...task.progress, total: task.progress.total + task.finish.length };
       // The rate is measured from the first progress that moved: not from the start, which includes
       // freezing the input, the seek and the encoder's start-up (a 4K Precise cut otherwise said
       // "about 391 s left" 14 s in and finished within a minute).
@@ -243,10 +276,34 @@ export class Tasks {
     }
   }
 
+  /** The plugin's step: cancellable (`abort`), with its progress after the merge's; "" when cancelled. */
+  async #finish(task: Task, finish: Finish, state: JobState): Promise<string> {
+    if (task.cancel || this.#stopped) return "";
+    const abort = (task.abort = new AbortController());
+    // The merge wrote the parts' length (the spec's range); the step adds the output's.
+    const merged = Math.max(0, task.spec.end - task.spec.start);
+    task.status = "running";
+    task.progress = { done: merged, total: merged + finish.length, part: 0, parts: 0, transition: 0, transitions: 0 };
+    this.#plugin.update();
+    try {
+      return await finish.run(state, abort.signal, (seconds, transition, transitions) => {
+        task.progress = { done: merged + Math.min(seconds, finish.length), total: merged + finish.length, part: 0, parts: 0, transition, transitions };
+        this.#plugin.update();
+      });
+    } catch (error) {
+      if (abort.signal.aborted || (error as { code?: string }).code === "aborted") return "";
+      throw error;
+    }
+  }
+
   async cancel(task: Task) {
     if (terminal(task)) return;
     task.cancel = true;
-    if (task.active) {
+    if (task.abort) {
+      // The plugin's own step: its ffmpeg ends, the work files go.
+      task.status = "cancelling";
+      task.abort.abort();
+    } else if (task.active) {
       task.status = "cancelling";
       await task.active.cancel().catch((error) => console.error(`[clipexport] cancel: ${error}`));
     } else if (task.status === "queued") {

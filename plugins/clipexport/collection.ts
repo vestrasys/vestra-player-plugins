@@ -1,4 +1,6 @@
 import type { ExportCheck, ExportPart, Scope } from "@vestra-player/sdk";
+import { CUT, normalize, transitionOf } from "./transitions.ts";
+import type { Transition } from "./transitions.ts";
 
 /**
  * The Collection: ranges of several local files, gathered in one list and
@@ -18,6 +20,11 @@ export interface Part {
   end: number;
   /** The thumbnail file in `<dataDirectory>/parts`, "" without one. */
   thumb: string;
+  /**
+   * The transition into the next part (Cut: none). It belongs to the end of
+   * this part, so a reorder carries it; the last part's is always Cut.
+   */
+  transition: Transition;
 }
 
 /** Parts of one merged export (the SDK's `MEDIA_SOURCE_LIMITS.parts`): the Collection holds no more. */
@@ -50,10 +57,12 @@ export function partsOf(stored: unknown): Part[] {
       name: typeof v.name === "string" ? v.name : "",
       // A file name in the plugin's own folder: never a path.
       thumb: typeof v.thumb === "string" && /^[\w.-]+$/.test(v.thumb) ? v.thumb : "",
+      // 0.2.x parts have none: a Cut, so their export is unchanged.
+      transition: transitionOf((v as { transition?: unknown }).transition),
     });
     if (parts.length >= PART_LIMIT) break;
   }
-  return parts;
+  return normalize(parts);
 }
 
 /** The parts as the export and its check take them. */
@@ -152,8 +161,10 @@ export class Collection {
     this.#sequence = this.parts.reduce((top, part) => Math.max(top, Number(part.id.replace(/\D/g, "")) || 0), 0);
   }
 
+  /** Every change ends here: the transitions are fitted to their (new) neighbours first. */
   #save() {
-    this.#store?.save({ parts: this.parts.map((part) => ({ ...part })) });
+    normalize(this.parts);
+    this.#store?.save({ parts: this.parts.map((part) => ({ ...part, transition: { ...part.transition } })) });
   }
   full = () => this.parts.length >= PART_LIMIT;
   find = (id: string) => this.parts.find((part) => part.id === id);
@@ -161,9 +172,11 @@ export class Collection {
   /** The tokens the parts use. */
   tokens = () => new Set(this.parts.map((part) => part.token));
 
-  /** A new part at the end of the list. */
-  add(fields: Omit<Part, "id" | "thumb">): Part {
-    const part: Part = { ...fields, id: `p${++this.#sequence}`, thumb: "" };
+  /** A new part at the end of the list; the part before it joins it with `join` (the default for new parts, Cut at first). */
+  add(fields: Omit<Part, "id" | "thumb" | "transition">, join: Transition = CUT): Part {
+    const part: Part = { ...fields, id: `p${++this.#sequence}`, thumb: "", transition: { ...CUT } };
+    const last = this.parts.at(-1);
+    if (last) last.transition = { ...join };
     this.parts.push(part);
     this.#save();
     return part;
@@ -212,6 +225,28 @@ export class Collection {
     this.parts = [...back, ...this.parts];
     this.#save();
     return true;
+  }
+  /** The transition from part `id` into the next one (fitted to their limit). */
+  setTransition(id: string, transition: Transition) {
+    const part = this.find(id);
+    if (!part) return;
+    part.transition = { ...transition };
+    this.#save();
+  }
+  /** Every junction gets `transition` (each fitted to its own limit); the transitions before, by part id (for Undo). */
+  applyAll(transition: Transition): Map<string, Transition> {
+    const before = new Map(this.parts.map((part) => [part.id, { ...part.transition }]));
+    for (const part of this.parts.slice(0, -1)) part.transition = { ...transition };
+    this.#save();
+    return before;
+  }
+  /** Undo Apply to All: each part that is still there gets its transition back. */
+  restoreTransitions(before: ReadonlyMap<string, Transition>) {
+    for (const part of this.parts) {
+      const old = before.get(part.id);
+      if (old) part.transition = { ...old };
+    }
+    this.#save();
   }
   flush() {
     return this.#store?.flush();

@@ -63,13 +63,15 @@ export const REASON = {
   partUnknown: "A part's file is no longer known. Remove the part.",
   cannotRead: "The player cannot read this file.",
   noCapability: "This version of the player cannot do this.",
+  noFfmpeg: "The transitions need FFmpeg, which the player could not find.",
+  transitionFailed: "Could not write the transitions.",
   undoFull: "There is no room to bring the cleared parts back: the Collection holds at most 100. Remove parts, then Undo again.",
 } as const;
 export type Reason = keyof typeof REASON;
 
 /** The reasons an export job ends with (`jobError`, a released input). */
-export type JobReason = "space" | "exists" | "permission" | "encoder" | "exportFailed" | "released" | "fastImpossible" | "noSourceBitrate" | "partMissing" | "partChanged" | "partUnknown";
-const JOB_REASONS: readonly Reason[] = ["space", "exists", "permission", "encoder", "exportFailed", "released", "fastImpossible", "noSourceBitrate", "partMissing", "partChanged", "partUnknown"];
+export type JobReason = "space" | "exists" | "permission" | "encoder" | "exportFailed" | "released" | "fastImpossible" | "noSourceBitrate" | "partMissing" | "partChanged" | "partUnknown" | "noFfmpeg" | "transitionFailed";
+const JOB_REASONS: readonly Reason[] = ["space", "exists", "permission", "encoder", "exportFailed", "released", "fastImpossible", "noSourceBitrate", "partMissing", "partChanged", "partUnknown", "noFfmpeg", "transitionFailed"];
 
 /** A failure in the plugin's own words: `code` names its text in {@link REASON}. */
 export class Failure extends Error {
