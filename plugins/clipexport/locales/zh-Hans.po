@@ -712,7 +712,7 @@ msgstr "重新编码 · 任意帧"
 
 #: ui/tab.slint:1101 ui/tab.slint:1372
 msgid "Start"
-msgstr "开始"
+msgstr "起点"
 
 #: ui/tab.slint:1110 ui/tab.slint:1130
 msgid "Now"
@@ -720,7 +720,7 @@ msgstr "当前"
 
 #: ui/tab.slint:1121 ui/tab.slint:1399
 msgid "End"
-msgstr "结束"
+msgstr "终点"
 
 #: ui/tab.slint:1144
 msgid "Use A-B range"

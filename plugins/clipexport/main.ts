@@ -91,6 +91,8 @@ interface Form {
   audioIndex: number;
   processed: boolean;
   burn: boolean;
+  /** The source the marks were set on (`PlayerState.sourceId`); 0 before any. */
+  sourceId: number;
 }
 
 export interface Options {
@@ -133,7 +135,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   } catch {
     // no data directory: parts show their icon only
   }
-  const form: Form = { start: "", end: "", autoStart: "", autoEnd: "", audioIndex: 1, processed: false, burn: false };
+  const form: Form = { start: "", end: "", autoStart: "", autoEnd: "", audioIndex: 1, processed: false, burn: false, sourceId: 0 };
   /** Finished clips since the Results page was last on screen: the badge on its sub-tab. */
   let unseen = 0;
   // Headless hosts refuse the display; that never fails the action itself.
@@ -462,7 +464,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     if (ui.clipBusy) return;
     ui.clipBusy = true; // exclusion before the first await
     try {
-      Object.assign(form, { start, end });
+      Object.assign(form, { start, end, sourceId: player.state.sourceId });
       await exportRange(parseRange(start, end), ask);
     } catch (error) {
       ui.clipStatus = errorStatus(error);
@@ -477,6 +479,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     ui.clipBusy = true;
     try {
       const seen = await player.refresh();
+      if (marksFor(seen)) panel.set({ clipStart: form.start, clipEnd: form.end });
       if (!clippable(seen)) throw new Failure(notClippable(seen));
       const range = lastRange(seen.position, settings.lastSeconds);
       // A range the user typed (or set with Now or A-B) stays; empty or filled in by the plugin, it shows what was exported.
@@ -496,12 +499,27 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
    * which a later automatic fill may replace.
    */
   function setRange(range: { start?: number; end?: number }, automatic = false) {
+    // The range is the source's playing now: a half of another file's range never stays beside it.
+    marksFor(player.state);
     if (range.start !== undefined) form.start = clock(range.start);
     if (range.end !== undefined) form.end = clock(range.end);
     if (automatic) Object.assign(form, { autoStart: form.start, autoEnd: form.end });
     panel.set({ clipStart: form.start, clipEnd: form.end });
     rememberForm();
     probeSoon();
+  }
+  /**
+   * Start and End belong to the file they were set on, as LosslessCut keeps
+   * cut points per file (design §2: each file is marked on its own): another
+   * source starts with none, the fields show their placeholders until the user
+   * sets marks. True when marks of another source were cleared.
+   */
+  function marksFor(state: PlayerState) {
+    if (form.sourceId === state.sourceId) return false;
+    const stale = !!(form.start || form.end);
+    Object.assign(form, { start: "", end: "", autoStart: "", autoEnd: "", sourceId: state.sourceId });
+    if (stale) rememberForm();
+    return stale;
   }
   const setMethod = (next: Method) => {
     if (!METHODS.includes(next) || settings.method === next) return;
@@ -708,11 +726,14 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   }
 
   /** Add the marked range (the Clip page's Start and End) of the file playing as the last part. `say`: from a key, success on screen too. */
-  async function addPart(say = false) {
+  async function addPart(say = false, typed?: { start: string; end: string }) {
     if (ui.adding) return;
     ui.adding = true; // exclusion before the first await
     try {
       const seen = await player.refresh();
+      // Pressed in the tab: the times it shows are this file's. From a key: marks of another file are not this file's range.
+      if (typed) Object.assign(form, { ...typed, sourceId: seen.sourceId });
+      else if (marksFor(seen)) panel.set({ clipStart: form.start, clipEnd: form.end });
       if (!clippable(seen)) throw new Failure(tabMode(seen) === "local" ? "needDuration" : "addLocal");
       const range = parseRange(form.start, form.end);
       if (range.end > seen.duration! + 0.0005) throw new Failure("outOfRange");
@@ -800,6 +821,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       void recheck();
       throw sourceError(error, "cannotRead");
     }
+    // The part's file is the source now: its marks are the part (read the new source first, so they are not cleared as stale).
+    await player.refresh();
     setRange({ start: part.start, end: part.end });
   }
   /** Export Merged (the clip folder, named by the Collection template) or Export As… (a save dialog). */
@@ -941,6 +964,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   /** The part of the tab that reads the player's state; read only while the tab shows. */
   function liveProps() {
     const state = player.state;
+    // A new source while the tab shows: the old file's marks go (written to the tab's own fields after this pass).
+    if (marksFor(state)) queueMicrotask(() => panel.set({ clipStart: form.start, clipEnd: form.end }));
     lastSource = isLocal(state.source) ? state.source : null;
     const ab = abRange(state);
     const view = clipView(state);
@@ -1043,6 +1068,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       for (const key of ["start", "end", "autoStart", "autoEnd"] as const) if (typeof kept[key] === "string") form[key] = kept[key];
       if (Number.isInteger(kept.audioIndex)) form.audioIndex = kept.audioIndex!;
       for (const key of ["processed", "burn"] as const) if (typeof kept[key] === "boolean") form[key] = kept[key];
+      if (Number.isInteger(kept.sourceId)) form.sourceId = kept.sourceId!;
       panel.set({ clipStart: form.start, clipEnd: form.end });
       plugin.update();
     },
@@ -1054,7 +1080,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   // Clip
   on("setMethod", (index: number) => setMethod(METHODS[Number(index)]!));
   on("clipEdited", (start: string, end: string) => {
-    Object.assign(form, { start: String(start), end: String(end) });
+    // Typed while the tab shows the source playing: the marks are its.
+    Object.assign(form, { start: String(start), end: String(end), sourceId: player.state.sourceId });
     rememberForm();
     probeSoon();
   });
@@ -1188,10 +1215,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
         sayProblem(problemOf(error));
       }
     });
-  on("addPart", (start: string, end: string) => {
-    Object.assign(form, { start: String(start), end: String(end) });
-    return addPart();
-  });
+  on("addPart", (start: string, end: string) => addPart(false, { start: String(start), end: String(end) }));
   onPart("removePart", (id) => removePart(id));
   onPart("movePart", (id, to) => {
     if (collection.move(id, Number(to))) void recheck();
@@ -1247,10 +1271,10 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
    * A range the user has not typed is set to the position → +10 s.
    */
   async function openClip() {
-    if (!typedByUser()) {
-      const { position, duration } = await player.refresh();
-      setRange(defaultRange(position, duration), true);
-    }
+    const seen = await player.refresh();
+    marksFor(seen);
+    // Cleared above when they were another file's; the user's own range stays as typed (nothing written over it).
+    if (!typedByUser()) setRange(defaultRange(seen.position, seen.duration), true);
     await showTab("clip");
   }
   entry("clip.open", 470, openClip, { group: "clip-export" });
@@ -1260,6 +1284,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
    * range yet it opens the Clip page instead.
    */
   entry("clip.export", 471, async () => {
+    // Another file's marks are not this one's: with none for this file the key opens the Clip page.
+    if (marksFor(await player.refresh())) panel.set({ clipStart: form.start, clipEnd: form.end });
     if (!form.start.trim() && !form.end.trim()) return openClip();
     await exportClip(form.start, form.end, false, true);
   }, { bindings: ["Ctrl+Shift+E"], ...inTab, ...canExport });
