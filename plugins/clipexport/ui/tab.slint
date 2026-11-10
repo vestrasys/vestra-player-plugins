@@ -232,7 +232,6 @@ export global ClipBridge {
     // The method a merged export uses now (Precise when Fast cannot write the parts).
     in property <int> collection-method-index;
     in property <bool> collection-busy;
-    in property <Status> collection-status;
     in-out property <string> collection-template;
     in property <string> collection-preview;
 
@@ -842,11 +841,18 @@ component PartItem inherits Rectangle {
     height: 46px;
     background: root.dragging ? Theme.selected-bg : root.entry.selected ? Theme.selected-bg : area.has-hover ? Theme.hover-bg : transparent;
     opacity: root.dragging ? 0.6 : 1;
+    // The whole row drags (the handle shows that it can): a press that moves more than a few pixels reorders;
+    // a click selects, a double-click plays the part.
     area := TouchArea {
-        clicked => {
-            root.pressed();
-            ClipBridge.select-part(root.entry.id);
+        mouse-cursor: self.pressed && root.dragging ? grabbing : default;
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down { root.pressed(); }
+            if event.kind == PointerEventKind.up || event.kind == PointerEventKind.cancel { root.drag-ended(); }
         }
+        moved => {
+            if self.pressed && abs(self.mouse-y - self.pressed-y) > 4px { root.drag-moved(self.mouse-y - self.pressed-y); }
+        }
+        clicked => { ClipBridge.select-part(root.entry.id); }
         double-clicked => {
             ClipBridge.preview-part(root.entry.id);
             VestraFocus.release();
@@ -856,21 +862,10 @@ component PartItem inherits Rectangle {
         padding-left: 2px;
         padding-right: 4px;
         spacing: 5px;
-        // The drag handle: press and move to reorder.
+        // The drag handle: a hint that the row can be dragged (the whole row takes the drag).
         Rectangle {
             width: 14px;
-            ToolTipArea {
-                text: @tr("Drag to reorder");
-                Glyph { x: 0px; y: (parent.height - self.height) / 2; glyph: Glyphs.grip; color: handle.has-hover || handle.pressed ? Theme.text : Theme.icon-disabled; }
-                handle := TouchArea {
-                    mouse-cursor: grab;
-                    pointer-event(event) => {
-                        if event.kind == PointerEventKind.down { root.pressed(); }
-                        if event.kind == PointerEventKind.up || event.kind == PointerEventKind.cancel { root.drag-ended(); }
-                    }
-                    moved => { if self.pressed { root.drag-moved(self.mouse-y - self.pressed-y); } }
-                }
-            }
+            Glyph { x: 0px; y: (parent.height - self.height) / 2; glyph: Glyphs.grip; color: area.has-hover || root.dragging ? Theme.text : Theme.icon-disabled; }
         }
         Text {
             width: 16px;
@@ -936,8 +931,9 @@ component PartItem inherits Rectangle {
             }
         }
     }
-    if root.line-above: Rectangle { y: 0px; height: 2px; background: Theme.accent; }
-    if root.line-below: Rectangle { y: parent.height - 2px; height: 2px; background: Theme.accent; }
+    // Always there, shown while it applies (no element is created or removed during a drag).
+    Rectangle { y: 0px; height: 2px; background: Theme.accent; visible: root.line-above; }
+    Rectangle { y: parent.height - 2px; height: 2px; background: Theme.accent; visible: root.line-below; }
     Rectangle { y: parent.height - 1px; height: 1px; background: Theme.line; }
 }
 
@@ -974,8 +970,6 @@ export component ClipExportTab inherits Rectangle {
     // The Collection: Fast can write the parts (or no check answered yet), what a problem line says.
     private property <bool> merge-fast-ok: !ClipBridge.copy.checked || ClipBridge.copy.ok;
     private property <bool> merge-fast: ClipBridge.support.fast && ClipBridge.collection-method-index == 0;
-    private property <bool> collection-problem: ClipBridge.collection-status.kind == "error" || ClipBridge.collection-status.kind == "clip-failed"
-        || ClipBridge.collection-status.kind == "no-destination" || ClipBridge.collection-status.kind == "blocked";
     private property <bool> can-merge: ClipBridge.collection-info.count > 0 && !ClipBridge.blocking.shown && !ClipBridge.collection-busy && !ClipBridge.queue-full;
     // "Fast: part 2 is 1920×818, part 1 is 3840×1714".
     private property <string> fast-why: ClipBridge.copy.checked && !ClipBridge.copy.ok && ClipBridge.copy.part != ""
@@ -1360,16 +1354,17 @@ export component ClipExportTab inherits Rectangle {
                     if ClipBridge.card.shown: ProgressCard { card: ClipBridge.card; }
                     // Add from: the file playing and the marks it shares with the Clip page.
                     Heading { text: @tr("Add from"); }
+                    // The source playing; greyed when it cannot be added (a stream, a plugin's picture), with one line why.
+                    if ClipBridge.add-from.name != "": HorizontalLayout {
+                        spacing: 5px;
+                        VerticalLayout { alignment: center; Glyph { glyph: Glyphs.film; color: ClipBridge.add-from.can ? Theme.text-dim : Theme.icon-disabled; } }
+                        Line { text: ClipBridge.add-from.name; color: ClipBridge.add-from.can ? Theme.text : Theme.text-dim; }
+                        Text { text: ClipBridge.add-from.duration; color: Theme.text-dim; font-family: Theme.font-mono; font-size: Theme.font-xs; vertical-alignment: center; }
+                    }
                     if !ClipBridge.add-from.can: Line {
                         text: ClipBridge.mode == "stream" ? @tr("Only local files can be added: this picture is made by a plugin.")
                             : ClipBridge.mode == "network" ? @tr("Only local files can be added: this video is a stream.")
                             : @tr("Open a local video to add its ranges.");
-                    }
-                    if ClipBridge.add-from.can: HorizontalLayout {
-                        spacing: 5px;
-                        VerticalLayout { alignment: center; Glyph { glyph: Glyphs.film; } }
-                        Line { text: ClipBridge.add-from.name; color: Theme.text; }
-                        Text { text: ClipBridge.add-from.duration; color: Theme.text-dim; font-family: Theme.font-mono; font-size: Theme.font-xs; vertical-alignment: center; }
                     }
                     HorizontalLayout {
                         spacing: 3px;
@@ -1545,8 +1540,8 @@ export component ClipExportTab inherits Rectangle {
                     }
                     // A blocking problem in red (Export stays greyed while it stands), else the last action's problem or news.
                     Line {
-                        color: ClipBridge.blocking.shown || root.collection-problem ? Theme.danger : Theme.text-dim;
-                        text: ClipBridge.blocking.shown ? Words.blocking(ClipBridge.blocking.problem, ClipBridge.blocking.part) : Words.status(ClipBridge.collection-status);
+                        color: Theme.danger;
+                        text: ClipBridge.blocking.shown ? Words.blocking(ClipBridge.blocking.problem, ClipBridge.blocking.part) : "";
                     }
                 }
             }

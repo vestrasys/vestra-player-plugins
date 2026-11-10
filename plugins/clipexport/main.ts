@@ -6,13 +6,13 @@ import {
   METHODS, NO_TIMELINE, parseCodec, parseKeyframes, PRESET_ENCODE, presetOf, PRESETS, RATES, snapStart, SPEEDS, timeline, timelineWindow,
 } from "./clip.ts";
 import type { Encode, Method } from "./clip.ts";
-import { blockingNote, Collection, copyNote, exportParts, lengthClock, listKey, partStates, partTicks, targetNote, totalLength, UNDO_MS } from "./collection.ts";
+import { blockingNote, Collection, copyNote, exportParts, lengthClock, listKey, partStates, partTicks, retryDelay, targetNote, totalLength, UNDO_MS } from "./collection.ts";
 import type { Part } from "./collection.ts";
 import { capturer } from "./form.ts";
-import { audioChoices, clippable, clock, Failure, isLocal, message, notClippable, parseRange, parseTime, problemOf, REASON, tabMode } from "./model.ts";
+import { audioChoices, clippable, clock, Failure, isLocal, message, notClippable, parseRange, parseTime, problemOf, REASON, tabMode, withExtension } from "./model.ts";
 import type { Problem, Reason, Spec } from "./model.ts";
 import { COLLECTION_TEMPLATE, DEFAULT_TEMPLATE, insertVariable, normalTemplate, renderName } from "./names.ts";
-import { makeThumb, Results, sizeOf } from "./results.ts";
+import { makeThumb, PART_THUMB, Results, scaleThumb, sizeOf } from "./results.ts";
 import type { Saved } from "./results.ts";
 import { hostSupport, rangeMarker, showDone } from "./seams.ts";
 import type { HostSupport, OsdAction } from "./seams.ts";
@@ -125,7 +125,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   } catch {
     // no data directory: rows show their icon only
   }
-  const ui = { clipBusy: false, clipStatus: status(), resultsStatus: status(), adding: false, collectionBusy: false, collectionStatus: status() };
+  const ui = { clipBusy: false, clipStatus: status(), resultsStatus: status(), adding: false, collectionBusy: false };
   const collection = new Collection(plugin);
   let partFolder: string | null = null;
   try {
@@ -176,8 +176,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
 
   /** A task reached its end: a finished one becomes a result (kept across restarts); report it on screen and in the tab. */
   async function finished(task: Task) {
-    // A merged export reports on the Collection page; a part's file that went or changed shows on its row.
-    const setStatus = (next: Status) => (task.parts ? (ui.collectionStatus = next) : (ui.clipStatus = next));
+    // A clip reports on the Clip page's status line; a merged export on screen only (a part's file that went or changed shows on its row).
+    const setStatus = (next: Status) => void (task.parts || (ui.clipStatus = next));
     if (task.parts && task.status === "failed") void recheck();
     if (task.status === "completed") {
       const path = task.output ?? task.destination;
@@ -448,7 +448,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     if (ask) {
       const picked = await plugin.dialogs.saveFile({ title: "Export Clip", fileName: name });
       if (!picked) return void (ui.clipStatus = status("no-destination"));
-      destination = /\.(mp4|mkv)$/i.test(picked) ? picked : `${picked}${extension}`;
+      // The container follows the format (LosslessCut's rule): Precise writes MP4 whatever the typed extension said.
+      destination = withExtension(picked, extension);
     } else destination = join(await targetFolder(seen.source), name);
     await exporter.start(spec, seen, destination);
     ui.clipStatus = status("clip-started");
@@ -519,10 +520,14 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   /** The last check of the list (`media.exportCheck`), and the list it answered for. */
   let check: ExportCheck | null = null;
   let checkKey = "";
-  let checking = false;
+  /** The check running now (one at a time), whether the list changed meanwhile, and the last check's refusal. */
+  let flight: Promise<void> | null = null;
   let checkAgain = false;
+  let checkError: unknown = null;
+  /** `busy` answers in a row; the automatic retry backs off and stops after five (`retryDelay`). */
+  let busyTries = 0;
   let checkTimer: ReturnType<typeof setTimeout> | undefined;
-  /** The row selected in the list (Delete removes it). */
+  /** The row selected in the list (Delete removes it); cleared when another page shows. */
   let selected: string | null = null;
   /** The parts a Clear took away, while Undo can bring them back. */
   let undo: { parts: Part[]; timer: ReturnType<typeof setTimeout> } | null = null;
@@ -532,45 +537,79 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     clearTimeout(checkTimer);
     if (undo) clearTimeout(undo.timer);
   });
+  /**
+   * One queue for everything that gets or lets go of a token: `remember` with
+   * the part it makes, and each `forget`. `remember` gives the same token again
+   * for the same file, so a forget decided before a new part of that file was
+   * added would take the new part's file away: each forget looks at the parts
+   * again inside the queue, right before it asks.
+   */
+  let sourceQueue: Promise<unknown> = Promise.resolve();
+  function serial<T>(run: () => Promise<T>): Promise<T> {
+    const next = sourceQueue.then(run, run);
+    sourceQueue = next.catch(() => {});
+    return next;
+  }
   const encodingOption = () => (support.encodeOptions ? { encoding: exportEncoding(settings.encode) } : undefined);
   /** The check, when it answered for the list as it is now. */
   const freshCheck = () => (check && checkKey === listKey(exportParts(collection.parts)) ? check : null);
   /**
    * Check the list again (cheap: nothing is decoded): after every change, when
-   * the tab shows, after Locate… and a failed merge. One check at a time; a
-   * change meanwhile asks again once it answered.
+   * the tab shows, after Locate… and a failed merge, and before an export. One
+   * check at a time; a change meanwhile asks again once it answered. `busy`
+   * (the plugin's four requests) retries after 0.3, 0.6, 1.2, 2.4 and 4.8 s,
+   * then stops until the next change.
    */
-  async function recheck(): Promise<void> {
+  function recheck(): Promise<void> {
     clearTimeout(checkTimer);
     if (!collection.parts.length) {
       check = null;
       checkKey = "";
-      return;
+      checkError = null;
+      return Promise.resolve();
     }
-    if (checking) return void (checkAgain = true);
-    checking = true;
-    try {
-      do {
-        checkAgain = false;
-        const parts = exportParts(collection.parts);
-        try {
-          const answer = await plugin.media.exportCheck(parts, encodingOption());
-          check = answer;
-          checkKey = listKey(parts);
-        } catch (error) {
-          // Four requests of the plugin at once: ask again shortly; anything else is logged (the export checks again itself).
-          if ((error as { code?: string }).code === "busy") {
-            checkTimer = setTimeout(() => void recheck(), 300);
-            checkTimer.unref?.();
-          } else console.error(`[clipexport] collection check: ${message(error)}`);
-          break;
-        }
-      } while (checkAgain);
-    } finally {
-      checking = false;
-      // Past the check's await: the rows and the footer changed outside SDK-invoked code.
-      plugin.update();
+    if (flight) {
+      checkAgain = true;
+      return flight;
     }
+    flight = (async () => {
+      try {
+        do {
+          checkAgain = false;
+          const parts = exportParts(collection.parts);
+          try {
+            const answer = await plugin.media.exportCheck(parts, encodingOption());
+            check = answer;
+            checkKey = listKey(parts);
+            checkError = null;
+            busyTries = 0;
+          } catch (error) {
+            checkError = error;
+            const delay = (error as { code?: string }).code === "busy" ? retryDelay(busyTries++) : null;
+            if (delay !== null) {
+              checkTimer = setTimeout(() => void recheck(), delay);
+              checkTimer.unref?.();
+            } else console.error(`[clipexport] collection check: ${message(error)}`);
+            break;
+          }
+        } while (checkAgain);
+      } finally {
+        flight = null;
+        // Past the check's await: the rows and the footer changed outside SDK-invoked code.
+        plugin.update();
+      }
+    })();
+    return flight;
+  }
+  /** A check of the list as it is now, through the same single check (an export waits for it). */
+  async function currentCheck(): Promise<ExportCheck> {
+    for (let i = 0; i < 2; i++) {
+      await recheck();
+      const fresh = freshCheck();
+      if (fresh) return fresh;
+      if (checkError) throw sourceError(checkError);
+    }
+    throw new Failure("busy");
   }
   /** Fast for the Collection: the user's choice when a copy can write the parts (or no check answered yet); Precise otherwise. */
   function collectionMethod(): Method {
@@ -584,29 +623,40 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     for (const task of tasks.list) for (const part of task.parts ?? []) used.add(part.source);
     return used;
   }
-  /** Let the player forget files no part names any more (each frees one of the plugin's 500 references). */
-  async function forgetUnused(tokens: Iterable<string>) {
-    const used = usedTokens();
-    for (const token of new Set(tokens)) if (!used.has(token)) await plugin.media.sources.forget(token).catch((error) => console.error(`[clipexport] forget: ${message(error)}`));
+  /** Let the player forget files no part names any more (each frees one of the plugin's 500 references), one at a time in the queue. */
+  function forgetUnused(tokens: Iterable<string>) {
+    return Promise.all(
+      [...new Set(tokens)].map((token) =>
+        serial(async () => {
+          if (usedTokens().has(token)) return;
+          await plugin.media.sources.forget(token).catch((error) => console.error(`[clipexport] forget: ${message(error)}`));
+        }),
+      ),
+    );
   }
   /** Once a session, when the tab shows: tokens and thumbnails that a lost list or an ended session left behind go. */
   async function tidy() {
     if (tidied) return;
     tidied = true;
     try {
-      const used = usedTokens();
-      for (const file of await plugin.media.sources.list()) if (!used.has(file.token)) await plugin.media.sources.forget(file.token);
+      const files = await serial(() => plugin.media.sources.list());
+      await forgetUnused(files.map((file) => file.token));
     } catch (error) {
       console.error(`[clipexport] tidy references: ${message(error)}`);
     }
     if (!partFolder) return;
-    // A thumbnail is named after its part (`<part id>-<time>.jpg`): one being written for a part now is kept too.
-    const kept = new Set([...collection.parts, ...(undo?.parts ?? [])].map((part) => part.id));
-    for (const name of await readdir(partFolder).catch(() => [] as string[]))
-      if (!kept.has(name.split("-")[0]!)) await rm(join(partFolder, name), { force: true }).catch(() => {});
+    const sweep = Date.now();
+    for (const name of await readdir(partFolder).catch(() => [] as string[])) {
+      const file = join(partFolder, name);
+      // Written since the sweep began (a part added meanwhile): kept. A thumbnail is named after its part (`<part id>-…`).
+      const info = await stat(file).catch(() => null);
+      if (!info || info.mtimeMs >= sweep - 1000) continue;
+      const kept = new Set([...collection.parts, ...(undo?.parts ?? [])].map((part) => part.id));
+      if (!kept.has(name.split("-")[0]!)) await rm(file, { force: true }).catch(() => {});
+    }
   }
 
-  // Thumbnails: a frame captured at the part's start while its file plays (there is no thumbnail API), into the data directory.
+  // Thumbnails: a frame captured at the part's start while its file plays (there is no thumbnail API), scaled down into the data directory.
   const partThumbs = new Map<string, ImageRef>();
   const partThumbOf = (part: Part) => {
     if (!part.thumb || !partFolder) return null;
@@ -619,30 +669,42 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     for (const key of partThumbs.keys()) if (key.startsWith(`${part.id}/`)) partThumbs.delete(key);
     if (part.thumb && partFolder) void rm(join(partFolder, part.thumb), { force: true }).catch(() => {});
   };
-  /** Capture the part's first frame from the file playing (`seen`); a failure leaves the row with its icon. */
+  /**
+   * Capture the part's first frame from the file playing (`seen`) as a full
+   * frame, then scale it with ffmpeg (the Results thumbnails' path) to twice
+   * the row's size; the full frame is deleted. Without ffmpeg, or on a
+   * failure, the row keeps its icon.
+   */
   async function partThumbnail(part: Part, seen: PlayerState) {
-    if (!partFolder) return;
+    if (!partFolder || !(await plugin.tools.available("ffmpeg").catch(() => false))) return;
     let snapshot: Awaited<ReturnType<typeof plugin.media.capture>> | undefined;
+    // The frame as asked for, and as the player wrote it (its outcome); only files in the plugin's own folder are deleted.
+    let asked = "";
+    let frame = "";
     try {
       snapshot = await plugin.media.capture({ ifCurrent: seen, at: part.start });
       await mkdir(partFolder, { recursive: true });
       // A new name each time: an export never overwrites a file.
-      const file = join(partFolder, `${part.id}-${Date.now()}.jpg`);
-      const end = await (await snapshot.export({ format: "jpeg", destination: file, quality: 70 })).done;
+      const stamp = Date.now();
+      frame = asked = join(partFolder, `${part.id}-${stamp}.frame.jpg`);
+      const end = await (await snapshot.export({ format: "jpeg", destination: asked, quality: 90 })).done;
       if (end.status !== "completed") return;
-      const written = end.outcome && "destination" in end.outcome ? end.outcome.destination : file;
-      if (!collection.find(part.id)) return void rm(written, { force: true }).catch(() => {});
-      collection.update(part, { thumb: basename(written) });
+      if (end.outcome && "destination" in end.outcome) frame = end.outcome.destination;
+      const name = await scaleThumb(plugin, frame, join(partFolder, `${part.id}-${stamp}.jpg`), PART_THUMB);
+      if (!name) return;
+      if (!collection.find(part.id)) return void rm(join(partFolder, name), { force: true }).catch(() => {});
+      collection.update(part, { thumb: name });
       // Past the export's await: the row's picture changed outside SDK-invoked code.
       plugin.update();
     } catch (error) {
       console.error(`[clipexport] part thumbnail: ${message(error)}`);
     } finally {
+      for (const file of new Set([asked, frame])) if (file && dirname(file) === partFolder) void rm(file, { force: true }).catch(() => {});
       await snapshot?.dispose().catch(() => {});
     }
   }
 
-  /** Add the marked range (the Clip page's Start and End) of the file playing as the last part. `say`: from a key, on screen too. */
+  /** Add the marked range (the Clip page's Start and End) of the file playing as the last part. `say`: from a key, success on screen too. */
   async function addPart(say = false) {
     if (ui.adding) return;
     ui.adding = true; // exclusion before the first await
@@ -652,19 +714,21 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       const range = parseRange(form.start, form.end);
       if (range.end > seen.duration! + 0.0005) throw new Failure("outOfRange");
       if (collection.full()) throw new Failure("collectionFull");
-      const file = await plugin.media.sources.remember({ ifCurrent: seen }).catch((error) => {
-        throw sourceError(error);
+      // In the token queue: no forget can come between the token and the part that uses it.
+      const part = await serial(async () => {
+        const file = await plugin.media.sources.remember({ ifCurrent: seen }).catch((error) => {
+          throw sourceError(error);
+        });
+        // The player's own name: the file as the token stands for it.
+        return collection.add({ token: file.token, name: file.name, start: range.start, end: Math.min(range.end, file.duration || range.end) });
       });
-      // The player's own name: the file as the token stands for it.
-      const part = collection.add({ token: file.token, name: file.name, start: range.start, end: Math.min(range.end, file.duration || range.end) });
-      ui.collectionStatus = status("added", { name: String(collection.parts.length) });
       if (say) shown(osd.show("Added as part {}", [collection.parts.length]));
       plugin.update();
       void recheck();
       void partThumbnail(part, seen);
     } catch (error) {
-      ui.collectionStatus = errorStatus(error);
-      if (say) sayProblem(problemOf(error));
+      // The Collection page has no status line (its red line is for what blocks the export): the message says it.
+      sayProblem(problemOf(error));
     } finally {
       ui.adding = false;
     }
@@ -677,8 +741,10 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     void forgetUnused([part.token]);
     void recheck();
   }
+  /** The Collection page is the one on screen (Delete acts on its selection only then). */
+  const collectionShown = () => tabShown() && settings.page === "collection";
   /** Delete (while the list has the focus): the selected part. */
-  const removeSelected = () => selected && removePart(selected);
+  const removeSelected = () => selected && collectionShown() && removePart(selected);
   /** Clear Collection: empty at once, with Undo on the message for a while (no confirmation dialog). */
   function clearCollection() {
     if (!collection.parts.length) return;
@@ -689,7 +755,6 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     undo = { parts, timer };
     selected = null;
     void recheck();
-    ui.collectionStatus = status("cleared");
     void osd.show("Collection cleared.", [], { actions: [{ title: text("Undo"), command: "clip.collectionUndo" }] }).catch(() => {});
   }
   /** Undo is no longer offered: the cleared parts' thumbnails and files go. */
@@ -702,12 +767,12 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     void forgetUnused(parts.map((part) => part.token));
     plugin.update();
   }
+  /** Undo Clear: the parts come back before those added since; refused (Undo stays offered) when they would not fit. */
   function undoClear() {
     if (!undo) return;
+    if (!collection.restore(undo.parts)) return sayProblem({ reason: "undoFull", raw: "" });
     clearTimeout(undo.timer);
-    collection.restore(undo.parts);
     undo = null;
-    ui.collectionStatus = status();
     void recheck();
   }
   /** Locate…: the player's own file dialog; the file the user picks stands for the part's file from then on. */
@@ -739,41 +804,33 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     if (ui.collectionBusy) return;
     ui.collectionBusy = true; // exclusion before the first await
     try {
-      const parts = collection.parts.map((part) => ({ ...part }));
-      if (!parts.length) throw new Failure("emptyCollection");
+      if (!collection.parts.length) throw new Failure("emptyCollection");
       if (tasks.full()) throw new Failure("queueFull");
-      // The export works on the list as it is now; later edits apply to the next one.
+      const answer = await currentCheck();
+      // The export works on the list it checked; later edits apply to the next one.
+      const parts = collection.parts.map((part) => ({ ...part }));
       const input = exportParts(parts);
-      const answer = await plugin.media.exportCheck(input, encodingOption()).catch((error) => {
-        throw sourceError(error);
-      });
-      check = answer;
-      checkKey = listKey(input);
       const first = answer.blocking[0];
-      if (first) {
-        ui.collectionStatus = status("blocked", { reason: first.problem, name: String(first.part + 1) });
-        if (say) shown(osd.show(BLOCKING[first.problem], [first.part + 1]));
-        return;
-      }
+      // The red line under the buttons says it (from the same check); a key says it on screen.
+      if (first) return void (say && shown(osd.show(BLOCKING[first.problem], [first.part + 1])));
       const chosen: Method = method() === "fast" && answer.copy.ok ? "fast" : "precise";
+      // The container follows the format: a re-encode is MP4, a copy what the check says the player writes.
       const extension = chosen === "fast" && answer.copy.ok ? `.${answer.copy.container}` : ".mp4";
       const head = parts[0]!;
       const name = `${renderName(settings.collectionTemplate, { source: head.name, start: head.start, end: parts.at(-1)!.end, now: new Date(), n: nextNumber() }, COLLECTION_TEMPLATE)}${extension}`;
       let destination: string;
       if (ask) {
         const picked = await plugin.dialogs.saveFile({ title: "Export Collection", fileName: name });
-        if (!picked) return void (ui.collectionStatus = status("no-destination"));
-        destination = /\.(mp4|mkv)$/i.test(picked) ? picked : `${picked}${extension}`;
+        if (!picked) return;
+        destination = withExtension(picked, extension);
       } else destination = join(await targetFolder(null), name);
       const spec: Spec = {
         start: 0, end: totalLength(parts), processed: false, subtitles: false, track: "selected", method: chosen,
         encode: chosen === "precise" && support.encodeOptions ? { ...settings.encode } : undefined,
       };
       await exporter.startParts(spec, input, destination);
-      ui.collectionStatus = status("clip-started");
     } catch (error) {
-      ui.collectionStatus = errorStatus(error);
-      if (say) sayFailed(problemOf(error));
+      sayFailed(problemOf(error));
     } finally {
       ui.collectionBusy = false;
     }
@@ -805,7 +862,6 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       target: targetNote(fresh),
       collectionMethodIndex: METHODS.indexOf(collectionMethod()),
       collectionBusy: ui.collectionBusy,
-      collectionStatus: ui.collectionStatus,
     };
   }
 
@@ -901,8 +957,9 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     const can = clippable(state);
     return {
       can,
-      name: can && lastSource ? basename(lastSource) : "",
-      duration: can && state.duration ? clock(state.duration) : "",
+      // A stream's name too (shown greyed beside why it cannot be added); a plugin's picture has none.
+      name: can && lastSource ? basename(lastSource) : tabMode(state) === "network" && state.source ? basename(state.source.split(/[?#]/)[0]!) : "",
+      duration: state.duration && Number.isFinite(state.duration) ? clock(state.duration) : "",
       length: can && !("error" in range) ? (range.end - range.start).toFixed(1) : "",
       next: collection.parts.length + 1,
       full: collection.full(),
@@ -941,6 +998,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     if (!Number.isInteger(index) || !page) return;
     if (page === "results") unseen = 0;
     if (settings.page === page) return;
+    // A selection is the Collection page's: another page in front leaves nothing for Delete to remove.
+    selected = null;
     settings.page = page;
     store();
   }
@@ -1108,14 +1167,13 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     void retitleLast();
   });
   // Collection
-  /** A Collection action from the tab: its problem goes on the page's status line. */
+  /** A Collection action from the tab: its problem is said on screen (the page's red line is for what blocks the export). */
   const onPart = (name: string, action: (...args: string[]) => unknown) =>
     on(name, async (...args: unknown[]) => {
       try {
-        ui.collectionStatus = status();
         await action(...args.map(String));
       } catch (error) {
-        ui.collectionStatus = errorStatus(error);
+        sayProblem(problemOf(error));
       }
     });
   on("addPart", (start: string, end: string) => {
@@ -1240,7 +1298,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   /** The Undo button of the "Collection cleared" message (an OSD button runs a command), while Undo is offered. */
   entry("clip.collectionUndo", 485, undoClear, { ...inCollection, enabled: () => !!undo });
   /** Delete while the list has the keyboard focus (a key of the panel's content, `focus: "panel"`). */
-  entry("clip.collectionRemove", 486, removeSelected, { ...inCollection, bindings: ["Delete"], focus: "panel", enabled: () => !!selected });
+  entry("clip.collectionRemove", 486, removeSelected, { ...inCollection, bindings: ["Delete"], focus: "panel", enabled: () => !!selected && collectionShown() });
   /**
    * Export Last N Seconds (Ctrl+Shift+R): its title states the length the
    * user chose in Settings, so the command is declared again when it changes

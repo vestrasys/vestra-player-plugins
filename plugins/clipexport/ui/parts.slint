@@ -60,6 +60,7 @@ export global Words {
         if (code == "partUnknown") { return @tr("A part's file is no longer known. Remove the part."); }
         if (code == "cannotRead") { return @tr("The player cannot read this file."); }
         if (code == "noCapability") { return @tr("This version of the player cannot do this."); }
+        if (code == "undoFull") { return @tr("There is no room to bring the cleared parts back: the Collection holds at most 100. Remove parts, then Undo again."); }
         return raw;
     }
 
@@ -115,10 +116,6 @@ export global Words {
         if (s.kind == "no-destination") { return @tr("No save location chosen."); }
         if (s.kind == "clip-started") { return @tr("Export started. Follow it in Results."); }
         if (s.kind == "restarted") { return @tr("Restarted."); }
-        // TRANSLATORS: {} is a part number of the Collection.
-        if (s.kind == "added") { return @tr("Added as part {}", s.name); }
-        if (s.kind == "blocked") { return Words.blocking(s.reason, s.name); }
-        if (s.kind == "cleared") { return @tr("Collection cleared."); }
         return "";
     }
 

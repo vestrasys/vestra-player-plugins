@@ -22,6 +22,8 @@ export interface Part {
 
 /** Parts of one merged export (the SDK's `MEDIA_SOURCE_LIMITS.parts`): the Collection holds no more. */
 export const PART_LIMIT = 100;
+/** The wait before the next automatic check after `busy` answers in a row: 0.3 s doubling, none after five. */
+export const retryDelay = (tries: number) => (tries < 5 ? 300 * 2 ** tries : null);
 /** How long Clear Collection can be undone. */
 export const UNDO_MS = 30_000;
 
@@ -198,11 +200,18 @@ export class Collection {
     this.#save();
     return all;
   }
-  /** Undo a Clear: the old parts come back first, parts added since stay after them (within the limit). */
-  restore(old: Part[]) {
+  /**
+   * Undo a Clear: the old parts come back first, parts added since stay after
+   * them. Nothing is dropped: false (and nothing changes) when they would not
+   * fit within {@link PART_LIMIT} together.
+   */
+  restore(old: Part[]): boolean {
     const ids = new Set(this.parts.map((part) => part.id));
-    this.parts = [...old.filter((part) => !ids.has(part.id)), ...this.parts].slice(0, PART_LIMIT);
+    const back = old.filter((part) => !ids.has(part.id));
+    if (back.length + this.parts.length > PART_LIMIT) return false;
+    this.parts = [...back, ...this.parts];
     this.#save();
+    return true;
   }
   flush() {
     return this.#store?.flush();

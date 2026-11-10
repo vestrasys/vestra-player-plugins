@@ -63,6 +63,7 @@ export const REASON = {
   partUnknown: "A part's file is no longer known. Remove the part.",
   cannotRead: "The player cannot read this file.",
   noCapability: "This version of the player cannot do this.",
+  undoFull: "There is no room to bring the cleared parts back: the Collection holds at most 100. Remove parts, then Undo again.",
 } as const;
 export type Reason = keyof typeof REASON;
 
@@ -150,6 +151,13 @@ export function stemOf(source: string | null) {
 /** The player can take a snapshot of the source now (the input of every export). */
 export const usable = (state: PlayerState) =>
   state.kind === "media" && (state.phase === "ready" || state.phase === "ended") && state.can.snapshot;
+
+/**
+ * A chosen file name with the extension of what will be written: the
+ * container follows the format (as LosslessCut does), so a re-encode named
+ * `.mkv` in the save dialog becomes `.mp4` instead of an MP4 inside an MKV name.
+ */
+export const withExtension = (path: string, extension: string) => `${path.replace(/\.(mp4|mkv)$/i, "")}${extension}`;
 
 /** A local file path (not a URL). */
 export const isLocal = (source: string | null): source is string =>

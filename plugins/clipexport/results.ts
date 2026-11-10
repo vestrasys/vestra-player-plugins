@@ -137,12 +137,12 @@ const THUMB_TIMEOUT_MS = 10_000;
  * one thread, as the playlist's thumbnails, so the player keeps the other
  * cores.
  */
-export function thumbArgs(path: string) {
+export function thumbArgs(path: string, size: { width: number; height: number } = { width: THUMB_W, height: THUMB_H }) {
   return [
     "-nostdin", "-v", "error", "-threads", "1", "-skip_frame", "nokey",
     "-i", path,
     "-map", "0:V:0", "-an", "-sn", "-dn", "-frames:v", "1", "-filter_threads", "1",
-    "-vf", `scale=${THUMB_W}:${THUMB_H}:force_original_aspect_ratio=decrease:flags=bilinear,format=yuvj420p`,
+    "-vf", `scale=${size.width}:${size.height}:force_original_aspect_ratio=decrease:flags=bilinear,format=yuvj420p`,
     "-threads", "1", "-q:v", "5", "-f", "image2pipe", "-c:v", "mjpeg", "-",
   ];
 }
@@ -163,6 +163,26 @@ export async function makeThumb(plugin: Scope, folder: string | null, item: Save
     const name = `${item.id}-${item.finished}.jpg`;
     await writeFile(join(folder, name), stdout);
     return name;
+  } catch (error) {
+    console.error(`[clipexport] thumbnail: ${(error as Error).message}`);
+    return "";
+  }
+}
+
+/** A Collection row's thumbnail: twice the row's 64×36, so the data directory keeps small files (max side 256). */
+export const PART_THUMB = { width: 256, height: 144 };
+/**
+ * Scale the picture at `input` (a captured frame) down to `size` with ffmpeg,
+ * the same way as the Results thumbnails, into `output`; its file name, or ""
+ * when ffmpeg is missing or fails.
+ */
+export async function scaleThumb(plugin: Scope, input: string, output: string, size: { width: number; height: number }): Promise<string> {
+  try {
+    if (!(await plugin.tools.available("ffmpeg"))) return "";
+    const { stdout } = await plugin.tools.run("ffmpeg", thumbArgs(input, size), { timeoutMs: THUMB_TIMEOUT_MS, maxOutput: 1 << 20 });
+    if (!stdout.length) return "";
+    await writeFile(output, stdout);
+    return basename(output);
   } catch (error) {
     console.error(`[clipexport] thumbnail: ${(error as Error).message}`);
     return "";
