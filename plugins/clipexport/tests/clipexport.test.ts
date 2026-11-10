@@ -113,6 +113,7 @@ test("one menu item, Video ▸ Export Clip…; the rest is in the command palett
       ["clip.collectionExport", "", "clip.collection"],
       ["clip.collectionClear", "", "clip.collection"],
       ["clip.collectionUndo", "", "clip.collection"],
+      ["clip.collectionUndoApply", "", "clip.collection"],
       ["clip.collectionRemove", "Delete", "clip.collection"],
       ["clip.last", "Ctrl+Shift+R", "clip.panel"],
     ]);
@@ -134,7 +135,7 @@ test("every command has the Export category in the command palette, and every ho
     ready(host);
     const { stop } = await start(host, locale);
     try {
-      assert.equal(host.commands.size, 17);
+      assert.equal(host.commands.size, 18);
       for (const [id, command] of host.commands) {
         assert.equal(command.declaration.category, "Export", id);
         assert.ok(command.display.category?.trim(), `${id}: shows a category in ${locale}`);

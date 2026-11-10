@@ -60,6 +60,8 @@ export global Words {
         if (code == "partUnknown") { return @tr("A part's file is no longer known. Remove the part."); }
         if (code == "cannotRead") { return @tr("The player cannot read this file."); }
         if (code == "noCapability") { return @tr("This version of the player cannot do this."); }
+        if (code == "noFfmpeg") { return @tr("The transitions need FFmpeg, which the player could not find."); }
+        if (code == "transitionFailed") { return @tr("Could not write the transitions."); }
         if (code == "undoFull") { return @tr("There is no room to bring the cleared parts back: the Collection holds at most 100. Remove parts, then Undo again."); }
         return raw;
     }
@@ -85,6 +87,39 @@ export global Words {
         // TRANSLATORS: {} is frames per second.
         if (field == "fps") { return @tr("{} fps", value); }
         return value;
+    }
+
+    // A transition's name (the picker's tiles, the chip's tooltip).
+    public pure function kind-name(kind: string) -> string {
+        if (kind == "crossfade") { return @tr("Crossfade"); }
+        if (kind == "fadeBlack") { return @tr("Fade through black"); }
+        if (kind == "fadeWhite") { return @tr("Fade through white"); }
+        if (kind == "wipe") { return @tr("Wipe"); }
+        if (kind == "slide") { return @tr("Slide"); }
+        return @tr("Cut");
+    }
+
+    // A transition's short name (the chip).
+    public pure function kind-short(kind: string) -> string {
+        if (kind == "fadeBlack") { return @tr("Through black"); }
+        if (kind == "fadeWhite") { return @tr("Through white"); }
+        return Words.kind-name(kind);
+    }
+
+    // The way the new picture moves, after the name of a Wipe or Slide (" ←"); "" for the other kinds.
+    public pure function arrow(kind: string, dir: string) -> string {
+        if (kind != "wipe" && kind != "slide") { return ""; }
+        if (dir == "right") { return " →"; }
+        if (dir == "up") { return " ↑"; }
+        if (dir == "down") { return " ↓"; }
+        return " ←";
+    }
+
+    // What the sound does with a kind (it follows the picture).
+    public pure function sound(kind: string) -> string {
+        if (kind == "fadeBlack" || kind == "fadeWhite") { return @tr("Sound fades out, then in"); }
+        if (kind == "cut") { return @tr("Sound: cut"); }
+        return @tr("Sound crossfades with the picture");
     }
 
     // The state of a Collection row's file.

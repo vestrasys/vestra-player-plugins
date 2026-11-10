@@ -74,7 +74,7 @@ test("vertical slice: the marked range of two files becomes two parts; Export Me
       [2, `${clock(10)} – ${clock(12.5)}`, "2.5"],
     ]);
     await eventually(() => rows(host).map((row) => row.current), [false, true], "the file playing in the playing colour");
-    await eventually(() => tab(host)["collection-info"], { count: 2, total: lengthClock(5.5), checked: true, undo: false });
+    await eventually(() => tab(host)["collection-info"], { count: 2, total: lengthClock(5.5), checked: true, undo: false, transitions: 0, saved: "0.0", off: false });
     await eventually(() => (tab(host).copy as { ok: boolean }).ok, true, "two files a copy can join");
     assert.equal(tab(host)["collection-method-index"], 0, "Fast");
     host.mounted().emit("export-merged");
@@ -413,8 +413,8 @@ test("the Collection is kept across restarts; a token the player no longer knows
 test("Collection logic: stored parts, moves, the check's states, ticks and lengths", () => {
   const stored = { parts: [{ id: "p1", token: "a", name: "x.mp4", start: 1, end: 2, thumb: "../evil.jpg" }, { id: "p1", token: "b", start: 0, end: 1 }, { id: "p2", token: "", start: 0, end: 1 }, { id: "p3", token: "c", start: 3, end: 2 }, { id: "p4", token: "d", start: 0, end: 4, thumb: "p4-1.jpg" }] };
   assert.deepEqual(partsOf(stored), [
-    { id: "p1", token: "a", name: "x.mp4", start: 1, end: 2, thumb: "" },
-    { id: "p4", token: "d", name: "", start: 0, end: 4, thumb: "p4-1.jpg" },
+    { id: "p1", token: "a", name: "x.mp4", start: 1, end: 2, thumb: "", transition: { kind: "cut", dir: "left", duration: 1 } },
+    { id: "p4", token: "d", name: "", start: 0, end: 4, thumb: "p4-1.jpg", transition: { kind: "cut", dir: "left", duration: 1 } },
   ]);
   assert.deepEqual(partsOf(null), []);
   assert.deepEqual(moved([1, 2, 3, 4], 3, 0), [4, 1, 2, 3]);

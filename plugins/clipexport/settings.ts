@@ -5,6 +5,8 @@ import type { Scope } from "@vestra-player/sdk";
 import { encodeOf, lastSeconds, METHODS } from "./clip.ts";
 import type { Encode, Method } from "./clip.ts";
 import { COLLECTION_TEMPLATE, normalTemplate } from "./names.ts";
+import { transitionOf } from "./transitions.ts";
+import type { Transition } from "./transitions.ts";
 
 /** Everything kept in `settings.json`. */
 export interface Settings {
@@ -24,6 +26,8 @@ export interface Settings {
   advancedOpen: boolean;
   /** The merged export's file-name template (the Collection). */
   collectionTemplate: string;
+  /** The transition a new part gets from the part before it: Cut until Apply to All sets another (Q3 a). */
+  newTransition: Transition;
   /** The sub-tab shown last. */
   page: Page;
   /** Seconds of work per second of media of the last Precise export on this machine (the time estimate); null before one. */
@@ -71,6 +75,7 @@ export function settingsOf(stored: unknown, folder = defaultFolder()): Settings 
     lastSeconds: lastSeconds(s.lastSeconds),
     advancedOpen: flag(s.advancedOpen, false),
     collectionTemplate: normalTemplate(s.collectionTemplate, COLLECTION_TEMPLATE),
+    newTransition: transitionOf(s.newTransition),
     page: pageOf(s.page),
     preciseSpeed: s.preciseSpeed === null || s.preciseSpeed === undefined ? null : inRange(s.preciseSpeed, 0.01, 1000, 0) || null,
   };

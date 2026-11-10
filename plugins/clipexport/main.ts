@@ -8,7 +8,10 @@ import {
 import type { Encode, Method } from "./clip.ts";
 import { blockingNote, Collection, copyNote, exportParts, lengthClock, listKey, partStates, partTicks, retryDelay, targetNote, totalLength, UNDO_MS } from "./collection.ts";
 import type { Part } from "./collection.ts";
+import { finisher, inflightStore, sweepWork } from "./finish.ts";
 import { capturer } from "./form.ts";
+import { anyTransition, capOf, DIRECTIONS, FIRST_DURATION, junctionTicks, KINDS, mergeEncode, PRESET_DURATIONS, sourceBitrate, timing, typedDuration } from "./transitions.ts";
+import type { Direction, Kind, Plan, Transition } from "./transitions.ts";
 import { audioChoices, clippable, clock, Failure, isLocal, message, notClippable, parseRange, parseTime, problemOf, REASON, tabMode, withExtension } from "./model.ts";
 import type { Problem, Reason, Spec } from "./model.ts";
 import { COLLECTION_TEMPLATE, DEFAULT_TEMPLATE, insertVariable, normalTemplate, renderName } from "./names.ts";
@@ -53,6 +56,7 @@ const TITLE = {
   "clip.collectionClear": "Clear Collection",
   "clip.collectionUndo": "Undo Clear Collection",
   "clip.collectionRemove": "Remove from Collection",
+  "clip.collectionUndoApply": "Undo Apply to All",
 } as const;
 type CommandId = keyof typeof TITLE;
 
@@ -98,6 +102,8 @@ interface Form {
 export interface Options {
   /** Pretend the player offers less than it does (tests of the tab's views; seams.ts). */
   support: Partial<HostSupport>;
+  /** The free space beside a file, in bytes (tests; the system's otherwise). */
+  freeSpace: (folder: string) => Promise<number>;
 }
 
 /** Megabytes as a number for the tab ("8.1", "71"); the tab adds the unit in the user's language. "" when unknown. */
@@ -127,7 +133,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   } catch {
     // no data directory: rows show their icon only
   }
-  const ui = { clipBusy: false, clipStatus: status(), resultsStatus: status(), adding: false, collectionBusy: false };
+  const ui = { clipBusy: false, clipStatus: status(), resultsStatus: status(), adding: false, collectionBusy: false, picker: "" };
   const collection = new Collection(plugin);
   let partFolder: string | null = null;
   try {
@@ -150,7 +156,17 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   const sayFailed = ({ reason, raw }: Problem) => shown(osd.show("Export failed: {}", [reason ? text(REASON[reason]) : cut(raw)]));
   // A failure while reporting a finished task goes to the log (it would otherwise be lost: no message, no result row).
   const tasks = new Tasks(plugin, (task) => void finished(task).catch((error) => console.error(`[clipexport] finishing task ${task.id}: ${message(error)}`)));
-  const exporter = capturer(plugin, tasks);
+  // A merged export with transitions: the player's merge goes into the work folder, the plugin's ffmpeg writes the file.
+  let workFolder: string | null = null;
+  try {
+    workFolder = join(plugin.dataDirectory, "work");
+  } catch {
+    // no data directory: merged exports join with cuts
+  }
+  // Half files beside the user's videos are recorded while they are written; what a crash left goes now, before any task runs.
+  const inflight = inflightStore(plugin);
+  const swept = workFolder ? sweepWork(workFolder, inflight).catch((error) => console.error(`[clipexport] work folder: ${message(error)}`)) : Promise.resolve();
+  const exporter = capturer(plugin, tasks, workFolder ? finisher(plugin, workFolder, { inflight, ...(options.freeSpace ? { freeSpace: options.freeSpace } : {}) }) : undefined);
   const marker = rangeMarker(plugin, text("Clip"));
   let sequence = 0;
   const nextNumber = () => ++sequence;
@@ -271,14 +287,18 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   /** The progress card at the top of the Clip page: the running task and how many wait. */
   function card() {
     const task = tasks.running();
-    if (!task) return { shown: false, id: "", name: "", method: "", preset: "", percent: -1, left: -1, elapsed: "", queued: 0, part: 0, parts: 0, ticks: "" };
+    if (!task) return { shown: false, id: "", name: "", method: "", preset: "", percent: -1, left: -1, elapsed: "", queued: 0, part: 0, parts: 0, transition: 0, transitions: 0, ticks: "" };
     const share = task.progress && task.progress.total > 0 ? task.progress.done / task.progress.total : null;
     const { spec } = task;
     return {
       // A merged export: which part is being written, and thin ticks at the joins.
       part: task.progress?.part ?? 0,
       parts: task.parts?.length ?? 0,
-      ticks: task.parts ? partTicks(task.parts.map((part) => part.end - part.start)) : "",
+      // The plugin's step: which transition ffmpeg has reached.
+      transition: task.progress?.transition ?? 0,
+      transitions: task.progress?.transitions ?? 0,
+      // The junctions where the output has them: with transitions, the overlaps already taken off.
+      ticks: task.finish ? junctionTicks(task.finish.plan as Plan) : task.parts ? partTicks(task.parts.map((part) => part.end - part.start)) : "",
       shown: true,
       id: task.id,
       name: basename(task.destination),
@@ -725,6 +745,17 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     }
   }
 
+  /** The video bit rate of the part's source (it is playing: `source` is its path), for a "Same as source" export with transitions. */
+  async function partBitrate(part: Part, source: string | null) {
+    if (!source || !(await plugin.tools.available("ffprobe").catch(() => false))) return;
+    try {
+      const { stdout } = await plugin.tools.run("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=bit_rate:format=bit_rate", "-of", "default=nw=1", source], { timeoutMs: 15_000, maxOutput: 4096 });
+      const values = [...new TextDecoder().decode(stdout).matchAll(/bit_rate=(\d+)/g)].map((m) => Number(m[1])).filter((n) => n > 0);
+      if (values[0] && collection.find(part.id)) collection.update(part, { bitrate: values[0] });
+    } catch (error) {
+      console.error(`[clipexport] part bit rate: ${message(error)}`);
+    }
+  }
   /** Add the marked range (the Clip page's Start and End) of the file playing as the last part. `say`: from a key, success on screen too. */
   async function addPart(say = false, typed?: { start: string; end: string }) {
     if (ui.adding) return;
@@ -744,12 +775,14 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
           throw sourceError(error);
         });
         // The player's own name: the file as the token stands for it.
-        return collection.add({ token: file.token, name: file.name, start: range.start, end: Math.min(range.end, file.duration || range.end) });
+        // The part before it joins it with the default for new parts: Cut, until Apply to All sets another (Q3 a).
+        return collection.add({ token: file.token, name: file.name, start: range.start, end: Math.min(range.end, file.duration || range.end) }, settings.newTransition);
       });
       if (say) shown(osd.show("Added as part {}", [collection.parts.length]));
       plugin.update();
       void recheck();
       void partThumbnail(part, seen);
+      void partBitrate(part, seen.source);
     } catch (error) {
       // The Collection page has no status line (its red line is for what blocks the export): the message says it.
       sayProblem(problemOf(error));
@@ -857,7 +890,20 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
         start: 0, end: totalLength(parts), processed: false, subtitles: false, track: "selected", method: chosen,
         encode: chosen === "precise" && support.encodeOptions ? { ...settings.encode } : undefined,
       };
-      await exporter.startParts(spec, input, destination);
+      // Precise with a transition: the plain merge, then the plugin writes the transitions (Fast joins with cuts, Q2 a).
+      const transitions = parts.map((part) => part.transition);
+      const plan: Plan | undefined = chosen === "precise" && workFolder && anyTransition(transitions) && answer.encode
+        ? {
+          transitions, lengths: parts.map((part) => part.end - part.start), fps: answer.encode.fps, audio: !!answer.encode.audio,
+          encode: settings.encode, merge: mergeEncode(settings.encode),
+          bitrate: settings.encode.rate === "source" ? sourceBitrate(parts) : null,
+        }
+        : undefined;
+      // "Same as source" with transitions aims at the parts' own bit rate: unknown, it asks for another quality.
+      if (plan && plan.encode.rate === "source" && !plan.bitrate) throw new Failure("noSourceBitrate");
+      // What a crash left in the work folder is gone first.
+      await swept;
+      await exporter.startParts(spec, input, destination, plan);
     } catch (error) {
       sayFailed(problemOf(error));
     } finally {
@@ -872,6 +918,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   /** The Collection's rows: number, file, range, length, thumbnail, the state of its file. */
   function partRows() {
     const states = partStates(freshCheck(), collection.parts.length);
+    // Fast joins with cuts: the transitions are kept, greyed and struck (Q2 a).
+    const fastNow = collectionMethod() === "fast";
     const playing = lastSource ? basename(lastSource) : null;
     return collection.parts.map((part, index) => ({
       id: part.id,
@@ -883,14 +931,102 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       current: playing !== null && part.name === playing,
       state: states[index]!,
       selected: part.id === selected,
+      // The junction below the part: its transition into the next one (none below the last part).
+      join: index < collection.parts.length - 1,
+      kind: part.transition.kind,
+      dir: part.transition.dir,
+      duration: part.transition.duration.toFixed(1),
+      off: fastNow && part.transition.kind !== "cut",
     }));
+  }
+  /** The footer's sum: the written length (overlaps taken off, unless Fast joins with cuts) and the transitions. */
+  function collectionInfo(checked: boolean) {
+    const fastNow = collectionMethod() === "fast";
+    const junctions = collection.parts.slice(0, -1).filter((part) => part.transition.kind !== "cut");
+    // What the export takes off: each overlap on whole frames, held to half the shorter part, at the merge's frame rate.
+    const fps = freshCheck()?.encode?.fps ?? 30;
+    const t = timing(collection.parts.map((part) => part.end - part.start), collection.parts.map((part) => part.transition), fps);
+    const saved = t.overlaps.reduce((sum, frames) => sum + frames, 0) / fps;
+    const length = totalLength(collection.parts) - (fastNow ? 0 : saved);
+    return {
+      count: collection.parts.length, total: lengthClock(length), checked, undo: !!undo,
+      transitions: junctions.length, saved: saved.toFixed(1), off: fastNow && junctions.length > 0,
+    };
+  }
+  /** The picker of the junction below part `ui.picker`, while it is open: its kind, direction, duration, the limit, the two parts' pictures. */
+  function pickerView() {
+    const index = ui.picker ? collection.indexOf(ui.picker) : -1;
+    const part = collection.parts[index];
+    const next = collection.parts[index + 1];
+    if (!part || !next) return { shown: false, id: "", from: 0, to: 0, kind: "cut", dir: "left", duration: "1.0", cap: "", custom: false, joins: 0 };
+    const tr = part.transition;
+    return {
+      shown: true, id: part.id, from: index + 1, to: index + 2, kind: tr.kind, dir: tr.dir,
+      duration: tr.duration.toFixed(1), cap: capOf(part, next).toFixed(1),
+      custom: !(PRESET_DURATIONS as readonly number[]).includes(tr.duration),
+      joins: collection.parts.length - 1,
+    };
+  }
+  function pickerPictures() {
+    const index = ui.picker ? collection.indexOf(ui.picker) : -1;
+    const part = collection.parts[index];
+    const next = collection.parts[index + 1];
+    return part && next ? [partThumbOf(part), partThumbOf(next)] : [];
+  }
+  /** Pick a kind, a direction or a duration for the junction below part `id`: at once (no OK). */
+  function setTransition(id: string, kind: string, dir: string, duration: string) {
+    const index = collection.indexOf(id);
+    const part = collection.parts[index];
+    const next = collection.parts[index + 1];
+    if (!part || !next) return;
+    const before = part.transition;
+    const k = KINDS.includes(kind as Kind) ? (kind as Kind) : before.kind;
+    const d = DIRECTIONS.includes(dir as Direction) ? (dir as Direction) : before.dir;
+    const cap = capOf(part, next);
+    // The first kind picked on a Cut gets 1 s (Q5 a); a typed value over the limit is set to the limit.
+    const typed = typedDuration(duration, cap);
+    const seconds = before.kind === "cut" && k !== "cut" ? Math.min(cap, FIRST_DURATION) : typed ?? before.duration;
+    collection.setTransition(id, { kind: k, dir: d, duration: seconds });
+  }
+  /** Apply to All: this junction's transition on every junction and as the default for new parts; Undo on the message. */
+  function applyToAll(id: string) {
+    const part = collection.find(id);
+    if (!part) return;
+    expireApplyUndo();
+    const transition = { ...part.transition };
+    const before = collection.applyAll(transition);
+    const timer = setTimeout(expireApplyUndo, UNDO_MS);
+    timer.unref?.();
+    applyUndo = { before, defaultBefore: { ...settings.newTransition }, timer };
+    settings.newTransition = transition;
+    store();
+    void osd.show("Transition applied to every join.", [], { actions: [{ title: text("Undo"), command: "clip.collectionUndoApply" }] }).catch(() => {});
+  }
+  let applyUndo: { before: Map<string, Transition>; defaultBefore: Transition; timer: ReturnType<typeof setTimeout> } | null = null;
+  plugin.onDispose(() => void (applyUndo && clearTimeout(applyUndo.timer)));
+  function expireApplyUndo() {
+    if (!applyUndo) return;
+    clearTimeout(applyUndo.timer);
+    applyUndo = null;
+    plugin.update();
+  }
+  function undoApply() {
+    if (!applyUndo) return;
+    clearTimeout(applyUndo.timer);
+    collection.restoreTransitions(applyUndo.before);
+    settings.newTransition = applyUndo.defaultBefore;
+    store();
+    applyUndo = null;
   }
   /** The Collection page's footer and notes. */
   function collectionView() {
     const fresh = freshCheck();
     return {
       parts: partRows(),
-      collectionInfo: { count: collection.parts.length, total: lengthClock(totalLength(collection.parts)), checked: !!fresh, undo: !!undo },
+      collectionInfo: collectionInfo(!!fresh),
+      picker: pickerView(),
+      // The two parts' thumbnails for the tiles: a property of its own (a missing one is null, which only a list takes).
+      pickerPictures: pickerPictures(),
       blocking: blockingNote(fresh),
       copy: copyNote(fresh),
       target: targetNote(fresh),
@@ -1019,6 +1155,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       probeSoon();
     } else {
       marker.set(null);
+      ui.picker = "";
       // What the user typed, written back for the next build of the tab (the player may rebuild it from the last values).
       panel.set({ clipStart: form.start, clipEnd: form.end });
     }
@@ -1038,6 +1175,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     // A selection is the Collection page's: another page in front leaves nothing for Delete to remove.
     selected = null;
     settings.page = page;
+    // The picker belongs to the Collection page.
+    ui.picker = "";
     store();
   }
   /** Show the tab at a page; when it cannot open, the keys keep working. */
@@ -1228,6 +1367,15 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   onPart("previewPart", (id) => previewPart(id));
   on("exportMerged", () => exportCollection(false));
   on("exportMergedAs", () => exportCollection(true));
+  // Transitions: the picker of a junction opens and closes; a pick applies at once.
+  on("openJoin", (id: string) => {
+    // Fast joins with cuts: a chip does not open the picker (its tooltip says why).
+    if (collectionMethod() === "fast" || collection.indexOf(String(id)) < 0) return;
+    ui.picker = String(id);
+  });
+  on("closeJoin", () => void (ui.picker = ""));
+  on("setTransition", (id: string, kind: string, dir: string, duration: string) => setTransition(String(id), String(kind), String(dir), String(duration)));
+  on("applyAll", (id: string) => applyToAll(String(id)));
   on("collectionTemplateEdited", (value: string) => {
     settings.collectionTemplate = normalTemplate(value, COLLECTION_TEMPLATE);
     store();
@@ -1336,6 +1484,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   /** The Undo button of the "Collection cleared" message (an OSD button runs a command), while Undo is offered. */
   entry("clip.collectionUndo", 485, undoClear, { ...inCollection, enabled: () => !!undo });
   /** Delete while the list has the keyboard focus (a key of the panel's content, `focus: "panel"`). */
+  /** The Undo button of the "applied to every join" message (an OSD button runs a command), while Undo is offered. */
+  entry("clip.collectionUndoApply", 487, undoApply, { ...inCollection, enabled: () => !!applyUndo });
   entry("clip.collectionRemove", 486, removeSelected, { ...inCollection, bindings: ["Delete"], focus: "panel", enabled: () => !!selected && collectionShown() });
   /**
    * Export Last N Seconds (Ctrl+Shift+R): its title states the length the

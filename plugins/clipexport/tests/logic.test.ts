@@ -120,10 +120,10 @@ test("R2 and R4: the range the file holds and the progress, from the job's state
   assert.deepEqual(actualRange(done({ destination: "/a.mp4", start: 240, end: 259.02 }), { start: 242.3, end: 259 }), { start: 240, end: 259.02 });
   assert.deepEqual(actualRange(done({ destination: "/a.mp4" }), { start: 242.3, end: 259 }), { start: 242.3, end: 259 }, "none reported: the range asked for");
   assert.deepEqual(actualRange(done({ destination: "/a.mp4", start: 5, end: 5 }), { start: 1, end: 2 }), { start: 1, end: 2 });
-  assert.deepEqual(jobProgress({ progress: { done: 3, total: 12 } } as never), { done: 3, total: 12, part: 0, parts: 0 });
-  assert.deepEqual(jobProgress({ progress: { done: 13, total: 12 } } as never), { done: 12, total: 12, part: 0, parts: 0 });
-  assert.deepEqual(jobProgress({ progress: { done: 6, total: 12, part: 2, parts: 3 } } as never), { done: 6, total: 12, part: 2, parts: 3 }, "a merged export: the part being written");
-  assert.deepEqual(jobProgress({ progress: { done: 6, total: 12, part: 9, parts: 3 } } as never), { done: 6, total: 12, part: 3, parts: 3 });
+  assert.deepEqual(jobProgress({ progress: { done: 3, total: 12 } } as never), { done: 3, total: 12, part: 0, parts: 0, transition: 0, transitions: 0 });
+  assert.deepEqual(jobProgress({ progress: { done: 13, total: 12 } } as never), { done: 12, total: 12, part: 0, parts: 0, transition: 0, transitions: 0 });
+  assert.deepEqual(jobProgress({ progress: { done: 6, total: 12, part: 2, parts: 3 } } as never), { done: 6, total: 12, part: 2, parts: 3, transition: 0, transitions: 0 }, "a merged export: the part being written");
+  assert.deepEqual(jobProgress({ progress: { done: 6, total: 12, part: 9, parts: 3 } } as never), { done: 6, total: 12, part: 3, parts: 3, transition: 0, transitions: 0 });
   assert.equal(jobProgress({ progress: null } as never), null);
   assert.equal(jobProgress({} as never), null);
   assert.equal(jobProgress({ progress: { done: 0, total: 0 } } as never), null);

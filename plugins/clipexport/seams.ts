@@ -70,6 +70,9 @@ export interface Progress {
   total: number;
   part: number;
   parts: number;
+  /** A merged export with transitions, while the plugin writes them: the transition reached (from 1) of how many; 0 otherwise. */
+  transition: number;
+  transitions: number;
 }
 
 /** The times the finished file holds (R2): the player's `outcome.start` / `end`, the range asked for when it gives none. */
@@ -86,7 +89,7 @@ export function jobProgress(state: JobState): Progress | null {
   if (!(progress && Number.isFinite(progress.done) && Number.isFinite(progress.total) && progress.total > 0)) return null;
   const count = (value: unknown) => (typeof value === "number" && Number.isInteger(value) && value > 0 ? value : 0);
   const parts = count(progress.parts);
-  return { done: Math.min(progress.done, progress.total), total: progress.total, part: parts ? Math.min(count(progress.part), parts) : 0, parts };
+  return { done: Math.min(progress.done, progress.total), total: progress.total, part: parts ? Math.min(count(progress.part), parts) : 0, parts, transition: 0, transitions: 0 };
 }
 
 /** A button of a finished export's message (R5): a label and one of the plugin's own commands. */
