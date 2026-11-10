@@ -221,7 +221,7 @@ export function transitionGraph(parts: readonly number[] | Layout, transitions: 
   t.overlaps.forEach((overlap, i) => {
     const next = i + 1;
     const vOut = next === t.frames.length - 1 ? "vout" : `vj${next}`;
-    const aOut = next === t.frames.length - 1 ? "aout" : `aj${next}`;
+    const aOut = next === t.frames.length - 1 ? "sound" : `aj${next}`;
     const tr = transitions[i]!;
     if (overlap === 0) {
       out.push(`[${video}][v${next}]concat=n=2:v=1:a=0,settb=AVTB[${vOut}]`);
@@ -243,7 +243,7 @@ export function transitionGraph(parts: readonly number[] | Layout, transitions: 
   });
   if (t.frames.length === 1) {
     out.push("[v0]null[vout]");
-    if (audio) out.push("[a0]anull[aout]");
+    if (audio) out.push("[a0]acopy[sound]");
   }
   return { graph: out.join(";"), timing: t, length: t.written / fps };
 }
@@ -282,7 +282,7 @@ export function transitionArgs(o: EncodeArgs) {
   const rate = o.encode.rate === "source" && o.bitrate && o.bitrate > 0
     ? ["-b:v", String(Math.round(o.bitrate)), "-maxrate", String(Math.round(o.bitrate * 1.5)), "-bufsize", String(Math.round(o.bitrate * 2))]
     : ["-crf", String(o.encode.rate === "source" ? 18 : o.encode.crf)];
-  const sound = o.audio ? ["-map", "[aout]", "-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", `${o.encode.audio}k`] : ["-an"];
+  const sound = o.audio ? ["-map", "[sound]", "-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", `${o.encode.audio}k`] : ["-an"];
   const args = [
     "-nostdin", "-v", "error", "-y", "-threads", threads,
     "-i", o.input,

@@ -110,7 +110,7 @@ test("the filter graph: trim each part out of the merge, xfade + acrossfade (qsi
   assert.match(graph, /\[v0\]\[v1\]xfade=transition=fade:duration=1:offset=2\.95\[vj1\]/);
   assert.match(graph, /\[a0\]\[a1\]acrossfade=ns=48000:c1=qsin:c2=qsin\[aj1\]/);
   assert.match(graph, /\[vj1\]\[v2\]xfade=transition=fadeblack:duration=1:offset=5\.95\[vout\]/);
-  assert.match(graph, /\[aj1\]afade=t=out:st=6:d=0\.5\[ad2\];\[a2\]afade=t=in:st=0\.5:d=0\.5\[ai2\];\[ad2\]\[ai2\]acrossfade=ns=48000:c1=nofade:c2=nofade\[aout\]/);
+  assert.match(graph, /\[aj1\]afade=t=out:st=6:d=0\.5\[ad2\];\[a2\]afade=t=in:st=0\.5:d=0\.5\[ai2\];\[ad2\]\[ai2\]acrossfade=ns=48000:c1=nofade:c2=nofade\[sound\]/);
   const cuts = transitionGraph([4, 4], [CUT, CUT], 10, false).graph;
   assert.equal(cuts, "[0:v]trim=start_frame=0:end_frame=40,settb=AVTB,setpts=N/(10*TB)[v0];[0:v]trim=start_frame=40:end_frame=80,settb=AVTB,setpts=N/(10*TB)[v1];[v0][v1]concat=n=2:v=1:a=0,settb=AVTB[vout]");
   // One timebase on every branch: concat writes 1/1000000, a trimmed part keeps its file's, and xfade takes only equal ones.
