@@ -616,9 +616,9 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     const fresh = freshCheck();
     return method() === "fast" && (!fresh || fresh.copy.ok) ? "fast" : "precise";
   }
-  /** Tokens still needed: the parts', those a Clear can bring back, and those of merged exports (queued, running or to retry). */
   /** The parts of merged exports being started (a save dialog, a free name): not yet a task, already the export's. */
   const pendingParts = new Set<ExportPart[]>();
+  /** Tokens still needed: the parts', those a Clear can bring back, those of merged exports (queued, running or to retry) and of exports being started. */
   function usedTokens() {
     const used = collection.tokens();
     for (const part of undo?.parts ?? []) used.add(part.token);
