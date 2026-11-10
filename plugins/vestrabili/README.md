@@ -20,7 +20,7 @@ VestraBili reads Bilibili pages with [yt-dlp](https://github.com/yt-dlp/yt-dlp).
 - Your own yt-dlp is used instead when the environment variable `VESTRA_YTDLP` names it, or when `yt-dlp` is on the PATH and VestraBili has not downloaded its own copy. VestraBili never updates a yt-dlp it did not download.
 - Downloads honour `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`; yt-dlp itself does too.
 
-yt-dlp is released into the public domain ([Unlicense](https://github.com/yt-dlp/yt-dlp/blob/master/LICENSE)). It is not part of VestraBili and is not redistributed with it; each user's player downloads it from the yt-dlp project.
+yt-dlp's source code is released under the [Unlicense](https://github.com/yt-dlp/yt-dlp/blob/master/LICENSE), but the standalone builds VestraBili downloads bundle GPLv3+ code and are licensed GPLv3+ as a whole ([yt-dlp's licensing notes](https://github.com/yt-dlp/yt-dlp#licensing)). yt-dlp is a separate program: it is not part of VestraBili and is not redistributed with it; each user's player downloads it from the yt-dlp project.
 
 ## Requirements
 

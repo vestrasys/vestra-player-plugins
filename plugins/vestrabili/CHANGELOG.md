@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.2
+
+- Nobody needs to do anything: the download and its checks are unchanged.
+- The download question now states yt-dlp's licence correctly: the standalone builds VestraBili downloads are licensed GPLv3+ (they bundle GPLv3+ code), while yt-dlp's source code is Unlicense. yt-dlp is a separate program and is not redistributed with VestraBili. 0.5.0 said yt-dlp was in the public domain, which holds only for its source code.
+
 ## 0.5.1
 
 - After yt-dlp is ready, the window says "Resolving the video and audio…" at once instead of keeping the last download percentage until the video opens (with SDK 1.5.45 and later a window refreshes when its handler returns, and this one was still waiting for the video).
