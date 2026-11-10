@@ -1538,7 +1538,7 @@ export component ClipExportTab inherits Rectangle {
                             clicked => { ClipBridge.export-merged-as(); }
                         }
                     }
-                    // A blocking problem in red (Export stays greyed while it stands), else the last action's problem or news.
+                    // What blocks the export, in red (Export stays greyed while it stands); empty otherwise (action problems go on screen).
                     Line {
                         color: Theme.danger;
                         text: ClipBridge.blocking.shown ? Words.blocking(ClipBridge.blocking.problem, ClipBridge.blocking.part) : "";

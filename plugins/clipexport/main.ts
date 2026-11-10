@@ -1,6 +1,6 @@
 import { access, constants, mkdir, readdir, rm, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-import type { CommandOptions, ExportCheck, ImageRef, Panel, PanelState, Plugin, PlayerState, Text } from "@vestra-player/sdk";
+import type { CommandOptions, ExportCheck, ExportPart, ImageRef, Panel, PanelState, Plugin, PlayerState, Text } from "@vestra-player/sdk";
 import {
   abRange, AUDIO_RATES, codecArgs, crfOf, defaultRange, effectiveMethod, estimate, exportEncoding, fastContainer, HEIGHTS, keyframeArgs, LAST_SECONDS, lastRange, lastSeconds,
   METHODS, NO_TIMELINE, parseCodec, parseKeyframes, PRESET_ENCODE, presetOf, PRESETS, RATES, snapStart, SPEEDS, timeline, timelineWindow,
@@ -617,10 +617,13 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     return method() === "fast" && (!fresh || fresh.copy.ok) ? "fast" : "precise";
   }
   /** Tokens still needed: the parts', those a Clear can bring back, and those of merged exports (queued, running or to retry). */
+  /** The parts of merged exports being started (a save dialog, a free name): not yet a task, already the export's. */
+  const pendingParts = new Set<ExportPart[]>();
   function usedTokens() {
     const used = collection.tokens();
     for (const part of undo?.parts ?? []) used.add(part.token);
     for (const task of tasks.list) for (const part of task.parts ?? []) used.add(part.source);
+    for (const parts of pendingParts) for (const part of parts) used.add(part.source);
     return used;
   }
   /** Let the player forget files no part names any more (each frees one of the plugin's 500 references), one at a time in the queue. */
@@ -803,13 +806,16 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   async function exportCollection(ask: boolean, say = false) {
     if (ui.collectionBusy) return;
     ui.collectionBusy = true; // exclusion before the first await
+    let input: ExportPart[] | null = null;
     try {
       if (!collection.parts.length) throw new Failure("emptyCollection");
       if (tasks.full()) throw new Failure("queueFull");
       const answer = await currentCheck();
       // The export works on the list it checked; later edits apply to the next one.
       const parts = collection.parts.map((part) => ({ ...part }));
-      const input = exportParts(parts);
+      // Its files are the export's from here on (no await before): a part removed during the save dialog keeps its token.
+      input = exportParts(parts);
+      pendingParts.add(input);
       const first = answer.blocking[0];
       // The red line under the buttons says it (from the same check); a key says it on screen.
       if (first) return void (say && shown(osd.show(BLOCKING[first.problem], [first.part + 1])));
@@ -833,6 +839,11 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       sayFailed(problemOf(error));
     } finally {
       ui.collectionBusy = false;
+      // The task holds the tokens now, or the export did not start: either way the pending hold ends.
+      if (input) {
+        pendingParts.delete(input);
+        if (!tasks.list.some((task) => task.parts && listKey(task.parts) === listKey(input!))) void forgetUnused(input.map((part) => part.source));
+      }
     }
   }
   /** The Collection's rows: number, file, range, length, thumbnail, the state of its file. */
@@ -958,7 +969,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     return {
       can,
       // A stream's name too (shown greyed beside why it cannot be added); a plugin's picture has none.
-      name: can && lastSource ? basename(lastSource) : tabMode(state) === "network" && state.source ? basename(state.source.split(/[?#]/)[0]!) : "",
+      // The file's name; a stream has no title in the public API (its address's last segment says nothing, "watch"), so none.
+      name: can && lastSource ? basename(lastSource) : "",
       duration: state.duration && Number.isFinite(state.duration) ? clock(state.duration) : "",
       length: can && !("error" in range) ? (range.end - range.start).toFixed(1) : "",
       next: collection.parts.length + 1,

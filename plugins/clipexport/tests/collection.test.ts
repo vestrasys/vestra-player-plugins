@@ -138,7 +138,7 @@ test("add: only a local file with a valid range; the 101st part is refused", asy
     await said(host, REASON.addLocal);
     await host.command("clip.collection").run();
     await host.settle();
-    await eventually(() => tab(host)["add-from"], { can: false, name: "live.m3u8", duration: "01:00.000", length: "", next: 1, full: false }, "the stream's name, greyed, and why");
+    await eventually(() => tab(host)["add-from"], { can: false, name: "", duration: "01:00.000", length: "", next: 1, full: false }, "no title for a stream in the public API: no name, only why");
     play(host, "/media/one.mp4", 30);
     host.mounted().emit("add-part", "5", "1");
     await said(host, REASON.endBeforeStart);
@@ -613,6 +613,62 @@ test("a check the player answers busy is retried with a growing wait, five times
     await said(host, `Export failed: ${REASON.busy}`);
     assert.equal(partsExports(host).length, 0);
   } finally {
+    await stop();
+  }
+});
+test("a part removed while Export As… waits for the save dialog keeps its file: the export holds its tokens before its first await", async () => {
+  const host = new TestHost();
+  play(host, "/media/one.mp4");
+  const { stop } = await start(host);
+  const folder = await mkdtemp(join(tmpdir(), "clipexport-as-"));
+  const dialog = gate();
+  let asked = false;
+  try {
+    await add(host, "1", "3");
+    host.handle("dialogs.open", async () => {
+      asked = true;
+      await dialog.held;
+      return { cancelled: false, paths: [join(folder, "joined")] };
+    });
+    host.mounted().emit("export-merged-as");
+    await until(() => asked, "the save dialog");
+    host.mounted().emit("remove-part", rows(host)[0]!.id);
+    await eventually(() => rows(host).length, 0);
+    await new Promise((done) => setTimeout(done, 100));
+    assert.equal(host.sent("media.sources.forget").length, 0, "not forgotten while the dialog is open");
+    dialog.release();
+    await until(() => partsExports(host).length === 1, "the merged export");
+    await until(() => host.osd.some((line) => line.startsWith("Clip exported as")), "the export finished with its file");
+    assert.equal(partsExports(host)[0]!.destination, join(folder, "joined.mp4"));
+  } finally {
+    dialog.release();
+    await stop();
+    await rm(folder, { recursive: true, force: true });
+  }
+});
+
+test("Export As… cancelled after the part was removed: the hold ends and the unused file is forgotten", async () => {
+  const host = new TestHost();
+  play(host, "/media/one.mp4");
+  const { stop } = await start(host);
+  const dialog = gate();
+  let asked = false;
+  try {
+    await add(host, "1", "3");
+    host.handle("dialogs.open", async () => {
+      asked = true;
+      await dialog.held;
+      return { cancelled: true, paths: [] };
+    });
+    host.mounted().emit("export-merged-as");
+    await until(() => asked, "the save dialog");
+    host.mounted().emit("remove-part", rows(host)[0]!.id);
+    await eventually(() => rows(host).length, 0);
+    dialog.release();
+    await until(() => host.sent("media.sources.forget").length === 1, "forgotten once nothing holds it");
+    assert.equal(partsExports(host).length, 0);
+  } finally {
+    dialog.release();
     await stop();
   }
 });
