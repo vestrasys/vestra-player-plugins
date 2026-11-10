@@ -323,6 +323,8 @@ component Action {
     in property <string> key;
     // false in a narrow tab: the key moves to the tooltip.
     in property <bool> show-key: true;
+    // false where the row has no room: the glyph alone, the label stays in the tooltip.
+    in property <bool> show-text: true;
     in property <bool> enabled: true;
     in property <bool> primary;
     in property <string> tip;
@@ -348,8 +350,8 @@ component Action {
                 : touch.pressed ? Theme.button-press
                 : touch.has-hover ? Theme.button-hover : Theme.button-bg;
             row := HorizontalLayout {
-                padding-left: root.text == "" ? 4px : Theme.button-padding;
-                padding-right: root.text == "" ? 4px : Theme.button-padding;
+                padding-left: root.text == "" || !root.show-text ? 4px : Theme.button-padding;
+                padding-right: root.text == "" || !root.show-text ? 4px : Theme.button-padding;
                 spacing: 5px;
                 alignment: center;
                 if root.glyph != "": VerticalLayout {
@@ -359,7 +361,7 @@ component Action {
                         color: !root.enabled ? Theme.icon-disabled : root.primary ? Theme.text : Theme.text-list;
                     }
                 }
-                if root.text != "": Text {
+                if root.text != "" && root.show-text: Text {
                     text: root.text;
                     color: !root.enabled ? Theme.text-dim : root.primary ? Theme.text : Theme.text-list;
                     font-size: Theme.font-body;
@@ -414,9 +416,10 @@ component Label inherits Text {
 
 // A time or number field (the std LineEdit); reports its focus so that the fullscreen sidebar stays.
 // The std LineEdit asks for at least 160 px: two of them beside Start and End needed ~450 px and pushed End out
-// of the 317 px tab. A time field needs far less (eight mono digits); the row's buttons keep their room.
+// of the 317 px tab. A time field needs its time: "00:02.000" is 54.4 px in Consolas 11 px, plus the
+// field's 12 + 12 px padding and the cursor: 80 px.
 component Field inherits LineEdit {
-    min-width: 56px;
+    min-width: 80px;
     horizontal-stretch: 1;
     height: Theme.input-height;
     font-size: Theme.font-body;
@@ -945,6 +948,21 @@ export component ClipExportTab inherits Rectangle {
     background: Theme.bg-panel;
     // The width classes: narrow < 317 px (key caps move to the tooltips).
     private property <bool> narrow: root.width < 317px;
+    // The Collection's Start / End row: two 80 px fields, "–" and four 3 px gaps, and the two buttons
+    // (8 + 8 px padding, a 14 px glyph, 5 px gaps, the label, the key cap). Measured on the labels in the
+    // user's language: labels where they fit, key caps where those fit too, else the glyphs alone (the
+    // label and key stay in the tooltips). The page has 8 px padding on each side.
+    private property <length> marks-room: root.width - 16px;
+    private property <length> marks-fields: 2 * 80px + 6px + 4 * 3px;
+    private property <length> marks-labels-need: 2 * (8px + 8px + 14px + 5px) + start-label.preferred-width + end-label.preferred-width;
+    private property <length> marks-caps-need: (ClipBridge.keys.start != "" ? 5px + start-cap.width : 0px) + (ClipBridge.keys.end != "" ? 5px + end-cap.width : 0px);
+    private property <bool> marks-labels: root.marks-fields + root.marks-labels-need <= root.marks-room;
+    private property <bool> marks-caps: !root.narrow && root.marks-labels && root.marks-fields + root.marks-labels-need + root.marks-caps-need <= root.marks-room;
+    // Measured only (outside every layout, never shown): the labels and key caps of Start and End as the row shows them.
+    start-label := Text { visible: false; text: @tr("Start"); font-size: Theme.font-body; }
+    end-label := Text { visible: false; text: @tr("End"); font-size: Theme.font-body; }
+    start-cap := KeyHint { visible: false; text: ClipBridge.keys.start; }
+    end-cap := KeyHint { visible: false; text: ClipBridge.keys.end; }
     private property <bool> fast: ClipBridge.support.fast && ClipBridge.method-index == 0;
     // What the ⓘ beside Fast / Precise explains: the method, and where this clip will start.
     private property <string> method-tip: root.fast
@@ -1376,7 +1394,8 @@ export component ClipExportTab inherits Rectangle {
                             text: @tr("Start");
                             glyph: Glyphs.target;
                             key: ClipBridge.keys.start;
-                            show-key: !root.narrow;
+                            show-text: root.marks-labels;
+                            show-key: root.marks-caps;
                             enabled: ClipBridge.add-from.can;
                             tip: @tr("Set Clip Start");
                             tip-keys: [{ key: ClipBridge.keys.start, text: "" }];
@@ -1403,7 +1422,8 @@ export component ClipExportTab inherits Rectangle {
                             text: @tr("End");
                             glyph: Glyphs.target;
                             key: ClipBridge.keys.end;
-                            show-key: !root.narrow;
+                            show-text: root.marks-labels;
+                            show-key: root.marks-caps;
                             enabled: ClipBridge.add-from.can;
                             tip: @tr("Set Clip End");
                             tip-keys: [{ key: ClipBridge.keys.end, text: "" }];

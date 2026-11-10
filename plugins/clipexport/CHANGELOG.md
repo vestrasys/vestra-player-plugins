@@ -2,10 +2,11 @@
 
 ## 0.2.1
 
-**Who must change: nobody.** Two fixes of 0.2.0; still Vestra Player 0.7.7 or later.
+**Who must change: nobody.** Two fixes of 0.2.0; still Vestra Player 0.7.6 or later.
 
 - **Start and End belong to the file they were set on.** A new file (opened, from the playlist, or a part's double-click) no longer shows the last file's range (for example the same 0:20–0:29 on every video): its fields are empty until you set marks, as cut points are per file in LosslessCut. A part's double-click marks that part. Export Clip… fills the new file's position → +10 s; Add Range to Collection and Export Clip Range by key refuse with the reason when this file has no marks.
-- **End is visible again** beside the time fields on the Collection page: the fields no longer ask for the std field's 160 px each (two of them pushed End out of the 317 px tab). The Clip page's Now buttons fit at the narrowest tab too.
+- **End is visible again** beside the time fields on the Collection page: the fields no longer ask for the std field's 160 px each (two of them pushed End out of the 317 px tab). Each time field is wide enough for a whole time (80 px). Start and End show their labels where the row has room for them in your language, their key caps where those fit too, and their glyphs alone otherwise (the label and key stay in the tooltip). The Clip page's Now buttons fit at the narrowest tab too.
+- The range marks Start and End are nouns in every language: German Start / Ende, French Début / Fin, Spanish Inicio / Fin, Simplified Chinese 起点 / 终点 (were the verbs Starten, Démarrer, Iniciar, and 开始 / 结束).
 
 ## 0.2.0
 

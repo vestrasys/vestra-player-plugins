@@ -717,8 +717,12 @@ test("the time fields fit beside Start and End: not the std LineEdit's 160 px mi
   const slint = await readFile(new URL("../ui/tab.slint", import.meta.url), "utf8");
   const field = /component Field inherits LineEdit \{[^}]*?min-width: (\d+)px;/.exec(slint);
   assert.ok(field, "Field sets its own minimum width");
-  const min = Number(field![1]);
-  // At the 280 px minimum (narrow: no key caps), less 16 px padding: Start ≈ 60, End ≈ 55, "–" 6, 4 gaps of 3 px; German "Starten"/"Ende" add ≈ 16.
-  assert.ok(60 + 55 + 6 + 12 + 16 + 2 * min <= 280 - 16, `two ${min} px fields leave room for Start and End at 280 px`);
-  assert.ok(min >= 48, "still wide enough to type a time");
+  // "00:02.000" (clock()'s shortest time) is 54.4 px in Consolas 11 px; the field pads 12 + 12 px.
+  assert.ok(Number(field![1]) >= Math.ceil(54.4 + 24), "a time shows whole");
+  // The row works out from the measured labels whether they fit, then the key caps; else the glyphs alone.
+  assert.ok(slint.includes(`marks-fields: 2 * ${field![1]}px`), "the row's sum uses the field's width");
+  for (const label of ["Start", "End"])
+    assert.match(slint, new RegExp(String.raw`text: @tr\("${label}"\);\s*glyph: Glyphs\.target;\s*key: ClipBridge\.keys\.\w+;\s*show-text: root\.marks-labels;\s*show-key: root\.marks-caps;`), label);
+  // The fallback without labels fits at the 280 px minimum: two 22 px glyph buttons, the fields, "–", the gaps.
+  assert.ok(22 + 22 + 2 * Number(field![1]) + 6 + 12 <= 280 - 16);
 });
