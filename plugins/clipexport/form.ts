@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import type { PlayerState, Scope, Snapshot } from "@vestra-player/sdk";
+import type { ExportPart, PlayerState, Scope, Snapshot } from "@vestra-player/sdk";
 import { chooseAudio, Failure, uniqueFile, validate } from "./model.ts";
 import type { Spec } from "./model.ts";
 import type { Task, Tasks } from "./tasks.ts";
@@ -59,8 +59,21 @@ export function capturer(plugin: Scope, tasks: Tasks) {
     }
   }
 
-  /** Retry a failed or cancelled task: its retained input if still kept, otherwise the current source. */
+  /**
+   * Queue a merged export of the Collection: the parts as they are now (a
+   * snapshot of the list), into `destination` made unique. Nothing is frozen:
+   * the player reads the remembered files when the job runs.
+   */
+  async function startParts(spec: Spec, parts: ExportPart[], destination: string): Promise<Task> {
+    if (tasks.full()) throw new Failure("queueFull");
+    if (stopped) throw new Failure("cancelled");
+    const target = await uniqueFile(destination, new Set(tasks.list.map((task) => resolve(task.destination))));
+    return tasks.add({ spec, sourceId: 0, source: "", parts: parts.map((part) => ({ ...part })), destination: target });
+  }
+
+  /** Retry a failed or cancelled task: its retained input if still kept, otherwise the current source; a merged export its parts. */
   async function retry(task: Task) {
+    if (task.parts) return startParts({ ...task.spec }, task.parts, task.destination);
     if (tasks.retained(task)) {
       const snapshot = tasks.take(task);
       return start({ ...task.spec }, null, task.destination, snapshot).then((next) => {
@@ -73,6 +86,7 @@ export function capturer(plugin: Scope, tasks: Tasks) {
 
   return {
     start,
+    startParts,
     retry,
     stop() {
       stopped = true;

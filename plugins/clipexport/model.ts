@@ -54,12 +54,22 @@ export const REASON = {
   fastImpossible: "Fast cut is not possible for this file. Use Precise.",
   noSourceBitrate: "The bitrate of this file is unknown. Choose another quality.",
   folderGone: "The file or folder was moved or deleted.",
+  addLocal: "Only local files can be added to the Collection.",
+  collectionFull: "The Collection holds 100 parts. Remove one first.",
+  tooManyFiles: "Clip Export remembers at most 500 files. Remove parts of other files first.",
+  emptyCollection: "The Collection is empty. Add a range first.",
+  partMissing: "A part's file is missing. Locate it or remove the part.",
+  partChanged: "A part's file has changed. Locate it or remove the part.",
+  partUnknown: "A part's file is no longer known. Remove the part.",
+  cannotRead: "The player cannot read this file.",
+  noCapability: "This version of the player cannot do this.",
+  undoFull: "There is no room to bring the cleared parts back: the Collection holds at most 100. Remove parts, then Undo again.",
 } as const;
 export type Reason = keyof typeof REASON;
 
 /** The reasons an export job ends with (`jobError`, a released input). */
-export type JobReason = "space" | "exists" | "permission" | "encoder" | "exportFailed" | "released" | "fastImpossible" | "noSourceBitrate";
-const JOB_REASONS: readonly Reason[] = ["space", "exists", "permission", "encoder", "exportFailed", "released", "fastImpossible", "noSourceBitrate"];
+export type JobReason = "space" | "exists" | "permission" | "encoder" | "exportFailed" | "released" | "fastImpossible" | "noSourceBitrate" | "partMissing" | "partChanged" | "partUnknown";
+const JOB_REASONS: readonly Reason[] = ["space", "exists", "permission", "encoder", "exportFailed", "released", "fastImpossible", "noSourceBitrate", "partMissing", "partChanged", "partUnknown"];
 
 /** A failure in the plugin's own words: `code` names its text in {@link REASON}. */
 export class Failure extends Error {
@@ -141,6 +151,13 @@ export function stemOf(source: string | null) {
 /** The player can take a snapshot of the source now (the input of every export). */
 export const usable = (state: PlayerState) =>
   state.kind === "media" && (state.phase === "ready" || state.phase === "ended") && state.can.snapshot;
+
+/**
+ * A chosen file name with the extension of what will be written: the
+ * container follows the format (as LosslessCut does), so a re-encode named
+ * `.mkv` in the save dialog becomes `.mp4` instead of an MP4 inside an MKV name.
+ */
+export const withExtension = (path: string, extension: string) => `${path.replace(/\.(mp4|mkv)$/i, "")}${extension}`;
 
 /** A local file path (not a URL). */
 export const isLocal = (source: string | null): source is string =>
