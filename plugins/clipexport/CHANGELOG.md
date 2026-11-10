@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1
+
+- Store icon.
+
 ## 0.1.0
 
 - First release. Clip export moves out of the player's built-in Snapshot plugin into this store plugin; snapshots and bursts stay in the player. Nothing to migrate: the player with the old Capture tab was never released.

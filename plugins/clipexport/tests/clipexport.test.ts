@@ -993,3 +993,12 @@ test("real pages: the last sub-tab is remembered; commands select their page", a
     await rm(data, { recursive: true, force: true });
   }
 });
+
+test("store listing: the id of the directory and a 256×256 PNG icon", async () => {
+  const manifest = JSON.parse(await readFile(new URL("manifest.json", directory), "utf8"));
+  assert.equal(manifest.id, ID); // <owner>.<directory>, as the repository requires
+  assert.equal(manifest.icon, "assets/icon.png");
+  const png = await readFile(new URL(manifest.icon, directory));
+  assert.equal(png.toString("latin1", 1, 4), "PNG");
+  assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [256, 256]);
+});
