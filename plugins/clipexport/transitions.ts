@@ -190,6 +190,8 @@ const seconds = (value: number) => value.toFixed(6).replace(/\.?0+$/, "") || "0"
  * takes only inputs of one timebase (concat writes 1/1000000).
  */
 const rate = (fps: number) => seconds(fps);
+/** The sound's sample rate in the merge (Precise writes 48 kHz stereo). Each overlap is the picture's, in whole samples. */
+const RATE = 48000;
 const secs = (frames: number, fps: number) => seconds(frames / fps);
 
 /**
@@ -207,7 +209,12 @@ export function transitionGraph(parts: readonly number[] | Layout, transitions: 
     // The part's sound from its own start in the merge, as long as its frames: the padding after it is left out,
     // and picture and sound meet at every junction.
     const at = t.times[i]!;
-    if (audio) out.push(`[0:a]atrim=start=${seconds(at)}:end=${seconds(at + f / fps)},asetpts=PTS-STARTPTS,asettb=1/48000[a${i}]`);
+    // Exactly its frames' length in samples, on contiguous timestamps: the merge's sound has the joins' overlapping
+    // timestamps (each part's AAC padding), so a window by time can hold more samples than its length.
+    if (audio) {
+      const samples = Math.round((f / fps) * RATE);
+      out.push(`[0:a]atrim=start=${seconds(at)}:end=${seconds(at + f / fps)},asettb=1/${RATE},asetpts=N/SR/TB,apad=whole_len=${samples},atrim=end_sample=${samples},asetpts=N/SR/TB[a${i}]`);
+    }
   });
   let video = "v0";
   let sound = "a0";
@@ -218,7 +225,7 @@ export function transitionGraph(parts: readonly number[] | Layout, transitions: 
     const tr = transitions[i]!;
     if (overlap === 0) {
       out.push(`[${video}][v${next}]concat=n=2:v=1:a=0,settb=AVTB[${vOut}]`);
-      if (audio) out.push(`[${sound}][a${next}]concat=n=2:v=0:a=1,asettb=1/48000[${aOut}]`);
+      if (audio) out.push(`[${sound}][a${next}]concat=n=2:v=0:a=1,asettb=1/${RATE}[${aOut}]`);
     } else {
       const d = secs(overlap, fps);
       out.push(`[${video}][v${next}]xfade=transition=${xfadeName(tr)}:duration=${d}:offset=${secs(t.offsets[i]! - 0.5, fps)}[${vOut}]`);
@@ -228,8 +235,8 @@ export function transitionGraph(parts: readonly number[] | Layout, transitions: 
         const lengthSoFar = t.offsets[i]! + overlap;
         out.push(`[${sound}]afade=t=out:st=${secs(lengthSoFar - overlap, fps)}:d=${half}[ad${next}]`);
         out.push(`[a${next}]afade=t=in:st=${half}:d=${half}[ai${next}]`);
-        out.push(`[ad${next}][ai${next}]acrossfade=d=${d}:c1=nofade:c2=nofade[${aOut}]`);
-      } else if (audio) out.push(`[${sound}][a${next}]acrossfade=d=${d}:c1=qsin:c2=qsin[${aOut}]`);
+        out.push(`[ad${next}][ai${next}]acrossfade=ns=${Math.round((overlap / fps) * RATE)}:c1=nofade:c2=nofade[${aOut}]`);
+      } else if (audio) out.push(`[${sound}][a${next}]acrossfade=ns=${Math.round((overlap / fps) * RATE)}:c1=qsin:c2=qsin[${aOut}]`);
     }
     video = vOut;
     sound = aOut;

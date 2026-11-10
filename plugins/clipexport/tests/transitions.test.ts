@@ -105,12 +105,12 @@ test("the filter graph: trim each part out of the merge, xfade + acrossfade (qsi
   assert.equal(length, 10);
   assert.match(graph, /\[0:v\]trim=start_frame=0:end_frame=40,settb=AVTB,setpts=N\/\(\d+\*TB\)\[v0\]/);
   assert.match(graph, /\[0:v\]trim=start_frame=40:end_frame=80,settb=AVTB,setpts=N\/\(\d+\*TB\)\[v1\]/);
-  assert.match(graph, /\[0:a\]atrim=start=4:end=8,asetpts=PTS-STARTPTS,asettb=1\/48000\[a1\]/);
+  assert.match(graph, /\[0:a\]atrim=start=4:end=8,asettb=1\/48000,asetpts=N\/SR\/TB,apad=whole_len=192000,atrim=end_sample=192000,asetpts=N\/SR\/TB\[a1\]/);
   // The offset half a frame before the blend's first frame: xfade starts at the first frame at or after it, whatever the rounding.
   assert.match(graph, /\[v0\]\[v1\]xfade=transition=fade:duration=1:offset=2\.95\[vj1\]/);
-  assert.match(graph, /\[a0\]\[a1\]acrossfade=d=1:c1=qsin:c2=qsin\[aj1\]/);
+  assert.match(graph, /\[a0\]\[a1\]acrossfade=ns=48000:c1=qsin:c2=qsin\[aj1\]/);
   assert.match(graph, /\[vj1\]\[v2\]xfade=transition=fadeblack:duration=1:offset=5\.95\[vout\]/);
-  assert.match(graph, /\[aj1\]afade=t=out:st=6:d=0\.5\[ad2\];\[a2\]afade=t=in:st=0\.5:d=0\.5\[ai2\];\[ad2\]\[ai2\]acrossfade=d=1:c1=nofade:c2=nofade\[aout\]/);
+  assert.match(graph, /\[aj1\]afade=t=out:st=6:d=0\.5\[ad2\];\[a2\]afade=t=in:st=0\.5:d=0\.5\[ai2\];\[ad2\]\[ai2\]acrossfade=ns=48000:c1=nofade:c2=nofade\[aout\]/);
   const cuts = transitionGraph([4, 4], [CUT, CUT], 10, false).graph;
   assert.equal(cuts, "[0:v]trim=start_frame=0:end_frame=40,settb=AVTB,setpts=N/(10*TB)[v0];[0:v]trim=start_frame=40:end_frame=80,settb=AVTB,setpts=N/(10*TB)[v1];[v0][v1]concat=n=2:v=1:a=0,settb=AVTB[vout]");
   // One timebase on every branch: concat writes 1/1000000, a trimmed part keeps its file's, and xfade takes only equal ones.
@@ -519,7 +519,7 @@ test("the layout is measured: each part starts at its first frame at or after th
   assert.equal(layoutOf([0, 0.1], [0.05, 0.05, 0.05]), null, "a part with no frame");
   // The graph cuts the sound at each part's own start, for its frames' length.
   const { graph } = transitionGraph(layout, [tr("crossfade", 0.5), CUT, CUT, CUT], 30, true);
-  assert.match(graph, /\[0:a\]atrim=start=2\.535352:end=4\.302019,asetpts=PTS-STARTPTS,asettb=1\/48000\[a1\]/);
+  assert.match(graph, /\[0:a\]atrim=start=2\.535352:end=4\.302019,asettb=1\/48000,asetpts=N\/SR\/TB,apad=whole_len=84800,atrim=end_sample=84800,asetpts=N\/SR\/TB\[a1\]/);
   assert.match(graph, /\[0:v\]trim=start_frame=75:end_frame=128,settb=AVTB,setpts=N\/\(\d+\*TB\)\[v1\]/);
 });
 
@@ -714,7 +714,7 @@ test("the export measures the merge (ffprobe of its frame times) and cuts there;
     await until(() => host.osd.some((line) => line.startsWith("Clip exported as")), "the export");
     const graph = calls[0]!.at(-1)!;
     assert.match(graph, /\[0:v\]trim=start_frame=120:end_frame=239,settb=AVTB,setpts=N\/\(\d+\*TB\)\[v1\]/, "the second part's 119 frames, where they are");
-    assert.match(graph, /\[0:a\]atrim=start=4\.021333:end=7\.988,asetpts=PTS-STARTPTS,asettb=1\/48000\[a1\]/, "its sound from its own start");
+    assert.match(graph, /\[0:a\]atrim=start=4\.021333:end=7\.988,asettb=1\/48000,asetpts=N\/SR\/TB,apad=whole_len=190400,atrim=end_sample=190400,asetpts=N\/SR\/TB\[a1\]/, "its sound from its own start");
     assert.deepEqual(recorded, [calls[0]!.at(-2)], "the half file was on record while it was written");
     await until(async () => JSON.parse(await readFile(join(data, "inflight.json"), "utf8")).partials.length === 0, "and is off it after");
   } finally {
@@ -763,6 +763,77 @@ for (const fps of [30, 60]) test(`with a real ffmpeg at ${fps} fps: every ordere
       }
     }
     assert.deepEqual(failures, []);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("with a real ffmpeg: the sound stays with the picture over many transitions (overlaps in whole samples, each part's sound where its picture is)", { skip: !haveFfmpeg && "no ffmpeg (set VESTRA_FFMPEG)" }, async () => {
+  const dir = await mkdtemp(join(tmpdir(), "clipexport-av-"));
+  const probe = (args: string[]) => String(spawnSync(ffprobe, args).stdout).trim();
+  try {
+    // Ten parts merged the player's way at 30 fps; each source is silent but for a click 0.1 s after the part's start (the first samples of an AAC cut are its priming).
+    const lengths = [1.2, 1.3, 1.2, 1.2667, 1.15, 1.31, 1.22, 1.19, 1.27, 1.2];
+    const list = ["ffconcat version 1.0"];
+    for (const [i, length] of lengths.entries()) {
+      const source = join(dir, `src-${i}.mp4`);
+      const at = 0.37 + i * 0.05;
+      spawnSync(FFMPEG, ["-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=s=32x16:r=30:d=4", "-f", "lavfi", "-i", `aevalsrc=if(between(t\\,${at + 0.1}\\,${at + 0.102})\\,0.9\\,0):s=48000:d=4`, "-c:v", "libx264", "-c:a", "aac", "-b:a", "256k", "-shortest", source]);
+      const part = join(dir, `part-${i}.mp4`);
+      const made = spawnSync(FFMPEG, ["-v", "error", "-y", "-ss", String(at), "-t", String(length), "-i", source, "-vf", "fps=30", "-af", "aresample=48000", "-t", String(length), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "256k", "-ac", "2", part]);
+      assert.equal(made.status, 0, String(made.stderr));
+      list.push(`file '${part.replace(/\\/g, "/")}'`);
+    }
+    writeFileSync(join(dir, "list.txt"), `${list.join("\n")}\n`);
+    const merged = join(dir, "merged.mp4");
+    assert.equal(spawnSync(FFMPEG, ["-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", join(dir, "list.txt"), "-c", "copy", merged]).status, 0);
+    const begin = Number(probe(["-v", "error", "-show_entries", "format=start_time", "-of", "csv=p=0", merged]));
+    const measured = layoutOf(parsePts(probe(ptsArgs(merged))), lengths)!;
+    const layout = { frames: measured.frames, times: measured.times.map((t) => Math.max(0, t - begin)) };
+    // Where each click is in the merge, from its part's first frame: the merge's own picture-to-sound relation, which the output must keep.
+    // The clicks by their timestamps (silencedetect's ends of silence), as a player plays them: the merge's sound has the
+    // joins' timestamp gaps, so a count of decoded samples would place them wrongly.
+    const clicksOf = (file: string) => {
+      const pcm = spawnSync(FFMPEG, ["-v", "error", "-i", file, "-map", "0:a", "-ac", "1", "-f", "s16le", "-acodec", "pcm_s16le", "-"], { maxBuffer: 1 << 28 }).stdout as Buffer;
+      const log = String(spawnSync(FFMPEG, ["-hide_banner", "-i", file, "-map", "0:a", "-af", "silencedetect=n=-30dB:d=0.02", "-f", "null", "-"]).stderr);
+      const found = [...log.matchAll(/silence_end: ([\d.]+)/g)].map((m) => Number(m[1]) * 48000);
+      return { pcm, found };
+    };
+    const inMerge = clicksOf(merged).found;
+    const offsets = layout.times.map((start) => {
+      const click = inMerge.find((s) => s / 48000 >= start && s / 48000 < start + 0.5);
+      assert.ok(click !== undefined, `a click in the merge after ${start} s`);
+      return click / 48000 - start;
+    });
+    for (const [name, transitions] of [
+      ["nine crossfades", lengths.map((_, i) => (i < 9 ? tr("crossfade", 0.3) : CUT))],
+      ["transitions between cuts", [tr("crossfade", 0.3), CUT, tr("slide", 0.3), CUT, tr("fadeBlack", 0.3), CUT, tr("wipe", 0.3), CUT, tr("fadeWhite", 0.3), CUT]],
+    ] as const) {
+      const out = join(dir, "out.mp4");
+      const built = encodeWith({ input: merged, output: out, progress: join(dir, "p.txt"), script: join(dir, "g.txt"), lengths: layout, transitions: [...transitions], fps: 30, audio: true, encode: { rate: "crf", crf: 30, speed: "faster", height: 0, fps: 0, audio: 256 }, threads: 2 });
+      const run = spawnSync(FFMPEG, built.args);
+      assert.equal(run.status, 0, `${name}: ${String(run.stderr)}`);
+      const t = timing(layout, [...transitions], 30);
+      // Picture and sound end together, within one AAC frame (1024 samples).
+      const frames = Number(probe(["-v", "error", "-count_frames", "-select_streams", "v:0", "-show_entries", "stream=nb_read_frames", "-of", "csv=p=0", out]));
+      assert.equal(frames, t.written, name);
+      const { pcm, found: clicks } = clicksOf(out);
+      const samples = pcm.length / 2;
+      assert.ok(Math.abs(samples - (frames / 30) * 48000) <= 1024, `${name}: ${samples} samples of sound, ${(frames / 30) * 48000} of picture`);
+      // Each part after a cut (and the first) has its click as far from its first frame as in the merge, within a frame.
+      let start = 0;
+      const pictureStarts = t.frames.map((f, i) => {
+        const here = start;
+        start += f - (t.overlaps[i] ?? 0);
+        return here;
+      });
+      pictureStarts.forEach((frame, i) => {
+        if (i && t.overlaps[i - 1]! > 0) return; // faded in: its click is under the blend
+        const expected = (frame / 30 + offsets[i]!) * 48000;
+        const near = clicks.find((s) => Math.abs(s - expected) <= 48000 / 30);
+        assert.ok(near !== undefined, `${name}: part ${i + 1}'s sound at ${expected / 48000} s (clicks at ${clicks.map((s) => (s / 48000).toFixed(3)).join(", ")}; picture starts ${pictureStarts.map((p) => (p / 30).toFixed(3)).join(", ")}; offsets ${offsets.map((o) => o.toFixed(3)).join(", ")}; frames ${t.frames.join(",")}; overlaps ${t.overlaps.join(",")})`);
+      });
+    }
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
