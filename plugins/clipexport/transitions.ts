@@ -108,14 +108,60 @@ export const applied = (transitions: readonly Transition[], fast: boolean) => (f
 export const anyTransition = (transitions: readonly Transition[]) => transitions.slice(0, -1).some((t) => t.kind !== "cut");
 
 /**
- * The timing on whole output frames (§2.3). `lengths[i]` is part i's length
- * in the merged file; `transitions[i]` the one into part i + 1 (the last is
- * ignored). Each length and each transition is rounded to frames (a
- * transition to at least one frame and at most the shorter part's half), so
- * the picture and the sound overlap by the same amount.
+ * Where the parts are in the merged file: each part's frame count and the
+ * time its first frame has. The player's merge gives each part the frames its
+ * source has in the part's window (a 1.789 s part at 30 fps can be 53 frames,
+ * not 54) and places the next part after the longer of its picture and sound
+ * (AAC pads the sound to whole 1024-sample frames), so both are measured on
+ * the merged file ({@link layoutOf}); {@link estimated} is the fallback.
  */
-export function timing(lengths: readonly number[], transitions: readonly Transition[], fps: number) {
-  const frames = lengths.map((length) => Math.max(1, Math.round(length * fps)));
+export interface Layout {
+  frames: number[];
+  times: number[];
+}
+/** The layout as asked: each length on whole frames, each part right after the one before. */
+export function estimated(lengths: readonly number[], fps: number): Layout {
+  const times: number[] = [];
+  lengths.reduce((at, length) => (times.push(at), at + length), 0);
+  return { frames: lengths.map((length) => Math.max(1, Math.round(length * fps))), times };
+}
+/**
+ * The layout measured on the merged file's video timestamps (`pts`, seconds,
+ * any order): part i + 1 begins at the first frame at or after part i's start
+ * plus its length (part i's own frames all lie before that, the next part's
+ * first frame at or after it, as the merge writes each part from 0 for its
+ * length). Null when the frames do not fit the lengths (each part needs one).
+ */
+export function layoutOf(pts: readonly number[], lengths: readonly number[]): Layout | null {
+  const sorted = [...pts].filter(Number.isFinite).sort((a, b) => a - b);
+  if (!sorted.length || !lengths.length) return null;
+  const frames: number[] = [];
+  const times: number[] = [];
+  let index = 0;
+  for (let i = 0; i < lengths.length; i++) {
+    if (index >= sorted.length) return null;
+    const start = sorted[index]!;
+    // Its frames end before its start plus its length (less 0.1 ms of rounding); the last part too (the merge can hold one more frame after it).
+    let end = index;
+    while (end < sorted.length && sorted[end]! < start + lengths[i]! - 1e-4) end++;
+    if (end === index) return null;
+    frames.push(end - index);
+    times.push(start);
+    index = end;
+  }
+  return { frames, times };
+}
+
+/**
+ * The timing on whole output frames (§2.3): each part's frames (measured, or
+ * estimated from `lengths`), `transitions[i]` the one into part i + 1 (the
+ * last is ignored). Each transition is rounded to frames (at least one, at
+ * most half the shorter part), so the picture and the sound overlap by the
+ * same amount.
+ */
+export function timing(parts: readonly number[] | Layout, transitions: readonly Transition[], fps: number) {
+  const layout = Array.isArray(parts) ? estimated(parts as number[], fps) : (parts as Layout);
+  const frames = layout.frames;
   const overlaps = frames.slice(0, -1).map((f, i) => {
     const t = transitions[i];
     if (!t || t.kind === "cut") return 0;
@@ -132,10 +178,11 @@ export function timing(lengths: readonly number[], transitions: readonly Transit
     offsets.push(written - overlap);
     written += frames[i + 1]! - overlap;
   });
-  return { frames, starts, overlaps, offsets, written, fps };
+  return { frames, starts, times: layout.times, overlaps, offsets, written, fps };
 }
 
-const secs = (frames: number, fps: number) => (frames / fps).toFixed(6).replace(/\.?0+$/, "") || "0";
+const seconds = (value: number) => value.toFixed(6).replace(/\.?0+$/, "") || "0";
+const secs = (frames: number, fps: number) => seconds(frames / fps);
 
 /**
  * The filter graph over the merged file (input 0): each part cut out with
@@ -144,12 +191,15 @@ const secs = (frames: number, fps: number) => (frames / fps).toFixed(6).replace(
  * fades through black and white, `concat` for a cut. Only the plugin's own
  * kind names and numbers go into it. `audio`: the merged file has sound.
  */
-export function transitionGraph(lengths: readonly number[], transitions: readonly Transition[], fps: number, audio: boolean) {
-  const t = timing(lengths, transitions, fps);
+export function transitionGraph(parts: readonly number[] | Layout, transitions: readonly Transition[], fps: number, audio: boolean) {
+  const t = timing(parts, transitions, fps);
   const out: string[] = [];
   t.frames.forEach((f, i) => {
     out.push(`[0:v]trim=start_frame=${t.starts[i]}:end_frame=${t.starts[i]! + f},setpts=PTS-STARTPTS[v${i}]`);
-    if (audio) out.push(`[0:a]atrim=start=${secs(t.starts[i]!, fps)}:end=${secs(t.starts[i]! + f, fps)},asetpts=PTS-STARTPTS[a${i}]`);
+    // The part's sound from its own start in the merge, as long as its frames: the padding after it is left out,
+    // and picture and sound meet at every junction.
+    const at = t.times[i]!;
+    if (audio) out.push(`[0:a]atrim=start=${seconds(at)}:end=${seconds(at + f / fps)},asetpts=PTS-STARTPTS[a${i}]`);
   });
   let video = "v0";
   let sound = "a0";
@@ -192,7 +242,10 @@ export interface EncodeArgs {
   input: string;
   output: string;
   progress: string;
-  lengths: readonly number[];
+  /** The file the filter graph is written to (`-/filter_complex`, FFmpeg 7 and later); the caller writes `graph` there. */
+  script: string;
+  /** The parts in the merge: measured, or the lengths as asked. */
+  lengths: readonly number[] | Layout;
   transitions: readonly Transition[];
   fps: number;
   audio: boolean;
@@ -218,13 +271,13 @@ export function transitionArgs(o: EncodeArgs) {
   const args = [
     "-nostdin", "-v", "error", "-y", "-threads", threads,
     "-i", o.input,
-    "-filter_complex", graph, "-filter_complex_threads", threads,
+    "-/filter_complex", o.script, "-filter_complex_threads", threads,
     "-map", "[vout]", ...sound,
     "-c:v", "libx264", ...rate, "-preset", presetOf(o.encode.speed), "-pix_fmt", "yuv420p", "-threads", threads,
     "-movflags", "+faststart", "-progress", o.progress, "-stats_period", "0.5",
     "-f", "mp4", o.output,
   ];
-  return { args, length };
+  return { args, graph, length };
 }
 
 /** The last `out_time_us` of ffmpeg's `-progress` file, in seconds; null before the first block. */
@@ -260,10 +313,31 @@ export interface Plan {
   /** The Precise settings of the final file, and those of the merge (the best quality, the same ceilings). */
   encode: Encode;
   merge: Encode;
+  /** "Same as source": the parts' own video bit rate (bits per second), weighted by length; null when none is known. */
+  bitrate?: number | null;
 }
 
-/** The merge's encoding: the same size and frame-rate ceilings, the best quality the player offers, so the final encode is the only loss that shows. */
-export const mergeEncode = (encode: Encode): Encode => (encode.rate === "source" ? { ...encode, audio: 256 } : { ...encode, rate: "crf", crf: 14, speed: "faster", audio: 256 });
+/**
+ * The merge's encoding: the same size and frame-rate ceilings, the best
+ * quality the player offers (CRF 14), so the final encode is the only loss
+ * that shows. "Same as source" too: the source bit rate applies to the final
+ * encode only.
+ */
+export const mergeEncode = (encode: Encode): Encode => ({ ...encode, rate: "crf", crf: 14, speed: "faster", audio: 256 });
+
+/** ffprobe's arguments for the merged file's video timestamps (one per line). */
+export const ptsArgs = (file: string) => ["-v", "error", "-select_streams", "v:0", "-show_entries", "packet=pts_time", "-of", "csv=p=0", file];
+/** The timestamps ffprobe printed. */
+export const parsePts = (text: string) =>
+  text.split(/\r?\n/).map((line) => line.split(",")[0]!.trim()).filter((field) => field !== "" && field !== "N/A").map(Number).filter((n) => Number.isFinite(n));
+/** The bit rate a "Same as source" final aims at: the parts' own (each remembered when it was added), weighted by length; null without any. */
+export function sourceBitrate(parts: readonly { start: number; end: number; bitrate?: number }[]) {
+  const known = parts.filter((p) => p.bitrate && p.bitrate > 0);
+  const length = known.reduce((sum, p) => sum + (p.end - p.start), 0);
+  return known.length && length > 0 ? known.reduce((sum, p) => sum + p.bitrate! * (p.end - p.start), 0) / length : null;
+}
+/** Free space the final encode needs beside its file: the merge's size and a tenth more (the final is no bigger at any of the presets), plus 50 MB. */
+export const spaceNeeded = (mergeBytes: number) => Math.ceil(mergeBytes * 1.1) + 50e6;
 
 /** The parts' lengths in the merged file: as the player wrote them (`facts.join.parts`) when it says, else as asked. */
 export function mergedLengths(state: { facts?: { join?: { parts?: { start: number; end: number }[] } } | null }, asked: readonly number[]) {

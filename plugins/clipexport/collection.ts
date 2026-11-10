@@ -25,6 +25,8 @@ export interface Part {
    * this part, so a reorder carries it; the last part's is always Cut.
    */
   transition: Transition;
+  /** The source's video bit rate (bits per second) as ffprobe read it when the part was added: a "Same as source" export with transitions aims at it. */
+  bitrate?: number;
 }
 
 /** Parts of one merged export (the SDK's `MEDIA_SOURCE_LIMITS.parts`): the Collection holds no more. */
@@ -57,6 +59,7 @@ export function partsOf(stored: unknown): Part[] {
       name: typeof v.name === "string" ? v.name : "",
       // A file name in the plugin's own folder: never a path.
       thumb: typeof v.thumb === "string" && /^[\w.-]+$/.test(v.thumb) ? v.thumb : "",
+      ...(typeof (v as { bitrate?: unknown }).bitrate === "number" && (v as { bitrate: number }).bitrate > 0 ? { bitrate: (v as { bitrate: number }).bitrate } : {}),
       // 0.2.x parts have none: a Cut, so their export is unchanged.
       transition: transitionOf((v as { transition?: unknown }).transition),
     });

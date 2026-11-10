@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, writeFileSync } from "node:fs";
-import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -10,7 +10,7 @@ import { HostError, startPlugin, TestHost } from "@vestra-player/sdk/testing";
 import activate from "../main.ts";
 import { REASON } from "../model.ts";
 import {
-  applied, capOf, CUT, junctionTicks, mergedLengths, mergeEncode, normalize, progressTime, soundOf, timing, transitionArgs, transitionAt, transitionGraph,
+  applied, capOf, CUT, estimated, junctionTicks, layoutOf, parsePts, ptsArgs, sourceBitrate, mergedLengths, mergeEncode, normalize, progressTime, soundOf, timing, transitionArgs, transitionAt, transitionGraph,
   transitionOf, typedDuration, xfadeName,
 } from "../transitions.ts";
 import type { Transition } from "../transitions.ts";
@@ -117,18 +117,23 @@ test("the filter graph: trim each part out of the merge, xfade + acrossfade (qsi
 
 test("ffmpeg's arguments: the Precise settings (CRF, x264 preset, yuv420p, AAC 48 kHz stereo at the tab's rate), -progress into a file, MP4", () => {
   const encode = { rate: "crf", crf: 20, speed: "balanced", height: 720, fps: 30, audio: 128 } as const;
-  const { args, length } = transitionArgs({ input: "/w/merge.mp4", output: "/out/.x.mp4.partial", progress: "/w/merge.mp4.progress", lengths: [4, 4], transitions: [tr("wipe", 1, "up"), CUT], fps: 30, audio: true, encode, threads: 3 });
+  const { args, graph, length } = transitionArgs({ input: "/w/merge.mp4", output: "/out/.x.mp4.partial", progress: "/w/merge.mp4.progress", script: "/w/merge.mp4.graph", lengths: [4, 4], transitions: [tr("wipe", 1, "up"), CUT], fps: 30, audio: true, encode, threads: 3 });
   assert.equal(length, 7);
   const at = (flag: string) => args[args.indexOf(flag) + 1];
   assert.deepEqual([at("-i"), at("-crf"), at("-preset"), at("-pix_fmt"), at("-c:a"), at("-ar"), at("-ac"), at("-b:a"), at("-progress"), at("-f"), args.at(-1)],
     ["/w/merge.mp4", "20", "medium", "yuv420p", "aac", "48000", "2", "128k", "/w/merge.mp4.progress", "mp4", "/out/.x.mp4.partial"]);
   assert.ok(args.includes("+faststart"));
-  assert.match(at("-filter_complex")!, /xfade=transition=wipeup:duration=1:offset=3/);
+  assert.equal(at("-/filter_complex"), "/w/merge.mp4.graph", "the graph is read from a file (Windows' command line is 32 767 characters)");
+  assert.ok(!args.includes("-filter_complex"));
+  assert.match(graph, /xfade=transition=wipeup:duration=1:offset=3/);
   // "Same as source": the merged file's own bit rate, peaks up to 1.5 times it (as the player's Precise).
-  const source = transitionArgs({ input: "i", output: "o", progress: "p", lengths: [4, 4], transitions: [tr("crossfade"), CUT], fps: 30, audio: false, encode: { ...encode, rate: "source" }, bitrate: 4e6, threads: 1 }).args;
+  const source = transitionArgs({ input: "i", output: "o", progress: "p", script: "g", lengths: [4, 4], transitions: [tr("crossfade"), CUT], fps: 30, audio: false, encode: { ...encode, rate: "source" }, bitrate: 4e6, threads: 1 }).args;
   assert.deepEqual([source[source.indexOf("-b:v") + 1], source[source.indexOf("-maxrate") + 1], source.includes("-crf"), source.includes("-an")], ["4000000", "6000000", false, true]);
-  // The merge: the best quality the player offers, the tab's size and rate ceilings.
+  // The merge: the best quality the player offers, the tab's size and rate ceilings; "Same as source" too (its bit rate is for the final only).
   assert.deepEqual(mergeEncode(encode), { ...encode, crf: 14, speed: "faster", audio: 256 });
+  assert.deepEqual(mergeEncode({ ...encode, rate: "source" }), { ...encode, rate: "crf", crf: 14, speed: "faster", audio: 256 });
+  assert.equal(sourceBitrate([{ start: 0, end: 1, bitrate: 3e6 }, { start: 0, end: 3, bitrate: 7e6 }, { start: 0, end: 5 }]), 6e6, "weighted by length; parts without one left out");
+  assert.equal(sourceBitrate([{ start: 0, end: 1 }]), null);
   assert.deepEqual(mergedLengths({ facts: { join: { parts: [{ start: 1, end: 3.5 }, { start: 0, end: 2 }] } } }, [2, 2]), [2.5, 2]);
   assert.deepEqual(mergedLengths({ facts: null }, [2, 2]), [2, 2]);
   assert.equal(progressTime("frame=1\nout_time_us=1500000\nprogress=continue\nout_time_us=2250000\nprogress=end\n"), 2.25);
@@ -140,6 +145,12 @@ test("ffmpeg's arguments: the Precise settings (CRF, x264 preset, yuv420p, AAC 4
 // ---------------------------------------------------------------- the frames, with a real ffmpeg (skipped without one)
 
 const FFMPEG = process.env.VESTRA_FFMPEG || "ffmpeg";
+/** The arguments, with the graph written to its file as the plugin does. */
+function encodeWith(o: Parameters<typeof transitionArgs>[0]) {
+  const built = transitionArgs(o);
+  writeFileSync(o.script, built.graph);
+  return built;
+}
 const haveFfmpeg = spawnSync(FFMPEG, ["-version"], { stdio: "ignore" }).status === 0;
 const ffprobe = process.env.VESTRA_FFPROBE || "ffprobe";
 
@@ -173,7 +184,7 @@ test("every Wipe and Slide direction, checked on the frames: the new picture mov
     for (const [name, pixels] of Object.entries(expected)) {
       const [kind, way] = name.split(" ") as [Transition["kind"], Transition["dir"]];
       const out = join(dir, `${kind}-${way}.mp4`);
-      const { args, length } = transitionArgs({ input: merged, output: out, progress: join(dir, "p.txt"), lengths: [2, 2], transitions: [tr(kind, 1, way), CUT], fps: 10, audio: true, encode, threads: 2 });
+      const { args, length } = encodeWith({ input: merged, output: out, progress: join(dir, "p.txt"), script: join(dir, "g.txt"), lengths: [2, 2], transitions: [tr(kind, 1, way), CUT], fps: 10, audio: true, encode, threads: 2 });
       const run = spawnSync(FFMPEG, args);
       assert.equal(run.status, 0, `${name}: ${String(run.stderr)}`);
       assert.equal(length, 3);
@@ -187,7 +198,7 @@ test("every Wipe and Slide direction, checked on the frames: the new picture mov
     const channels = (file: string) => [...(spawnSync(FFMPEG, ["-v", "error", "-ss", "1.5", "-i", file, "-frames:v", "1", "-vf", "scale=4:2:flags=area", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"]).stdout as Buffer)];
     for (const kind of ["fadeBlack", "fadeWhite"] as const) {
       const out = join(dir, `${kind}.mp4`);
-      const run = spawnSync(FFMPEG, transitionArgs({ input: merged, output: out, progress: join(dir, "p.txt"), lengths: [2, 2], transitions: [tr(kind, 1), CUT], fps: 10, audio: true, encode, threads: 2 }).args);
+      const run = spawnSync(FFMPEG, encodeWith({ input: merged, output: out, progress: join(dir, "p.txt"), script: join(dir, "g.txt"), lengths: [2, 2], transitions: [tr(kind, 1), CUT], fps: 10, audio: true, encode, threads: 2 }).args);
       assert.equal(run.status, 0, String(run.stderr));
       const values = channels(out);
       if (kind === "fadeBlack") assert.ok(Math.max(...values) < 110, `through black: ${values}`);
@@ -199,7 +210,7 @@ test("every Wipe and Slide direction, checked on the frames: the new picture mov
       "-filter_complex", "[0:v][1:v]vstack[a];[a][2:v]concat=n=2:v=1:a=0[v]", "-map", "[v]", "-c:v", "ffv1", tb]);
     for (const [way, pixels] of [["up", "GGGGBBBB"], ["down", "BBBBRRRR"]] as const) {
       const out = join(dir, `slide-tb-${way}.mp4`);
-      spawnSync(FFMPEG, transitionArgs({ input: tb, output: out, progress: join(dir, "p.txt"), lengths: [2, 2], transitions: [tr("slide", 1, way), CUT], fps: 10, audio: false, encode, threads: 2 }).args);
+      spawnSync(FFMPEG, encodeWith({ input: tb, output: out, progress: join(dir, "p.txt"), script: join(dir, "g.txt"), lengths: [2, 2], transitions: [tr("slide", 1, way), CUT], fps: 10, audio: false, encode, threads: 2 }).args);
       assert.equal(look(out), pixels, `slide ${way}: the old picture is pushed out`);
     }
   } finally {
@@ -281,8 +292,9 @@ test("Fast with matching files: the transitions are kept but greyed, the export 
 function fakeFfmpeg(host: TestHost, behave: (args: string[]) => unknown = () => undefined) {
   const calls: string[][] = [];
   host.tools.handle("ffmpeg", (args) => {
-    if (!args.includes("-filter_complex")) return { stdout: new Uint8Array() };
-    calls.push(args);
+    if (!args.includes("-/filter_complex")) return { stdout: new Uint8Array() };
+    // The graph file exists while ffmpeg runs: keep its text with the call.
+    calls.push([...args, `graph:${readFileSync(args[args.indexOf("-/filter_complex") + 1]!, "utf8")}`]);
     const outcome = behave(args);
     if (outcome instanceof Promise) {
       return outcome.then(() => {
@@ -331,12 +343,12 @@ test("Precise with a transition: the player merges into the work folder, the plu
     assert.equal(calls.length, 1);
     const at = (flag: string) => calls[0]![calls[0]!.indexOf(flag) + 1];
     assert.equal(at("-i"), String(job.destination));
-    assert.match(at("-filter_complex")!, /xfade=transition=fade:duration=1:offset=3/);
+    assert.match(calls[0]!.at(-1)!, /xfade=transition=fade:duration=1:offset=3/);
     assert.equal(at("-crf"), "18", "the tab's Precise quality (High quality)");
     const finals = (await readdir(folder)).filter((name) => name.endsWith(".mp4"));
     assert.equal(finals.length, 1);
     assert.equal(await readFile(join(folder, finals[0]!), "utf8"), "the final file");
-    assert.equal(calls[0]!.at(-1), partialOf(join(folder, finals[0]!)), "written beside it under a hidden name first");
+    assert.equal(calls[0]!.at(-2), partialOf(join(folder, finals[0]!)), "written beside it under a hidden name first");
     await until(() => leftovers(data, folder).length === 0, "no work files left");
     await eventually(() => (tab(host).results as { badge: string; state: string }[]).map((r) => [r.badge, r.state]), [["7.0", "completed"]], "the result is 4 + 4 − 1 s");
   } finally {
@@ -485,6 +497,226 @@ test("transitions are kept with the parts across restarts; a 0.2.x list loads wi
     await eventually(() => rows(again).map((r) => [r.kind, r.dir, r.duration]), [["slide", "down", "1.0"], ["cut", "left", "1.0"]]);
     await second.stop();
   } finally {
+    await rm(data, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------- review fixes: the real layout, long graphs, leftovers
+
+test("the layout is measured: each part starts at its first frame at or after the one before plus its length (the merge's padding included)", () => {
+  // The reviewer's merge: 2.514, 1.789, 0.9 and 1.768 s at 30 fps came out as 75, 53, 27 and 53 frames, each part
+  // starting after its sound's AAC padding (the 0.9 s part's start falls on the frame grid, no gap shows).
+  const grid = (start: number, frames: number) => Array.from({ length: frames }, (_, k) => start + k / 30);
+  const pts = [...grid(0, 75), ...grid(2.535352, 53), ...grid(4.324349, 27), ...grid(5.224349, 53)].reverse();
+  const layout = layoutOf(pts, [2.514, 1.789, 0.9, 1.768])!;
+  assert.deepEqual(layout.frames, [75, 53, 27, 53]);
+  assert.deepEqual(layout.times.map((s) => Math.round(s * 1e6) / 1e6), [0, 2.535352, 4.324349, 5.224349]);
+  assert.deepEqual(estimated([2.514, 1.789, 0.9, 1.768], 30).frames, [75, 54, 27, 53], "what rounding guessed (one frame off)");
+  assert.equal(layoutOf([], [1]), null);
+  assert.equal(layoutOf([0, 0.1], [0.05, 0.05, 0.05]), null, "a part with no frame");
+  // The graph cuts the sound at each part's own start, for its frames' length.
+  const { graph } = transitionGraph(layout, [tr("crossfade", 0.5), CUT, CUT, CUT], 30, true);
+  assert.match(graph, /\[0:a\]atrim=start=2\.535352:end=4\.302019,asetpts=PTS-STARTPTS\[a1\]/);
+  assert.match(graph, /\[0:v\]trim=start_frame=75:end_frame=128,setpts=PTS-STARTPTS\[v1\]/);
+});
+
+test("100 parts with fades through black: the graph is a file (it is longer than Windows' 32 767-character command line)", () => {
+  // Long parts at 60 fps: frame numbers of six digits, as an hour-long Collection has.
+  const lengths = Array.from({ length: 100 }, () => 61.234);
+  const transitions = lengths.map((_, i) => (i < 99 ? tr("fadeBlack", 0.5) : CUT));
+  const { args, graph } = transitionArgs({ input: "C:\\work\\merge-1.mp4", output: "C:\\videos\\.a.mp4.partial", progress: "p", script: "C:\\work\\merge-1.mp4.graph", lengths, transitions, fps: 60, audio: true, encode: { rate: "crf", crf: 18, speed: "faster", height: 0, fps: 0, audio: 192 }, threads: 4 });
+  assert.ok(graph.length > 32_767, `${graph.length} characters of graph`);
+  assert.ok(args.join(" ").length < 2_000, "the command line stays short");
+});
+
+test("with a real ffmpeg: parts merged the player's way (fractional lengths at 60 fps) are found where they are; 100 parts run from a graph file", { skip: !haveFfmpeg && "no ffmpeg (set VESTRA_FFMPEG)" }, async () => {
+  const dir = await mkdtemp(join(tmpdir(), "clipexport-merge-"));
+  const probe = (args: string[]) => String(spawnSync(ffprobe, args).stdout);
+  try {
+    // Four sources at 25 fps in four colours, cut and re-encoded as the player's Precise merge does it (-ss, -t, fps, AAC),
+    // then joined with the concat demuxer (no durations in the list).
+    const colours = ["red", "lime", "blue", "yellow"];
+    const lengths = [1.789, 0.95, 1.2345, 0.9];
+    const list: string[] = ["ffconcat version 1.0"];
+    for (const [i, colour] of colours.entries()) {
+      const source = join(dir, `src-${i}.mp4`);
+      spawnSync(FFMPEG, ["-v", "error", "-y", "-f", "lavfi", "-i", `color=c=${colour}:s=32x16:r=25:d=5`, "-f", "lavfi", "-i", "sine=f=440:d=5:r=44100", "-c:v", "libx264", "-c:a", "aac", "-shortest", source]);
+      const part = join(dir, `part-${i}.mp4`);
+      const made = spawnSync(FFMPEG, ["-v", "error", "-y", "-ss", "0.37", "-t", String(lengths[i]), "-i", source, "-vf", "fps=60", "-af", "aresample=48000", "-t", String(lengths[i]), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-ac", "2", part]);
+      assert.equal(made.status, 0, String(made.stderr));
+      list.push(`file '${part.replace(/\\/g, "/")}'`);
+    }
+    writeFileSync(join(dir, "list.txt"), `${list.join("\n")}\n`);
+    const merged = join(dir, "merged.mp4");
+    assert.equal(spawnSync(FFMPEG, ["-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", join(dir, "list.txt"), "-c", "copy", merged]).status, 0);
+    // What each part really is: its frames and its file's duration (where the concat demuxer puts the next one).
+    const truth = colours.map((_, i) => {
+      const file = join(dir, `part-${i}.mp4`);
+      return {
+        frames: Number(probe(["-v", "error", "-select_streams", "v:0", "-count_packets", "-show_entries", "stream=nb_read_packets", "-of", "csv=p=0", file]).trim()),
+        duration: Number(probe(["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", file]).trim()),
+      };
+    });
+    const layout = layoutOf(parsePts(probe(ptsArgs(merged))), lengths)!;
+    assert.deepEqual(layout.frames, truth.map((t) => t.frames), "each part's frames as the merge has them");
+    // Each part starts after the one before plus its length, by at most its sound's padding (a 1024-sample AAC frame) and a frame.
+    truth.forEach((_, i) => {
+      if (!i) return assert.ok(layout.times[0]! >= 0 && layout.times[0]! < 0.1, `the first frame at ${layout.times[0]} s`);
+      const after = layout.times[i - 1]! + lengths[i - 1]!;
+      assert.ok(layout.times[i]! >= after - 1e-3 && layout.times[i]! <= after + 1024 / 48000 + 1 / 60 + 1e-3, `part ${i + 1} starts at ${layout.times[i]} (after ${after})`);
+    });
+    assert.ok(layout.frames.some((f, i) => f !== Math.round(lengths[i]! * 60)) || layout.times.some((s, i) => Math.abs(s - lengths.slice(0, i).reduce((a, b) => a + b, 0)) > 0.005),
+      "the merge differs from the plain sums (the case this measures)");
+    // The transitions on the measured layout: every part's own colour in the middle of its stretch; picture and sound as long.
+    const transitions = [tr("crossfade", 0.3), tr("wipe", 0.3, "left"), tr("fadeBlack", 0.3), CUT];
+    const out = join(dir, "out.mp4");
+    const built = encodeWith({ input: merged, output: out, progress: join(dir, "p.txt"), script: join(dir, "g.txt"), lengths: layout, transitions, fps: 60, audio: true, encode: { rate: "crf", crf: 18, speed: "faster", height: 0, fps: 0, audio: 192 }, threads: 2 });
+    const run = spawnSync(FFMPEG, built.args);
+    assert.equal(run.status, 0, String(run.stderr));
+    const t = timing(layout, transitions, 60);
+    const written = Number(probe(["-v", "error", "-select_streams", "v:0", "-count_packets", "-show_entries", "stream=nb_read_packets", "-of", "csv=p=0", out]).trim());
+    assert.equal(written, t.written, "the frames written: the parts' frames less the overlaps");
+    const streams = probe(["-v", "error", "-show_entries", "stream=codec_type,duration", "-of", "csv=p=0", out]).trim().split(/\r?\n/).map((l) => l.split(","));
+    const video = Number(streams.find((s) => s[0] === "video")![1]);
+    const sound = Number(streams.find((s) => s[0] === "audio")![1]);
+    // The sound ends with the picture, give or take the AAC encoder's own padding (up to two 1024-sample frames).
+    assert.ok(Math.abs(video - sound) < 2 * 1024 / 48000 + 0.005, `picture ${video} s, sound ${sound} s`);
+    const colourAt = (frame: number) => {
+      const raw = spawnSync(FFMPEG, ["-v", "error", "-i", out, "-vf", `select=eq(n\\,${frame}),scale=1:1`, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"]).stdout as Buffer;
+      const [r, g, b] = [raw[0]!, raw[1]!, raw[2]!];
+      return r > 150 && g > 150 && b < 100 ? "yellow" : r > 150 && g < 100 ? "red" : g > 150 && r < 100 ? "lime" : b > 150 ? "blue" : `?${r},${g},${b}`;
+    };
+    // Part i's own stretch in the output: after the blend into it, before the blend out of it.
+    let begin = 0;
+    t.frames.forEach((frames, i) => {
+      const into = i ? t.overlaps[i - 1]! : 0;
+      const out2 = t.overlaps[i] ?? 0;
+      const middle = Math.floor(begin + into + (frames - into - out2) / 2);
+      assert.equal(colourAt(middle), colours[i], `part ${i + 1} in the middle of its own frames`);
+      begin += frames - out2;
+    });
+    // 100 parts of 0.5 s at 10 fps, each joined to the next through black for 0.2 s: ffmpeg reads the long graph from its file.
+    const many = join(dir, "many.mkv");
+    spawnSync(FFMPEG, ["-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=s=32x16:r=10:d=50", "-f", "lavfi", "-i", "sine=d=50:r=48000", "-c:v", "ffv1", "-c:a", "pcm_s16le", "-ac", "2", many]);
+    const lengths100 = Array.from({ length: 100 }, () => 0.5);
+    const long = encodeWith({ input: many, output: join(dir, "many-out.mp4"), progress: join(dir, "p2.txt"), script: join(dir, "g2.txt"), lengths: lengths100, transitions: lengths100.map((_, i) => (i < 99 ? tr("fadeBlack", 0.2) : CUT)), fps: 10, audio: true, encode: { rate: "crf", crf: 30, speed: "faster", height: 0, fps: 0, audio: 128 }, threads: 2 });
+    const ran = spawnSync(FFMPEG, long.args);
+    assert.equal(ran.status, 0, String(ran.stderr));
+    const length = Number(probe(["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", join(dir, "many-out.mp4")]).trim());
+    assert.ok(Math.abs(length - (50 - 99 * 0.2)) < 0.15, `${length} s`);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("on activation, what a crash left goes: the work folder is emptied, recorded half files beside the videos are deleted", async () => {
+  const data = await mkdtemp(join(tmpdir(), "clipexport-data-"));
+  const videos = await mkdtemp(join(tmpdir(), "clipexport-videos-"));
+  try {
+    await mkdir(join(data, "work"), { recursive: true });
+    for (const name of ["merge-1.mp4", ".vestra-export-12.tmp", "merge-1.mp4.progress", "merge-1.mp4.graph"]) await writeFile(join(data, "work", name), "left");
+    const half = join(videos, ".clip_collection.mp4.partial");
+    await writeFile(half, "half");
+    await writeFile(join(videos, "mine.mp4"), "the user's");
+    await writeFile(join(data, "inflight.json"), JSON.stringify({ partials: [half, join(videos, "mine.mp4")] }));
+    const host = new TestHost();
+    const { stop } = await start(host, "en", data);
+    try {
+      await until(() => readdirSync(join(data, "work")).length === 0 && !existsSync(half), "the leftovers gone");
+      assert.ok(existsSync(join(videos, "mine.mp4")), "only the plugin's own hidden .partial names are ever deleted");
+      await until(async () => JSON.parse(await readFile(join(data, "inflight.json"), "utf8")).partials.length === 0, "the record emptied");
+    } finally {
+      await stop();
+    }
+  } finally {
+    await rm(data, { recursive: true, force: true });
+    await rm(videos, { recursive: true, force: true });
+  }
+});
+
+test("too little room beside the destination: the export fails with Not enough disk space before ffmpeg runs; nothing is left", async () => {
+  const data = await mkdtemp(join(tmpdir(), "clipexport-data-"));
+  const host = new TestHost();
+  const { stop } = await startPlugin((plugin) => activate(plugin, { freeSpace: async () => 1000 }), { directory, host, locale: "en", dataDirectory: data });
+  const { folder, cleanup } = await withFolder(host);
+  try {
+    await twoWithCrossfade(host);
+    const calls = fakeFfmpeg(host);
+    host.mounted().emit("export-merged");
+    await until(() => host.osd.includes(`Export failed: ${REASON.space}`), "the reason");
+    assert.equal(calls.length, 0);
+    await until(() => leftovers(data, folder).length === 0, "no work files left");
+  } finally {
+    await stop();
+    await cleanup();
+    await rm(data, { recursive: true, force: true });
+  }
+});
+
+test("Same as source with transitions: the merge stays at the best quality, the final aims at the parts' own bit rate (read when each was added)", async () => {
+  const data = await mkdtemp(join(tmpdir(), "clipexport-data-"));
+  const host = new TestHost();
+  // ffprobe: the source's video bit rate at Add.
+  host.tools.handle("ffprobe", () => ({ stdout: "bit_rate=5000000\n" }));
+  const { stop } = await start(host, "en", data);
+  const { cleanup } = await withFolder(host);
+  try {
+    host.mounted().emit("set-preset", 0);
+    await twoWithCrossfade(host);
+    await until(async () => JSON.parse(await readFile(join(data, "collection.json"), "utf8").catch(() => "{}")).parts?.every((p: { bitrate?: number }) => p.bitrate === 5e6), "the bit rates kept with the parts");
+    const calls = fakeFfmpeg(host);
+    host.mounted().emit("export-merged");
+    await until(() => host.osd.some((line) => line.startsWith("Clip exported as")), "the export");
+    const merge = partsExports(host)[0]!.encoding as { crf?: number; videoBitrate?: string };
+    assert.deepEqual([merge.crf, merge.videoBitrate], [14, undefined], "the merge is not encoded at the source bit rate");
+    const args = calls[0]!;
+    assert.equal(args[args.indexOf("-b:v") + 1], "5000000");
+    assert.ok(!args.includes("-crf"));
+  } finally {
+    await stop();
+    await cleanup();
+    await rm(data, { recursive: true, force: true });
+  }
+});
+
+test("Same as source with transitions and no known bit rate: it asks for another quality, nothing starts", async () => {
+  const host = new TestHost();
+  const { stop } = await start(host);
+  try {
+    host.mounted().emit("set-preset", 0);
+    await twoWithCrossfade(host);
+    host.mounted().emit("export-merged");
+    await until(() => host.osd.includes(`Export failed: ${REASON.noSourceBitrate}`), "the reason");
+    assert.equal(partsExports(host).length, 0);
+  } finally {
+    await stop();
+  }
+});
+
+test("the export measures the merge (ffprobe of its frame times) and cuts there; the half file is on record while ffmpeg runs", async () => {
+  const data = await mkdtemp(join(tmpdir(), "clipexport-data-"));
+  const host = new TestHost();
+  const { stop } = await start(host, "en", data);
+  const { cleanup } = await withFolder(host);
+  try {
+    await twoWithCrossfade(host);
+    // The merge as the player wrote it: 120 frames, then the second part 21 ms later (its first part's sound padding), 119 frames.
+    const pts = [...Array.from({ length: 120 }, (_, k) => k / 30), ...Array.from({ length: 119 }, (_, k) => 4.021333 + k / 30)];
+    host.tools.handle("ffprobe", (args) => ({ stdout: args.includes("packet=pts_time") ? `${pts.map((s) => s.toFixed(6)).join("\n")}\n` : "" }));
+    let recorded: string[] = [];
+    const calls = fakeFfmpeg(host, () => {
+      recorded = JSON.parse(readFileSync(join(data, "inflight.json"), "utf8")).partials;
+    });
+    host.mounted().emit("export-merged");
+    await until(() => host.osd.some((line) => line.startsWith("Clip exported as")), "the export");
+    const graph = calls[0]!.at(-1)!;
+    assert.match(graph, /\[0:v\]trim=start_frame=120:end_frame=239,setpts=PTS-STARTPTS\[v1\]/, "the second part's 119 frames, where they are");
+    assert.match(graph, /\[0:a\]atrim=start=4\.021333:end=7\.988,asetpts=PTS-STARTPTS\[a1\]/, "its sound from its own start");
+    assert.deepEqual(recorded, [calls[0]!.at(-2)], "the half file was on record while it was written");
+    await until(async () => JSON.parse(await readFile(join(data, "inflight.json"), "utf8")).partials.length === 0, "and is off it after");
+  } finally {
+    await stop();
+    await cleanup();
     await rm(data, { recursive: true, force: true });
   }
 });

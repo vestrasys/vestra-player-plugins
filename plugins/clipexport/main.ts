@@ -8,9 +8,9 @@ import {
 import type { Encode, Method } from "./clip.ts";
 import { blockingNote, Collection, copyNote, exportParts, lengthClock, listKey, partStates, partTicks, retryDelay, targetNote, totalLength, UNDO_MS } from "./collection.ts";
 import type { Part } from "./collection.ts";
-import { finisher } from "./finish.ts";
+import { finisher, inflightStore, sweepWork } from "./finish.ts";
 import { capturer } from "./form.ts";
-import { anyTransition, capOf, DIRECTIONS, FIRST_DURATION, junctionTicks, KINDS, mergeEncode, PRESET_DURATIONS, typedDuration } from "./transitions.ts";
+import { anyTransition, capOf, DIRECTIONS, FIRST_DURATION, junctionTicks, KINDS, mergeEncode, PRESET_DURATIONS, sourceBitrate, timing, typedDuration } from "./transitions.ts";
 import type { Direction, Kind, Plan, Transition } from "./transitions.ts";
 import { audioChoices, clippable, clock, Failure, isLocal, message, notClippable, parseRange, parseTime, problemOf, REASON, tabMode, withExtension } from "./model.ts";
 import type { Problem, Reason, Spec } from "./model.ts";
@@ -102,6 +102,8 @@ interface Form {
 export interface Options {
   /** Pretend the player offers less than it does (tests of the tab's views; seams.ts). */
   support: Partial<HostSupport>;
+  /** The free space beside a file, in bytes (tests; the system's otherwise). */
+  freeSpace: (folder: string) => Promise<number>;
 }
 
 /** Megabytes as a number for the tab ("8.1", "71"); the tab adds the unit in the user's language. "" when unknown. */
@@ -161,7 +163,10 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   } catch {
     // no data directory: merged exports join with cuts
   }
-  const exporter = capturer(plugin, tasks, workFolder ? finisher(plugin, workFolder) : undefined);
+  // Half files beside the user's videos are recorded while they are written; what a crash left goes now, before any task runs.
+  const inflight = inflightStore(plugin);
+  const swept = workFolder ? sweepWork(workFolder, inflight).catch((error) => console.error(`[clipexport] work folder: ${message(error)}`)) : Promise.resolve();
+  const exporter = capturer(plugin, tasks, workFolder ? finisher(plugin, workFolder, { inflight, ...(options.freeSpace ? { freeSpace: options.freeSpace } : {}) }) : undefined);
   const marker = rangeMarker(plugin, text("Clip"));
   let sequence = 0;
   const nextNumber = () => ++sequence;
@@ -740,6 +745,17 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     }
   }
 
+  /** The video bit rate of the part's source (it is playing: `source` is its path), for a "Same as source" export with transitions. */
+  async function partBitrate(part: Part, source: string | null) {
+    if (!source || !(await plugin.tools.available("ffprobe").catch(() => false))) return;
+    try {
+      const { stdout } = await plugin.tools.run("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=bit_rate:format=bit_rate", "-of", "default=nw=1", source], { timeoutMs: 15_000, maxOutput: 4096 });
+      const values = [...new TextDecoder().decode(stdout).matchAll(/bit_rate=(\d+)/g)].map((m) => Number(m[1])).filter((n) => n > 0);
+      if (values[0] && collection.find(part.id)) collection.update(part, { bitrate: values[0] });
+    } catch (error) {
+      console.error(`[clipexport] part bit rate: ${message(error)}`);
+    }
+  }
   /** Add the marked range (the Clip page's Start and End) of the file playing as the last part. `say`: from a key, success on screen too. */
   async function addPart(say = false, typed?: { start: string; end: string }) {
     if (ui.adding) return;
@@ -766,6 +782,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       plugin.update();
       void recheck();
       void partThumbnail(part, seen);
+      void partBitrate(part, seen.source);
     } catch (error) {
       // The Collection page has no status line (its red line is for what blocks the export): the message says it.
       sayProblem(problemOf(error));
@@ -879,8 +896,13 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
         ? {
           transitions, lengths: parts.map((part) => part.end - part.start), fps: answer.encode.fps, audio: !!answer.encode.audio,
           encode: settings.encode, merge: mergeEncode(settings.encode),
+          bitrate: settings.encode.rate === "source" ? sourceBitrate(parts) : null,
         }
         : undefined;
+      // "Same as source" with transitions aims at the parts' own bit rate: unknown, it asks for another quality.
+      if (plan && plan.encode.rate === "source" && !plan.bitrate) throw new Failure("noSourceBitrate");
+      // What a crash left in the work folder is gone first.
+      await swept;
       await exporter.startParts(spec, input, destination, plan);
     } catch (error) {
       sayFailed(problemOf(error));
@@ -921,7 +943,10 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   function collectionInfo(checked: boolean) {
     const fastNow = collectionMethod() === "fast";
     const junctions = collection.parts.slice(0, -1).filter((part) => part.transition.kind !== "cut");
-    const saved = junctions.reduce((sum, part) => sum + part.transition.duration, 0);
+    // What the export takes off: each overlap on whole frames, held to half the shorter part, at the merge's frame rate.
+    const fps = freshCheck()?.encode?.fps ?? 30;
+    const t = timing(collection.parts.map((part) => part.end - part.start), collection.parts.map((part) => part.transition), fps);
+    const saved = t.overlaps.reduce((sum, frames) => sum + frames, 0) / fps;
     const length = totalLength(collection.parts) - (fastNow ? 0 : saved);
     return {
       count: collection.parts.length, total: lengthClock(length), checked, undo: !!undo,
@@ -1130,6 +1155,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       probeSoon();
     } else {
       marker.set(null);
+      ui.picker = "";
       // What the user typed, written back for the next build of the tab (the player may rebuild it from the last values).
       panel.set({ clipStart: form.start, clipEnd: form.end });
     }
@@ -1149,6 +1175,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     // A selection is the Collection page's: another page in front leaves nothing for Delete to remove.
     selected = null;
     settings.page = page;
+    // The picker belongs to the Collection page.
+    ui.picker = "";
     store();
   }
   /** Show the tab at a page; when it cannot open, the keys keep working. */
