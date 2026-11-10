@@ -115,8 +115,8 @@ msgid "Download yt-dlp to play Bilibili links?"
 msgstr "下载 yt-dlp 以播放 Bilibili 链接？"
 
 #: main.ts:65
-msgid "VestraBili plays Bilibili links with yt-dlp, a free open-source tool. It downloads it once (about {} MB) from the yt-dlp project's official GitHub releases, checks it against the project's signed checksums, and keeps it up to date. yt-dlp is in the public domain (Unlicense) and is not part of VestraBili."
-msgstr "VestraBili 使用免费开源工具 yt-dlp 播放 Bilibili 链接。它会从 yt-dlp 项目在 GitHub 上的官方发布页下载一次（约 {} MB），用项目签名的校验和核对文件，并自动保持更新。yt-dlp 属于公有领域（Unlicense），不是 VestraBili 的一部分。"
+msgid "VestraBili plays Bilibili links with yt-dlp, a free open-source tool. It downloads it once (about {} MB) from the yt-dlp project's official GitHub releases, checks it against the project's signed checksums, and keeps it up to date. yt-dlp's standalone builds are licensed GPLv3+ (its source code is Unlicense). It is a separate program, not part of VestraBili, and is not redistributed with it."
+msgstr "VestraBili 使用免费开源工具 yt-dlp 播放 Bilibili 链接。它会从 yt-dlp 项目在 GitHub 上的官方发布页下载一次（约 {} MB），用项目签名的校验和核对文件，并自动保持更新。yt-dlp 的独立可执行版本采用 GPLv3+ 许可（其源代码为 Unlicense）。它是独立的程序，不是 VestraBili 的一部分，也不随 VestraBili 分发。"
 
 #: main.ts:67
 msgid "Download"
@@ -170,15 +170,15 @@ msgstr "播放器无法打开这个链接。"
 msgid "The playback request failed."
 msgstr "播放请求失败。"
 
-#: main.ts:203 main.ts:208
+#: main.ts:203 main.ts:209
 msgid "Resolving the video and audio…"
 msgstr "正在解析视频和音频…"
 
-#: main.ts:211
+#: main.ts:213
 msgid "The video is ready."
 msgstr "视频已就绪。"
 
-#: main.ts:238
+#: main.ts:240
 msgid "VestraBili…"
 msgstr "VestraBili…"
 

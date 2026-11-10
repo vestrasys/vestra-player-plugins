@@ -65,7 +65,7 @@ test("the window asks before downloading yt-dlp; a refusal says how to get it la
     {
       message: "Download yt-dlp to play Bilibili links?",
       detail:
-        "VestraBili plays Bilibili links with yt-dlp, a free open-source tool. It downloads it once (about 42 MB) from the yt-dlp project's official GitHub releases, checks it against the project's signed checksums, and keeps it up to date. yt-dlp is in the public domain (Unlicense) and is not part of VestraBili.",
+        "VestraBili plays Bilibili links with yt-dlp, a free open-source tool. It downloads it once (about 42 MB) from the yt-dlp project's official GitHub releases, checks it against the project's signed checksums, and keeps it up to date. yt-dlp's standalone builds are licensed GPLv3+ (its source code is Unlicense). It is a separate program, not part of VestraBili, and is not redistributed with it.",
       confirm: "Download",
       cancel: "Cancel",
     },

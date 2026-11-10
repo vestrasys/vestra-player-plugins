@@ -1,6 +1,6 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: zysilm.vestrabili 0.5.0\n"
+"Project-Id-Version: zysilm.vestrabili 0.5.2\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
@@ -114,7 +114,7 @@ msgid "Download yt-dlp to play Bilibili links?"
 msgstr ""
 
 #: main.ts:65
-msgid "VestraBili plays Bilibili links with yt-dlp, a free open-source tool. It downloads it once (about {} MB) from the yt-dlp project's official GitHub releases, checks it against the project's signed checksums, and keeps it up to date. yt-dlp is in the public domain (Unlicense) and is not part of VestraBili."
+msgid "VestraBili plays Bilibili links with yt-dlp, a free open-source tool. It downloads it once (about {} MB) from the yt-dlp project's official GitHub releases, checks it against the project's signed checksums, and keeps it up to date. yt-dlp's standalone builds are licensed GPLv3+ (its source code is Unlicense). It is a separate program, not part of VestraBili, and is not redistributed with it."
 msgstr ""
 
 #: main.ts:67
@@ -169,15 +169,15 @@ msgstr ""
 msgid "The playback request failed."
 msgstr ""
 
-#: main.ts:203 main.ts:208
+#: main.ts:203 main.ts:209
 msgid "Resolving the video and audio…"
 msgstr ""
 
-#: main.ts:211
+#: main.ts:213
 msgid "The video is ready."
 msgstr ""
 
-#: main.ts:238
+#: main.ts:240
 msgid "VestraBili…"
 msgstr ""
 

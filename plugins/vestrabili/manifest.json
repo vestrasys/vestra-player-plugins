@@ -1,6 +1,6 @@
 {
   "id": "zysilm.vestrabili",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "apiVersion": "vestra/1",
   "entry": "main.ts",
   "capabilities": [
