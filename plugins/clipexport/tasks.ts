@@ -1,15 +1,18 @@
-import type { ExportJob, JobState, Scope, Snapshot } from "@vestra-player/sdk";
+import type { ExportJob, ExportPart, JobState, Scope, Snapshot } from "@vestra-player/sdk";
 import { Failure, jobProblem } from "./model.ts";
 import type { JobReason, Problem, Spec } from "./model.ts";
-import { actualRange, clipExport, jobProgress } from "./seams.ts";
+import { actualRange, clipExport, jobProgress, partsExport } from "./seams.ts";
+import type { Progress } from "./seams.ts";
 
-/** An accepted export: one frozen snapshot, one export job. */
+/** An accepted export: one frozen snapshot (a clip) or the Collection's parts (a merged export), one export job. */
 export interface Task {
   id: string;
   spec: Spec;
   sourceId: number;
   source: string;
   snapshot?: Snapshot;
+  /** A merged export of the Collection: its parts as they were when it started (later edits apply to the next export). */
+  parts?: ExportPart[];
   destination: string;
   status: string;
   /** Why it failed. */
@@ -24,8 +27,8 @@ export interface Task {
   /** When its job started running, and when it ended (ms since the epoch). */
   started?: number;
   ended?: number;
-  /** The running job's progress in seconds of media (R4); `null` while unknown. */
-  progress: { done: number; total: number } | null;
+  /** The running job's progress in seconds of media (R4), and the part being written of a merged export; `null` while unknown. */
+  progress: Progress | null;
   /** When the progress first moved, and how far it was then (the time-left estimate measures from here). */
   rateFrom?: { at: number; done: number };
   /** The finished clip's range as written (R2; the range asked for until then). */
@@ -52,7 +55,15 @@ export function jobError(error: { code: string; message: string }, spec?: Spec):
     if (spec.encode?.rate === "source") return "noSourceBitrate";
   }
   switch (error.code) {
+    // A merged export: a part's file went or changed since it was added, or its token is gone.
+    case "source-missing":
+      return "partMissing";
+    case "source-changed":
+      return "partChanged";
+    case "missing":
+      return "partUnknown";
     case "space":
+    case "no-space":
       return "space";
     case "exists":
       return "exists";
@@ -71,7 +82,7 @@ export function jobError(error: { code: string; message: string }, spec?: Spec):
  * first moved; -1 (none shown) until there is a rate worth the name (1.5 s of
  * it and some progress), and at the end, while the player checks the file.
  */
-export function timeLeft(task: Pick<Task, "progress" | "rateFrom">, now = Date.now()): number {
+export function timeLeft(task: { progress: { done: number; total: number } | null; rateFrom?: Task["rateFrom"] }, now = Date.now()): number {
   const progress = task.progress;
   const from = task.rateFrom;
   if (!progress || !from || progress.done >= progress.total) return -1;
@@ -170,7 +181,8 @@ export class Tasks {
             const { state } = await this.#run(task);
             if (state.status === "completed" && state.outcome && "destination" in state.outcome) {
               task.output = state.outcome.destination;
-              task.actual = actualRange(state, { start: task.spec.start, end: task.spec.end });
+              // A merged file holds the parts' length from 0; a clip the range the player wrote.
+              task.actual = task.parts ? { start: task.spec.start, end: task.spec.end } : actualRange(state, { start: task.spec.start, end: task.spec.end });
               task.status = "completed";
             } else if (state.status === "failed")
               throw new Failure(state.outcome && "error" in state.outcome ? jobError(state.outcome.error, task.spec) : jobError({ code: "unknown", message: "no error outcome" }));
@@ -196,9 +208,17 @@ export class Tasks {
   }
 
   async #run(task: Task): Promise<{ job: ExportJob; state: JobState }> {
-    if (!task.snapshot) throw new Failure("released");
     const { spec } = task;
-    const job = await task.snapshot.export(clipExport(task.destination, spec.end, spec.method, spec.encode));
+    let job: ExportJob;
+    if (task.parts) {
+      job = await this.#plugin.media.export(partsExport(task.parts, task.destination, spec.method, spec.encode)).catch((error: { code?: string; message?: string }) => {
+        // Refused before it started (a token the player no longer has, a part the check did not see): one of the plugin's reasons.
+        throw new Failure(jobError({ code: error.code ?? "unknown", message: error.message ?? String(error) }, spec));
+      });
+    } else {
+      if (!task.snapshot) throw new Failure("released");
+      job = await task.snapshot.export(clipExport(task.destination, spec.end, spec.method, spec.encode));
+    }
     task.active = job;
     task.jobs.push(job);
     if (task.cancel || this.#stopped) await job.cancel().catch(() => {});

@@ -1,6 +1,6 @@
 {
   "id": "zysilm.clipexport",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "apiVersion": "vestra/1",
   "entry": "main.ts",
   "capabilities": [
@@ -10,17 +10,19 @@
     "ui.dialog",
     "media.read",
     "media.control",
+    "media.sources",
     "playback.read",
+    "playback.control",
     "timeline.marks",
     "ui.osd"
   ],
   "name": "Clip Export",
   "author": "zysilm",
   "punchline": "Cut part of a video into a new file: a lossless stream copy or a re-encoded MP4",
-  "description": "Exports part of the local video playing as a new file, from a sidebar tab, Clip Export. Fast copies the streams (lossless, about as fast as the disk, from the keyframe at or before the start); Precise re-encodes an MP4 from the exact frame, with a quality preset or your own settings, and can include the video effects and burned-in subtitles. Set the range by typing it, with Now, from the A-B loop, or export the last 10–120 seconds with one key. The range shows on the seek bar while the tab is open; running exports show their progress, and the last twenty clips stay in Results.\nVideo ▸ Export Clip… opens the tab.",
+  "description": "Exports part of the local video playing as a new file, from a sidebar tab, Clip Export. Fast copies the streams (lossless, about as fast as the disk, from the keyframe at or before the start); Precise re-encodes an MP4 from the exact frame, with a quality preset or your own settings, and can include the video effects and burned-in subtitles. Set the range by typing it, with Now, from the A-B loop, or export the last 10–120 seconds with one key. The range shows on the seek bar while the tab is open; running exports show their progress, and the last twenty clips stay in Results.\nThe Collection page gathers ranges from several local files into one list: reorder it, remove parts, preview a part with a double click, and export them as one merged video (Fast when the files match, Precise otherwise).\nVideo ▸ Export Clip… opens the tab.",
   "tags": ["video", "clip", "export"],
   "sourceUrl": "https://github.com/vestrasys/vestra-player-plugins/tree/main/plugins/clipexport",
   "license": "Apache-2.0",
   "icon": "assets/icon.png",
-  "minPlayerVersion": "0.7.6"
+  "minPlayerVersion": "0.7.7"
 }

@@ -54,12 +54,21 @@ export const REASON = {
   fastImpossible: "Fast cut is not possible for this file. Use Precise.",
   noSourceBitrate: "The bitrate of this file is unknown. Choose another quality.",
   folderGone: "The file or folder was moved or deleted.",
+  addLocal: "Only local files can be added to the Collection.",
+  collectionFull: "The Collection holds 100 parts. Remove one first.",
+  tooManyFiles: "Clip Export remembers at most 500 files. Remove parts of other files first.",
+  emptyCollection: "The Collection is empty. Add a range first.",
+  partMissing: "A part's file is missing. Locate it or remove the part.",
+  partChanged: "A part's file has changed. Locate it or remove the part.",
+  partUnknown: "A part's file is no longer known. Remove the part.",
+  cannotRead: "The player cannot read this file.",
+  noCapability: "This version of the player cannot do this.",
 } as const;
 export type Reason = keyof typeof REASON;
 
 /** The reasons an export job ends with (`jobError`, a released input). */
-export type JobReason = "space" | "exists" | "permission" | "encoder" | "exportFailed" | "released" | "fastImpossible" | "noSourceBitrate";
-const JOB_REASONS: readonly Reason[] = ["space", "exists", "permission", "encoder", "exportFailed", "released", "fastImpossible", "noSourceBitrate"];
+export type JobReason = "space" | "exists" | "permission" | "encoder" | "exportFailed" | "released" | "fastImpossible" | "noSourceBitrate" | "partMissing" | "partChanged" | "partUnknown";
+const JOB_REASONS: readonly Reason[] = ["space", "exists", "permission", "encoder", "exportFailed", "released", "fastImpossible", "noSourceBitrate", "partMissing", "partChanged", "partUnknown"];
 
 /** A failure in the plugin's own words: `code` names its text in {@link REASON}. */
 export class Failure extends Error {

@@ -1,4 +1,4 @@
-import type { ExportOptions, JobState, Plugin, Text } from "@vestra-player/sdk";
+import type { ExportOptions, ExportPart, JobState, PartsExportOptions, Plugin, Text } from "@vestra-player/sdk";
 import { exportEncoding } from "./clip.ts";
 import type { Encode, Method } from "./clip.ts";
 
@@ -15,9 +15,11 @@ import type { Encode, Method } from "./clip.ts";
  * | R5 OSD actions | `osd.show(…, { actions })` (1.6.9) | `showDone` |
  * | R6 encode options | `ExportEncoding` (1.6.10) | `clipExport` (Precise), `clip.ts` `exportEncoding` |
  * | R7 A-B points | none yet | `clip.ts` `abRange` (needs the loop switched on) |
+ * | Collection: remembered files, merged exports, the check | `media.sources`, `media.export` with `parts`, `media.exportCheck` (1.7.8) | `collection.ts`, `partsExport` |
  *
- * All of them need player 0.7.6, which `minPlayerVersion` requires, so the
- * plugin uses them without asking (the SDK says not to probe by trying).
+ * R1–R6 need player 0.7.6 and the Collection's 0.7.7, which `minPlayerVersion`
+ * requires, so the plugin uses them without asking (the SDK says not to probe
+ * by trying).
  */
 export interface HostSupport {
   /** R1 (with R2): `Snapshot.export` can copy streams. */
@@ -50,6 +52,26 @@ export function clipExport(destination: string, end: number, method: Method, enc
   return encode ? { format: "mp4", destination, end, encoding: exportEncoding(encode) } : { format: "mp4", destination, end };
 }
 
+/**
+ * The export options of a merged export of the Collection (SDK 1.7.8
+ * `plugin.media.export` with `parts`): Fast copies every part (the player
+ * picks MP4 or MKV), Precise re-encodes them to the first part's size and
+ * frame rate with the tab's encoder settings.
+ */
+export function partsExport(parts: ExportPart[], destination: string, method: Method, encode: Encode | undefined): PartsExportOptions {
+  const copy = parts.map(({ source, start, end }) => ({ source, start, end }));
+  if (method === "fast") return { parts: copy, destination, format: "copy", container: "auto" };
+  return encode ? { parts: copy, destination, format: "mp4", encoding: exportEncoding(encode) } : { parts: copy, destination, format: "mp4" };
+}
+
+/** A running export's progress: seconds written of all, and for a merged export the part being written (from 1) of how many (0 for a clip). */
+export interface Progress {
+  done: number;
+  total: number;
+  part: number;
+  parts: number;
+}
+
 /** The times the finished file holds (R2): the player's `outcome.start` / `end`, the range asked for when it gives none. */
 export function actualRange(state: JobState, asked: { start: number; end: number }): { start: number; end: number } {
   const outcome = state.outcome && "destination" in state.outcome ? state.outcome : null;
@@ -59,18 +81,19 @@ export function actualRange(state: JobState, asked: { start: number; end: number
 }
 
 /** A running clip's progress in seconds of the clip (R4); `null` while unknown (before writing starts). */
-export function jobProgress(state: JobState): { done: number; total: number } | null {
+export function jobProgress(state: JobState): Progress | null {
   const progress = state.progress;
-  return progress && Number.isFinite(progress.done) && Number.isFinite(progress.total) && progress.total > 0
-    ? { done: Math.min(progress.done, progress.total), total: progress.total }
-    : null;
+  if (!(progress && Number.isFinite(progress.done) && Number.isFinite(progress.total) && progress.total > 0)) return null;
+  const count = (value: unknown) => (typeof value === "number" && Number.isInteger(value) && value > 0 ? value : 0);
+  const parts = count(progress.parts);
+  return { done: Math.min(progress.done, progress.total), total: progress.total, part: parts ? Math.min(count(progress.part), parts) : 0, parts };
 }
 
 /** A button of a finished export's message (R5): a label and one of the plugin's own commands. */
 export interface OsdAction {
   /** Translated by the player like the text: a `plugin.i18n.text` value, so that extract finds it. */
   title: Text;
-  command: "clip.revealLast" | "clip.tasks";
+  command: "clip.revealLast" | "clip.tasks" | "clip.collectionUndo";
 }
 /**
  * Show a finished export's message with its buttons (at most two). The

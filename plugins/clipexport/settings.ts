@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { Scope } from "@vestra-player/sdk";
 import { encodeOf, lastSeconds, METHODS } from "./clip.ts";
 import type { Encode, Method } from "./clip.ts";
-import { normalTemplate } from "./names.ts";
+import { COLLECTION_TEMPLATE, normalTemplate } from "./names.ts";
 
 /** Everything kept in `settings.json`. */
 export interface Settings {
@@ -22,15 +22,22 @@ export interface Settings {
   lastSeconds: number;
   /** The Clip page's Advanced rows are open. */
   advancedOpen: boolean;
-  /** The sub-tab shown last: 0 Clip, 1 Results, 2 Settings. */
-  page: number;
+  /** The merged export's file-name template (the Collection). */
+  collectionTemplate: string;
+  /** The sub-tab shown last. */
+  page: Page;
   /** Seconds of work per second of media of the last Precise export on this machine (the time estimate); null before one. */
   preciseSpeed: number | null;
 }
 
 /** The pages of the tab, as its sub-tab strip orders them. */
-export const PAGES = ["clip", "results", "settings"] as const;
+export const PAGES = ["clip", "collection", "results", "settings"] as const;
 export type Page = (typeof PAGES)[number];
+/** The pages before the Collection page: 0.1.x kept the page as its index among these. */
+const OLD_PAGES = ["clip", "results", "settings"] as const;
+/** A stored page: its name, or (0.1.x) its index among the old pages. */
+const pageOf = (value: unknown): Page =>
+  PAGES.includes(value as Page) ? (value as Page) : Number.isInteger(value) ? (OLD_PAGES[value as number] ?? "clip") : "clip";
 
 /** The user's Videos folder, else the home folder. */
 export const defaultFolder = () => {
@@ -63,7 +70,8 @@ export function settingsOf(stored: unknown, folder = defaultFolder()): Settings 
     template: normalTemplate(s.template),
     lastSeconds: lastSeconds(s.lastSeconds),
     advancedOpen: flag(s.advancedOpen, false),
-    page: Number.isInteger(s.page) ? inRange(s.page, 0, PAGES.length - 1, 0) : 0,
+    collectionTemplate: normalTemplate(s.collectionTemplate, COLLECTION_TEMPLATE),
+    page: pageOf(s.page),
     preciseSpeed: s.preciseSpeed === null || s.preciseSpeed === undefined ? null : inRange(s.preciseSpeed, 0.01, 1000, 0) || null,
   };
 }

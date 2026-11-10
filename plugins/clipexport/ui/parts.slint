@@ -51,7 +51,49 @@ export global Words {
         if (code == "fastImpossible") { return @tr("Fast cut is not possible for this file. Use Precise."); }
         if (code == "noSourceBitrate") { return @tr("The bitrate of this file is unknown. Choose another quality."); }
         if (code == "folderGone") { return @tr("The file or folder was moved or deleted."); }
+        if (code == "addLocal") { return @tr("Only local files can be added to the Collection."); }
+        if (code == "collectionFull") { return @tr("The Collection holds 100 parts. Remove one first."); }
+        if (code == "tooManyFiles") { return @tr("Clip Export remembers at most 500 files. Remove parts of other files first."); }
+        if (code == "emptyCollection") { return @tr("The Collection is empty. Add a range first."); }
+        if (code == "partMissing") { return @tr("A part's file is missing. Locate it or remove the part."); }
+        if (code == "partChanged") { return @tr("A part's file has changed. Locate it or remove the part."); }
+        if (code == "partUnknown") { return @tr("A part's file is no longer known. Remove the part."); }
+        if (code == "cannotRead") { return @tr("The player cannot read this file."); }
+        if (code == "noCapability") { return @tr("This version of the player cannot do this."); }
         return raw;
+    }
+
+    // What stops an export of the Collection (the check's `blocking`): the part (from 1) and what to do.
+    public pure function blocking(problem: string, part: string) -> string {
+        // TRANSLATORS: {} is a part number of the Collection (1, 2, …).
+        if (problem == "missing") { return @tr("Part {} is missing: locate it or remove it", part); }
+        // TRANSLATORS: {} is a part number of the Collection.
+        if (problem == "changed") { return @tr("Part {} has changed: locate it or remove it", part); }
+        // TRANSLATORS: {} is a part number of the Collection.
+        if (problem == "unknown") { return @tr("Part {} is no longer known: remove it", part); }
+        // TRANSLATORS: {} is a part number of the Collection.
+        if (problem == "noVideo") { return @tr("Part {} has no video: remove it", part); }
+        // TRANSLATORS: {} is a part number of the Collection.
+        if (problem == "range") { return @tr("Part {} is outside its file: remove it", part); }
+        return "";
+    }
+
+    // A value of the stream-copy check (`copy.reasons`): a size or codec as it is, a frame rate with its unit, no stream as "none".
+    public pure function copy-value(field: string, value: string) -> string {
+        if (value == "" || value == "none") { return @tr("none"); }
+        // TRANSLATORS: {} is frames per second.
+        if (field == "fps") { return @tr("{} fps", value); }
+        return value;
+    }
+
+    // The state of a Collection row's file.
+    public pure function part-state(state: string) -> string {
+        if (state == "missing") { return @tr("File missing"); }
+        if (state == "changed") { return @tr("File changed"); }
+        if (state == "unknown") { return @tr("File no longer known"); }
+        if (state == "noVideo") { return @tr("No video"); }
+        if (state == "range") { return @tr("Outside the file"); }
+        return "";
     }
 
     // The name of a task state; another state shows as it is.
@@ -73,6 +115,10 @@ export global Words {
         if (s.kind == "no-destination") { return @tr("No save location chosen."); }
         if (s.kind == "clip-started") { return @tr("Export started. Follow it in Results."); }
         if (s.kind == "restarted") { return @tr("Restarted."); }
+        // TRANSLATORS: {} is a part number of the Collection.
+        if (s.kind == "added") { return @tr("Added as part {}", s.name); }
+        if (s.kind == "blocked") { return Words.blocking(s.reason, s.name); }
+        if (s.kind == "cleared") { return @tr("Collection cleared."); }
         return "";
     }
 

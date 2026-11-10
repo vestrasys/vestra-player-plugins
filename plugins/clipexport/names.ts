@@ -5,6 +5,8 @@ import { clock, stemOf } from "./model.ts";
  * in braces, the rest as typed. The default states the clip's range.
  */
 export const DEFAULT_TEMPLATE = "{name}_{start}-{end}";
+/** A merged export of the Collection: `{name}` is the first part's file, `{start}` its start, `{end}` the last part's end. */
+export const COLLECTION_TEMPLATE = "{name}_collection_{date}";
 /** The variables, in the order the tab's chips show them. */
 export const VARIABLES = ["{name}", "{start}", "{end}", "{date}", "{time}", "{n}"] as const;
 /** At most this many characters per template (a name stays well inside the 255 of the file systems). */
@@ -50,9 +52,9 @@ export const safeName = (text: string) => {
 export const NAME_LIMIT = 168;
 
 /** A template as kept: at most {@link TEMPLATE_LIMIT} characters, the default when it is blank. */
-export function normalTemplate(value: unknown) {
+export function normalTemplate(value: unknown, fallback = DEFAULT_TEMPLATE) {
   const text = typeof value === "string" ? value.slice(0, TEMPLATE_LIMIT) : "";
-  return text.trim() ? text : DEFAULT_TEMPLATE;
+  return text.trim() ? text : fallback;
 }
 
 /**
@@ -60,7 +62,7 @@ export function normalTemplate(value: unknown) {
  * as written. Illegal characters become `_`; a name that comes out empty uses
  * the default template.
  */
-export function renderName(template: string, values: NameValues): string {
+export function renderName(template: string, values: NameValues, fallback = DEFAULT_TEMPLATE): string {
   const table: Record<string, string> = {
     "{name}": stemOf(values.source),
     "{start}": clock(values.start, "."),
@@ -83,7 +85,7 @@ export function renderName(template: string, values: NameValues): string {
     }
     return name.length > NAME_LIMIT ? safeName(name.slice(0, NAME_LIMIT)) : name;
   };
-  return fill(normalTemplate(template)) || fill(DEFAULT_TEMPLATE);
+  return fill(normalTemplate(template, fallback)) || fill(fallback) || fill(DEFAULT_TEMPLATE);
 }
 
 /** Insert a variable chip at the end of the template (a click puts it where the text ends). */
