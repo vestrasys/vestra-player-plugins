@@ -182,6 +182,14 @@ export function timing(parts: readonly number[] | Layout, transitions: readonly 
 }
 
 const seconds = (value: number) => value.toFixed(6).replace(/\.?0+$/, "") || "0";
+/**
+ * The frame rate in an expression. Each part's frames are put on an exact
+ * 1/fps grid from 0 (`setpts=N/(fps*TB)`, on one timebase for every branch):
+ * the merge's own timestamps have the gaps of its joins, which the MP4
+ * muxer's constant-rate output would fill with a repeated frame, and xfade
+ * takes only inputs of one timebase (concat writes 1/1000000).
+ */
+const rate = (fps: number) => seconds(fps);
 const secs = (frames: number, fps: number) => seconds(frames / fps);
 
 /**
@@ -195,11 +203,11 @@ export function transitionGraph(parts: readonly number[] | Layout, transitions: 
   const t = timing(parts, transitions, fps);
   const out: string[] = [];
   t.frames.forEach((f, i) => {
-    out.push(`[0:v]trim=start_frame=${t.starts[i]}:end_frame=${t.starts[i]! + f},setpts=PTS-STARTPTS[v${i}]`);
+    out.push(`[0:v]trim=start_frame=${t.starts[i]}:end_frame=${t.starts[i]! + f},settb=AVTB,setpts=N/(${rate(fps)}*TB)[v${i}]`);
     // The part's sound from its own start in the merge, as long as its frames: the padding after it is left out,
     // and picture and sound meet at every junction.
     const at = t.times[i]!;
-    if (audio) out.push(`[0:a]atrim=start=${seconds(at)}:end=${seconds(at + f / fps)},asetpts=PTS-STARTPTS[a${i}]`);
+    if (audio) out.push(`[0:a]atrim=start=${seconds(at)}:end=${seconds(at + f / fps)},asetpts=PTS-STARTPTS,asettb=1/48000[a${i}]`);
   });
   let video = "v0";
   let sound = "a0";
@@ -209,11 +217,11 @@ export function transitionGraph(parts: readonly number[] | Layout, transitions: 
     const aOut = next === t.frames.length - 1 ? "aout" : `aj${next}`;
     const tr = transitions[i]!;
     if (overlap === 0) {
-      out.push(`[${video}][v${next}]concat=n=2:v=1:a=0[${vOut}]`);
-      if (audio) out.push(`[${sound}][a${next}]concat=n=2:v=0:a=1[${aOut}]`);
+      out.push(`[${video}][v${next}]concat=n=2:v=1:a=0,settb=AVTB[${vOut}]`);
+      if (audio) out.push(`[${sound}][a${next}]concat=n=2:v=0:a=1,asettb=1/48000[${aOut}]`);
     } else {
       const d = secs(overlap, fps);
-      out.push(`[${video}][v${next}]xfade=transition=${xfadeName(tr)}:duration=${d}:offset=${secs(t.offsets[i]!, fps)}[${vOut}]`);
+      out.push(`[${video}][v${next}]xfade=transition=${xfadeName(tr)}:duration=${d}:offset=${secs(t.offsets[i]! - 0.5, fps)}[${vOut}]`);
       if (audio && soundOf(tr.kind) === "dip") {
         // Out over the first half of the overlap, in over the second: the sound dips with the picture.
         const half = secs(overlap / 2, fps);

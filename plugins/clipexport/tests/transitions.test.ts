@@ -103,15 +103,18 @@ test("junction offsets on whole frames: each blend starts at the length so far l
 test("the filter graph: trim each part out of the merge, xfade + acrossfade (qsin), a dip for the fades through black/white, concat for a cut", () => {
   const { graph, length } = transitionGraph([4, 4, 4], [tr("crossfade", 1), tr("fadeBlack", 1), CUT], 10, true);
   assert.equal(length, 10);
-  assert.match(graph, /\[0:v\]trim=start_frame=0:end_frame=40,setpts=PTS-STARTPTS\[v0\]/);
-  assert.match(graph, /\[0:v\]trim=start_frame=40:end_frame=80,setpts=PTS-STARTPTS\[v1\]/);
-  assert.match(graph, /\[0:a\]atrim=start=4:end=8,asetpts=PTS-STARTPTS\[a1\]/);
-  assert.match(graph, /\[v0\]\[v1\]xfade=transition=fade:duration=1:offset=3\[vj1\]/);
+  assert.match(graph, /\[0:v\]trim=start_frame=0:end_frame=40,settb=AVTB,setpts=N\/\(\d+\*TB\)\[v0\]/);
+  assert.match(graph, /\[0:v\]trim=start_frame=40:end_frame=80,settb=AVTB,setpts=N\/\(\d+\*TB\)\[v1\]/);
+  assert.match(graph, /\[0:a\]atrim=start=4:end=8,asetpts=PTS-STARTPTS,asettb=1\/48000\[a1\]/);
+  // The offset half a frame before the blend's first frame: xfade starts at the first frame at or after it, whatever the rounding.
+  assert.match(graph, /\[v0\]\[v1\]xfade=transition=fade:duration=1:offset=2\.95\[vj1\]/);
   assert.match(graph, /\[a0\]\[a1\]acrossfade=d=1:c1=qsin:c2=qsin\[aj1\]/);
-  assert.match(graph, /\[vj1\]\[v2\]xfade=transition=fadeblack:duration=1:offset=6\[vout\]/);
+  assert.match(graph, /\[vj1\]\[v2\]xfade=transition=fadeblack:duration=1:offset=5\.95\[vout\]/);
   assert.match(graph, /\[aj1\]afade=t=out:st=6:d=0\.5\[ad2\];\[a2\]afade=t=in:st=0\.5:d=0\.5\[ai2\];\[ad2\]\[ai2\]acrossfade=d=1:c1=nofade:c2=nofade\[aout\]/);
   const cuts = transitionGraph([4, 4], [CUT, CUT], 10, false).graph;
-  assert.equal(cuts, "[0:v]trim=start_frame=0:end_frame=40,setpts=PTS-STARTPTS[v0];[0:v]trim=start_frame=40:end_frame=80,setpts=PTS-STARTPTS[v1];[v0][v1]concat=n=2:v=1:a=0[vout]");
+  assert.equal(cuts, "[0:v]trim=start_frame=0:end_frame=40,settb=AVTB,setpts=N/(10*TB)[v0];[0:v]trim=start_frame=40:end_frame=80,settb=AVTB,setpts=N/(10*TB)[v1];[v0][v1]concat=n=2:v=1:a=0,settb=AVTB[vout]");
+  // One timebase on every branch: concat writes 1/1000000, a trimmed part keeps its file's, and xfade takes only equal ones.
+  assert.equal(graph.split(";").filter((step) => step.startsWith("[0:v]") && !step.includes("settb=AVTB")).length, 0);
   assert.doesNotMatch(graph, /[;'"`$]{2}|\.\.\//, "only numbers and the plugin's own names");
 });
 
@@ -125,7 +128,7 @@ test("ffmpeg's arguments: the Precise settings (CRF, x264 preset, yuv420p, AAC 4
   assert.ok(args.includes("+faststart"));
   assert.equal(at("-/filter_complex"), "/w/merge.mp4.graph", "the graph is read from a file (Windows' command line is 32 767 characters)");
   assert.ok(!args.includes("-filter_complex"));
-  assert.match(graph, /xfade=transition=wipeup:duration=1:offset=3/);
+  assert.match(graph, /xfade=transition=wipeup:duration=1:offset=2\.983333/);
   // "Same as source": the merged file's own bit rate, peaks up to 1.5 times it (as the player's Precise).
   const source = transitionArgs({ input: "i", output: "o", progress: "p", script: "g", lengths: [4, 4], transitions: [tr("crossfade"), CUT], fps: 30, audio: false, encode: { ...encode, rate: "source" }, bitrate: 4e6, threads: 1 }).args;
   assert.deepEqual([source[source.indexOf("-b:v") + 1], source[source.indexOf("-maxrate") + 1], source.includes("-crf"), source.includes("-an")], ["4000000", "6000000", false, true]);
@@ -343,7 +346,7 @@ test("Precise with a transition: the player merges into the work folder, the plu
     assert.equal(calls.length, 1);
     const at = (flag: string) => calls[0]![calls[0]!.indexOf(flag) + 1];
     assert.equal(at("-i"), String(job.destination));
-    assert.match(calls[0]!.at(-1)!, /xfade=transition=fade:duration=1:offset=3/);
+    assert.match(calls[0]!.at(-1)!, /xfade=transition=fade:duration=1:offset=2\.983333/);
     assert.equal(at("-crf"), "18", "the tab's Precise quality (High quality)");
     const finals = (await readdir(folder)).filter((name) => name.endsWith(".mp4"));
     assert.equal(finals.length, 1);
@@ -516,8 +519,8 @@ test("the layout is measured: each part starts at its first frame at or after th
   assert.equal(layoutOf([0, 0.1], [0.05, 0.05, 0.05]), null, "a part with no frame");
   // The graph cuts the sound at each part's own start, for its frames' length.
   const { graph } = transitionGraph(layout, [tr("crossfade", 0.5), CUT, CUT, CUT], 30, true);
-  assert.match(graph, /\[0:a\]atrim=start=2\.535352:end=4\.302019,asetpts=PTS-STARTPTS\[a1\]/);
-  assert.match(graph, /\[0:v\]trim=start_frame=75:end_frame=128,setpts=PTS-STARTPTS\[v1\]/);
+  assert.match(graph, /\[0:a\]atrim=start=2\.535352:end=4\.302019,asetpts=PTS-STARTPTS,asettb=1\/48000\[a1\]/);
+  assert.match(graph, /\[0:v\]trim=start_frame=75:end_frame=128,settb=AVTB,setpts=N\/\(\d+\*TB\)\[v1\]/);
 });
 
 test("100 parts with fades through black: the graph is a file (it is longer than Windows' 32 767-character command line)", () => {
@@ -710,13 +713,57 @@ test("the export measures the merge (ffprobe of its frame times) and cuts there;
     host.mounted().emit("export-merged");
     await until(() => host.osd.some((line) => line.startsWith("Clip exported as")), "the export");
     const graph = calls[0]!.at(-1)!;
-    assert.match(graph, /\[0:v\]trim=start_frame=120:end_frame=239,setpts=PTS-STARTPTS\[v1\]/, "the second part's 119 frames, where they are");
-    assert.match(graph, /\[0:a\]atrim=start=4\.021333:end=7\.988,asetpts=PTS-STARTPTS\[a1\]/, "its sound from its own start");
+    assert.match(graph, /\[0:v\]trim=start_frame=120:end_frame=239,settb=AVTB,setpts=N\/\(\d+\*TB\)\[v1\]/, "the second part's 119 frames, where they are");
+    assert.match(graph, /\[0:a\]atrim=start=4\.021333:end=7\.988,asetpts=PTS-STARTPTS,asettb=1\/48000\[a1\]/, "its sound from its own start");
     assert.deepEqual(recorded, [calls[0]!.at(-2)], "the half file was on record while it was written");
     await until(async () => JSON.parse(await readFile(join(data, "inflight.json"), "utf8")).partials.length === 0, "and is off it after");
   } finally {
     await stop();
     await cleanup();
     await rm(data, { recursive: true, force: true });
+  }
+});
+
+for (const fps of [30, 60]) test(`with a real ffmpeg at ${fps} fps: every ordered pair of junction kinds (Cut and each transition, before and after one another) on five parts merged the player's way`, { skip: !haveFfmpeg && "no ffmpeg (set VESTRA_FFMPEG)" }, async () => {
+  const dir = await mkdtemp(join(tmpdir(), "clipexport-pairs-"));
+  const probe = (args: string[]) => String(spawnSync(ffprobe, args).stdout);
+  try {
+    // Five parts of fractional lengths at 60 fps, cut and re-encoded as the player's merge does (its own timebase per file), joined by the concat demuxer.
+    const lengths = [1.789, 1.2345, 1.51, 0.977, 1.333];
+    const source = join(dir, "src.mp4");
+    spawnSync(FFMPEG, ["-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=s=32x16:r=25:d=12", "-f", "lavfi", "-i", "sine=f=440:d=12:r=44100", "-c:v", "libx264", "-c:a", "aac", "-shortest", source]);
+    const list = ["ffconcat version 1.0"];
+    lengths.forEach((length, i) => {
+      const part = join(dir, `part-${i}.mp4`);
+      const made = spawnSync(FFMPEG, ["-v", "error", "-y", "-ss", String(0.37 + i * 2), "-t", String(length), "-i", source, "-vf", `fps=${fps}`, "-af", "aresample=48000", "-t", String(length), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-ac", "2", part]);
+      assert.equal(made.status, 0, String(made.stderr));
+      list.push(`file '${part.replace(/\\/g, "/")}'`);
+    });
+    writeFileSync(join(dir, "list.txt"), `${list.join("\n")}\n`);
+    const merged = join(dir, "merged.mp4");
+    assert.equal(spawnSync(FFMPEG, ["-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", join(dir, "list.txt"), "-c", "copy", merged]).status, 0);
+    const layout = layoutOf(parsePts(probe(ptsArgs(merged))), lengths)!;
+    assert.ok(layout, "measured");
+    const kinds: Transition[] = [CUT, tr("crossfade", 0.3), tr("fadeBlack", 0.3), tr("fadeWhite", 0.3), tr("wipe", 0.3, "up"), tr("slide", 0.3, "right")];
+    const failures: string[] = [];
+    for (const a of kinds) {
+      for (const b of kinds) {
+        // a → b at junctions 1–2, b → a at 3–4: every ordered pair, at the start and in the middle of the chain.
+        const transitions = [a, b, a, b, CUT];
+        const out = join(dir, `${a.kind}-${b.kind}.mp4`);
+        const built = encodeWith({ input: merged, output: out, progress: join(dir, "p.txt"), script: join(dir, "g.txt"), lengths: layout, transitions, fps, audio: true, encode: { rate: "crf", crf: 30, speed: "faster", height: 0, fps: 0, audio: 128 }, threads: 2 });
+        const run = spawnSync(FFMPEG, built.args);
+        if (run.status !== 0) {
+          failures.push(`${a.kind} → ${b.kind}: ${String(run.stderr).trim().split(/\r?\n/).at(-1)}`);
+          continue;
+        }
+        const frames = Number(probe(["-v", "error", "-select_streams", "v:0", "-count_packets", "-show_entries", "stream=nb_read_packets", "-of", "csv=p=0", out]).trim());
+        const expected = timing(layout, transitions, fps).written;
+        if (frames !== expected) failures.push(`${a.kind} → ${b.kind}: ${frames} frames, ${expected} expected`);
+      }
+    }
+    assert.deepEqual(failures, []);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
 });
