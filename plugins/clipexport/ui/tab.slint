@@ -413,7 +413,11 @@ component Label inherits Text {
 }
 
 // A time or number field (the std LineEdit); reports its focus so that the fullscreen sidebar stays.
+// The std LineEdit asks for at least 160 px: two of them beside Start and End needed ~450 px and pushed End out
+// of the 317 px tab. A time field needs far less (eight mono digits); the row's buttons keep their room.
 component Field inherits LineEdit {
+    min-width: 56px;
+    horizontal-stretch: 1;
     height: Theme.input-height;
     font-size: Theme.font-body;
     changed has-focus => { ClipBridge.focus-changed(self.has-focus); }

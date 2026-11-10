@@ -672,3 +672,53 @@ test("Export As… cancelled after the part was removed: the hold ends and the u
     await stop();
   }
 });
+test("Start and End belong to their file: another file starts with none (no range carried over); a preview marks its part", async () => {
+  const host = new TestHost();
+  play(host, "/media/one.mp4");
+  const { stop } = await start(host);
+  try {
+    await showCollection(host);
+    // Export Clip… fills the position → +10 s of this file.
+    await host.command("clip.open").run();
+    await host.settle();
+    await eventually(() => [tab(host)["clip-start"], tab(host)["clip-end"]], [clock(2), clock(12)]);
+    await add(host, String(tab(host)["clip-start"]), String(tab(host)["clip-end"]));
+    // The next file: the fields are empty (their placeholders show), not the last file's 0:02–0:12.
+    play(host, "/media/two.mp4", 30);
+    await host.settle();
+    await eventually(() => [tab(host)["clip-start"], tab(host)["clip-end"]], ["", ""], "no stale range on the new file");
+    // Add Range to Collection (the key) with no marks on this file adds nothing and says why.
+    await host.command("clip.collectionAdd").run();
+    await said(host, REASON.time);
+    assert.equal(rows(host).length, 1);
+    // Export Clip… on the new file fills its own position → +10 s.
+    host.setSource({ position: 7 });
+    await host.command("clip.open").run();
+    await host.settle();
+    await eventually(() => [tab(host)["clip-start"], tab(host)["clip-end"]], [clock(7), clock(17)]);
+    // Set Clip Start on a third file keeps no End of the second.
+    play(host, "/media/three.mp4", 30);
+    host.setSource({ position: 4 });
+    await host.command("clip.start").run();
+    await host.settle();
+    await eventually(() => [tab(host)["clip-start"], tab(host)["clip-end"]], [clock(4), ""]);
+    // Double-click a part: its file opens and its marks are the part's (not cleared as another file's).
+    host.mounted().emit("preview-part", rows(host)[0]!.id);
+    await until(() => host.sourceOpens.length === 1, "the open");
+    await eventually(() => [tab(host)["clip-start"], tab(host)["clip-end"]], [clock(2), clock(12)]);
+    await host.settle();
+    await eventually(() => [tab(host)["clip-start"], tab(host)["clip-end"]], [clock(2), clock(12)], "still the part's after the tab follows the new source");
+  } finally {
+    await stop();
+  }
+});
+
+test("the time fields fit beside Start and End: not the std LineEdit's 160 px minimum (two of them pushed End out of the tab)", async () => {
+  const slint = await readFile(new URL("../ui/tab.slint", import.meta.url), "utf8");
+  const field = /component Field inherits LineEdit \{[^}]*?min-width: (\d+)px;/.exec(slint);
+  assert.ok(field, "Field sets its own minimum width");
+  const min = Number(field![1]);
+  // At the 280 px minimum (narrow: no key caps), less 16 px padding: Start ≈ 60, End ≈ 55, "–" 6, 4 gaps of 3 px; German "Starten"/"Ende" add ≈ 16.
+  assert.ok(60 + 55 + 6 + 12 + 16 + 2 * min <= 280 - 16, `two ${min} px fields leave room for Start and End at 280 px`);
+  assert.ok(min >= 48, "still wide enough to type a time");
+});

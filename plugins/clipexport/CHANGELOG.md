@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1
+
+**Who must change: nobody.** Two fixes of 0.2.0; still Vestra Player 0.7.7 or later.
+
+- **Start and End belong to the file they were set on.** A new file (opened, from the playlist, or a part's double-click) no longer shows the last file's range (for example the same 0:20–0:29 on every video): its fields are empty until you set marks, as cut points are per file in LosslessCut. A part's double-click marks that part. Export Clip… fills the new file's position → +10 s; Add Range to Collection and Export Clip Range by key refuse with the reason when this file has no marks.
+- **End is visible again** beside the time fields on the Collection page: the fields no longer ask for the std field's 160 px each (two of them pushed End out of the 317 px tab). The Clip page's Now buttons fit at the narrowest tab too.
+
 ## 0.2.0
 
 **Who must change: nobody.** Needs Vestra Player 0.7.6 or later (remembered files and exports of several parts, SDK 1.7.8); the install asks for two more permissions, `media.sources` (remember the videos you add) and `playback.control` (play a part on double-click).
