@@ -27,7 +27,7 @@ In the command palette (Ctrl+Shift+P), all under Export: Export Clip Range (Ctrl
 
 ## Requirements
 
-Vestra Player 0.7.7 or later (it remembers the files you add and joins their parts), with its FFmpeg (or `ffmpeg` and `ffprobe` on the `PATH`) for the keyframe preview and the thumbnails in Results.
+Vestra Player 0.7.6 or later (it remembers the files you add and joins their parts), with its FFmpeg (or `ffmpeg` and `ffprobe` on the `PATH`) for the keyframe preview and the thumbnails in Results.
 
 ## Translations
 

@@ -17,7 +17,7 @@ import type { Encode, Method } from "./clip.ts";
  * | R7 A-B points | none yet | `clip.ts` `abRange` (needs the loop switched on) |
  * | Collection: remembered files, merged exports, the check | `media.sources`, `media.export` with `parts`, `media.exportCheck` (1.7.8) | `collection.ts`, `partsExport` |
  *
- * R1–R6 need player 0.7.6 and the Collection's 0.7.7, which `minPlayerVersion`
+ * R1–R6 and the Collection need player 0.7.6, which `minPlayerVersion`
  * requires, so the plugin uses them without asking (the SDK says not to probe
  * by trying).
  */
