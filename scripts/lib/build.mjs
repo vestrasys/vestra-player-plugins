@@ -13,6 +13,10 @@
  * A released version is never released again. Earlier versions come from the
  * previous index, so the history survives each Pages deployment.
  *
+ * No manifest may declare a capability that only the player's built-in
+ * plugins may declare (scripts/lib/capabilities.mjs): every plugin here is
+ * a third-party plugin, and the build is the gate to the signed index.
+ *
  * A plugin with npm dependencies must pass scripts/lib/dependencies.mjs: the
  * static rules here, and the installed rules and size limits in the pack
  * (scripts/plugin.mjs).
@@ -59,6 +63,10 @@ import {
   sha256,
   tagOf,
 } from "./publishing.mjs";
+import {
+  builtinOnlyCapabilities,
+  builtinOnlyProblems,
+} from "./capabilities.mjs";
 import { dependencyProblems } from "./dependencies.mjs";
 import { readHostedPlugins, readRegistry } from "./registry.mjs";
 import { revokedAppendProblems, revokedProblems } from "./revoked.mjs";
@@ -217,6 +225,11 @@ export async function buildIndex({
   if (registry.problems.length) throw new Error(registry.problems.join("\n"));
   const hosted = await readHostedPlugins(root);
   if (hosted.problems.length) throw new Error(hosted.problems.join("\n"));
+  const builtinOnly = await builtinOnlyCapabilities();
+  const reserved = hosted.plugins.flatMap(({ name, manifest }) =>
+    builtinOnlyProblems(manifest, `plugins/${name}/manifest.json`, builtinOnly),
+  );
+  if (reserved.length) throw new Error(reserved.join("\n"));
   // The npm dependency rules before anything is installed or packed; the
   // pack (scripts/plugin.mjs) installs and applies the rest.
   const dependencies = [];

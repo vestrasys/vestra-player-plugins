@@ -45,6 +45,10 @@ the publish pipeline, the index format and the signing key.
 - `vestra.` is reserved for the player's built-in plugins: neither an id
   nor an owner here may use it. `npm run registry` and the publish build
   enforce these rules.
+- Neither may a manifest declare a capability that only built-in plugins
+  may declare (`commands.run`, `palette.lead`; the SDK's `CAPABILITY_INFO`
+  marks them `builtinOnly`). `vestra-plugin check`, `npm run registry` and
+  the publish build refuse such a plugin, naming the capability.
 - A changed id is a new plugin to the store: the old id's history is not
   carried over. Bump the version (minor) and say so in the changelog.
 - A plugin directory holds `manifest.json`, its sources (`.ts`, `.slint`),
