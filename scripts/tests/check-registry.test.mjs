@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import {
+  cp,
+  mkdir,
+  mkdtemp,
+  rm,
+  symlink,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
@@ -59,7 +67,26 @@ before(async () => {
   await mkdir(join(root, "registry"));
   git("init", "-q");
 });
-after(() => rm(root, { recursive: true, force: true }));
+after(async () => {
+  // Remove the link first, so the cleanup never reaches the real node_modules.
+  if (linked) await unlink(join(root, "node_modules"));
+  await rm(root, { recursive: true, force: true });
+});
+
+// The plain form reads the SDK (the builtin-only capabilities), so its tests
+// link this repository's node_modules into the scratch root. The pull
+// request form runs without node_modules in CI; its test runs first, without
+// the link.
+let linked = false;
+const linkSdk = async () => {
+  if (linked) return;
+  await symlink(
+    join(import.meta.dirname, "../../node_modules"),
+    join(root, "node_modules"),
+    "junction",
+  );
+  linked = true;
+};
 
 test("owner rule in pull requests", async () => {
   const base = await commit(
@@ -120,6 +147,7 @@ test("owner rule in pull requests", async () => {
 });
 
 test("revoked.json is append-only against the base", async () => {
+  await linkSdk();
   const pr = check;
   const plain = (base) =>
     spawnSync(
@@ -183,6 +211,7 @@ test("revoked.json is append-only against the base", async () => {
 });
 
 test("plugins/: owner and id rules, and registrations cannot take their ids", async () => {
+  await linkSdk();
   const plain = () =>
     spawnSync(process.execPath, [join(root, "scripts/check-registry.mjs")], {
       cwd: root,
@@ -229,4 +258,20 @@ test("plugins/: owner and id rules, and registrations cannot take their ids", as
   result = plain();
   assert.equal(result.status, 1);
   assert.match(result.stderr, /plugins\/demo: no owner/);
+
+  // Built-in-only capabilities (fixtures/builtin-only, id someone.launcher).
+  await rm(join(root, "plugins"), { recursive: true, force: true });
+  await cp(
+    join(import.meta.dirname, "fixtures/builtin-only"),
+    join(root, "plugins/launcher"),
+    { recursive: true },
+  );
+  await writeFile(join(root, "plugins/owners.toml"), 'launcher = "someone"\n');
+  result = plain();
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /plugins\/launcher\/manifest\.json: capability "commands\.run" is for the player's built-in plugins only/,
+  );
+  assert.match(result.stderr, /capability "palette\.lead"/);
 });
