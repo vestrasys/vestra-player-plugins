@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.1
+
+**Who must change: nobody.** No new permission and the same player (0.7.6 or later). Settings, the Collection and Results carry over.
+
+- Fixed: Animated GIF and Animated WebP, and a Precise merge of the Collection with transitions, failed with "Export failed: Export failed" on a fresh install. The player writes the clip or the merge into the plugin's work folder first, and that folder did not exist yet (the player's log said "destination directory is unavailable"). The folder is now made before anything writes into it.
+
 ## 0.6.0
 
 **Who must change: nobody.** No new permission and the same player (0.7.6 or later). Settings, the Collection and Results carry over; the sub-tab shown last stays the same page (the pages after Clip move one place to the right).

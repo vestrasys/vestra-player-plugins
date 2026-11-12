@@ -59,6 +59,15 @@ export function inflightStore(plugin: Scope): Inflight {
 }
 
 /**
+ * The work folder, made when it is missing, before anything writes into it: a
+ * fresh install has none, and the player refuses a destination whose folder
+ * is not there ("destination directory is unavailable"). Every write into it,
+ * the player's clip or merge as well as the plugin's palette, graph and
+ * progress files, waits for this; it costs one call when the folder is there.
+ */
+export const workReady = (folder: string) => mkdir(folder, { recursive: true }).then(() => folder);
+
+/**
  * At activation, before any task runs: what a crash or a kill left. The work
  * folder holds only the plugin's own files (merges, the player's temporary
  * files of them, progress and graph files), so it is emptied; the half files
@@ -119,10 +128,11 @@ export function finisher(plugin: Scope, workFolder: string, env: FinishEnv = {})
     const planned = timing(p.lengths, p.transitions, p.fps);
     return {
       merged,
+      ready: () => workReady(workFolder).then(() => merged),
       length: planned.written / p.fps,
       plan: p,
       async run(state: JobState, signal: AbortSignal, report) {
-        await mkdir(workFolder, { recursive: true });
+        await workReady(workFolder);
         // The player's own file name for the merge, if it changed it.
         const input = state.outcome && "destination" in state.outcome ? state.outcome.destination : merged;
         // The merge (Precise) writes each part for its length as asked (-t), whatever its frames: the windows to measure.

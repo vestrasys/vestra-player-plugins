@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
+import { dirname } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { HostError } from "@vestra-player/sdk/testing";
 import type { TestHost } from "@vestra-player/sdk/testing";
@@ -20,6 +22,28 @@ export function watchHost(host: TestHost, fakes: Fakes) {
     if (fakes.failOpen) throw new HostError("failed", "open failed");
     fakes.opened.push(String(p.path));
   });
+}
+
+/**
+ * The player's check of an export's destination folder, which the test host
+ * does not make: the player accepts the job, then ends it `failed` when the
+ * destination's folder is not there (src/host/src/playback/media_worker.rs for
+ * a clip or a frame, media_join.rs for parts; Clip Export 0.6.0 on a fresh
+ * install). Destinations are paths on this computer: give the plugin real
+ * folders (a temporary data directory, a temporary clip folder).
+ */
+export function checkDestinations(host: TestHost) {
+  type Request = (method: string, params?: Record<string, unknown>) => Promise<unknown>;
+  const wire = host as unknown as { request: Request };
+  const request = wire.request.bind(host);
+  wire.request = async (method, params = {}) => {
+    const reply = await request(method, params);
+    if (method !== "jobs.start" || existsSync(dirname(String(params.destination)))) return reply;
+    const job = host.jobs.get((reply as { jobId: number }).jobId);
+    const what = params.parts === undefined ? "PNG destination" : "destination";
+    if (job) Object.assign(job, { status: "failed", outcome: { error: { code: "export-failed", message: `${what} directory is unavailable: The system cannot find the file specified. (os error 2)` } } });
+    return reply;
+  };
 }
 
 type Status = { kind: string; reason: string; raw: string; name: string };

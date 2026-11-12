@@ -15,10 +15,10 @@ import {
 } from "../transitions.ts";
 import type { Transition } from "../transitions.ts";
 import { partialOf } from "../finish.ts";
-import { eventually } from "./fakes.ts";
+import { checkDestinations, eventually } from "./fakes.ts";
 
 const directory = new URL("..", import.meta.url);
-const start = (host = new TestHost(), locale: Locale = "en", dataDirectory?: string) => startPlugin(activate, { directory, host, locale, dataDirectory });
+const start = (host = new TestHost(), locale: Locale = "en", dataDirectory?: string) => (checkDestinations(host), startPlugin(activate, { directory, host, locale, dataDirectory }));
 const tab = (host: TestHost) => host.mounted().props;
 type Row = { id: string; number: number; name: string; join: boolean; kind: string; dir: string; duration: string; off: boolean };
 const rows = (host: TestHost) => (tab(host).parts ?? []) as Row[];

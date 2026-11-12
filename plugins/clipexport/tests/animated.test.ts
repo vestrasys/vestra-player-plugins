@@ -13,7 +13,7 @@ import { animatedOf, encodeOf, estimate, exportEncoding, PRESET_ENCODE, presetOf
 import { REASON, withExtension } from "../model.ts";
 import { CUT } from "../transitions.ts";
 import type { Transition } from "../transitions.ts";
-import { eventually } from "./fakes.ts";
+import { checkDestinations, eventually } from "./fakes.ts";
 
 /**
  * Animated GIF and WebP (0.5.0): the Quality chooser's two presets, Precise
@@ -22,7 +22,7 @@ import { eventually } from "./fakes.ts";
  * transitions.
  */
 const directory = new URL("..", import.meta.url);
-const start = (host = new TestHost(), dataDirectory?: string) => startPlugin(activate, { directory, host, locale: "en", dataDirectory });
+const start = (host = new TestHost(), dataDirectory?: string) => (checkDestinations(host), startPlugin(activate, { directory, host, locale: "en", dataDirectory }));
 const tab = (host: TestHost) => host.mounted().props;
 const tick = () => new Promise((done) => setTimeout(done, 5));
 async function until(predicate: () => boolean | Promise<boolean>, what = "condition") {
@@ -390,6 +390,82 @@ test("the merged Collection as a GIF: with a crossfade the parts blend first, th
     await stop();
     await cleanup();
     await rm(data, { recursive: true, force: true });
+  }
+});
+
+test("a fresh install (an empty data directory): the work folder is made before the player writes into it; GIF and WebP of a clip, the merged Collection as a GIF and as an MP4 with a crossfade", async () => {
+  /** One export on a data directory that has nothing in it yet (`start` adds the player's check of the destination folder). */
+  async function fresh(what: string, run: (host: TestHost, folder: string) => Promise<void>) {
+    const data = await mkdtemp(join(tmpdir(), "clipexport-fresh-"));
+    const host = new TestHost();
+    host.openElsewhere("/media/one.mp4");
+    host.setSource({ position: 2, duration: 120 });
+    const { stop } = await start(host, data);
+    const { folder, cleanup } = await withFolder(host);
+    try {
+      assert.ok(!existsSync(join(data, "work")), `${what}: no work folder yet`);
+      await run(host, folder);
+      await until(() => host.osd.some((line) => line.startsWith("Clip exported as") || line.startsWith("Export failed")), `${what}: the export`);
+      assert.deepEqual(host.osd.filter((line) => line.startsWith("Export failed")), [], what);
+      const job = host.sent("jobs.start").find((sent) => String(sent.destination).startsWith(join(data, "work")));
+      assert.ok(job, `${what}: the player wrote into the work folder`);
+      await until(() => leftovers(data, folder).length === 0, `${what}: no work files left`);
+    } finally {
+      await stop();
+      await cleanup();
+      await rm(data, { recursive: true, force: true });
+    }
+  }
+  const parts = (host: TestHost) => (tab(host).parts ?? []) as { id: string; kind: string }[];
+  const add = async (host: TestHost, path: string) => {
+    host.openElsewhere(path);
+    host.setSource({ position: 2, duration: 120 });
+    const count = parts(host).length;
+    host.mounted().emit("add-part", "0", "4");
+    await until(() => parts(host).length === count + 1, `part ${count + 1}`);
+  };
+  for (const [what, index] of [["GIF", 3], ["WebP", 4]] as const) {
+    await fresh(`${what} of a clip`, async (host) => {
+      fakeFfmpeg(host);
+      await choose(host, index);
+      host.mounted().emit("export-clip", "0:01", "0:03");
+    });
+  }
+  await fresh("the merged Collection as a GIF", async (host) => {
+    fakeFfmpeg(host);
+    await choose(host, 3);
+    await add(host, "/media/one.mp4");
+    await add(host, "/media/two.mp4");
+    host.mounted().emit("export-merged");
+  });
+  await fresh("the merged Collection as an MP4 with a crossfade", async (host) => {
+    fakeFfmpeg(host);
+    await add(host, "/media/one.mp4");
+    await add(host, "/media/two.mp4");
+    const id = parts(host)[0]!.id;
+    host.mounted().emit("open-join", id);
+    host.mounted().emit("set-transition", id, "crossfade", "left", "1");
+    await eventually(() => parts(host)[0]!.kind, "crossfade");
+    await eventually(() => tab(host)["collection-method-index"], 1, "Precise");
+    host.mounted().emit("export-merged");
+  });
+});
+
+test("the player's check of the destination folder (the fake above): a job whose folder is missing fails as on a fresh install of 0.6.0", async () => {
+  const host = new TestHost();
+  checkDestinations(host);
+  host.openElsewhere("/media/one.mp4");
+  host.setSource({ position: 2, duration: 120 });
+  const { plugin, stop } = await startPlugin(async () => {}, { directory, host, locale: "en" });
+  try {
+    const missing = join(tmpdir(), `clipexport-missing-${process.pid}-${Date.now()}`, "work", "merge.mp4");
+    const snapshot = await plugin.media.capture();
+    const job = await snapshot.export({ format: "mp4", destination: missing, end: 3 });
+    const end = await job.done;
+    assert.equal(end.status, "failed");
+    assert.match(String((end.outcome as { error: { message: string } }).error.message), /destination directory is unavailable/);
+  } finally {
+    await stop();
   }
 });
 
