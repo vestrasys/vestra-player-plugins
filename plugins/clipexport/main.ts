@@ -10,7 +10,10 @@ import { ANIMATED, encoderProbe, extensionOf, MAX_ANIMATED_SECONDS } from "./ani
 import { blockingNote, Collection, copyNote, exportParts, lengthClock, listKey, partStates, partTicks, retryDelay, targetNote, totalLength, UNDO_MS } from "./collection.ts";
 import type { Part } from "./collection.ts";
 import { finisher, inflightStore, sweepWork } from "./finish.ts";
-import { analyse, audioStreamArgs, audioStreamCount, averageOf, bandAt, bandsPath, COUNTS, curveOf, curvePath, HighlightStore, pick, RATE, scanLoudness, short, shortTerm, total as lengthText } from "./highlights.ts";
+import {
+  analyse, audioStreamArgs, audioStreamCount, averageOf, bandAt, bandsPath, COUNTS, curveOf, curvePath, HighlightStore, nextAfter, pick, RATE, scanLoudness, short, shortTerm, stepFrom, thumbName,
+  total as lengthText,
+} from "./highlights.ts";
 import type { Candidate, HighlightScan } from "./highlights.ts";
 import { capturer } from "./form.ts";
 import { anyTransition, capOf, CUT, DIRECTIONS, FIRST_DURATION, junctionTicks, KINDS, mergeEncode, PRESET_DURATIONS, sourceBitrate, timing, typedDuration } from "./transitions.ts";
@@ -61,6 +64,8 @@ const TITLE = {
   "clip.collectionRemove": "Remove from Collection",
   "clip.collectionUndoApply": "Undo Apply to All",
   "clip.highlights": "Find Highlights",
+  "clip.highlightAdd": "Add Highlight to Collection",
+  "clip.highlightDismiss": "Dismiss Highlight",
 } as const;
 type CommandId = keyof typeof TITLE;
 
@@ -1132,6 +1137,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     first: false,
     /** The read of the kept scan for this file (Find Highlights waits for it). */
     loading: Promise.resolve() as Promise<void>,
+    /** The row thumbnails made for this file (file names in its scan's thumbnail folder). */
+    thumbs: new Set<string>(),
   };
   /** The scan running (one at a time): its file, how far it got, the curve so far, the status to go back to on Cancel. */
   type Scan = { key: string; path: string; sourceId: number; duration: number; abort: AbortController; started: number; done: number; curve: number[]; average: number | null; before: HighlightStatus };
@@ -1161,7 +1168,12 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       if (scan && scan.sourceId !== state.sourceId) cancelScan();
       // What the last file's page still had to write goes now (its timer would write the next file's scan otherwise).
       flushKeep();
-      Object.assign(hl, { key, path: state.source, stream, first, sourceId: state.sourceId, status: "loading", problem: { reason: "", raw: "" }, saved: null, selected: "" });
+      Object.assign(hl, { key, path: state.source, stream, first, sourceId: state.sourceId, status: "loading", problem: { reason: "", raw: "" }, saved: null, selected: "", thumbs: new Set<string>() });
+      hlThumbRefs.clear();
+      hlThumbWork.clear();
+      hlThumbsOff = false;
+      hlThumbAbort.abort();
+      hlThumbAbort = new AbortController();
       hl.loading = loadHighlights(key, state.source, stream, silentFile(state));
     } else {
       hl.first = first;
@@ -1172,13 +1184,18 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   async function loadHighlights(key: string, path: string, stream: number, silent: boolean) {
     const stamp = await kept.stamp(path, stream);
     const found = stamp ? await kept.load(stamp) : null;
+    // Its thumbnails are known before its rows show (a row without one asks for one).
+    const thumbs = found && found !== "changed" ? await keptThumbs(found) : null;
     if (hl.key !== key || hl.status !== "loading") return;
     if (found === "changed") hl.status = "changed";
-    else if (found) Object.assign(hl, { saved: found, status: "done" });
+    else if (found) Object.assign(hl, { saved: found, status: "done", thumbs });
     else hl.status = silent ? "noSound" : "ready";
     // Past the file reads: the page changed outside SDK-invoked code.
     plugin.update();
   }
+  /** The thumbnails kept for a scan; those no suggestion shows any more (scanned again, a start moved) go. */
+  const keptThumbs = (saved: HighlightScan) =>
+    kept.thumbs(saved.path, saved.stream, new Set(saved.candidates.map((candidate) => thumbName(candidate.id, saved.edits[candidate.id]?.start ?? candidate.start))));
   /** Writes of the page's scan (what was added, dismissed, moved), gathered for half a second; `flushKeep` writes them now. */
   let pendingKeep: { saved: HighlightScan; timer: ReturnType<typeof setTimeout> } | null = null;
   function keepSoon(saved: HighlightScan) {
@@ -1256,7 +1273,14 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       const result = analyse(values, job.duration);
       const saved: HighlightScan = { version: 1, ...stamp, scanned: Date.now(), mode: "loudness", duration: job.duration, average: result.average, curve: result.curve, candidates: result.candidates, handled: {}, edits: {} };
       await kept.save(saved);
-      if (hl.key === key) Object.assign(hl, { saved, status: "done", selected: "" });
+      // Scanned again: the pictures of suggestions found again stay, the others go.
+      const thumbs = await keptThumbs(saved);
+      // A Cancel at the very end (or another file) discards it: the page went back to what it showed, no message.
+      if (hl.key === key && scan === job && !job.abort.signal.aborted) {
+        Object.assign(hl, { saved, status: "done", selected: "", thumbs });
+        // Finished while the page is not on screen (D13): one line on the video, its Show opens the page.
+        if (!highlightsShown()) foundSaid(suggestions(saved).rows.length);
+      }
     } catch (error) {
       if (job.abort.signal.aborted) {
         if (hl.key === key && scan === job) hl.status = job.before;
@@ -1284,9 +1308,9 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
 
   /** The suggestions listed: the chosen number of the strongest, those added or dismissed left out, with the user's edges, in time order. */
   function suggestions(saved: HighlightScan) {
-    const { left, total: picked } = pick(saved.candidates, settings.highlightCount, saved.handled);
+    const { left, total: picked, dismissed } = pick(saved.candidates, settings.highlightCount, saved.handled);
     const rows = left.map((candidate) => ({ ...candidate, ...saved.edits[candidate.id] })).sort((a, b) => a.start - b.start);
-    return { rows, picked };
+    return { rows, picked, dismissed };
   }
   const suggestionOf = (id: string) => (hl.saved ? suggestions(hl.saved).rows.find((row) => row.id === id) : undefined);
   /** The selected suggestion follows the Range (Now, Set Clip Start / End, typing on the Clip page): its row shows the new edges. */
@@ -1332,6 +1356,100 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     saved.handled[id] = "dismissed";
     if (hl.selected === id) hl.selected = "";
     keepSoon(saved);
+  }
+  /** Restore N dismissed: the dismissed ones among those picked come back to the list. */
+  function restoreHighlights() {
+    const saved = hl.saved;
+    if (!saved) return;
+    const { dismissed } = suggestions(saved);
+    if (!dismissed.length) return;
+    for (const id of dismissed) delete saved.handled[id];
+    keepSoon(saved);
+  }
+  /** The Highlights page is the one on screen. */
+  const highlightsShown = () => tabShown() && settings.page === "highlights";
+  /** The page shows its list (the review), not a scan: the list keys act on it. */
+  const reviewing = () => highlightsShown() && hl.status === "done" && !!hl.saved && scan?.key !== hl.key;
+  /** Up and Down in the list: the row above or below is selected (and jumped to). */
+  function stepHighlight(step: number) {
+    if (!reviewing() || !step) return;
+    const id = stepFrom(suggestions(hl.saved!).rows.map((row) => row.id), hl.selected, Math.sign(step));
+    if (id && id !== hl.selected) return selectHighlight(id);
+  }
+  /**
+   * Enter (Add Highlight to Collection) and Delete (Dismiss Highlight) while the list has the focus: the selected
+   * suggestion is added or dismissed, and the next one is selected (and jumped to), so a review goes on from the keys.
+   */
+  async function handleSelected(how: "add" | "dismiss") {
+    const saved = hl.saved;
+    const id = hl.selected;
+    if (!reviewing() || !saved || !id) return;
+    const next = nextAfter(suggestions(saved).rows.map((row) => row.id), id);
+    if (how === "add") await addHighlights([id]);
+    else dismissHighlight(id);
+    if (hl.saved === saved && saved.handled[id] && next && !hl.selected) await selectHighlight(next);
+  }
+  /** "N highlights found" on the video, with Show (the Find Highlights command, which opens the page). */
+  function foundSaid(count: number) {
+    // TRANSLATORS: the button of "N highlights found" on the video: it opens the Highlights page.
+    const options = { actions: [{ title: text("Show"), command: "clip.highlights" }] };
+    if (count === 0) return shown(osd.show("Nothing stood out in this video.", [], options));
+    if (count === 1) return shown(osd.show("1 highlight found", [], options));
+    // TRANSLATORS: {} is a number of suggested ranges (2 or more).
+    shown(osd.show("{} highlights found", [count], options));
+  }
+
+  // Row thumbnails (design step 2): the first keyframe of each listed suggestion, made by ffmpeg from the file (the
+  // player does not seek), one at a time in the queue the Collection's frame captures use, one thread, only while the
+  // page shows. They are kept beside the scan (`highlights/<hash>/`) and go with it.
+  const hlThumbRefs = new Map<string, ImageRef>();
+  /** Thumbnails asked for this file (queued, or failed twice: not asked again until another file). */
+  const hlThumbWork = new Set<string>();
+  /**
+   * No more pictures are asked for this file (until another file): FFmpeg is missing, or the first picture failed
+   * both ways while none had worked (no picture in the file, an audio file). A row failing once others worked is that
+   * row's failure only.
+   */
+  let hlThumbsOff = false;
+  /** Stops the picture being made when another file opens or the plugin is deactivated. */
+  let hlThumbAbort = new AbortController();
+  plugin.onDispose(() => hlThumbAbort.abort());
+  /** A row's picture: made, or asked for now (`ask`: the page shows) while the row keeps its icon. */
+  function highlightThumb(row: { id: string; start: number }, ask: boolean) {
+    const folder = kept.thumbFolder(hl.path, hl.stream);
+    if (!folder) return null;
+    const name = thumbName(row.id, row.start);
+    if (hl.thumbs.has(name)) {
+      const file = join(folder, name);
+      let ref = hlThumbRefs.get(file);
+      if (!ref) hlThumbRefs.set(file, (ref = plugin.ui.image(file, { maxSide: 128 })));
+      return ref;
+    }
+    if (ask && !hlThumbsOff && !hlThumbWork.has(name)) {
+      hlThumbWork.add(name);
+      const key = hl.key;
+      thumbQueue = thumbQueue.then(() => (disposed ? undefined : makeHighlightThumb(key, row.id, row.start, folder, name)));
+    }
+    return null;
+  }
+  async function makeHighlightThumb(key: string, id: string, start: number, folder: string, name: string) {
+    // Still wanted: the same file, the row listed with this start, the page on screen (else it is asked for when it shows).
+    if (hl.key !== key || hlThumbsOff || suggestionOf(id)?.start !== start || !reviewing()) {
+      if (hl.key === key) hlThumbWork.delete(name);
+      return;
+    }
+    if (!(await plugin.tools.available("ffmpeg").catch(() => false))) return void (hl.key === key && (hlThumbsOff = true));
+    const { signal } = hlThumbAbort;
+    // The first keyframe from the start; when there is none after it (a start in the last keyframe interval: ffmpeg
+    // gives nothing) or the run failed, the keyframe at or before the start, once.
+    let made = await scaleThumb(plugin, hl.path, join(folder, name), PART_THUMB, { at: start, signal });
+    if (!made && hl.key === key && !signal.aborted) made = await scaleThumb(plugin, hl.path, join(folder, name), PART_THUMB, { at: start, before: true, signal });
+    if (hl.key !== key || signal.aborted) return;
+    // Failed both ways: this row keeps its icon (it stays in `hlThumbWork`); with no picture of the file made yet, the file has none.
+    if (!made) return void (hl.thumbs.size === 0 && (hlThumbsOff = true));
+    hl.thumbs.add(made);
+    // Past ffmpeg's await: the row's picture changed outside SDK-invoked code.
+    plugin.update();
   }
   /** The strip: a click on a band selects its suggestion; elsewhere it seeks. */
   async function heatClicked(ratio: number) {
@@ -1397,13 +1515,13 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   /** The Highlights page: its state, the strip, the rows; the sub-tab's count. */
   function highlightView(state: PlayerState) {
     const view = highlightsFor(state);
-    const empty = { state: "none", name: "", duration: "", percent: 0, left: -1, scanned: 0, loudness: true, first: false, reason: "", raw: "", count: COUNTS.indexOf(settings.highlightCount as never), remaining: 0, total: 0, length: "" };
+    const empty = { state: "none", name: "", duration: "", percent: 0, left: -1, scanned: 0, loudness: true, first: false, reason: "", raw: "", count: COUNTS.indexOf(settings.highlightCount as never), remaining: 0, total: 0, length: "", picked: -1 };
     if (!view || !state.duration) return { highlights: empty, heat: heatOf({ curve: "", bands: "", picked: "", seconds: 0 }), head: -1, highlightRows: [], regions: [] as Candidate[] };
     const duration = state.duration;
     const head = state.position !== null ? Math.max(0, Math.min(1, state.position / duration)) : -1;
     const running = scan && scan.key === view.key ? scan : null;
     const saved = view.status === "done" ? view.saved : null;
-    const { rows, picked } = saved ? suggestions(saved) : { rows: [] as Candidate[], picked: 0 };
+    const { rows, picked, dismissed } = saved ? suggestions(saved) : { rows: [] as Candidate[], picked: 0, dismissed: [] as string[] };
     let curve = "";
     if (running) curve = curvePath(running.curve, running.average, duration, running.done);
     else if (saved) {
@@ -1433,19 +1551,28 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
         remaining: rows.length,
         total: picked,
         length: lengthText(rows.reduce((sum, row) => sum + (row.end - row.start), 0)),
+        // The selected row's place in the list (Up and Down keep it in view); -1 none.
+        picked: selected && !running ? rows.indexOf(selected) : -1,
       },
       heat: heatOf({ curve, bands: running ? "" : bandsPath(others, duration), picked: selected && !running ? bandsPath([selected], duration) : "", seconds: Math.round(duration) }),
       // Its own property: a position tick sends this number, not the strip's paths.
       head,
-      highlightRows: running ? [] : rows.map((row) => ({
-        id: row.id,
-        range: `${short(row.start)} – ${short(row.end)}`,
-        brief: narrowTimes(row),
-        badge: (row.end - row.start).toFixed(1),
-        kind: "loud",
-        lu: String(Math.round(row.peak)),
-        selected: row === selected,
-      })),
+      highlightRows: running ? [] : [
+        ...rows.map((row) => ({
+          id: row.id,
+          range: `${short(row.start)} – ${short(row.end)}`,
+          brief: narrowTimes(row),
+          badge: (row.end - row.start).toFixed(1),
+          kind: "loud",
+          lu: String(Math.round(row.peak)),
+          selected: row === selected,
+          // Asked for only while the page shows (one ffmpeg run at a time); the icon meanwhile.
+          thumb: highlightThumb(row, settings.page === "highlights"),
+          restore: 0,
+        })),
+        // Restore N dismissed: the list's last row (a row of the same ListView), while any is dismissed.
+        ...(dismissed.length ? [{ id: "restore", range: "", brief: "", badge: "", kind: "", lu: "", selected: false, thumb: null, restore: dismissed.length }] : []),
+      ],
       regions: running ? [] : others,
     };
   }
@@ -1841,6 +1968,11 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   on("addHighlight", (id: string) => addHighlights([String(id)]));
   on("dismissHighlight", (id: string) => dismissHighlight(String(id)));
   on("addAllHighlights", () => addHighlights(hl.saved ? suggestions(hl.saved).rows.map((row) => row.id) : []));
+  on("restoreHighlights", () => restoreHighlights());
+  // Delete while the list has the focus.
+  on("dismissSelected", () => handleSelected("dismiss"));
+  // Up and Down while the list has the focus (the tab's own keys: -1 or 1).
+  on("stepHighlight", (step: number) => stepHighlight(Number(step)));
   on("heatClicked", (ratio: number) => heatClicked(Number(ratio)));
   on("focusChanged", (focused: boolean) => panel.setInteraction({ focused: focused === true }));
   plugin.onError((error) => {
@@ -1958,6 +2090,14 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     await view.loading;
     if (hl.key === view.key && ["ready", "changed", "error"].includes(hl.status)) await findHighlights();
   }, inTab);
+  /**
+   * Enter while the Highlights list has the keyboard focus (a key of the panel's content, `focus: "panel"`, as Delete
+   * in the Collection). Delete is the list's own key (the tab calls `dismissSelected`): a second default Delete in the
+   * panel would be a binding conflict with Remove from Collection; Dismiss Highlight takes a key the user gives it.
+   */
+  const inHighlights = { home: "clip.highlights", focus: "panel" as const, enabled: () => !!hl.selected && reviewing() };
+  entry("clip.highlightAdd", 489, () => handleSelected("add"), { ...inHighlights, bindings: ["Enter"] });
+  entry("clip.highlightDismiss", 490, () => handleSelected("dismiss"), inHighlights);
   /**
    * Export Last N Seconds (Ctrl+Shift+R): its title states the length the
    * user chose in Settings, so the command is declared again when it changes

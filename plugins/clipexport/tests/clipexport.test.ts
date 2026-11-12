@@ -116,6 +116,8 @@ test("one menu item, Video ▸ Export Clip…; the rest is in the command palett
       ["clip.collectionUndoApply", "", "clip.collection"],
       ["clip.collectionRemove", "Delete", "clip.collection"],
       ["clip.highlights", "", "clip.panel"],
+      ["clip.highlightAdd", "Enter", "clip.highlights"],
+      ["clip.highlightDismiss", "", "clip.highlights"],
       ["clip.last", "Ctrl+Shift+R", "clip.panel"],
     ]);
     assert.deepEqual(host.conflicts, []);
@@ -136,7 +138,7 @@ test("every command has the Export category in the command palette, and every ho
     ready(host);
     const { stop } = await start(host, locale);
     try {
-      assert.equal(host.commands.size, 19);
+      assert.equal(host.commands.size, 21);
       for (const [id, command] of host.commands) {
         assert.equal(command.declaration.category, "Export", id);
         assert.ok(command.display.category?.trim(), `${id}: shows a category in ${locale}`);
@@ -221,7 +223,7 @@ test("the tab's Slint: a ListView for Results, library widgets, key caps, Theme 
   }
   // A `for` over bound data only inside the ListView.
   const loops = [...slint.matchAll(/for \w+(?:\[\w+\])? in ([\w.-]+|\[[^\]]*\])/g)].map((m) => m[1]);
-  assert.deepEqual(loops.filter((what) => !what!.startsWith("[")), ["ClipBridge.parts", "ClipBridge.highlight-rows", "ClipBridge.results"]);
+  assert.deepEqual(loops.filter((what) => !what!.startsWith("[")), ["ClipBridge.highlight-rows", "ClipBridge.parts", "ClipBridge.results"]);
   assert.match(slint, /ListView \{[^{}]*for row\[i\] in ClipBridge\.parts: PartItem/, "the Collection is a ListView too");
   assert.match(slint, /ListView \{[^{}]*for row in ClipBridge\.highlight-rows: HighlightItem/, "the suggestions are a ListView too");
   // The bridge's callbacks are the ones the plugin handles: each emitted callback reaches main.ts.

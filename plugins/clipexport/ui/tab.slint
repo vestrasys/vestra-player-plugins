@@ -239,6 +239,8 @@ export struct Highlights {
     remaining: int,
     total: int,
     length: string,
+    // The selected row's place in the list (-1 none): Up and Down keep it in view.
+    picked: int,
 }
 
 // The heat strip: the curve and the bands as paths (1000 × 100 and 1000 × 10 view boxes), the video's length in
@@ -252,7 +254,8 @@ export struct HeatView {
 }
 
 // One suggestion: its times (with tenths, and without for a narrow tab), length ("28.6"), kind, how far its
-// loudest moment is above the video's average (LU), whether it is selected (the Range).
+// loudest moment is above the video's average (LU), whether it is selected (the Range), the picture of its start.
+// The list's last row can be Restore N dismissed instead: `restore` is N (0 for a suggestion).
 export struct HighlightRow {
     id: string,
     range: string,
@@ -261,6 +264,8 @@ export struct HighlightRow {
     kind: string,
     lu: string,
     selected: bool,
+    thumb: image,
+    restore: int,
 }
 
 export global ClipBridge {
@@ -404,6 +409,10 @@ export global ClipBridge {
     callback add-highlight(string);
     callback dismiss-highlight(string);
     callback add-all-highlights();
+    // Restore N dismissed; Up (-1) and Down (1), and Delete (the selected one), while the list has the focus.
+    callback restore-highlights();
+    callback step-highlight(int);
+    callback dismiss-selected();
     // A click on the strip, at this share of its width (0–1).
     callback heat-clicked(float);
 }
@@ -1455,12 +1464,14 @@ component ScanCard inherits Rectangle {
     }
 }
 
-// One suggestion (the Collection row's look): a tile with its length, the times, the kind, + and ×; a click
-// selects it (it becomes the Range), a double-click plays it from its start. The selected row has Start and End
-// under it: the Range card's Now buttons, which move the selected suggestion's edges.
-component HighlightItem inherits Rectangle {
+// One suggestion (the Collection row's look): its first picture with its length, the times, the kind, + and ×;
+// a click selects it (it becomes the Range), a double-click plays it from its start. The selected row has Start
+// and End under it: the Range card's Now buttons, which move the selected suggestion's edges.
+component SuggestionItem inherits Rectangle {
     in property <HighlightRow> entry;
     in property <bool> narrow;
+    // A press on the row: the list takes the keyboard focus (Up, Down, Enter, Delete).
+    callback pressed();
     height: root.entry.selected ? 72px : 46px;
     background: root.entry.selected ? Theme.selected-bg : area.has-hover ? Theme.hover-bg : transparent;
     ToolTipArea {
@@ -1472,6 +1483,9 @@ component HighlightItem inherits Rectangle {
         area := TouchArea {
             width: root.width;
             height: 46px;
+            pointer-event(event) => {
+                if event.kind == PointerEventKind.down { root.pressed(); }
+            }
             clicked => { ClipBridge.select-highlight(root.entry.id); }
             double-clicked => {
                 ClipBridge.play-highlight(root.entry.id);
@@ -1492,7 +1506,9 @@ component HighlightItem inherits Rectangle {
                     border-radius: 3px;
                     clip: true;
                     background: Theme.bg-video;
+                    // The icon until the picture is made (or without FFmpeg); the picture covers it.
                     Glyph { x: 3px; y: 3px; glyph: Glyphs.film; color: Theme.text-dim; }
+                    Image { width: 100%; height: 100%; source: root.entry.thumb; image-fit: cover; }
                     Rectangle {
                         x: parent.width - self.width - 2px;
                         y: parent.height - self.height - 2px;
@@ -1572,6 +1588,75 @@ component HighlightItem inherits Rectangle {
         }
     }
     Rectangle { y: parent.height - 1px; height: 1px; background: Theme.line; }
+}
+
+// A row of the Highlights list: a suggestion, or (the last row, while any is dismissed) Restore N dismissed.
+component HighlightItem inherits Rectangle {
+    in property <HighlightRow> entry;
+    in property <bool> narrow;
+    callback pressed();
+    height: root.entry.restore > 0 ? 34px : root.entry.selected ? 72px : 46px;
+    if root.entry.restore == 0: SuggestionItem {
+        width: root.width;
+        entry: root.entry;
+        narrow: root.narrow;
+        pressed => { root.pressed(); }
+    }
+    if root.entry.restore > 0: HorizontalLayout {
+        alignment: center;
+        padding: 6px;
+        Action {
+            // TRANSLATORS: {} is how many suggestions were dismissed.
+            text: @tr("Restore {} dismissed", root.entry.restore);
+            clicked => { ClipBridge.restore-highlights(); }
+        }
+    }
+}
+
+// The suggestions in an inset well; Slint's ListView builds only the rows in view. After a click on a row the list
+// has the keyboard focus: Up and Down select (and jump), Delete dismisses the selected one, Esc gives the keys back
+// to the video, as in the Collection list; Enter (not taken here) is the plugin's Add Highlight to Collection, a key
+// of the panel's content. The selected row stays in view.
+component HighlightList inherits FocusScope {
+    in property <int> picked;
+    in property <bool> narrow;
+    key-pressed(event) => {
+        // Only the plain keys: with a modifier they stay the player's (and the user's own bindings).
+        if event.modifiers.control || event.modifiers.alt || event.modifiers.shift || event.modifiers.meta { return reject; }
+        if event.text == Key.UpArrow { ClipBridge.step-highlight(-1); return accept; }
+        if event.text == Key.DownArrow { ClipBridge.step-highlight(1); return accept; }
+        if event.text == Key.Delete { ClipBridge.dismiss-selected(); return accept; }
+        if event.text == Key.Escape { VestraFocus.release(); return accept; }
+        return reject;
+    }
+    // The rows above the selected one are 46 px each; the selected one is 72 px (its Start and End).
+    changed picked => {
+        if root.picked >= 0 {
+            if root.picked * 46px < -list.content-y {
+                list.content-y = -root.picked * 46px;
+            } else if root.picked * 46px + 72px > -list.content-y + list.visible-height {
+                list.content-y = min(0px, list.visible-height - root.picked * 46px - 72px);
+            }
+        }
+    }
+    Rectangle {
+        background: Theme.bg-list;
+        border-width: 1px;
+        border-color: Theme.line;
+        border-radius: Theme.radius-control;
+        clip: true;
+        list := ListView {
+            x: 1px;
+            y: 1px;
+            width: parent.width - 2px;
+            height: parent.height - 2px;
+            for row in ClipBridge.highlight-rows: HighlightItem {
+                entry: row;
+                narrow: root.narrow;
+                pressed => { root.focus(); }
+            }
+        }
+    }
 }
 
 export component ClipExportTab inherits Rectangle {
@@ -2448,25 +2533,12 @@ export component ClipExportTab inherits Rectangle {
                             }
                         }
                     }
-                    // The suggestions in an inset well; Slint's ListView builds only the rows in view.
-                    if root.hl-review: Rectangle {
+                    // The suggestions (and Restore N dismissed) in an inset well, with the list keys.
+                    if root.hl-review: HighlightList {
                         vertical-stretch: 1;
                         min-height: 3 * 46px + 2px;
-                        background: Theme.bg-list;
-                        border-width: 1px;
-                        border-color: Theme.line;
-                        border-radius: Theme.radius-control;
-                        clip: true;
-                        ListView {
-                            x: 1px;
-                            y: 1px;
-                            width: parent.width - 2px;
-                            height: parent.height - 2px;
-                            for row in ClipBridge.highlight-rows: HighlightItem {
-                                entry: row;
-                                narrow: root.narrow;
-                            }
-                        }
+                        picked: ClipBridge.highlights.picked;
+                        narrow: root.narrow;
                     }
                     if !root.hl-review: Rectangle { vertical-stretch: 1; }
                 }

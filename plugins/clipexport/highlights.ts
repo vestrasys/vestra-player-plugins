@@ -274,13 +274,36 @@ export type Handled = "added" | "dismissed";
 /**
  * The suggestions the list shows: the `count` strongest of all (those added
  * or dismissed count too, so the list is what is left of them), in time
- * order; `total` is how many were picked.
+ * order; `total` is how many were picked, `dismissed` the ids of those
+ * dismissed among them (Restore N dismissed brings them back).
  */
 export function pick(candidates: readonly Candidate[], count: number, handled: Readonly<Record<string, Handled>>) {
   const strongest = [...candidates].sort((x, y) => y.peak - x.peak || x.start - y.start).slice(0, count);
   const left = strongest.filter((candidate) => !handled[candidate.id]).sort((x, y) => x.start - y.start);
-  return { left, total: strongest.length };
+  const dismissed = strongest.filter((candidate) => handled[candidate.id] === "dismissed").map((candidate) => candidate.id);
+  return { left, total: strongest.length, dismissed };
 }
+
+/**
+ * The row to select once `id` leaves the list (Enter, Delete): the next one,
+ * or the one before when it was the last; "" when none is left.
+ */
+export function nextAfter(ids: readonly string[], id: string) {
+  const index = ids.indexOf(id);
+  if (index < 0) return "";
+  return ids[index + 1] ?? ids[index - 1] ?? "";
+}
+
+/** Up and Down in the list: the row `step` away from `id`, held at the ends; from none, Down takes the first and Up the last. */
+export function stepFrom(ids: readonly string[], id: string, step: number) {
+  if (!ids.length) return "";
+  const index = ids.indexOf(id);
+  if (index < 0) return step > 0 ? ids[0]! : ids.at(-1)!;
+  return ids[Math.max(0, Math.min(ids.length - 1, index + step))]!;
+}
+
+/** A row's thumbnail file: its suggestion and where it starts (an edited start is another picture). */
+export const thumbName = (id: string, start: number) => `${id.replace(/[^\w-]/g, "")}-${Math.round(start * 10)}.jpg`;
 
 const x = (seconds: number, duration: number) => (duration > 0 ? Math.max(0, Math.min(1000, (seconds / duration) * 1000)) : 0);
 const fixed = (n: number) => String(Math.round(n * 10) / 10);
@@ -457,6 +480,32 @@ export class HighlightStore {
     return this.folder ? join(this.folder, keptName(path, stream)) : null;
   }
 
+  /** The folder of a kept scan's row thumbnails (`<hash>/` beside `<hash>.json`); it goes with its scan. */
+  thumbFolder(path: string, stream: number) {
+    return this.folder ? join(this.folder, keptName(path, stream).slice(0, -".json".length)) : null;
+  }
+
+  /**
+   * The thumbnails kept for a scan: those still wanted (`wanted`, file names)
+   * are returned; the others (a suggestion scanned again, an edge moved) are
+   * deleted.
+   */
+  async thumbs(path: string, stream: number, wanted: ReadonlySet<string>) {
+    const folder = this.thumbFolder(path, stream);
+    const found = new Set<string>();
+    if (!folder) return found;
+    for (const name of await readdir(folder).catch(() => [] as string[])) {
+      if (wanted.has(name)) found.add(name);
+      else await rm(join(folder, name), { force: true }).catch(() => {});
+    }
+    return found;
+  }
+
+  /** A kept scan and its thumbnails go. */
+  async #drop(file: string) {
+    await Promise.all([rm(file, { force: true }), rm(file.slice(0, -".json".length), { recursive: true, force: true })]).catch(() => {});
+  }
+
   /** The file's stamp now; `null` when it cannot be read. */
   async stamp(path: string, stream: number): Promise<Stamp | null> {
     const info = await stat(path).catch(() => null);
@@ -477,11 +526,11 @@ export class HighlightStore {
       // damaged: dropped below
     }
     if (!saved || saved.path !== stamp.path || saved.stream !== stamp.stream) {
-      await rm(file, { force: true }).catch(() => {});
+      await this.#drop(file);
       return null;
     }
     if (saved.size !== stamp.size || saved.mtimeMs !== stamp.mtimeMs) {
-      await rm(file, { force: true }).catch(() => {});
+      await this.#drop(file);
       return "changed";
     }
     // Used now: the most recent.
@@ -517,9 +566,15 @@ export class HighlightStore {
       if (info && Date.now() - info.mtimeMs > 60_000) await rm(join(this.folder, name), { force: true }).catch(() => {});
     }
     const names = all.filter((name) => name.endsWith(".json"));
+    // A thumbnail folder whose scan is gone goes too.
+    const scans = new Set(names);
+    for (const name of all) {
+      if (name.endsWith(".json") || name.endsWith(".tmp") || scans.has(`${name}.json`)) continue;
+      if ((await stat(join(this.folder, name)).catch(() => null))?.isDirectory()) await rm(join(this.folder, name), { recursive: true, force: true }).catch(() => {});
+    }
     if (names.length <= CACHE_LIMIT) return;
     const dated = await Promise.all(names.map(async (name) => ({ name, time: (await stat(join(this.folder!, name)).catch(() => null))?.mtimeMs ?? 0 })));
     dated.sort((a, b) => b.time - a.time);
-    for (const { name } of dated.slice(CACHE_LIMIT)) await rm(join(this.folder, name), { force: true }).catch(() => {});
+    for (const { name } of dated.slice(CACHE_LIMIT)) await this.#drop(join(this.folder, name));
   }
 }
