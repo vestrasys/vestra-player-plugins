@@ -1,0 +1,15 @@
+{
+  "id": "zysilm.amdmotion",
+  "version": "0.1.0",
+  "apiVersion": "vestra/1",
+  "entry": "main.ts",
+  "capabilities": ["commands", "ui.osd", "ui.window", "video.motion"],
+  "name": "AMD Motion Smoothing",
+  "author": "zysilm",
+  "punchline": "Smoother motion with real in-between frames from your AMD Radeon GPU",
+  "description": "Doubles the video's frame rate while it plays, with in-between frames made by the motion estimation of AMD's frame-rate converter (AMF) on your AMD Radeon GPU: not blended frames. Video ▸ AMD Motion Smoothing… opens a window to choose Off, Double Frame Rate or Match Display (the doubled frames paced to the display, with GPU rendering) and shows what runs or why not. Needs Windows with an AMD Radeon GPU and the AMD graphics driver; it does nothing on other GPUs or systems. Off by default; remembers your choice.",
+  "tags": ["video", "motion", "smoothing", "frame rate", "amd"],
+  "sourceUrl": "https://github.com/vestrasys/vestra-player-plugins/tree/main/plugins/amdmotion",
+  "license": "Apache-2.0",
+  "minPlayerVersion": "0.8.1"
+}
