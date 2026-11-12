@@ -9,7 +9,8 @@ import type { Layout, Transition } from "./transitions.ts";
  * the merged Collection as an MP4 into the plugin's work folder (the GIF and
  * WebP presets' intermediate encoding, clip.ts), with the video effects and
  * burned-in subtitles when asked; the plugin then runs the player's ffmpeg
- * once over that file, as it does for the transitions (finish.ts), and writes
+ * over that file (GIF: twice, the palette first), as it does for the
+ * transitions (finish.ts), and writes
  * the image beside the destination under a hidden name first.
  *
  * The defaults follow the common practice of GIF makers (Giphy's and ezgif's
@@ -44,22 +45,29 @@ export const MAX_ANIMATED_SECONDS = 60;
 export const scaleFilter = (box: number) =>
   `scale='if(gte(iw,ih),min(${box},iw),-2)':'if(gte(iw,ih),-2,min(${box},ih))':flags=lanczos,setsar=1`;
 
-/** The filter chain from the video `from` to the label `to` (graph syntax, labels without brackets). */
+/** The picture step from the video `from` to the label `to` (graph syntax, labels without brackets): the frame rate, then the size. */
 export function animatedChain(format: Animated, from: string, to: string) {
   const { box, fps } = ANIMATED[format];
-  const picture = `fps=${fps},${scaleFilter(box)}`;
-  if (format === "webp") return `[${from}]${picture}[${to}]`;
-  // One palette for the whole clip, from the clip; Bayer dithering, only the changed rectangle of each frame.
-  return `[${from}]${picture},split[gifa][gifb];[gifa]palettegen=max_colors=256[gifp];[gifb][gifp]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle[${to}]`;
+  return `[${from}]fps=${fps},${scaleFilter(box)}[${to}]`;
 }
+/** One 256-colour palette for the whole clip, from the clip itself (FFmpeg's default statistics over every frame). */
+export const PALETTEGEN = "palettegen=max_colors=256";
+/** Ordered (Bayer) dithering, only the changed rectangle of each frame. */
+export const PALETTEUSE = "paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle";
 
 export interface AnimatedArgs {
   input: string;
   output: string;
   progress: string;
-  /** The graph's file (`-/filter_complex`); the caller writes `graph` there. */
+  /** The graph's file (`-/filter_complex`); the caller writes each pass's `graph` to its `script`. */
   script: string;
   format: Animated;
+  /**
+   * GIF: the palette image the first pass writes (in the work folder); its
+   * graph and progress files are beside it (`<palette>.graph`,
+   * `<palette>.progress`).
+   */
+  palette?: string;
   /** The WebP encoder found (`libwebp_anim`, else `libwebp`); unused for GIF. */
   encoder?: string;
   /** A merged export with transitions: the parts in the merge and each junction's transition (the picture only). */
@@ -69,29 +77,57 @@ export interface AnimatedArgs {
   threads?: number;
 }
 
-/** ffmpeg's arguments for the animated image: the graph (the transitions first, if any), the encoder, loop forever, no sound, `-progress` into a file. */
-export function animatedArgs(o: AnimatedArgs) {
+/** One ffmpeg run: its arguments, the graph to write to `script` first, and its progress file. */
+export interface AnimatedPass {
+  args: string[];
+  graph: string;
+  script: string;
+  progress: string;
+}
+
+/**
+ * ffmpeg's runs for the animated image, in order, each with its graph (the
+ * transitions first, if any): loop forever, no sound, `-progress` into a
+ * file. WebP is one run. GIF is two, as FFmpeg's GIF recipe does it: the
+ * palette of the whole clip into a PNG, then the image with it. One graph
+ * with `split` would keep every frame in memory until the palette is known
+ * at the end (about 800 MB for a minute at 960×720 in the review's
+ * measurement); two runs read the merge twice and hold one frame.
+ */
+export function animatedArgs(o: AnimatedArgs): { passes: AnimatedPass[]; length: number } {
   const threads = String(o.threads ?? autoThreads());
-  let graph: string;
+  let prefix = "";
+  let from = "0:v";
   let length = o.length;
   if (o.transitions) {
     const joined = transitionGraph(o.transitions.lengths, o.transitions.transitions, o.transitions.fps, false);
-    graph = `${joined.graph};${animatedChain(o.format, "vout", "out")}`;
+    prefix = `${joined.graph};`;
+    from = "vout";
     length = joined.length;
-  } else graph = animatedChain(o.format, "0:v", "out");
-  const codec = o.format === "gif"
-    ? ["-c:v", "gif", "-loop", "0", "-f", "gif"]
-    : ["-c:v", o.encoder ?? "libwebp_anim", "-lossless", "0", "-q:v", String(WEBP_QUALITY), "-compression_level", String(WEBP_EFFORT), "-loop", "0", "-f", "webp"];
-  const args = [
-    "-nostdin", "-v", "error", "-y", "-threads", threads,
-    "-i", o.input,
-    "-/filter_complex", o.script, "-filter_complex_threads", threads,
-    "-map", "[out]", "-an", "-sn", "-dn",
-    ...codec,
-    "-progress", o.progress, "-stats_period", "0.5",
-    o.output,
-  ];
-  return { args, graph, length };
+  }
+  const head = ["-nostdin", "-v", "error", "-y", "-threads", threads, "-i", o.input];
+  const graphFlags = (script: string) => ["-/filter_complex", script, "-filter_complex_threads", threads];
+  const tail = (progress: string, output: string) => ["-progress", progress, "-stats_period", "0.5", output];
+  if (o.format === "webp") {
+    const graph = `${prefix}${animatedChain("webp", from, "out")}`;
+    const codec = ["-c:v", o.encoder ?? "libwebp_anim", "-lossless", "0", "-q:v", String(WEBP_QUALITY), "-compression_level", String(WEBP_EFFORT), "-loop", "0", "-f", "webp"];
+    return { passes: [{ args: [...head, ...graphFlags(o.script), "-map", "[out]", "-an", "-sn", "-dn", ...codec, ...tail(o.progress, o.output)], graph, script: o.script, progress: o.progress }], length };
+  }
+  const palette = o.palette ?? `${o.output}.palette.png`;
+  const first: AnimatedPass = {
+    graph: `${prefix}${animatedChain("gif", from, "gifv")};[gifv]${PALETTEGEN}[out]`,
+    script: `${palette}.graph`,
+    progress: `${palette}.progress`,
+    args: [],
+  };
+  first.args = [...head, ...graphFlags(first.script), "-map", "[out]", "-an", "-sn", "-dn", "-frames:v", "1", "-update", "1", "-f", "image2", ...tail(first.progress, palette)];
+  const second: AnimatedPass = {
+    graph: `${prefix}${animatedChain("gif", from, "gifv")};[gifv][1:v]${PALETTEUSE}[out]`,
+    script: o.script,
+    progress: o.progress,
+    args: [...head, "-i", palette, ...graphFlags(o.script), "-map", "[out]", "-an", "-sn", "-dn", "-c:v", "gif", "-loop", "0", "-f", "gif", ...tail(o.progress, o.output)],
+  };
+  return { passes: [first, second], length };
 }
 
 /** The encoder names in `ffmpeg -encoders` (lines such as ` V....D gif   GIF (…)` after the legend). */

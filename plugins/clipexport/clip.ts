@@ -195,7 +195,10 @@ export const PRESETS: readonly Exclude<Preset, "custom">[] = ["source", "high", 
  * `gif` and `webp` (0.5.0): the H.264 fields are those of the intermediate
  * MP4 the player writes for the plugin's ffmpeg step: the best quality (CRF
  * 14, fast), at most 720p (the image is at most 640 px on its longer side, so
- * 720 lines always hold it) and 30 fps (the image has 15 or 20).
+ * 720 lines always hold it) and 30 fps (the image has 15 or 20). A clip is
+ * read without sound; a merge has the parts' sound (the parts export has no
+ * way to leave it out, SDK 1.7.9), at the lowest AAC rate, and the image
+ * leaves it out.
  */
 const INTERMEDIATE = { rate: "crf", crf: 14, speed: "faster", height: 720, fps: 30, audio: 128 } as const;
 export const PRESET_ENCODE: Readonly<Record<Exclude<Preset, "custom">, Encode>> = {

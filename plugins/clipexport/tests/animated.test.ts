@@ -8,6 +8,7 @@ import test from "node:test";
 import { HostError, startPlugin, TestHost } from "@vestra-player/sdk/testing";
 import activate from "../main.ts";
 import { ANIMATED, animatedArgs, animatedChain, encoderFor, encodersOf, extensionOf, MAX_ANIMATED_SECONDS, scaleFilter } from "../animated.ts";
+import type { AnimatedPass } from "../animated.ts";
 import { animatedOf, encodeOf, estimate, exportEncoding, PRESET_ENCODE, presetOf, PRESETS } from "../clip.ts";
 import { REASON, withExtension } from "../model.ts";
 import { CUT } from "../transitions.ts";
@@ -107,41 +108,55 @@ test("the presets: Animated GIF and WebP after the three MP4 ones, Custom after 
   assert.deepEqual([guess(PRESET_ENCODE.webp).sizelow, guess(PRESET_ENCODE.webp).sizehigh], [0.4, 2]);
 });
 
-test("GIF's arguments: 15 fps, at most 480 px (never enlarged), one palette from the clip, Bayer dithering, changed rectangles; loops; no sound; -progress", () => {
+test("GIF in two runs (bounded memory): the palette of the whole clip into a PNG, then the image with it; 15 fps, at most 480 px (never enlarged), Bayer dithering, changed rectangles; loops; no sound", () => {
   assert.deepEqual(ANIMATED, { gif: { box: 480, fps: 15 }, webp: { box: 640, fps: 20 } });
   assert.equal(MAX_ANIMATED_SECONDS, 60);
   assert.equal(scaleFilter(480), "scale='if(gte(iw,ih),min(480,iw),-2)':'if(gte(iw,ih),-2,min(480,ih))':flags=lanczos,setsar=1");
-  const { args, graph, length } = animatedArgs({ input: "C:\\work\\merge-1.mp4", output: "C:\\v\\.a.gif.partial", progress: "p", script: "g", format: "gif", length: 4, threads: 2 });
+  const { passes, length } = animatedArgs({ input: "C:/work/merge-1.mp4", output: "C:/v/.a.gif.partial", progress: "p", script: "g", palette: "C:/work/pal.png", format: "gif", length: 4, threads: 2 });
   assert.equal(length, 4);
-  assert.equal(
-    graph,
-    "[0:v]fps=15,scale='if(gte(iw,ih),min(480,iw),-2)':'if(gte(iw,ih),-2,min(480,ih))':flags=lanczos,setsar=1,split[gifa][gifb];[gifa]palettegen=max_colors=256[gifp];[gifb][gifp]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle[out]",
-  );
-  const at = (flag: string) => args[args.indexOf(flag) + 1];
-  assert.deepEqual([at("-i"), at("-/filter_complex"), at("-map"), at("-c:v"), at("-loop"), at("-f"), at("-progress"), args.at(-1)], ["C:\\work\\merge-1.mp4", "g", "[out]", "gif", "0", "gif", "p", "C:\\v\\.a.gif.partial"]);
-  assert.ok(args.includes("-an") && args.includes("-nostdin"));
-  assert.ok(!args.includes("-filter_complex"), "the graph is a file");
+  assert.equal(passes.length, 2);
+  const [first, second] = passes as [AnimatedPass, AnimatedPass];
+  const picture = "[0:v]fps=15,scale='if(gte(iw,ih),min(480,iw),-2)':'if(gte(iw,ih),-2,min(480,ih))':flags=lanczos,setsar=1[gifv]";
+  assert.equal(first.graph, `${picture};[gifv]palettegen=max_colors=256[out]`);
+  assert.equal(second.graph, `${picture};[gifv][1:v]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle[out]`);
+  assert.ok(!first.graph.includes("split") && !second.graph.includes("split"), "no frame is kept for a later palette");
+  const at = (args: string[], flag: string) => args[args.indexOf(flag) + 1];
+  // The palette: one PNG in the work folder, its own graph and progress files beside it.
+  assert.deepEqual([first.script, first.progress, at(first.args, "-/filter_complex"), at(first.args, "-progress"), at(first.args, "-frames:v"), at(first.args, "-f"), first.args.at(-1)], ["C:/work/pal.png.graph", "C:/work/pal.png.progress", "C:/work/pal.png.graph", "C:/work/pal.png.progress", "1", "image2", "C:/work/pal.png"]);
+  // The image: the merge and the palette in, the GIF out.
+  const inputs = second.args.flatMap((arg, i) => (arg === "-i" ? [second.args[i + 1]] : []));
+  assert.deepEqual(inputs, ["C:/work/merge-1.mp4", "C:/work/pal.png"]);
+  assert.deepEqual([second.script, at(second.args, "-/filter_complex"), at(second.args, "-map"), at(second.args, "-c:v"), at(second.args, "-loop"), at(second.args, "-f"), at(second.args, "-progress"), second.args.at(-1)], ["g", "g", "[out]", "gif", "0", "gif", "p", "C:/v/.a.gif.partial"]);
+  for (const pass of passes) {
+    assert.ok(pass.args.includes("-an") && pass.args.includes("-nostdin"));
+    assert.ok(!pass.args.includes("-filter_complex"), "the graph is a file");
+  }
 });
 
-test("WebP's arguments: libwebp's animated encoder at its default quality and effort, 20 fps, at most 640 px, loops; the still encoder when it is the only one", () => {
-  const { args, graph } = animatedArgs({ input: "i", output: "o", progress: "p", script: "g", format: "webp", encoder: "libwebp_anim", length: 4, threads: 1 });
+test("WebP's arguments: one run, libwebp's animated encoder at its default quality and effort, 20 fps, at most 640 px, loops; the still encoder when it is the only one", () => {
+  const { passes } = animatedArgs({ input: "i", output: "o", progress: "p", script: "g", format: "webp", encoder: "libwebp_anim", length: 4, threads: 1 });
+  assert.equal(passes.length, 1);
+  const { args, graph } = passes[0]!;
   assert.equal(graph, `[0:v]fps=20,${scaleFilter(640)}[out]`);
   const at = (flag: string) => args[args.indexOf(flag) + 1];
   assert.deepEqual([at("-c:v"), at("-lossless"), at("-q:v"), at("-compression_level"), at("-loop"), at("-f")], ["libwebp_anim", "0", "75", "4", "0", "webp"]);
-  const still = animatedArgs({ input: "i", output: "o", progress: "p", script: "g", format: "webp", encoder: "libwebp", length: 4, threads: 1 }).args;
+  const still = animatedArgs({ input: "i", output: "o", progress: "p", script: "g", format: "webp", encoder: "libwebp", length: 4, threads: 1 }).passes[0]!.args;
   assert.equal(still[still.indexOf("-c:v") + 1], "libwebp");
 });
 
-test("a merged image with transitions: the parts are blended first (the picture only), then the image chain; its length is Σ L − Σ d", () => {
-  const { graph, length } = animatedArgs({
+test("a merged image with transitions: the parts are blended first (the picture only), then the image chain, in both GIF runs; its length is Σ L − Σ d", () => {
+  const { passes, length } = animatedArgs({
     input: "i", output: "o", progress: "p", script: "g", format: "gif", length: 8, threads: 1,
     transitions: { lengths: [4, 4], transitions: [tr("crossfade"), CUT], fps: 30 },
   });
   assert.equal(length, 7);
-  assert.match(graph, /^\[0:v\]trim=start_frame=0:end_frame=120,/);
-  assert.match(graph, /xfade=transition=fade:duration=1:offset=2\.983333\[vout\];\[vout\]fps=15,/);
-  assert.match(graph, /paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle\[out\]$/);
-  assert.ok(!graph.includes("[0:a]") && !graph.includes("acrossfade"), "no sound");
+  for (const { graph } of passes) {
+    assert.ok(graph.startsWith("[0:v]trim=start_frame=0:end_frame=120,"));
+    assert.ok(graph.includes("xfade=transition=fade:duration=1:offset=2.983333[vout];[vout]fps=15,"));
+    assert.ok(!graph.includes("[0:a]") && !graph.includes("acrossfade"), "no sound");
+  }
+  assert.ok(passes[0]!.graph.endsWith("[gifv]palettegen=max_colors=256[out]"));
+  assert.ok(passes[1]!.graph.endsWith("[gifv][1:v]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle[out]"));
   assert.equal(animatedChain("webp", "vout", "out"), `[vout]fps=20,${scaleFilter(640)}[out]`);
 });
 
@@ -181,11 +196,15 @@ test("Animated GIF of a clip: the player writes the clip without sound into the 
     const job = host.sent("jobs.start")[0]!;
     assert.ok(String(job.destination).startsWith(join(data, "work")), "the clip goes into the work folder");
     assert.deepEqual(job.encoding, { crf: 14, speed: "faster", maxHeight: 720, fps: 30, audioBitrate: 128, threads: "auto" });
-    assert.equal(runs.length, 1);
-    const { args, graph } = runs[0]!;
-    // The input is the file the player reports it wrote (the test host reports its own name for a clip).
-    assert.ok(args[args.indexOf("-i") + 1]);
-    assert.match(graph, /palettegen/);
+    // Two runs: the palette into the work folder, then the image with it.
+    assert.equal(runs.length, 2);
+    const [palette, image] = runs as [{ args: string[]; graph: string }, { args: string[]; graph: string }];
+    assert.ok(palette.graph.endsWith("palettegen=max_colors=256[out]"));
+    assert.ok(palette.args.at(-1)!.startsWith(join(data, "work")), "the palette is a work file");
+    // The input is the file the player reports it wrote (the test host reports its own name for a clip); the palette is the second.
+    const inputs = image.args.flatMap((arg, i) => (arg === "-i" ? [image.args[i + 1]] : []));
+    assert.deepEqual(inputs, [palette.args[palette.args.indexOf("-i") + 1], palette.args.at(-1)]);
+    assert.ok(image.graph.includes("paletteuse="));
     const final = join(folder, "one_00.01.000-00.05.000.gif");
     assert.equal(await readFile(final, "utf8"), "GIF89a the image");
     await until(() => leftovers(data, folder).length === 0, "no work files left");
@@ -341,8 +360,8 @@ test("the merged Collection as a GIF: with a crossfade the parts blend first, th
     await until(() => host.osd.filter((line) => line.startsWith("Clip exported as")).length === 1, "the first export");
     const merge = host.exports.filter((e) => Array.isArray(e.parts))[0]!;
     assert.ok(String(merge.destination).startsWith(join(data, "work")));
-    assert.equal(runs.length, 1);
-    assert.match(runs[0]!.graph, /^\[0:v\]fps=15,/);
+    assert.equal(runs.length, 2, "the palette, then the image");
+    assert.ok(runs.every((run) => run.graph.startsWith("[0:v]fps=15,")));
     // A crossfade: blended first, no sound.
     const id = rows()[0]!.id;
     host.mounted().emit("open-join", id);
@@ -350,9 +369,11 @@ test("the merged Collection as a GIF: with a crossfade the parts blend first, th
     await eventually(() => rows()[0]!.kind, "crossfade");
     host.mounted().emit("export-merged");
     await until(() => host.osd.filter((line) => line.startsWith("Clip exported as")).length === 2, "the second export");
-    assert.equal(runs.length, 2);
-    assert.match(runs[1]!.graph, /xfade=transition=fade.*\[vout\];\[vout\]fps=15,/);
-    assert.ok(!runs[1]!.graph.includes("acrossfade"));
+    assert.equal(runs.length, 4);
+    for (const run of runs.slice(2)) {
+      assert.match(run.graph, /xfade=transition=fade.*\[vout\];\[vout\]fps=15,/);
+      assert.ok(!run.graph.includes("acrossfade"));
+    }
     assert.equal((await readdir(folder)).filter((name) => name.endsWith(".gif")).length, 2);
     await eventually(() => (tab(host).results as { badge: string }[]).map((r) => r.badge), ["7.0", "8.0"], "4 + 4 − 1 s, then 4 + 4 s");
     await until(() => leftovers(data, folder).length === 0, "no work files left");
@@ -362,6 +383,47 @@ test("the merged Collection as a GIF: with a crossfade the parts blend first, th
     host.mounted().emit("export-merged");
     await until(() => host.osd.includes(`Export failed: ${REASON.animatedTooLong}`), "the refusal");
     assert.equal(host.exports.length, before);
+  } finally {
+    await stop();
+    await cleanup();
+    await rm(data, { recursive: true, force: true });
+  }
+});
+
+test("Fast with a saved Animated GIF and parts Fast cannot join: the fallback is a High quality MP4 (no image, no minute limit); Precise writes the GIF again", async () => {
+  const data = await mkdtemp(join(tmpdir(), "clipexport-data-"));
+  const host = new TestHost();
+  const { stop } = await start(host, data);
+  const { folder, cleanup } = await withFolder(host);
+  const rows = () => (tab(host).parts ?? []) as { id: string }[];
+  const add = async (path: string, from: string, to: string) => {
+    host.openElsewhere(path);
+    host.setSource({ position: 2, duration: 120 });
+    const count = rows().length;
+    host.mounted().emit("add-part", from, to);
+    await until(() => rows().length === count + 1, `part ${count + 1}`);
+  };
+  try {
+    const runs = fakeFfmpeg(host);
+    await choose(host, 3);
+    host.mounted().emit("set-method", 0);
+    await host.settle();
+    await eventually(() => tab(host)["method-index"], 0, "Fast chosen, Animated GIF kept");
+    // Two files of different sizes, together over a minute.
+    host.mediaFiles.set("/media/wide.mp4", { duration: 120, video: { codec: "h264", width: 1920, height: 818, fps: 30, pixelFormat: "yuv420p" } });
+    await add("/media/one.mp4", "0", "40");
+    await add("/media/wide.mp4", "0", "40");
+    await eventually(() => tab(host)["collection-preview"], `${tab(host)["collection-preview"]}`.replace(/\.\w+$/, ".mp4"), "the name says MP4");
+    host.mounted().emit("export-merged");
+    await until(() => host.osd.some((line) => line.startsWith("Clip exported as")), "the export");
+    const merge = host.exports.filter((e) => Array.isArray(e.parts))[0]!;
+    assert.equal(merge.kind, "rawMp4", "Precise: Fast cannot join these parts");
+    assert.ok(String(merge.destination).startsWith(folder) && String(merge.destination).endsWith(".mp4"), "an MP4 straight into the folder");
+    assert.deepEqual(merge.encoding, { crf: 18, speed: "faster", audioBitrate: 192, threads: "auto" }, "High quality, not the image's intermediate");
+    assert.equal(runs.length, 0, "no image run");
+    assert.ok(!host.osd.some((line) => line.includes(REASON.animatedTooLong)));
+    // The check of the parts asked with the same encoding.
+    assert.deepEqual(host.sent("jobs.check").at(-1)!.encoding, merge.encoding);
   } finally {
     await stop();
     await cleanup();
@@ -413,8 +475,10 @@ function probe(file: string) {
 /** Encode with the plugin's arguments, the graph written to its file. */
 function encode(o: Parameters<typeof animatedArgs>[0]) {
   const built = animatedArgs(o);
-  writeFileSync(o.script, built.graph);
-  run(FFMPEG, built.args);
+  for (const pass of built.passes) {
+    writeFileSync(pass.script, pass.graph);
+    run(FFMPEG, pass.args);
+  }
   return built;
 }
 

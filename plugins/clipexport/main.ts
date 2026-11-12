@@ -564,9 +564,20 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     settings.method = next;
     store();
     probeSoon();
+    // With an animated quality, the check's re-encode is the image's intermediate in Precise and High quality's in Fast.
+    if (live && animatedOf(settings.encode)) void recheck();
   };
   /** The animated image a Precise export writes now (the Quality chooser's GIF or WebP); null for an MP4 or a Fast cut. */
   const animatedNow = (chosen: Method): Animated | null => (chosen === "precise" && support.encodeOptions ? animatedOf(settings.encode) : null);
+  /**
+   * The MP4 encoding of a Precise re-encode that is no image: the tab's
+   * settings, or High quality while an animated quality is chosen (a merge
+   * the user asked as Fast that cannot be copied falls back to Precise: an
+   * MP4, never a silent GIF).
+   */
+  const mp4Encode = (): Encode => (animatedOf(settings.encode) ? { ...PRESET_ENCODE.high } : settings.encode);
+  /** The encoding the check and a merged export use: the image's intermediate when Precise writes one, else the MP4's. */
+  const mergeEncoding = (): Encode => (animatedNow(method()) ? settings.encode : mp4Encode());
   /**
    * What the plugin's step needs for an animated image, checked before
    * anything starts: the written length (at most a minute, animated.ts), the
@@ -619,7 +630,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     sourceQueue = next.catch(() => {});
     return next;
   }
-  const encodingOption = () => (support.encodeOptions ? { encoding: exportEncoding(settings.encode) } : undefined);
+  const encodingOption = () => (support.encodeOptions ? { encoding: exportEncoding(mergeEncoding()) } : undefined);
   /** The check, when it answered for the list as it is now. */
   const freshCheck = () => (check && checkKey === listKey(exportParts(collection.parts)) ? check : null);
   /**
@@ -909,7 +920,9 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       // The red line under the buttons says it (from the same check); a key says it on screen.
       if (first) return void (say && shown(osd.show(BLOCKING[first.problem], [first.part + 1])));
       const chosen: Method = method() === "fast" && answer.copy.ok ? "fast" : "precise";
-      const animated = animatedNow(chosen);
+      // The image only when the user chose Precise: Fast falling back to Precise writes an MP4 (High quality's, for an animated choice).
+      const animated = animatedNow(method());
+      const encode = mergeEncoding();
       const transitions = parts.map((part) => part.transition);
       const lengths = parts.map((part) => part.end - part.start);
       // An animated image: its written length (the overlaps taken off) and the encoder are checked before the save dialog.
@@ -927,15 +940,15 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       } else destination = join(await targetFolder(null), name);
       const spec: Spec = {
         start: 0, end: totalLength(parts), processed: false, subtitles: false, track: "selected", method: chosen,
-        encode: chosen === "precise" && support.encodeOptions ? { ...settings.encode } : undefined,
+        encode: chosen === "precise" && support.encodeOptions ? { ...encode } : undefined,
       };
       // Precise with a transition: the plain merge, then the plugin writes the transitions (Fast joins with cuts, Q2 a).
       // An animated image: the plain merge, then the plugin writes the image (with the transitions, if any).
       const plan: Plan | undefined = animatedStep ?? (chosen === "precise" && workFolder && anyTransition(transitions) && answer.encode
         ? {
           transitions, lengths, fps: answer.encode.fps, audio: !!answer.encode.audio,
-          encode: settings.encode, merge: mergeEncode(settings.encode),
-          bitrate: settings.encode.rate === "source" ? sourceBitrate(parts) : null,
+          encode, merge: mergeEncode(encode),
+          bitrate: encode.rate === "source" ? sourceBitrate(parts) : null,
         }
         : undefined);
       // "Same as source" with transitions aims at the parts' own bit rate: unknown, it asks for another quality.
@@ -1121,7 +1134,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
         start: keyOf("clip.start"), end: keyOf("clip.end"), add: keyOf("clip.collectionAdd"), merge: keyOf("clip.collectionExport"), remove: keyOf("clip.collectionRemove"),
       },
       ...collectionView(),
-      collectionPreview: `${renderName(settings.collectionTemplate, { source: shownSource(), start: 242.3, end: 259, now: new Date(), n: sequence + 1 }, COLLECTION_TEMPLATE)}${extensionOf(animatedNow(collectionMethod()))}`,
+      collectionPreview: `${renderName(settings.collectionTemplate, { source: shownSource(), start: 242.3, end: 259, now: new Date(), n: sequence + 1 }, COLLECTION_TEMPLATE)}${extensionOf(animatedNow(method()))}`,
       support: { fast: support.fastCut, encode: support.encodeOptions, progress: support.progress },
       methodIndex: METHODS.indexOf(method()),
       audioIndex: form.audioIndex,
