@@ -744,3 +744,29 @@ test("an unset Start or End shows no time: the fields' hint is no range that cou
     await stop();
   }
 });
+
+test("Export Clip with a range and an empty Collection: enabled and the highlighted button; it never waits on the Collection", async () => {
+  const host = new TestHost();
+  play(host, "/media/bbb.mp4", 90);
+  const { stop } = await start(host);
+  try {
+    await showCollection(host);
+    host.setSource({ position: 74.667 });
+    host.mounted().emit("clip-now", "start");
+    await host.settle();
+    host.setSource({ position: 77.833 });
+    host.mounted().emit("clip-now", "end");
+    await host.settle();
+    // What the button's `enabled` reads, in the state of the GUI check (Fast, 01:14.667–01:17.833, nothing added).
+    await eventually(() => [tab(host)["clip-start"], tab(host)["clip-end"], tab(host)["method-index"], tab(host)["clip-busy"], tab(host)["queue-full"], tab(host)["field-error"], (tab(host)["collection-info"] as { count: number }).count],
+      [clock(74.667), clock(77.833), 0, false, false, "", 0]);
+    const slint = await readFile(new URL("../ui/tab.slint", import.meta.url), "utf8");
+    const button = slint.slice(slint.indexOf('text: @tr("Export Clip");') - 400, slint.indexOf('text: @tr("Export Clip");') + 600);
+    assert.match(button, /primary: ClipBridge\.collection-info\.count == 0;/, "the gradient while the Collection is empty");
+    assert.match(button, /enabled: !ClipBridge\.clip-busy && !ClipBridge\.queue-full && ClipBridge\.field-error == "";/, "nothing of the Collection disables it");
+    // The footer: the count in bold.
+    assert.match(slint, /@tr\("\{\} parts", ClipBridge\.collection-info\.count\);[^}]*font-weight: 700;/);
+  } finally {
+    await stop();
+  }
+});

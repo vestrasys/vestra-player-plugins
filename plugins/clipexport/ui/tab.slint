@@ -1185,14 +1185,26 @@ component MergeFooter inherits Rectangle {
         spacing: 5px;
         HorizontalLayout {
             spacing: 6px;
-            Line {
+            // The count in bold, the written length in the monospaced face.
+            Text {
+                horizontal-stretch: 0;
+                // TRANSLATORS: {} is a number of parts (2 or more).
+                text: ClipBridge.collection-info.count == 1 ? @tr("1 part") : @tr("{} parts", ClipBridge.collection-info.count);
                 color: Theme.text;
-                // TRANSLATORS: {} is the Collection's total length ("1:02.2").
-                text: ClipBridge.collection-info.count == 1 ? @tr("1 part · {}", ClipBridge.collection-info.total)
-                    // TRANSLATORS: {0} is a number of parts (2 or more), {1} their total length ("1:02.2").
-                    : @tr("{0} parts · {1}", ClipBridge.collection-info.count, ClipBridge.collection-info.total);
+                font-size: Theme.font-body;
+                font-weight: 700;
+                vertical-alignment: center;
             }
             Text {
+                horizontal-stretch: 0;
+                text: ClipBridge.collection-info.total;
+                color: Theme.text-dim;
+                font-family: Theme.font-mono;
+                font-size: Theme.font-xs;
+                vertical-alignment: center;
+            }
+            Text {
+                horizontal-stretch: 1;
                 text: Words.method(ClipBridge.collection-method-index == 0 ? "fast" : "precise")
                     + (ClipBridge.collection-info.transitions == 0 ? ""
                         : " · " + (ClipBridge.collection-info.off ? @tr("transitions off in Fast")

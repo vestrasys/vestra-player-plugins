@@ -952,6 +952,10 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   function collectionInfo(checked: boolean) {
     const fastNow = collectionMethod() === "fast";
     const junctions = collection.parts.slice(0, -1).filter((part) => part.transition.kind !== "cut");
+    // "Switched to Precise" stays only while it explains something: a transition is set and the method is still the
+    // Precise it switched to. Once every junction is a Cut again (picked, Undo of Apply to All, removed, cleared) or
+    // the method is Fast, the note is done and does not come back by itself.
+    if (ui.switched && (fastNow || junctions.length === 0)) ui.switched = false;
     // What the export takes off: each overlap on whole frames, held to half the shorter part, at the merge's frame rate.
     const fps = freshCheck()?.encode?.fps ?? 30;
     const t = timing(collection.parts.map((part) => part.end - part.start), collection.parts.map((part) => part.transition), fps);
@@ -960,8 +964,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     return {
       count: collection.parts.length, total: lengthClock(length), checked, undo: !!undo,
       transitions: junctions.length, saved: saved.toFixed(1), off: fastNow && junctions.length > 0,
-      // The method a transition switched to stays Precise while the list has parts; a method the user picks clears it.
-      switched: ui.switched && !fastNow && collection.parts.length > 0,
+      switched: ui.switched,
     };
   }
   /** The picker of the junction below part `ui.picker`, while it is open: its kind, direction, duration, the limit, the two parts' pictures. */

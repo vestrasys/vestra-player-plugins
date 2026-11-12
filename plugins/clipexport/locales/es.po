@@ -173,7 +173,7 @@ msgstr "No hay sitio para recuperar las partes vaciadas: la colección admite co
 msgid "Export failed: {}"
 msgstr "Error al exportar: {}"
 
-#: main.ts:176 ui/tab.slint:1468 ui/tab.slint:1964
+#: main.ts:176 ui/tab.slint:1480 ui/tab.slint:1976
 msgid "Clip"
 msgstr "Clip"
 
@@ -197,7 +197,7 @@ msgstr "Elige una carpeta existente."
 msgid "Clip folder: {}"
 msgstr "Carpeta de clips: {}"
 
-#: main.ts:477 ui/tab.slint:1770
+#: main.ts:477 ui/tab.slint:1782
 msgid "Export Clip"
 msgstr "Exportar clip"
 
@@ -213,7 +213,7 @@ msgstr "Añadido como parte {}"
 msgid "Collection cleared."
 msgstr "Colección vaciada."
 
-#: main.ts:823 main.ts:1026
+#: main.ts:823 main.ts:1029
 msgid "Undo"
 msgstr "Deshacer"
 
@@ -242,104 +242,104 @@ msgstr "La parte {} no tiene vídeo: quítala"
 msgid "Part {} is outside its file: remove it"
 msgstr "La parte {} está fuera de su archivo: quítala"
 
-#: main.ts:893 main.ts:1447
+#: main.ts:893 main.ts:1450
 msgid "Export Collection"
 msgstr "Exportar la colección"
 
-#: main.ts:1026
+#: main.ts:1029
 msgid "Transition applied to every join."
 msgstr "Transición aplicada a todas las uniones."
 
-#: main.ts:1063 manifest.json
+#: main.ts:1066 manifest.json
 msgid "Clip Export"
 msgstr "Exportar clips"
 
-#: main.ts:1213 main.ts:1477
+#: main.ts:1216 main.ts:1480
 msgid "The Clip Export tab could not open."
 msgstr "No se pudo abrir la pestaña Exportar clips."
 
-#: main.ts:1446
+#: main.ts:1449
 msgid "Export Clip…"
 msgstr "Exportar clip…"
 
-#: main.ts:1446 main.ts:1447 main.ts:1537
+#: main.ts:1449 main.ts:1450 main.ts:1540
 msgid "Export"
 msgstr "Exportación"
 
-#: main.ts:1446 main.ts:1447 main.ts:1542 ui/tab.slint:1670
+#: main.ts:1449 main.ts:1450 main.ts:1545 ui/tab.slint:1682
 msgid "Nothing to export"
 msgstr "Nada que exportar"
 
-#: main.ts:1447
+#: main.ts:1450
 msgid "Clip Export Tab"
 msgstr "Pestaña Exportar clips"
 
-#: main.ts:1447
+#: main.ts:1450
 msgid "Export Clip Range"
 msgstr "Exportar el intervalo del clip"
 
-#: main.ts:1447 ui/tab.slint:1704
+#: main.ts:1450 ui/tab.slint:1716
 msgid "Set Clip Start"
 msgstr "Fijar inicio del clip"
 
-#: main.ts:1447 ui/tab.slint:1724
+#: main.ts:1450 ui/tab.slint:1736
 msgid "Set Clip End"
 msgstr "Fijar final del clip"
 
-#: main.ts:1447
+#: main.ts:1450
 msgid "Export Tasks…"
 msgstr "Tareas de exportación…"
 
-#: main.ts:1447
+#: main.ts:1450
 msgid "Clip Export Settings…"
 msgstr "Configuración de exportación de clips…"
 
-#: main.ts:1447
+#: main.ts:1450
 msgid "Clip Folder…"
 msgstr "Carpeta de clips…"
 
-#: main.ts:1447 ui/tab.slint:1931
+#: main.ts:1450 ui/tab.slint:1943
 msgid "Open Clip Folder"
 msgstr "Abrir carpeta de clips"
 
-#: main.ts:1447
+#: main.ts:1450
 msgid "Show Last Clip in Folder"
 msgstr "Mostrar el último clip en la carpeta"
 
-#: main.ts:1447 ui/tab.slint:1829
+#: main.ts:1450 ui/tab.slint:1841
 msgid "Add Range to Collection"
 msgstr "Añadir el intervalo a la colección"
 
-#: main.ts:1447
+#: main.ts:1450
 msgid "Show Collection"
 msgstr "Mostrar la colección"
 
-#: main.ts:1447
+#: main.ts:1450
 msgid "Clear Collection"
 msgstr "Vaciar la colección"
 
-#: main.ts:1447
+#: main.ts:1450
 msgid "Undo Clear Collection"
 msgstr "Deshacer vaciar la colección"
 
-#: main.ts:1447 ui/tab.slint:1015
+#: main.ts:1450 ui/tab.slint:1015
 msgid "Remove from Collection"
 msgstr "Quitar de la colección"
 
-#: main.ts:1447
+#: main.ts:1450
 msgid "Undo Apply to All"
 msgstr "Deshacer Aplicar a todas"
 
-#: main.ts:1500
+#: main.ts:1503
 msgid "Clip start: {}"
 msgstr "Inicio del clip: {}"
 
-#: main.ts:1505
+#: main.ts:1508
 msgid "Clip end: {}"
 msgstr "Final del clip: {}"
 
 #. {} is 10, 30, 60 or 120.
-#: main.ts:1536 ui/tab.slint:1758
+#: main.ts:1539 ui/tab.slint:1770
 msgid "Export Last {} Seconds"
 msgstr "Exportar los últimos {} segundos"
 
@@ -394,7 +394,7 @@ msgid "none"
 msgstr "ninguno"
 
 #. {} is frames per second.
-#: ui/parts.slint:88 ui/tab.slint:1590
+#: ui/parts.slint:88 ui/tab.slint:1602
 msgid "{} fps"
 msgstr "{} fps"
 
@@ -514,19 +514,19 @@ msgstr "Rápido"
 msgid "Precise"
 msgstr "Preciso"
 
-#: ui/parts.slint:166 ui/tab.slint:1567 ui/tab.slint:1568
+#: ui/parts.slint:166 ui/tab.slint:1579 ui/tab.slint:1580
 msgid "Same as source"
 msgstr "Igual que el origen"
 
-#: ui/parts.slint:167 ui/tab.slint:1543 ui/tab.slint:1567 ui/tab.slint:1568
+#: ui/parts.slint:167 ui/tab.slint:1555 ui/tab.slint:1579 ui/tab.slint:1580
 msgid "High quality"
 msgstr "Alta calidad"
 
-#: ui/parts.slint:168 ui/tab.slint:1567 ui/tab.slint:1568
+#: ui/parts.slint:168 ui/tab.slint:1579 ui/tab.slint:1580
 msgid "Small file"
 msgstr "Archivo pequeño"
 
-#: ui/parts.slint:169 ui/tab.slint:1567
+#: ui/parts.slint:169 ui/tab.slint:1579
 msgid "Custom"
 msgstr "Personalizado"
 
@@ -552,7 +552,7 @@ msgstr "hace {} d"
 #. {} is a number of seconds.
 #. {} is a clip's length in seconds ("3.5").
 #. {} is a length in seconds ("1.0").
-#: ui/parts.slint:188 ui/tab.slint:706 ui/tab.slint:985 ui/tab.slint:1077 ui/tab.slint:1425 ui/tab.slint:1426 ui/tab.slint:1427 ui/tab.slint:1428 ui/tab.slint:1654 ui/tab.slint:2005
+#: ui/parts.slint:188 ui/tab.slint:706 ui/tab.slint:985 ui/tab.slint:1077 ui/tab.slint:1437 ui/tab.slint:1438 ui/tab.slint:1439 ui/tab.slint:1440 ui/tab.slint:1666 ui/tab.slint:2017
 msgid "{} s"
 msgstr "{} s"
 
@@ -610,7 +610,7 @@ msgstr "Exportando · {} %"
 
 #. {0} is a task state (Exporting), {1} the time spent (0:12).
 #. what the closed Advanced rows hold now: an audio choice and a quality.
-#: ui/tab.slint:741 ui/tab.slint:1542
+#: ui/tab.slint:741 ui/tab.slint:1554
 msgid "{0} · {1}"
 msgstr "{0} · {1}"
 
@@ -681,369 +681,369 @@ msgstr "{0} · {1} s"
 msgid "Part {0} → {1}. Click to change."
 msgstr "Parte {0} → {1}. Haz clic para cambiar."
 
-#. {} is the Collection's total length ("1:02.2").
-#: ui/tab.slint:1191
-msgid "1 part · {}"
-msgstr "1 parte · {}"
+#. {} is a number of parts (2 or more).
+#: ui/tab.slint:1192
+msgid "1 part"
+msgstr "1 parte"
 
-#. {0} is a number of parts (2 or more), {1} their total length ("1:02.2").
-#: ui/tab.slint:1193
-msgid "{0} parts · {1}"
-msgstr "{0} partes · {1}"
+#. {} is a number of parts (2 or more).
+#: ui/tab.slint:1192
+msgid "{} parts"
+msgstr "{} partes"
 
-#: ui/tab.slint:1198
+#: ui/tab.slint:1210
 msgid "transitions off in Fast"
 msgstr "transiciones desactivadas en Rápido"
 
 #. {} is the seconds the transition takes off the length ("1.0").
-#: ui/tab.slint:1200
+#: ui/tab.slint:1212
 msgid "1 transition −{} s"
 msgstr "1 transición −{} s"
 
 #. {0} is a number of transitions (2 or more), {1} the seconds they take off ("2.5").
-#: ui/tab.slint:1202
+#: ui/tab.slint:1214
 msgid "{0} transitions −{1} s"
 msgstr "{0} transiciones −{1} s"
 
-#: ui/tab.slint:1222
+#: ui/tab.slint:1234
 msgid "Export Merged"
 msgstr "Exportar unido"
 
-#: ui/tab.slint:1227
+#: ui/tab.slint:1239
 msgid "Export the parts as one file into the clip folder"
 msgstr "Exportar las partes como un archivo a la carpeta de clips"
 
-#: ui/tab.slint:1233 ui/tab.slint:1784
+#: ui/tab.slint:1245 ui/tab.slint:1796
 msgid "Export As…"
 msgstr "Exportar como…"
 
-#: ui/tab.slint:1235
+#: ui/tab.slint:1247
 msgid "Export the parts as one file you choose"
 msgstr "Exportar las partes como un archivo que elijas"
 
-#: ui/tab.slint:1264
+#: ui/tab.slint:1276
 msgid "Fast cut copies the streams: lossless and done in seconds, but a clip can only start on a keyframe."
 msgstr "El corte rápido copia los flujos: sin pérdida y en segundos, pero un clip solo puede empezar en un fotograma clave."
 
 #. {0} and {2} are times, {1} seconds.
-#: ui/tab.slint:1268
+#: ui/tab.slint:1280
 msgid "It will start at {0}, {1} s before your start, and end at {2}."
 msgstr "Empezará en {0}, {1} s antes de su inicio, y terminará en {2}."
 
 #. {0} and {1} are times.
-#: ui/tab.slint:1270
+#: ui/tab.slint:1282
 msgid "It will start at {0} and end at {1}."
 msgstr "Empezará en {0} y terminará en {1}."
 
-#: ui/tab.slint:1271
+#: ui/tab.slint:1283
 msgid "It starts on the keyframe at or before your start."
 msgstr "Empieza en el fotograma clave de su inicio o anterior."
 
-#: ui/tab.slint:1272
+#: ui/tab.slint:1284
 msgid "Its streams do not fit in MP4, so it is saved as MKV."
 msgstr "Sus flujos no caben en MP4, así que se guarda como MKV."
 
-#: ui/tab.slint:1273
+#: ui/tab.slint:1285
 msgid "Pick Precise to start on the exact frame."
 msgstr "Elija Preciso para empezar en el fotograma exacto."
 
-#: ui/tab.slint:1274
+#: ui/tab.slint:1286
 msgid "Precise re-encodes from the exact frame, and can include video effects and subtitles."
 msgstr "Preciso recodifica desde el fotograma exacto y puede incluir efectos de vídeo y subtítulos."
 
 #. {0} and {1} are times.
-#: ui/tab.slint:1276
+#: ui/tab.slint:1288
 msgid "Precise re-encodes from the exact frame {0} to {1}, and can include video effects and subtitles."
 msgstr "Preciso recodifica desde el fotograma exacto {0} hasta {1} y puede incluir efectos de vídeo y subtítulos."
 
 #. {0} seconds of media, {1} megabytes ("46" or "55–80"), {2} a time span ("2 s", "about 1–3 min").
-#: ui/tab.slint:1281
+#: ui/tab.slint:1293
 msgid "Length {0} s · ≈ {1} MB · ≈ {2}"
 msgstr "Duración {0} s · ≈ {1} MB · ≈ {2}"
 
 #. {0} seconds of media, {1} a time span ("2 s", "about 1–3 min").
-#: ui/tab.slint:1283
+#: ui/tab.slint:1295
 msgid "Length {0} s · ≈ {1}"
 msgstr "Duración {0} s · ≈ {1}"
 
 #. {0} is a part number; {1} and {2} are what differs (a size, a codec, a frame rate) in that part and in part 1.
-#: ui/tab.slint:1294
+#: ui/tab.slint:1306
 msgid "Fast: part {0} is {1}, part 1 is {2}"
 msgstr "Rápido: la parte {0} es {1}, la parte 1 es {2}"
 
-#: ui/tab.slint:1300
+#: ui/tab.slint:1312
 msgid "Switched to Precise: transitions need re-encoding."
 msgstr "Cambiado a Preciso: las transiciones necesitan recodificar."
 
-#: ui/tab.slint:1301
+#: ui/tab.slint:1313
 msgid "Transitions: Precise only. Fast joins with cuts."
 msgstr "Transiciones: solo Preciso. Rápido une con cortes."
 
-#: ui/tab.slint:1304
+#: ui/tab.slint:1316
 msgid "Fast copies the streams: only when every part has the same codecs, size, frame rate and audio."
 msgstr "Rápido copia las pistas: solo cuando todas las partes tienen los mismos códecs, tamaño, fotogramas por segundo y audio."
 
 #. {0} is a size in pixels (3840×1714), {1} frames per second.
-#: ui/tab.slint:1308
+#: ui/tab.slint:1320
 msgid "Precise re-encodes every part to {0} · {1} fps like part 1: other sizes get black bars, audio is resampled to 48 kHz stereo. Quality: the Clip page's Advanced."
 msgstr "Preciso recodifica cada parte a {0} · {1} fps como la parte 1: otros tamaños llevan bandas negras y el audio se convierte a 48 kHz estéreo. Calidad: Avanzado en la página Clip."
 
-#: ui/tab.slint:1309
+#: ui/tab.slint:1321
 msgid "Precise re-encodes every part to the first part's size and frame rate: other sizes get black bars, audio is resampled to 48 kHz stereo. Quality: the Clip page's Advanced."
 msgstr "Preciso recodifica cada parte al tamaño y los fotogramas por segundo de la primera: otros tamaños llevan bandas negras y el audio se convierte a 48 kHz estéreo. Calidad: Avanzado en la página Clip."
 
 #. {0} and {1} are part numbers: the transition from part 1 into part 2.
-#: ui/tab.slint:1396
+#: ui/tab.slint:1408
 msgid "Transition {0} → {1}"
 msgstr "Transición {0} → {1}"
 
 #. the Escape key as printed on keyboards (closes the picker).
-#: ui/tab.slint:1398
+#: ui/tab.slint:1410
 msgid "Esc"
 msgstr "Esc"
 
-#: ui/tab.slint:1415
+#: ui/tab.slint:1427
 msgid "Direction"
 msgstr "Dirección"
 
-#: ui/tab.slint:1424
+#: ui/tab.slint:1436
 msgid "Duration"
 msgstr "Duración"
 
 #. {} is the longest transition at this junction in seconds ("8.2").
-#: ui/tab.slint:1442
+#: ui/tab.slint:1454
 msgid "Up to {} s here (half of the shorter part)"
 msgstr "Hasta {} s aquí (la mitad de la parte más corta)"
 
-#: ui/tab.slint:1447
+#: ui/tab.slint:1459
 msgid "Apply to All"
 msgstr "Aplicar a todas"
 
-#: ui/tab.slint:1448
+#: ui/tab.slint:1460
 msgid "Use for every join and for new parts"
 msgstr "Usar en todas las uniones y en las partes nuevas"
 
 #. {} is the number of junctions (places between two parts).
-#: ui/tab.slint:1453
+#: ui/tab.slint:1465
 msgid "1 join"
 msgstr "1 unión"
 
 #. {} is the number of junctions (places between two parts).
-#: ui/tab.slint:1453
+#: ui/tab.slint:1465
 msgid "{} joins"
 msgstr "{} uniones"
 
-#: ui/tab.slint:1468
+#: ui/tab.slint:1480
 msgid "Results ({})"
 msgstr "Resultados ({})"
 
-#: ui/tab.slint:1468
+#: ui/tab.slint:1480
 msgid "Results"
 msgstr "Resultados"
 
-#: ui/tab.slint:1468
+#: ui/tab.slint:1480
 msgid "Settings"
 msgstr "Ajustes"
 
-#: ui/tab.slint:1478
+#: ui/tab.slint:1490
 msgid "Show or hide this tab"
 msgstr "Mostrar u ocultar esta pestaña"
 
-#: ui/tab.slint:1539
+#: ui/tab.slint:1551
 msgid "Advanced"
 msgstr "Avanzado"
 
-#: ui/tab.slint:1543 ui/tab.slint:1564
+#: ui/tab.slint:1555 ui/tab.slint:1576
 msgid "Same as source (stream copy)"
 msgstr "Igual que el origen (copia de flujos)"
 
-#: ui/tab.slint:1554 ui/tab.slint:1617
+#: ui/tab.slint:1566 ui/tab.slint:1629
 msgid "Audio"
 msgstr "Audio"
 
-#: ui/tab.slint:1563
+#: ui/tab.slint:1575
 msgid "Quality"
 msgstr "Calidad"
 
-#: ui/tab.slint:1572
+#: ui/tab.slint:1584
 msgid "High quality (H.264 + AAC in MP4)"
 msgstr "Alta calidad (H.264 + AAC en MP4)"
 
-#: ui/tab.slint:1578
+#: ui/tab.slint:1590
 msgid "Resolution"
 msgstr "Resolución"
 
-#: ui/tab.slint:1580 ui/tab.slint:1590
+#: ui/tab.slint:1592 ui/tab.slint:1602
 msgid "Source"
 msgstr "Origen"
 
-#: ui/tab.slint:1587
+#: ui/tab.slint:1599
 msgid "Frame rate"
 msgstr "Fotogramas por segundo"
 
-#: ui/tab.slint:1597
+#: ui/tab.slint:1609
 msgid "Source bitrate"
 msgstr "Tasa de bits del origen"
 
-#: ui/tab.slint:1597
+#: ui/tab.slint:1609
 msgid "Quality number {}"
 msgstr "Número de calidad {}"
 
-#: ui/tab.slint:1608
+#: ui/tab.slint:1620
 msgid "Speed"
 msgstr "Velocidad"
 
-#: ui/tab.slint:1610
+#: ui/tab.slint:1622
 msgid "Faster"
 msgstr "Más rápido"
 
-#: ui/tab.slint:1610
+#: ui/tab.slint:1622
 msgid "Balanced"
 msgstr "Equilibrado"
 
-#: ui/tab.slint:1610
+#: ui/tab.slint:1622
 msgid "Smaller"
 msgstr "Más pequeño"
 
-#: ui/tab.slint:1620
+#: ui/tab.slint:1632
 msgid "AAC {} kb/s"
 msgstr "AAC {} kb/s"
 
-#: ui/tab.slint:1629
+#: ui/tab.slint:1641
 msgid "Reset"
 msgstr "Restablecer"
 
-#: ui/tab.slint:1635
+#: ui/tab.slint:1647
 msgid "Include video effects"
 msgstr "Incluir efectos de video"
 
-#: ui/tab.slint:1641
+#: ui/tab.slint:1653
 msgid "Burn in subtitles"
 msgstr "Incrustar subtítulos"
 
-#: ui/tab.slint:1646
+#: ui/tab.slint:1658
 msgid "Effects and subtitles: Precise only"
 msgstr "Efectos y subtítulos: solo Preciso"
 
-#: ui/tab.slint:1651
+#: ui/tab.slint:1663
 msgid "Range"
 msgstr "Intervalo"
 
-#: ui/tab.slint:1669
+#: ui/tab.slint:1681
 msgid "This picture is made by a plugin"
 msgstr "Esta imagen la genera un complemento"
 
-#: ui/tab.slint:1674
+#: ui/tab.slint:1686
 msgid "There is no file to cut."
 msgstr "No hay ningún archivo que cortar."
 
-#: ui/tab.slint:1675
+#: ui/tab.slint:1687
 msgid "Open a local file to cut clips."
 msgstr "Abre un archivo local para cortar clips."
 
-#: ui/tab.slint:1676
+#: ui/tab.slint:1688
 msgid "Open a local video file to cut clips."
 msgstr "Abre un archivo de vídeo local para cortar clips."
 
-#: ui/tab.slint:1690
+#: ui/tab.slint:1702
 msgid "Start"
 msgstr "Inicio"
 
-#: ui/tab.slint:1700 ui/tab.slint:1720
+#: ui/tab.slint:1712 ui/tab.slint:1732
 msgid "Now"
 msgstr "Ahora"
 
-#: ui/tab.slint:1711
+#: ui/tab.slint:1723
 msgid "End"
 msgstr "Fin"
 
-#: ui/tab.slint:1741
+#: ui/tab.slint:1753
 msgid "Use A-B range"
 msgstr "Usar el intervalo A-B"
 
-#: ui/tab.slint:1744
+#: ui/tab.slint:1756
 msgid "Copy the A-B loop into Start and End"
 msgstr "Copiar el bucle A-B en Inicio y Final"
 
 #. {0} and {1} are the A and B times of the loop.
-#: ui/tab.slint:1746
+#: ui/tab.slint:1758
 msgid "A {0} · B {1}"
 msgstr "A {0} · B {1}"
 
 #. {} is 10, 30, 60 or 120.
-#: ui/tab.slint:1752
+#: ui/tab.slint:1764
 msgid "Last {} s"
 msgstr "Últimos {} s"
 
-#: ui/tab.slint:1777
+#: ui/tab.slint:1789
 msgid "Export as {} into the clip folder"
 msgstr "Exportar como {} a la carpeta de clips"
 
-#: ui/tab.slint:1778
+#: ui/tab.slint:1790
 msgid "Export the range into the clip folder"
 msgstr "Exportar el intervalo a la carpeta de clips"
 
-#: ui/tab.slint:1786
+#: ui/tab.slint:1798
 msgid "Export the range into a file you choose"
 msgstr "Exportar el intervalo a un archivo que elija"
 
-#: ui/tab.slint:1799
+#: ui/tab.slint:1811
 msgid "Use Precise"
 msgstr "Usar Preciso"
 
-#: ui/tab.slint:1813 ui/tab.slint:1970
+#: ui/tab.slint:1825 ui/tab.slint:1982
 msgid "Collection"
 msgstr "Colección"
 
-#: ui/tab.slint:1826
+#: ui/tab.slint:1838
 msgid "Add"
 msgstr "Añadir"
 
 #. {} is the number the new part gets in the Collection.
-#: ui/tab.slint:1832
+#: ui/tab.slint:1844
 msgid "as part {}"
 msgstr "como parte {}"
 
-#: ui/tab.slint:1840
+#: ui/tab.slint:1852
 msgid "Clear"
 msgstr "Vaciar"
 
-#: ui/tab.slint:1854
+#: ui/tab.slint:1866
 msgid "Join ranges from any local videos into one file:"
-msgstr "Une intervalos de cualquier vídeo local en un archivo:"
+msgstr "Une intervalos de vídeos locales en un archivo:"
 
-#: ui/tab.slint:1855
+#: ui/tab.slint:1867
 msgid "set a range above, then + Add."
 msgstr "marca un intervalo arriba y pulsa + Añadir."
 
-#: ui/tab.slint:1923
+#: ui/tab.slint:1935
 msgid "No clips yet."
 msgstr "Todavía no hay clips."
 
-#: ui/tab.slint:1933
+#: ui/tab.slint:1945
 msgid "Clear Finished"
 msgstr "Borrar terminados"
 
-#: ui/tab.slint:1950
+#: ui/tab.slint:1962
 msgid "Save to"
 msgstr "Guardar en"
 
-#: ui/tab.slint:1957
+#: ui/tab.slint:1969
 msgid "Save to the media folder when possible"
 msgstr "Guardar en la carpeta del medio cuando sea posible"
 
-#: ui/tab.slint:1962
+#: ui/tab.slint:1974
 msgid "File name"
 msgstr "Nombre de archivo"
 
-#: ui/tab.slint:1979
+#: ui/tab.slint:1991
 msgid "Click a variable to add it to the file name. Existing files are never overwritten: a number is added."
 msgstr "Haz clic en una variable para añadirla al nombre de archivo. Los archivos existentes nunca se sobrescriben: se añade un número."
 
-#: ui/tab.slint:1999
+#: ui/tab.slint:2011
 msgid "Last N s"
 msgstr "Últimos N s"
 
-#: ui/tab.slint:2002
+#: ui/tab.slint:2014
 msgid "Last clip length"
 msgstr "Duración de «Últimos N s»"

@@ -312,14 +312,34 @@ test("a transition picked in Fast switches the method to Precise and says so; a 
     host.mounted().emit("set-transition", a, "crossfade", "left", "");
     await eventually(() => [rows(host)[0]!.kind, method(), tab(host)["collection-method-index"], info().switched, info().off], ["crossfade", 1, 1, true, false]);
     assert.deepEqual([picker().shown, picker().kind], [true, "crossfade"]);
+    // Back to Cut: nothing needs Precise any more, so the line goes (the method stays as it is); it does not come back
+    // by itself when a transition is picked again in Precise (nothing is switched then).
+    host.mounted().emit("set-transition", a, "cut", "left", "");
+    await eventually(() => [rows(host)[0]!.kind, method(), info().switched], ["cut", 1, false]);
+    host.mounted().emit("set-transition", a, "crossfade", "left", "");
+    await eventually(() => rows(host)[0]!.kind, "crossfade");
+    await host.settle();
+    assert.equal(info().switched, false, "picked in Precise: no switch to speak of");
+    // In Fast again, a transition switches and says so once more.
+    host.mounted().emit("set-method", 0);
+    host.mounted().emit("set-transition", a, "wipe", "left", "");
+    await eventually(() => [rows(host)[0]!.kind, method(), info().switched], ["wipe", 1, true]);
     // The user's own pick of a method takes the line away (and Fast greys the transition again).
     host.mounted().emit("set-method", 0);
     await eventually(() => [method(), info().switched, info().off, rows(host)[0]!.off], [0, false, true, true]);
     // Apply to All of a transition in Fast: Precise as well.
     host.mounted().emit("open-join", a);
     host.mounted().emit("apply-all", a);
-    await eventually(() => [method(), info().switched, rows(host)[1]!.kind], [1, true, "crossfade"]);
+    await eventually(() => [method(), info().switched, rows(host)[0]!.kind, rows(host)[1]!.kind], [1, true, "wipe", "wipe"]);
+    // Undo of Apply to All, then the last transition back to Cut: the line goes with it.
+    await host.command("clip.collectionUndoApply").run();
+    await eventually(() => [rows(host)[0]!.kind, rows(host)[1]!.kind, info().switched], ["wipe", "cut", true], "one transition left: still Precise because of it");
+    host.mounted().emit("set-transition", a, "cut", "left", "");
+    await eventually(() => [rows(host)[0]!.kind, info().switched], ["cut", false]);
     // Clear takes the line away with the parts.
+    host.mounted().emit("set-method", 0);
+    host.mounted().emit("set-transition", a, "slide", "left", "");
+    await eventually(() => info().switched, true);
     host.mounted().emit("clear-parts");
     await eventually(() => [(tab(host)["collection-info"] as { count: number }).count, info().switched], [0, false]);
     void b;

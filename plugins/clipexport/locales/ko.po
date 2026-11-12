@@ -173,7 +173,7 @@ msgstr "비운 파트를 되돌릴 자리가 없습니다: 컬렉션은 최대 1
 msgid "Export failed: {}"
 msgstr "내보내기 실패: {}"
 
-#: main.ts:176 ui/tab.slint:1468 ui/tab.slint:1964
+#: main.ts:176 ui/tab.slint:1480 ui/tab.slint:1976
 msgid "Clip"
 msgstr "클립"
 
@@ -197,7 +197,7 @@ msgstr "기존 폴더를 선택하세요."
 msgid "Clip folder: {}"
 msgstr "클립 폴더: {}"
 
-#: main.ts:477 ui/tab.slint:1770
+#: main.ts:477 ui/tab.slint:1782
 msgid "Export Clip"
 msgstr "클립 내보내기"
 
@@ -213,7 +213,7 @@ msgstr "파트 {}(으)로 추가했습니다"
 msgid "Collection cleared."
 msgstr "컬렉션을 비웠습니다."
 
-#: main.ts:823 main.ts:1026
+#: main.ts:823 main.ts:1029
 msgid "Undo"
 msgstr "실행 취소"
 
@@ -242,104 +242,104 @@ msgstr "파트 {}에 영상이 없습니다: 제거하세요"
 msgid "Part {} is outside its file: remove it"
 msgstr "파트 {}이(가) 파일 범위를 벗어났습니다: 제거하세요"
 
-#: main.ts:893 main.ts:1447
+#: main.ts:893 main.ts:1450
 msgid "Export Collection"
 msgstr "컬렉션 내보내기"
 
-#: main.ts:1026
+#: main.ts:1029
 msgid "Transition applied to every join."
 msgstr "모든 연결 부분에 전환 효과를 적용했습니다."
 
-#: main.ts:1063 manifest.json
+#: main.ts:1066 manifest.json
 msgid "Clip Export"
 msgstr "클립 내보내기"
 
-#: main.ts:1213 main.ts:1477
+#: main.ts:1216 main.ts:1480
 msgid "The Clip Export tab could not open."
 msgstr "‘클립 내보내기’ 탭을 열 수 없습니다."
 
-#: main.ts:1446
+#: main.ts:1449
 msgid "Export Clip…"
 msgstr "클립 내보내기…"
 
-#: main.ts:1446 main.ts:1447 main.ts:1537
+#: main.ts:1449 main.ts:1450 main.ts:1540
 msgid "Export"
 msgstr "내보내기"
 
-#: main.ts:1446 main.ts:1447 main.ts:1542 ui/tab.slint:1670
+#: main.ts:1449 main.ts:1450 main.ts:1545 ui/tab.slint:1682
 msgid "Nothing to export"
 msgstr "내보낼 것이 없습니다"
 
-#: main.ts:1447
+#: main.ts:1450
 msgid "Clip Export Tab"
 msgstr "‘클립 내보내기’ 탭"
 
-#: main.ts:1447
+#: main.ts:1450
 msgid "Export Clip Range"
 msgstr "클립 구간 내보내기"
 
-#: main.ts:1447 ui/tab.slint:1704
+#: main.ts:1450 ui/tab.slint:1716
 msgid "Set Clip Start"
 msgstr "클립 시작 설정"
 
-#: main.ts:1447 ui/tab.slint:1724
+#: main.ts:1450 ui/tab.slint:1736
 msgid "Set Clip End"
 msgstr "클립 끝 설정"
 
-#: main.ts:1447
+#: main.ts:1450
 msgid "Export Tasks…"
 msgstr "내보내기 작업…"
 
-#: main.ts:1447
+#: main.ts:1450
 msgid "Clip Export Settings…"
 msgstr "클립 내보내기 설정…"
 
-#: main.ts:1447
+#: main.ts:1450
 msgid "Clip Folder…"
 msgstr "클립 폴더…"
 
-#: main.ts:1447 ui/tab.slint:1931
+#: main.ts:1450 ui/tab.slint:1943
 msgid "Open Clip Folder"
 msgstr "클립 폴더 열기"
 
-#: main.ts:1447
+#: main.ts:1450
 msgid "Show Last Clip in Folder"
 msgstr "최근 클립을 폴더에서 보기"
 
-#: main.ts:1447 ui/tab.slint:1829
+#: main.ts:1450 ui/tab.slint:1841
 msgid "Add Range to Collection"
 msgstr "구간을 컬렉션에 추가"
 
-#: main.ts:1447
+#: main.ts:1450
 msgid "Show Collection"
 msgstr "컬렉션 보기"
 
-#: main.ts:1447
+#: main.ts:1450
 msgid "Clear Collection"
 msgstr "컬렉션 비우기"
 
-#: main.ts:1447
+#: main.ts:1450
 msgid "Undo Clear Collection"
 msgstr "컬렉션 비우기 실행 취소"
 
-#: main.ts:1447 ui/tab.slint:1015
+#: main.ts:1450 ui/tab.slint:1015
 msgid "Remove from Collection"
 msgstr "컬렉션에서 제거"
 
-#: main.ts:1447
+#: main.ts:1450
 msgid "Undo Apply to All"
 msgstr "모두 적용 실행 취소"
 
-#: main.ts:1500
+#: main.ts:1503
 msgid "Clip start: {}"
 msgstr "클립 시작: {}"
 
-#: main.ts:1505
+#: main.ts:1508
 msgid "Clip end: {}"
 msgstr "클립 끝: {}"
 
 #. {} is 10, 30, 60 or 120.
-#: main.ts:1536 ui/tab.slint:1758
+#: main.ts:1539 ui/tab.slint:1770
 msgid "Export Last {} Seconds"
 msgstr "마지막 {}초 내보내기"
 
@@ -394,7 +394,7 @@ msgid "none"
 msgstr "없음"
 
 #. {} is frames per second.
-#: ui/parts.slint:88 ui/tab.slint:1590
+#: ui/parts.slint:88 ui/tab.slint:1602
 msgid "{} fps"
 msgstr "{}fps"
 
@@ -514,19 +514,19 @@ msgstr "빠르게"
 msgid "Precise"
 msgstr "정확하게"
 
-#: ui/parts.slint:166 ui/tab.slint:1567 ui/tab.slint:1568
+#: ui/parts.slint:166 ui/tab.slint:1579 ui/tab.slint:1580
 msgid "Same as source"
 msgstr "원본과 동일"
 
-#: ui/parts.slint:167 ui/tab.slint:1543 ui/tab.slint:1567 ui/tab.slint:1568
+#: ui/parts.slint:167 ui/tab.slint:1555 ui/tab.slint:1579 ui/tab.slint:1580
 msgid "High quality"
 msgstr "고화질"
 
-#: ui/parts.slint:168 ui/tab.slint:1567 ui/tab.slint:1568
+#: ui/parts.slint:168 ui/tab.slint:1579 ui/tab.slint:1580
 msgid "Small file"
 msgstr "작은 파일"
 
-#: ui/parts.slint:169 ui/tab.slint:1567
+#: ui/parts.slint:169 ui/tab.slint:1579
 msgid "Custom"
 msgstr "사용자 지정"
 
@@ -552,7 +552,7 @@ msgstr "{}일 전"
 #. {} is a number of seconds.
 #. {} is a clip's length in seconds ("3.5").
 #. {} is a length in seconds ("1.0").
-#: ui/parts.slint:188 ui/tab.slint:706 ui/tab.slint:985 ui/tab.slint:1077 ui/tab.slint:1425 ui/tab.slint:1426 ui/tab.slint:1427 ui/tab.slint:1428 ui/tab.slint:1654 ui/tab.slint:2005
+#: ui/parts.slint:188 ui/tab.slint:706 ui/tab.slint:985 ui/tab.slint:1077 ui/tab.slint:1437 ui/tab.slint:1438 ui/tab.slint:1439 ui/tab.slint:1440 ui/tab.slint:1666 ui/tab.slint:2017
 msgid "{} s"
 msgstr "{}초"
 
@@ -610,7 +610,7 @@ msgstr "내보내는 중 · {}%"
 
 #. {0} is a task state (Exporting), {1} the time spent (0:12).
 #. what the closed Advanced rows hold now: an audio choice and a quality.
-#: ui/tab.slint:741 ui/tab.slint:1542
+#: ui/tab.slint:741 ui/tab.slint:1554
 msgid "{0} · {1}"
 msgstr "{0} · {1}"
 
@@ -681,369 +681,369 @@ msgstr "{0} · {1}초"
 msgid "Part {0} → {1}. Click to change."
 msgstr "파트 {0} → {1}. 클릭해서 바꾸기."
 
-#. {} is the Collection's total length ("1:02.2").
-#: ui/tab.slint:1191
-msgid "1 part · {}"
-msgstr "파트 1개 · {}"
+#. {} is a number of parts (2 or more).
+#: ui/tab.slint:1192
+msgid "1 part"
+msgstr "1개 부분"
 
-#. {0} is a number of parts (2 or more), {1} their total length ("1:02.2").
-#: ui/tab.slint:1193
-msgid "{0} parts · {1}"
-msgstr "파트 {0}개 · {1}"
+#. {} is a number of parts (2 or more).
+#: ui/tab.slint:1192
+msgid "{} parts"
+msgstr "{}개 부분"
 
-#: ui/tab.slint:1198
+#: ui/tab.slint:1210
 msgid "transitions off in Fast"
 msgstr "빠르게에서는 전환 효과 없음"
 
 #. {} is the seconds the transition takes off the length ("1.0").
-#: ui/tab.slint:1200
+#: ui/tab.slint:1212
 msgid "1 transition −{} s"
 msgstr "전환 1개 −{}초"
 
 #. {0} is a number of transitions (2 or more), {1} the seconds they take off ("2.5").
-#: ui/tab.slint:1202
+#: ui/tab.slint:1214
 msgid "{0} transitions −{1} s"
 msgstr "전환 {0}개 −{1}초"
 
-#: ui/tab.slint:1222
+#: ui/tab.slint:1234
 msgid "Export Merged"
 msgstr "합쳐서 내보내기"
 
-#: ui/tab.slint:1227
+#: ui/tab.slint:1239
 msgid "Export the parts as one file into the clip folder"
 msgstr "파트를 파일 하나로 합쳐 클립 폴더로 내보내기"
 
-#: ui/tab.slint:1233 ui/tab.slint:1784
+#: ui/tab.slint:1245 ui/tab.slint:1796
 msgid "Export As…"
 msgstr "다른 이름으로 내보내기…"
 
-#: ui/tab.slint:1235
+#: ui/tab.slint:1247
 msgid "Export the parts as one file you choose"
 msgstr "파트를 파일 하나로 합쳐 원하는 곳으로 내보내기"
 
-#: ui/tab.slint:1264
+#: ui/tab.slint:1276
 msgid "Fast cut copies the streams: lossless and done in seconds, but a clip can only start on a keyframe."
 msgstr "빠른 자르기는 스트림을 복사합니다. 무손실이고 몇 초면 끝나지만, 클립은 키프레임에서만 시작할 수 있습니다."
 
 #. {0} and {2} are times, {1} seconds.
-#: ui/tab.slint:1268
+#: ui/tab.slint:1280
 msgid "It will start at {0}, {1} s before your start, and end at {2}."
 msgstr "{0}에서 시작하고(지정한 시작보다 {1}초 앞) {2}에서 끝납니다."
 
 #. {0} and {1} are times.
-#: ui/tab.slint:1270
+#: ui/tab.slint:1282
 msgid "It will start at {0} and end at {1}."
 msgstr "{0}에서 시작하고 {1}에서 끝납니다."
 
-#: ui/tab.slint:1271
+#: ui/tab.slint:1283
 msgid "It starts on the keyframe at or before your start."
 msgstr "지정한 시작 위치나 그 앞의 키프레임에서 시작합니다."
 
-#: ui/tab.slint:1272
+#: ui/tab.slint:1284
 msgid "Its streams do not fit in MP4, so it is saved as MKV."
 msgstr "스트림이 MP4에 맞지 않아 MKV로 저장합니다."
 
-#: ui/tab.slint:1273
+#: ui/tab.slint:1285
 msgid "Pick Precise to start on the exact frame."
 msgstr "정확한 프레임에서 시작하려면 ‘정확하게’를 고르세요."
 
-#: ui/tab.slint:1274
+#: ui/tab.slint:1286
 msgid "Precise re-encodes from the exact frame, and can include video effects and subtitles."
 msgstr "‘정확하게’는 정확한 프레임부터 재인코딩하며 비디오 효과와 자막을 포함할 수 있습니다."
 
 #. {0} and {1} are times.
-#: ui/tab.slint:1276
+#: ui/tab.slint:1288
 msgid "Precise re-encodes from the exact frame {0} to {1}, and can include video effects and subtitles."
 msgstr "‘정확하게’는 {0} 프레임부터 {1}까지 재인코딩하며 비디오 효과와 자막을 포함할 수 있습니다."
 
 #. {0} seconds of media, {1} megabytes ("46" or "55–80"), {2} a time span ("2 s", "about 1–3 min").
-#: ui/tab.slint:1281
+#: ui/tab.slint:1293
 msgid "Length {0} s · ≈ {1} MB · ≈ {2}"
 msgstr "길이 {0}초 · 약 {1}MB · 약 {2}"
 
 #. {0} seconds of media, {1} a time span ("2 s", "about 1–3 min").
-#: ui/tab.slint:1283
+#: ui/tab.slint:1295
 msgid "Length {0} s · ≈ {1}"
 msgstr "길이 {0}초 · 약 {1}"
 
 #. {0} is a part number; {1} and {2} are what differs (a size, a codec, a frame rate) in that part and in part 1.
-#: ui/tab.slint:1294
+#: ui/tab.slint:1306
 msgid "Fast: part {0} is {1}, part 1 is {2}"
 msgstr "빠르게: 파트 {0}은(는) {1}, 파트 1은 {2}"
 
-#: ui/tab.slint:1300
+#: ui/tab.slint:1312
 msgid "Switched to Precise: transitions need re-encoding."
 msgstr "정확하게로 바꿨습니다: 전환 효과는 다시 인코딩해야 합니다."
 
-#: ui/tab.slint:1301
+#: ui/tab.slint:1313
 msgid "Transitions: Precise only. Fast joins with cuts."
 msgstr "전환 효과: 정확하게만. 빠르게는 컷으로 이어 붙입니다."
 
-#: ui/tab.slint:1304
+#: ui/tab.slint:1316
 msgid "Fast copies the streams: only when every part has the same codecs, size, frame rate and audio."
 msgstr "빠르게는 스트림을 복사합니다: 모든 파트의 코덱, 크기, 프레임 속도, 오디오가 같을 때만 쓸 수 있습니다."
 
 #. {0} is a size in pixels (3840×1714), {1} frames per second.
-#: ui/tab.slint:1308
+#: ui/tab.slint:1320
 msgid "Precise re-encodes every part to {0} · {1} fps like part 1: other sizes get black bars, audio is resampled to 48 kHz stereo. Quality: the Clip page's Advanced."
 msgstr "정확하게는 모든 파트를 파트 1과 같은 {0} · {1} fps로 재인코딩합니다: 크기가 다르면 검은 띠가 생기고, 오디오는 48 kHz 스테레오로 변환됩니다. 품질: 클립 페이지의 고급."
 
-#: ui/tab.slint:1309
+#: ui/tab.slint:1321
 msgid "Precise re-encodes every part to the first part's size and frame rate: other sizes get black bars, audio is resampled to 48 kHz stereo. Quality: the Clip page's Advanced."
 msgstr "정확하게는 모든 파트를 첫 파트의 크기와 프레임 속도로 재인코딩합니다: 크기가 다르면 검은 띠가 생기고, 오디오는 48 kHz 스테레오로 변환됩니다. 품질: 클립 페이지의 고급."
 
 #. {0} and {1} are part numbers: the transition from part 1 into part 2.
-#: ui/tab.slint:1396
+#: ui/tab.slint:1408
 msgid "Transition {0} → {1}"
 msgstr "전환 {0} → {1}"
 
 #. the Escape key as printed on keyboards (closes the picker).
-#: ui/tab.slint:1398
+#: ui/tab.slint:1410
 msgid "Esc"
 msgstr "Esc"
 
-#: ui/tab.slint:1415
+#: ui/tab.slint:1427
 msgid "Direction"
 msgstr "방향"
 
-#: ui/tab.slint:1424
+#: ui/tab.slint:1436
 msgid "Duration"
 msgstr "길이"
 
 #. {} is the longest transition at this junction in seconds ("8.2").
-#: ui/tab.slint:1442
+#: ui/tab.slint:1454
 msgid "Up to {} s here (half of the shorter part)"
 msgstr "여기서는 최대 {}초 (짧은 파트의 절반)"
 
-#: ui/tab.slint:1447
+#: ui/tab.slint:1459
 msgid "Apply to All"
 msgstr "모두 적용"
 
-#: ui/tab.slint:1448
+#: ui/tab.slint:1460
 msgid "Use for every join and for new parts"
 msgstr "모든 연결 부분과 새 파트에 사용"
 
 #. {} is the number of junctions (places between two parts).
-#: ui/tab.slint:1453
+#: ui/tab.slint:1465
 msgid "1 join"
 msgstr "연결 1곳"
 
 #. {} is the number of junctions (places between two parts).
-#: ui/tab.slint:1453
+#: ui/tab.slint:1465
 msgid "{} joins"
 msgstr "연결 {}곳"
 
-#: ui/tab.slint:1468
+#: ui/tab.slint:1480
 msgid "Results ({})"
 msgstr "결과({})"
 
-#: ui/tab.slint:1468
+#: ui/tab.slint:1480
 msgid "Results"
 msgstr "결과"
 
-#: ui/tab.slint:1468
+#: ui/tab.slint:1480
 msgid "Settings"
 msgstr "설정"
 
-#: ui/tab.slint:1478
+#: ui/tab.slint:1490
 msgid "Show or hide this tab"
 msgstr "이 탭 표시/숨기기"
 
-#: ui/tab.slint:1539
+#: ui/tab.slint:1551
 msgid "Advanced"
 msgstr "고급"
 
-#: ui/tab.slint:1543 ui/tab.slint:1564
+#: ui/tab.slint:1555 ui/tab.slint:1576
 msgid "Same as source (stream copy)"
 msgstr "원본과 동일(스트림 복사)"
 
-#: ui/tab.slint:1554 ui/tab.slint:1617
+#: ui/tab.slint:1566 ui/tab.slint:1629
 msgid "Audio"
 msgstr "오디오"
 
-#: ui/tab.slint:1563
+#: ui/tab.slint:1575
 msgid "Quality"
 msgstr "화질"
 
-#: ui/tab.slint:1572
+#: ui/tab.slint:1584
 msgid "High quality (H.264 + AAC in MP4)"
 msgstr "고화질(MP4, H.264 + AAC)"
 
-#: ui/tab.slint:1578
+#: ui/tab.slint:1590
 msgid "Resolution"
 msgstr "해상도"
 
-#: ui/tab.slint:1580 ui/tab.slint:1590
+#: ui/tab.slint:1592 ui/tab.slint:1602
 msgid "Source"
 msgstr "원본"
 
-#: ui/tab.slint:1587
+#: ui/tab.slint:1599
 msgid "Frame rate"
 msgstr "프레임 속도"
 
-#: ui/tab.slint:1597
+#: ui/tab.slint:1609
 msgid "Source bitrate"
 msgstr "원본 비트레이트"
 
-#: ui/tab.slint:1597
+#: ui/tab.slint:1609
 msgid "Quality number {}"
 msgstr "품질 값 {}"
 
-#: ui/tab.slint:1608
+#: ui/tab.slint:1620
 msgid "Speed"
 msgstr "속도"
 
-#: ui/tab.slint:1610
+#: ui/tab.slint:1622
 msgid "Faster"
 msgstr "빠르게"
 
-#: ui/tab.slint:1610
+#: ui/tab.slint:1622
 msgid "Balanced"
 msgstr "균형"
 
-#: ui/tab.slint:1610
+#: ui/tab.slint:1622
 msgid "Smaller"
 msgstr "작게"
 
-#: ui/tab.slint:1620
+#: ui/tab.slint:1632
 msgid "AAC {} kb/s"
 msgstr "AAC {}kbps"
 
-#: ui/tab.slint:1629
+#: ui/tab.slint:1641
 msgid "Reset"
 msgstr "초기화"
 
-#: ui/tab.slint:1635
+#: ui/tab.slint:1647
 msgid "Include video effects"
 msgstr "비디오 효과 포함"
 
-#: ui/tab.slint:1641
+#: ui/tab.slint:1653
 msgid "Burn in subtitles"
 msgstr "자막 입히기"
 
-#: ui/tab.slint:1646
+#: ui/tab.slint:1658
 msgid "Effects and subtitles: Precise only"
 msgstr "효과와 자막: ‘정확하게’만"
 
-#: ui/tab.slint:1651
+#: ui/tab.slint:1663
 msgid "Range"
 msgstr "구간"
 
-#: ui/tab.slint:1669
+#: ui/tab.slint:1681
 msgid "This picture is made by a plugin"
 msgstr "이 화면은 플러그인이 만듭니다"
 
-#: ui/tab.slint:1674
+#: ui/tab.slint:1686
 msgid "There is no file to cut."
 msgstr "자를 파일이 없습니다."
 
-#: ui/tab.slint:1675
+#: ui/tab.slint:1687
 msgid "Open a local file to cut clips."
 msgstr "클립을 자르려면 로컬 파일을 여세요."
 
-#: ui/tab.slint:1676
+#: ui/tab.slint:1688
 msgid "Open a local video file to cut clips."
 msgstr "클립을 자르려면 로컬 동영상 파일을 여세요."
 
-#: ui/tab.slint:1690
+#: ui/tab.slint:1702
 msgid "Start"
 msgstr "시작"
 
-#: ui/tab.slint:1700 ui/tab.slint:1720
+#: ui/tab.slint:1712 ui/tab.slint:1732
 msgid "Now"
 msgstr "현재"
 
-#: ui/tab.slint:1711
+#: ui/tab.slint:1723
 msgid "End"
 msgstr "끝"
 
-#: ui/tab.slint:1741
+#: ui/tab.slint:1753
 msgid "Use A-B range"
 msgstr "A-B 구간 사용"
 
-#: ui/tab.slint:1744
+#: ui/tab.slint:1756
 msgid "Copy the A-B loop into Start and End"
 msgstr "A-B 반복을 시작과 끝에 복사"
 
 #. {0} and {1} are the A and B times of the loop.
-#: ui/tab.slint:1746
+#: ui/tab.slint:1758
 msgid "A {0} · B {1}"
 msgstr "A {0} · B {1}"
 
 #. {} is 10, 30, 60 or 120.
-#: ui/tab.slint:1752
+#: ui/tab.slint:1764
 msgid "Last {} s"
 msgstr "마지막 {}초"
 
-#: ui/tab.slint:1777
+#: ui/tab.slint:1789
 msgid "Export as {} into the clip folder"
 msgstr "{}(으)로 클립 폴더에 내보내기"
 
-#: ui/tab.slint:1778
+#: ui/tab.slint:1790
 msgid "Export the range into the clip folder"
 msgstr "구간을 클립 폴더로 내보내기"
 
-#: ui/tab.slint:1786
+#: ui/tab.slint:1798
 msgid "Export the range into a file you choose"
 msgstr "구간을 선택한 파일로 내보내기"
 
-#: ui/tab.slint:1799
+#: ui/tab.slint:1811
 msgid "Use Precise"
 msgstr "‘정확하게’ 사용"
 
-#: ui/tab.slint:1813 ui/tab.slint:1970
+#: ui/tab.slint:1825 ui/tab.slint:1982
 msgid "Collection"
 msgstr "컬렉션"
 
-#: ui/tab.slint:1826
+#: ui/tab.slint:1838
 msgid "Add"
 msgstr "추가"
 
 #. {} is the number the new part gets in the Collection.
-#: ui/tab.slint:1832
+#: ui/tab.slint:1844
 msgid "as part {}"
 msgstr "파트 {}(으)로"
 
-#: ui/tab.slint:1840
+#: ui/tab.slint:1852
 msgid "Clear"
 msgstr "비우기"
 
-#: ui/tab.slint:1854
+#: ui/tab.slint:1866
 msgid "Join ranges from any local videos into one file:"
 msgstr "로컬 동영상의 구간을 한 파일로 이어 붙입니다:"
 
-#: ui/tab.slint:1855
+#: ui/tab.slint:1867
 msgid "set a range above, then + Add."
 msgstr "위에서 구간을 정한 뒤 + 추가."
 
-#: ui/tab.slint:1923
+#: ui/tab.slint:1935
 msgid "No clips yet."
 msgstr "아직 클립이 없습니다."
 
-#: ui/tab.slint:1933
+#: ui/tab.slint:1945
 msgid "Clear Finished"
 msgstr "완료 항목 지우기"
 
-#: ui/tab.slint:1950
+#: ui/tab.slint:1962
 msgid "Save to"
 msgstr "저장 위치"
 
-#: ui/tab.slint:1957
+#: ui/tab.slint:1969
 msgid "Save to the media folder when possible"
 msgstr "가능하면 미디어 폴더에 저장"
 
-#: ui/tab.slint:1962
+#: ui/tab.slint:1974
 msgid "File name"
 msgstr "파일 이름"
 
-#: ui/tab.slint:1979
+#: ui/tab.slint:1991
 msgid "Click a variable to add it to the file name. Existing files are never overwritten: a number is added."
 msgstr "변수를 클릭하면 파일 이름에 추가됩니다. 기존 파일은 덮어쓰지 않고 번호를 붙입니다."
 
-#: ui/tab.slint:1999
+#: ui/tab.slint:2011
 msgid "Last N s"
 msgstr "마지막 N초"
 
-#: ui/tab.slint:2002
+#: ui/tab.slint:2014
 msgid "Last clip length"
 msgstr "‘마지막 N초’ 길이"
