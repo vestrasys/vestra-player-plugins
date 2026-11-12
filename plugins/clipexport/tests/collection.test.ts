@@ -7,7 +7,7 @@ import type { Locale } from "@vestra-player/sdk";
 import { HostError, startPlugin, TestHost } from "@vestra-player/sdk/testing";
 import { exportParts, lengthClock, listKey, moved, partsOf, partStates, partTicks, retryDelay } from "../collection.ts";
 import activate from "../main.ts";
-import { clock, REASON } from "../model.ts";
+import { clock, parseTime, REASON } from "../model.ts";
 import { dateOf } from "../names.ts";
 import { eventually, words } from "./fakes.ts";
 
@@ -725,4 +725,22 @@ test("the time fields fit beside Start and End: not the std LineEdit's 160 px mi
     assert.match(slint, new RegExp(String.raw`text: @tr\("${label}"\);\s*glyph: Glyphs\.target;\s*key: ClipBridge\.keys\.\w+;\s*show-text: root\.marks-labels;\s*show-key: root\.marks-caps;`), label);
   // The fallback without labels fits at the 280 px minimum: two 22 px glyph buttons, the fields, "–", the gaps.
   assert.ok(22 + 22 + 2 * Number(field![1]) + 6 + 12 <= 280 - 16);
+});
+
+test("an unset Start or End shows no time: the fields' hint is no range that could be read as set (Add to Collection stays off until one is)", async () => {
+  const slint = await readFile(new URL("../ui/tab.slint", import.meta.url), "utf8");
+  // Every field bound to the range (the Clip page's two and the Collection page's two), with its hint.
+  const hints = [...slint.matchAll(/placeholder-text: "([^"]*)";[^}]*?text <=> ClipBridge\.clip-(start|end);/g)].map((m) => [m[2], m[1]!] as const);
+  assert.deepEqual(hints.map(([field]) => field), ["start", "end", "start", "end"]);
+  for (const [field, hint] of hints) assert.equal(parseTime(hint), null, `the ${field} field's hint "${hint}" reads as a time`);
+  // Empty fields are no range: nothing to add, and the Add from row says no length.
+  const host = new TestHost();
+  play(host, "/media/one.mp4");
+  const { stop } = await start(host);
+  try {
+    await showCollection(host);
+    await eventually(() => [tab(host)["clip-start"], tab(host)["clip-end"], (tab(host)["add-from"] as { can: boolean; length: string }).length], ["", "", ""]);
+  } finally {
+    await stop();
+  }
 });

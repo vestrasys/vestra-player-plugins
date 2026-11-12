@@ -291,6 +291,58 @@ test("Fast with matching files: the transitions are kept but greyed, the export 
   }
 });
 
+test("a chip opens the picker exactly when it is clickable: every junction, Cut or not, in Fast and in Precise", async () => {
+  // A chip that is clickable (not `off`) shows the picker at once; one the plugin then refuses read "Transition 0 → 0" and ignored every pick.
+  const host = new TestHost();
+  play(host, "/media/one.mp4");
+  const { stop } = await start(host);
+  try {
+    await add(host, "0", "4");
+    await add(host, "10", "14");
+    await add(host, "20", "24");
+    const [a, b] = rows(host).map((r) => r.id);
+    const method = () => tab(host)["collection-method-index"];
+    const picker = () => tab(host).picker as { shown: boolean; id: string; from: number; to: number };
+    async function opens(id: string) {
+      host.mounted().emit("close-join");
+      host.mounted().emit("open-join", id);
+      await host.settle();
+      return picker().shown;
+    }
+    async function agree(what: string) {
+      for (const [index, row] of rows(host).entries()) {
+        if (!row.join) continue;
+        const shown = await opens(row.id);
+        assert.equal(shown, !row.off, `${what}: part ${index + 1}'s chip is ${row.off ? "off" : "clickable"}, the picker ${shown ? "opens" : "does not"}`);
+        if (shown) assert.deepEqual([picker().id, picker().from, picker().to], [row.id, index + 1, index + 2]);
+      }
+    }
+    // The default: Fast (the files match), every junction a Cut.
+    await eventually(method, 0, "Fast");
+    await agree("Fast, all cuts");
+    assert.ok(rows(host).filter((r) => r.join).every((r) => r.off), "Fast: every chip is greyed, a Cut too (design §4.4)");
+    // Precise: every chip opens its picker, and a pick applies.
+    host.mounted().emit("set-method", 1);
+    await eventually(method, 1, "Precise");
+    await agree("Precise, all cuts");
+    host.mounted().emit("open-join", a);
+    host.mounted().emit("set-transition", a, "crossfade", "left", "1");
+    await eventually(() => rows(host)[0]!.kind, "crossfade");
+    // Back to Fast with one transition set and one Cut: both chips greyed, neither opens.
+    host.mounted().emit("set-method", 0);
+    await eventually(method, 0, "Fast again");
+    await agree("Fast, a transition and a cut");
+    // A reorder in Fast, then Precise: the moved junctions open with their new numbers.
+    host.mounted().emit("move-part", b, 0);
+    await eventually(() => rows(host)[0]!.id, b);
+    host.mounted().emit("set-method", 1);
+    await eventually(method, 1, "Precise again");
+    await agree("Precise after a reorder");
+  } finally {
+    await stop();
+  }
+});
+
 /** Pretend to be ffmpeg for the transitions run: write the progress and the output; other runs (thumbnails) get nothing. */
 function fakeFfmpeg(host: TestHost, behave: (args: string[]) => unknown = () => undefined) {
   const calls: string[][] = [];

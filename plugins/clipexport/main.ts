@@ -936,7 +936,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       kind: part.transition.kind,
       dir: part.transition.dir,
       duration: part.transition.duration.toFixed(1),
-      off: fastNow && part.transition.kind !== "cut",
+      // Every junction, a Cut too: in Fast a chip does not open the picker (`openJoin`), so none may look clickable.
+      off: fastNow,
     }));
   }
   /** The footer's sum: the written length (overlaps taken off, unless Fast joins with cuts) and the transitions. */

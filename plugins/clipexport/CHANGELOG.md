@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1
+
+**Who must change: nobody.** No new permission and the same player (0.7.6 or later).
+
+- In Fast, every junction chip is greyed (a Cut too) and does not open the picker; before, a Cut's chip opened an empty picker (Transition 0 → 0) that changed nothing.
+- Start and End show "-:--.---" until set, no longer a time that looked like a range.
+
 ## 0.3.0
 
 **Who must change: nobody.** No new permission and the same player (0.7.6 or later). A Collection from 0.2.x loads unchanged: every junction is a Cut, so its export is the same file as before until you choose a transition.
