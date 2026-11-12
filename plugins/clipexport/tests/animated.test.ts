@@ -456,6 +456,45 @@ test("the tab: Animated GIF and WebP in the Quality chooser, Custom after them; 
   }
 });
 
+test("the tab: a muted line under Quality says what GIF or WebP writes, from the encoder's constants, in every language", async () => {
+  const slint = await readFile(new URL("../ui/tab.slint", import.meta.url), "utf8");
+  // Shown only while an animated quality is chosen, right after the Quality row, aligned with its chooser, small and dim.
+  const line = /\n(\s*)\/\/ An animated quality's fixed picture[^\n]*\n\s*if root\.animated: HorizontalLayout \{\s*padding-left: 68px;\s*Text \{([\s\S]*?)\n\1\}/.exec(slint);
+  assert.ok(line, "the line's row");
+  const body = line[2]!;
+  assert.match(body, /color: Theme\.text-dim;/);
+  assert.match(body, /font-size: Theme\.font-xs;/);
+  assert.ok(slint.indexOf("An animated quality's fixed picture") > slint.indexOf('Label { width: 64px; text: @tr("Quality"); }'), "below the Quality row");
+  assert.ok(slint.indexOf("An animated quality's fixed picture") < slint.indexOf("if !root.fast && ClipBridge.support.encode && !root.animated: VerticalLayout"), "where the H.264 rows would be");
+  // One template, its numbers from the bridge (no literal number in the line).
+  const template = "{0} · {1} px long edge · {2} fps · up to {3} s";
+  for (const format of ["gif", "webp"]) {
+    const name = format === "gif" ? "GIF" : "WebP";
+    assert.ok(body.includes(`@tr("${template}", "${name}", ClipBridge.${format}-spec.box, ClipBridge.${format}-spec.fps, ClipBridge.${format}-spec.seconds)`), format);
+  }
+  assert.doesNotMatch(body, /\b(480|640|15|20|60)\b/, "no number written in the Slint");
+  // The bridge carries animated.ts's numbers.
+  const host = new TestHost();
+  host.openElsewhere("/media/one.mp4");
+  host.setSource({ position: 2, duration: 120 });
+  const { stop } = await start(host);
+  try {
+    await eventually(() => tab(host)["gif-spec"], { box: ANIMATED.gif.box, fps: ANIMATED.gif.fps, seconds: MAX_ANIMATED_SECONDS });
+    await eventually(() => tab(host)["webp-spec"], { box: ANIMATED.webp.box, fps: ANIMATED.webp.fps, seconds: MAX_ANIMATED_SECONDS });
+  } finally {
+    await stop();
+  }
+  // Translated in every language the plugin ships, with the same four placeholders.
+  const locales = (await readdir(new URL("../locales/", import.meta.url))).filter((file) => file.endsWith(".po"));
+  assert.ok(locales.length >= 6, "the shipped languages");
+  for (const file of locales) {
+    const po = await readFile(new URL(`../locales/${file}`, import.meta.url), "utf8");
+    const translated = new RegExp(String.raw`msgid "${template.replace(/[{}]/g, "\\$&")}"\r?\nmsgstr "([^"]+)"`).exec(po);
+    assert.ok(translated, `${file}: translated`);
+    assert.deepEqual(translated[1]!.match(/\{\d\}/g)!.sort(), ["{0}", "{1}", "{2}", "{3}"], `${file}: placeholders`);
+  }
+});
+
 // ---------------------------------------------------------------- with a real ffmpeg (skipped without one)
 
 const FFMPEG = process.env.VESTRA_FFMPEG || "ffmpeg";

@@ -6,7 +6,7 @@ import {
   METHODS, NO_TIMELINE, parseCodec, parseKeyframes, PRESET_ENCODE, presetOf, PRESETS, RATES, snapStart, SPEEDS, timeline, timelineWindow,
 } from "./clip.ts";
 import type { Animated, Encode, Method } from "./clip.ts";
-import { encoderProbe, extensionOf, MAX_ANIMATED_SECONDS } from "./animated.ts";
+import { ANIMATED, encoderProbe, extensionOf, MAX_ANIMATED_SECONDS } from "./animated.ts";
 import { blockingNote, Collection, copyNote, exportParts, lengthClock, listKey, partStates, partTicks, retryDelay, targetNote, totalLength, UNDO_MS } from "./collection.ts";
 import type { Part } from "./collection.ts";
 import { finisher, inflightStore, sweepWork } from "./finish.ts";
@@ -1145,6 +1145,9 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
         // Custom comes after the presets in the Quality chooser.
         return preset === "custom" ? PRESETS.length : PRESETS.indexOf(preset);
       })(),
+      // The line under Quality while Animated GIF or WebP is chosen: the encoder's own numbers.
+      gifSpec: { ...ANIMATED.gif, seconds: MAX_ANIMATED_SECONDS },
+      webpSpec: { ...ANIMATED.webp, seconds: MAX_ANIMATED_SECONDS },
       encCrf: settings.encode.crf,
       encSource: settings.encode.rate === "source",
       encSpeed: SPEEDS.indexOf(settings.encode.speed),
