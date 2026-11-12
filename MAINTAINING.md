@@ -35,7 +35,8 @@ testing channel: CI tests, user rollback and revocation are the safety net.
 
 ```text
 plugins/<name>/   hosted third-party plugins (id <owner>.<name>): manifest.json, main.ts,
-                  .slint UI, tests/, README.md, CHANGELOG.md (vestratube, vestranes)
+                  .slint UI, tests/, README.md, CHANGELOG.md (amdmotion, autoframe,
+                  clipexport, shaderupscale, vestranes, vestratube)
 plugins/owners.toml  the owner of each hosted plugin
 registry/         third-party registrations, registry/<id>.toml (none can be merged yet)
 revoked.json      revoked plugin versions, copied into the index

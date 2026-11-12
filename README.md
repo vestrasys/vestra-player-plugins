@@ -45,7 +45,7 @@ The plugins in [`plugins/`](plugins) are complete examples. More: [SDK documenta
 
 A plugin gets into the store through a pull request that adds its source to this repository:
 
-1. Fork this repository and put your plugin folder in `plugins/<name>/`. Set its id to `<your GitHub login>.<name>` and add `<name> = "<your GitHub login>"` to [`plugins/owners.toml`](plugins/owners.toml).
+1. Fork this repository and put your plugin folder in `plugins/<name>/`. Set its id to `<your GitHub login>.<name>` and add `<name> = "<your GitHub login>"` to [`plugins/owners.toml`](plugins/owners.toml). Delete the `package.json` (with its `devDependencies`) and the `tsconfig.json` from the SDK tutorial: the repository root provides the SDK, TypeScript and esbuild, and the checks fail while those two files are there.
 2. Run the repository's checks: `npm ci`, then the one command in [CONTRIBUTING.md](CONTRIBUTING.md#run-the-checks).
 3. Open a pull request titled `Add <id>`. CI runs the same checks on macOS, Windows and Linux, and a maintainer reads the source.
 

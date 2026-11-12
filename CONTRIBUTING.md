@@ -25,8 +25,8 @@ plugin.
       `zysilm.vestratube` for `plugins/vestratube/` owned by `zysilm`. The
       owner is compared without case; no other plugin has the same id, even
       with different case. (CI)
-- [ ] Neither the id nor the owner uses `vestra`: it is reserved for the
-      player's built-in plugins. (CI)
+- [ ] The owner is not `vestra`, and the id does not start with `vestra.`:
+      both are reserved for the player's built-in plugins. (CI)
 
 ### Files
 
@@ -35,10 +35,15 @@ plugin.
 - [ ] No `tsconfig*.json` or `jsconfig.json`, no symbolic links, no
       submodules, no `node_modules` (the repository's `tsconfig.json` applies
       to every plugin). `dist/` and `*.vxp` are ignored by git. (CI)
-- [ ] No `package.json`, unless the plugin bundles npm packages
-      ([npm dependencies](#npm-dependencies)). The SDK, TypeScript and
-      esbuild come from the repository root, so a `package.json` with
-      `devDependencies` is refused. (CI)
+- [ ] A plugin without npm packages needs no `package.json`: delete the
+      one from the SDK tutorial. CI does not refuse every `package.json`; it
+      refuses one with a key other than `name`, `version`, `private`,
+      `type`, `description`, `license`, `dependencies`, `scripts` and
+      `vestra` (so `devDependencies` too: the SDK, TypeScript and esbuild
+      come from the repository root), and one with an install lifecycle
+      script (`preinstall`, `install`, `postinstall`, `prepublish`,
+      `preprepare`, `prepare`, `postprepare`). With `dependencies`, the
+      rules in [npm dependencies](#npm-dependencies) apply as well. (CI)
 
 ### Manifest
 
@@ -56,6 +61,8 @@ plugin.
       0.1. (Review)
 - [ ] Optional: translations. `npx vestra-plugin i18n extract`, then
       `locales/<lang>.po`; the store lists the plugin in those languages too.
+      Needs SDK 1.5.13 or later (the command is in npm releases since 1.5.11;
+      1.5.13 fixes how it merges catalogs). The repository's SDK is newer.
 
 ### README and CHANGELOG
 
@@ -93,6 +100,11 @@ maintainer reads every plugin's source.
       `@vestra-player/sdk/testing`. Nothing from another plugin or from
       outside the plugin's directory, and runtime code never imports from
       `tests/`. (CI: `npm run boundaries`)
+- [ ] A dynamic `import()` takes a string literal. One whose argument is
+      computed fails, unless the line of that argument carries a comment
+      with `boundary-reviewed:` and the reason. The reviewer reads every such
+      line, and the security scan flags it, as it does a computed
+      `require()`. (CI, then Review)
 
 ### Portability
 
@@ -137,9 +149,25 @@ npm ci
 npm run check && npm run format:check && npm run boundaries && npm run portability && npm run registry && npm run build && npm test
 ```
 
-That is what CI runs, apart from a spelling check
-([typos](https://github.com/crate-ci/typos)) and the three operating
-systems. One plugin at a time:
+CI runs these, the plugin's check, tests and pack on macOS, Windows and
+Linux, and some checks the commands above do not include:
+
+- a spelling check ([typos](https://github.com/crate-ci/typos));
+- osv-scanner over every lockfile, and dependency review of the npm
+  packages a pull request adds ([npm dependencies](#npm-dependencies));
+- the shader upstream check: each record in `shaders/SOURCES.txt` against
+  the downloaded upstream file
+  ([Third-party files and licenses](#third-party-files-and-licenses));
+- the package check: the packed `.vxp` has the source manifest's id,
+  version, API version and capabilities, a `.js` entry, no `.ts` or test
+  files, no `node_modules`, no native code, and the license files it must
+  ship;
+- the index dry run: the publish flow end to end with a throwaway key
+  (`npm run index:dry-run` runs its first step locally);
+- actionlint and zizmor, which only matter when a pull request changes a
+  workflow.
+
+One plugin at a time:
 
 ```sh
 npm run plugin -- check <name>   # also: test, build, pack
@@ -162,7 +190,8 @@ no testing channel.
       lower a version. (Review)
 - [ ] The title is `Update <id> to <version>`.
 - [ ] The id is unchanged. A changed id is a new plugin to the store, without
-      the old one's history.
+      the old one's history; if it must change, bump the minor version and
+      say so in the changelog.
 
 To have a broken or harmful version disabled on users' machines, ask a
 maintainer to revoke it. To report a vulnerability privately, see
