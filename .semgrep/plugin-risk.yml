@@ -1,5 +1,5 @@
 # Risk markers in hosted plugin code, for the security review of pull
-# requests (.github/workflows/security-scan.yml, CONTRIBUTING.md "Security
+# requests (.github/workflows/security-scan.yml, MAINTAINING.md "Security
 # review"). The player runs plugins as ordinary Node processes without a
 # sandbox, so the review of this repository is the main defence.
 #

@@ -7,7 +7,7 @@ name: Plugin security scan
 # findings (not already on the base branch) and files the scan cannot read
 # label the pull request `security-review` and get one summary comment that
 # is updated on each push. Findings do not fail the pull request: a
-# maintainer reads the code and removes the label (CONTRIBUTING.md,
+# maintainer reads the code and removes the label (MAINTAINING.md,
 # "Security review").
 #
 # Why pull_request_target, and why it is safe here (same design as
@@ -141,7 +141,7 @@ jobs:
               echo "$marker"
               echo "## Plugin security scan"
               echo
-              echo "**The scan failed** ([run]($RUN)), so this pull request is labelled \`security-review\`: a maintainer reads the changed plugin code by hand, or reruns the scan, before merging (CONTRIBUTING.md, \"Security review\")."
+              echo "**The scan failed** ([run]($RUN)), so this pull request is labelled \`security-review\`: a maintainer reads the changed plugin code by hand, or reruns the scan, before merging (MAINTAINING.md, \"Security review\")."
             } > "$body"
           fi
           if [[ "$FINDINGS" != 0 ]]; then

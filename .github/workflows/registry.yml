@@ -1,6 +1,6 @@
 name: Registry owners
 
-# The owner rule for registry/<id>.toml (CONTRIBUTING.md): a new registration
+# The owner rule for registry/<id>.toml (MAINTAINING.md): a new registration
 # lists the pull request author as an owner; a change to or removal of an
 # existing one comes from one of its owners on the base branch. Also checks
 # that revoked.json is append-only against the base branch.

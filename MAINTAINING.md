@@ -1,0 +1,788 @@
+# Maintaining
+
+For maintainers of this repository: layout, CI, security review, the publish
+pipeline, the index format, the signing key, revocation and retirement.
+Plugin authors need only [CONTRIBUTING.md](CONTRIBUTING.md).
+
+This repository publishes the official Vestra Player plugin index. Every
+plugin in it is a **third-party** plugin. Vestra Player has three kinds:
+
+- **Official plugins** are the player's built-in plugins. They live in the
+  [player repository](https://github.com/vestrasys/vestra-player/tree/main/src/plugins),
+  ship with the player and are not in this repository or its index. Only
+  they use the `vestra.` id prefix.
+- **Hosted third-party plugins** have their source in `plugins/` here. Every
+  change is a pull request to this repository and runs its full CI (type
+  checks, tests on macOS, Windows and Linux, boundaries, portability). This
+  is the only kind that can be published today.
+- **Registered third-party plugins** stay in their author's repository and
+  are registered in `registry/`; CI is to build them from source
+  ([not implemented yet](#registered-third-party-plugins-planned)).
+
+The repository accepts three kinds of change, each through a pull request
+to `main`:
+
+- a new hosted plugin or a change to one in `plugins/`
+  ([CONTRIBUTING.md](CONTRIBUTING.md));
+- a third-party plugin registration in `registry/<plugin id>.toml`
+  (validated, but not mergeable until third-party builds exist);
+- a revocation in `revoked.json` ([below](#revoking-a-version)).
+
+Merging to `main` publishes (see [Publishing](#publishing)). There is no
+testing channel: CI tests, user rollback and revocation are the safety net.
+
+## Layout
+
+```text
+plugins/<name>/   hosted third-party plugins (id <owner>.<name>): manifest.json, main.ts,
+                  .slint UI, tests/, README.md, CHANGELOG.md (vestratube, vestranes)
+plugins/owners.toml  the owner of each hosted plugin
+registry/         third-party registrations, registry/<id>.toml (none can be merged yet)
+revoked.json      revoked plugin versions, copied into the index
+keys/             the trusted public keys of the index signature (every *.pub.pem;
+                  normally just index-signing.pub.pem)
+scripts/          plugin.mjs (runs the SDK's vestra-plugin CLI), plugin-deps.mjs and
+                  lib/dependencies.mjs (npm dependencies of plugins), lib/file-licenses.mjs
+                  (licenses of plugin files, LGPL shaders), check-boundaries.mjs,
+                  check-portability.mjs, check-registry.mjs, the CI helpers
+                  ci-plugins.mjs, check-package.mjs and verify-shader-sources.mjs, and the publishing scripts:
+                  query-releases.mjs, build-index.mjs, publish-releases.mjs,
+                  sign-index.mjs, verify-index.mjs, generate-signing-key.mjs
+.github/workflows ci.yml (checks), publish.yml (Releases, index, Pages),
+                  weekly.yml (plugins against the latest SDK), registry.yml
+                  (owner check for registry pull requests), security-scan.yml,
+                  codeql.yml and scorecard.yml (see [Security review](#security-review)),
+                  and the reusable _static.yml, _plugin.yml, _index-dryrun.yml
+                  (see [CI](#ci))
+.semgrep/         the plugin risk rules (plugin-risk.yml) and their samples (tests/)
+osv-scanner.toml  reviewed osv-scanner exceptions (see [Security review](#security-review))
+```
+
+Plugins are independent: a plugin never imports another plugin or anything
+outside its own directory. Code imports only `@vestra-player/sdk` (types);
+tests may also import `@vestra-player/sdk/testing`. Runtime code never
+imports from the plugin's own `tests/` (the bundle would ship it), and a
+plugin directory holds real files only: no symbolic links, no submodules, no
+committed `node_modules`, and no `tsconfig*.json` or `jsconfig.json` of its
+own (the repository's `tsconfig.json`, which may not use `paths`, `baseUrl`,
+`rootDirs` or `extends`, applies to every plugin). `npm run boundaries`
+enforces all of this. After every `build` and `pack`, `scripts/lib/bundle.mjs`
+also checks what a bundled entry is made of: every input esbuild bundled
+must be the plugin's own file or one of its locked dependencies in its own
+`node_modules`, whatever led esbuild there.
+
+## Build and test
+
+Node 26 or later (`@vestra-player/sdk` 1.5 requires it; the player ships Node 26).
+
+```sh
+npm ci
+npm run plugin -- check vestratube  # strict type check
+npm run plugin -- build vestratube  # writes plugins/vestratube/dist/
+npm run plugin -- test vestratube   # node --test on plugins/vestratube/tests/
+npm run plugin -- pack vestratube   # dist/ as <id>-<version>.vxp
+```
+
+A name is a directory under `plugins/`; `--all` runs every plugin. The whole
+repository, as CI runs it (see [CI](#ci)):
+
+```sh
+npm ci && npm run check && npm run format:check && npm run boundaries \
+  && npm run portability && npm run registry && npm run build && npm test
+```
+
+CI also runs [typos](https://github.com/crate-ci/typos),
+[actionlint](https://github.com/rhysd/actionlint) and
+[zizmor](https://docs.zizmor.sh/) (configuration in `.github/zizmor.yml`);
+with those installed, `typos && actionlint && zizmor .github/workflows` runs
+the same checks locally.
+
+`npm test` runs the plugin tests and the tests of the repository scripts
+(`npm run test:scripts`). `format:check` covers the repository's own scripts
+and configuration; plugin sources keep their authors' formatting.
+
+## Run a plugin in the player
+
+Load a plugin directory into a development build of the player. From the
+player repository's `src/host/`, with this repository checked out next to it
+as `vestra-player-plugins`:
+
+```sh
+cargo run --bin vestra-host -- --plugin ../plugins/playback \
+  --plugin ../../../vestra-player-plugins/plugins/vestratube
+```
+
+`--plugin` may be repeated; the player runs the plugin's `.ts` sources
+directly. The built-in `playback` plugin provides the player controls.
+
+## Hosted plugins: owners, ids and versions
+
+The author's checklist is [CONTRIBUTING.md](CONTRIBUTING.md); the rules
+behind it:
+
+- Every hosted plugin has an **owner**: the GitHub user or organization that
+  maintains it, recorded in [`plugins/owners.toml`](plugins/owners.toml) as
+  `<name> = "<owner>"` (`vestratube = "zysilm"`). The owner is the plugin's
+  author (the manifest's `author`); a maintainer reviews every change. A new
+  hosted plugin, or a change of owner, needs a maintainer's agreement.
+- The id is `<owner>.<name>`, where `<name>` is the directory name
+  (`plugins/vestratube/` owned by `zysilm` is `zysilm.vestratube`); the owner is
+  compared without case. This is the same `<github-owner>.<name>` rule as
+  for registrations, with the owner from `plugins/owners.toml` instead of
+  the source repository.
+- `vestra.` is reserved for the player's built-in plugins: neither an id
+  nor an owner here may use it. `npm run registry` and the publish build
+  enforce these rules.
+- Neither may a manifest declare a capability that only built-in plugins
+  may declare (`commands.run`, `palette.lead`; the SDK's `CAPABILITY_INFO`
+  marks them `builtinOnly`). `vestra-plugin check`, `npm run registry` and
+  the publish build refuse such a plugin, naming the capability.
+- A changed id is a new plugin to the store: the old id's history is not
+  carried over. Bump the version (minor) and say so in the changelog.
+- **Every change that should reach users bumps `version`** in
+  `manifest.json` and adds a `CHANGELOG.md` entry. A version is released
+  once: once `<id>-v<version>` exists, CI never rebuilds it, so a change
+  without a version bump is not published. Never reuse or lower a version.
+
+## npm dependencies
+
+A hosted plugin may use packages from npm. They are bundled into the
+plugin's entry file by the SDK (`vestra-plugin build` runs esbuild), so the
+`.vxp` has no `node_modules` and users install nothing. This repository
+signs the index users trust, so every dependency is held to these rules
+(`scripts/lib/dependencies.mjs`):
+
+| Rule | Checked by |
+| --- | --- |
+| `plugins/<name>/package.json` has only `name`, `version`, `private`, `type`, `description`, `license`, `dependencies`, `scripts`, `vestra`: no `devDependencies` (esbuild, TypeScript and the SDK come from the repository root), no optional, peer or bundled dependencies, `overrides` or `workspaces`, no install lifecycle scripts (`preinstall`, `install`, `postinstall`, `prepare`, …) | `registry`, `build` |
+| `"vestra": { "bundle": true, "assets": ["licenses"] }`: the dependencies are bundled (`external` is not allowed), `licenses/` is packed as it is (the SDK otherwise leaves out `*.md`, such as `LICENSE.md`), and `vestra.assets` never ships `node_modules` | `registry`, `build` |
+| `package-lock.json` is committed (lockfileVersion 2 or 3) and matches `package.json`; installs are `npm ci --ignore-scripts`, so no install script ever runs | `registry`, `build` |
+| Every locked package comes from `https://registry.npmjs.org/` with a sha512 `integrity`: no git, file, link or URL sources | `registry`, `build` |
+| **No native code.** A locked package must not have an install script (`hasInstallScript`, which npm also sets for `binding.gyp`) or an `os`/`cpu`/`libc` restriction (prebuilt binaries), and must not be optional. After the install, no package may contain `binding.gyp`, `.node`, `.dll`, `.dylib`, `.so`, `.exe`, `.a`, `.lib`, `.o` or `.obj` files, declare `gypfile` or an install script in its own `package.json` (the lockfile is the author's file and is checked against what was installed) | `registry`, `build`; the package check refuses such files in the `.vxp` too |
+| **Licenses.** Every locked package's license (the SPDX expression in the lockfile, which must equal the package's own `package.json`) is satisfied by the allowlist: `MIT`, `MIT-0`, `ISC`, `0BSD`, `BSD-2-Clause`, `BSD-3-Clause`, `Apache-2.0`, `Zlib`, `BlueOak-1.0.0`, `BSL-1.0`, `CC0-1.0`, `Unlicense` (`A OR B` needs one side, `A AND B` both). GPL, AGPL, LGPL, MPL and anything unlisted are refused (an LGPL npm package too: LGPL is allowed only for [vendored shader files](#third-party-files-and-licenses)); adding a license to the list needs a maintainer's review | `registry`, `build` |
+| **License texts ship in the package.** `dependency-inventory.json` lists every locked package (`name`, `version`, `license`, `licenseFiles`), and `licenses/<name>/` (a scoped `@scope/pkg` as `@scope__pkg`) holds its `LICENSE*`/`LICENCE*`/`COPYING*`/`NOTICE*` files byte for byte as the package ships them. For a package that ships none, put its license text from its source repository into `licenses/<name>/LICENSE` yourself; the reviewer checks it | `registry` (inventory against the lockfile), `build` (against the installed files), the package check (inside the `.vxp`) |
+| **Size.** A package (every plugin's, with or without dependencies) is at most 4 MiB as a `.vxp` and 16 MiB unpacked | `build`, `pack`, the package check |
+| Code imports only Node built-ins, the SDK, its own files and the packages in its own `dependencies` (nothing from the repository's `node_modules`) | `boundaries` |
+| `node_modules` is never committed (a committed one with a matching install stamp would skip `npm ci` and the installed checks) | `boundaries`, `build` |
+| The bundle holds only the plugin's own files and its locked packages (esbuild's metafile, from the same build options as the SDK; the output must equal the shipped `dist/` file) | `build`, `pack` (so CI and publishing) |
+
+Adding or updating a dependency:
+
+```sh
+cd plugins/<name>
+npm install --ignore-scripts --save-exact <package>@<version>   # writes package.json and package-lock.json
+cd ../..
+npm run deps -- licenses <name> --write   # npm ci --ignore-scripts, then dependency-inventory.json and licenses/
+npm run registry && npm run plugin -- pack <name>
+```
+
+with `"vestra": { "bundle": true, "assets": ["licenses"] }` in the plugin's
+`package.json`. Commit
+`package.json`, `package-lock.json`, `dependency-inventory.json` and
+`licenses/` (never `node_modules/`). `npm run plugin -- <command>` and
+`npm run deps -- install <name|--all>` install a plugin's dependencies when
+its `package.json` or lockfile changed and apply every rule first; the SDK
+CLI itself runs with `npm_config_ignore_scripts=true`. A reviewer reads the
+lockfile diff of a pull request like code: new packages, their maintainers
+and what they do.
+
+Test fixtures for these rules (an MIT dependency that is accepted, a GPL one
+and a native one that are refused) are in
+`scripts/tests/fixtures/npm-deps/`, exercised by
+`scripts/tests/dependencies.test.mjs` through build, pack, the package
+check and the index build; those tests download from the npm registry.
+
+## Third-party files and licenses
+
+A plugin's own code (its `.ts`, `.slint` and the bundle built from them)
+keeps the plugin's permissive license. Third-party files that are not npm
+packages, such as mpv GLSL shaders, ship as separate files with their
+license texts and a source note. Permissive ones (MIT, BSD, the
+Unlicense, ...) follow the plugin's own conventions (see
+`plugins/shaderupscale/shaders/SOURCES.txt`). **LGPL-licensed mpv shaders**
+(for example RAVU, FSRCNNX, SSimDownscaler) are allowed only under these
+conditions (`scripts/lib/file-licenses.mjs`):
+
+| Rule | Checked by |
+| --- | --- |
+| The file is a shader (`.glsl`, `.hook`) under the plugin's `shaders/`, shipped as a **separate file**: never concatenated into, embedded in or derived inside the plugin's code | `registry`, `build`, the package check (no packed file other than a listed shader, the bundle included, may carry a GPL, AGPL or LGPL notice) |
+| `shaders/SOURCES.txt` has a record for it (below) whose `SHA256` equals the file's bytes as committed. Offline this proves only that the file and its record agree | `registry`, `build`, the package check (the listed files and `SOURCES.txt` ship byte for byte) |
+| The file is the upstream file, **unmodified**: CI downloads each record's upstream bytes (`raw.githubusercontent.com/<owner>/<repo>/<commit>/<path>`, the release asset, or the gist's raw file at the revision) and compares their SHA256 with the record's. A record whose `Repository` is not `https://github.com/<owner>/<repo>` (`<repo>` not `.` or `..`) or `https://gist.github.com/<owner>/<id>` is refused (by the offline checks too) | CI: `node scripts/verify-shader-sources.mjs plugins/<name>` in [`_plugin.yml`](.github/workflows/_plugin.yml) (needs the network; not part of the local checks) |
+| Its license is `LGPL-3.0-only` or `LGPL-3.0-or-later`, and the full license texts lie in the same directory, byte for byte the FSF's files (pinned by SHA256): `COPYING.LESSER` = [lgpl-3.0.txt](https://www.gnu.org/licenses/lgpl-3.0.txt) (`e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118`), `COPYING` = [gpl-3.0.txt](https://www.gnu.org/licenses/gpl-3.0.txt), which LGPL-3.0 incorporates (`3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986`); both packed | `registry`, `build`, the package check |
+| LGPL anywhere else is refused: in code (any file with an LGPL notice, whatever its name or extension: `license.ts`, `notice.js`, `ravu.txt`, `assets/ravu.md` are all read), in a shader outside `shaders/` or not listed, and in npm dependencies ([npm dependencies](#npm-dependencies)). GPL and AGPL notices are refused in every file. Not read for notices: `README.md`, `CHANGELOG.md`, `shaders/SOURCES.txt`, `.po` and `.pot` files under `locales/`, and license texts under `shaders/` or `licenses/` (`LICENSE`, `LICENCE`, `COPYING`, `NOTICE`, with no extension, `.txt` or `.md`, `COPYING.LESSER`, or a `-<name>` suffix such as `LICENSE-MIT`). mpv loads a shader whatever its file name, so these files may not contain `//!` anywhere (mpv starts a shader header at any `//!`), and every `COPYING` or `COPYING.LESSER` under `shaders/` is the FSF's text above, with or without an LGPL shader next to it | `registry`, `build`, the package check |
+
+A record in `shaders/SOURCES.txt` (the rest of the file is free text for
+readers; `File:` starts a line, a blank line ends the record):
+
+```text
+File: ravu/ravu-lite-ar-r4.hook
+Repository: https://github.com/bjin/mpv-prescalers
+Commit: <full 40-character commit id>
+Path: gather/ravu-lite-ar-r4.hook
+SHA256: <sha256 of the file, lowercase hex>
+License: LGPL-3.0-or-later
+```
+
+`File` is relative to `shaders/`; `Path` is the file's path in the
+upstream repository at `Commit`. For a gist, `Repository` is
+`https://gist.github.com/<owner>/<id>`, `Commit` the gist revision and
+`Path` the file name. A shader published only as a release asset (in no
+commit, such as FSRCNNX on `igv/FSRCNN-TensorFlow` release 1.1) has
+`Asset:` instead of `Path:`: the asset's https URL under the record's
+repository, `<Repository>/releases/download/<tag>/<file>`, with `Commit`
+the commit that tag points to. A record has exactly one of `Path` and
+`Asset`; an asset URL outside the repository is refused.
+
+```text
+File: fsrcnnx/FSRCNNX_x2_8-0-4-1.glsl
+Repository: https://github.com/igv/FSRCNN-TensorFlow
+Commit: <full commit id the tag 1.1 points to>
+Asset: https://github.com/igv/FSRCNN-TensorFlow/releases/download/1.1/FSRCNNX_x2_8-0-4-1.glsl
+SHA256: <sha256 of the asset, lowercase hex>
+License: LGPL-3.0-or-later
+```
+
+The SHA256 is of the file's bytes as committed, which must be the
+upstream bytes: `.gitattributes` stores `plugins/*/shaders/**/*.glsl`,
+`*.hook`, `COPYING` and `COPYING.LESSER` with `-text` (no line-ending
+conversion), so an upstream file with CRLF endings keeps them and its
+hash. Copy the file as downloaded (from the URL above), not through an
+editor that rewrites line endings. An LGPL file someone modified would
+itself stay LGPL and would have to be marked as modified; hosted plugins
+ship upstream files only, so no modified LGPL file is accepted here. The
+plugin's manifest `license` stays its own code's license; its README names
+the bundled LGPL shaders.
+
+**What review must still catch.** The checks match license notices as
+text, so a reviewer reads every pull request that adds or changes a
+shader or `SOURCES.txt` for what they cannot see:
+
+- a copyleft file whose notice was stripped or reworded (it then passes as
+  an unlisted, permissive file);
+- shorthand such as "LGPLv3", "(L)GPL" or a link to gnu.org instead of the
+  full notice, which the text match does not recognise;
+- shader text embedded in code, for example a GLSL string in a `.ts` file
+  without its header;
+- a `License` field that does not match the file's own notice or the
+  upstream repository's license (the field is not cross-checked against
+  the file);
+- that `Repository` and `Commit` are really the shader's upstream (CI
+  proves the bytes match that commit, not that the commit is the original
+  author's).
+
+Tests: `scripts/tests/file-licenses.test.mjs` (the FSF texts it uses are in
+`scripts/tests/fixtures/licenses/`).
+
+## CI
+
+The entry workflows only orchestrate; each check is written once, in a
+reusable workflow:
+
+- [`_static.yml`](.github/workflows/_static.yml) (Ubuntu): the plugins' npm
+  dependencies (`plugin-deps.mjs install --all`), `tsc` over the
+  repository, prettier, `boundaries`, `portability`, `registry` (with
+  `revoked.json` append-only against the pull request's base or the commit
+  before the push), the script tests, typos, actionlint and zizmor, the
+  semgrep rule samples, and osv-scanner over every lockfile
+  ([Security review](#security-review)).
+- [`_plugin.yml`](.github/workflows/_plugin.yml), one plugin: its npm
+  dependencies ([rules](#npm-dependencies)), strict type check, tests,
+  `vestra-plugin pack` (every CLI command validates `manifest.json`), then
+  `scripts/check-package.mjs` reads the `.vxp` and checks its manifest,
+  files, size, and the license files of its dependencies. Ubuntu, Windows and macOS, each with
+  Node 26 (the Node the player ships; the SDK's `engines` is `>=26`). Every
+  other job runs Node 26 too.
+- [`_index-dryrun.yml`](.github/workflows/_index-dryrun.yml): the publish
+  flow end to end with a key generated in the job: `build-index.mjs` packs
+  every plugin, `publish-releases.mjs --dry-run` checks the artifact as the
+  signing job does, then sign, verify, and check that the real keys in
+  `keys/` do **not** verify it. The real signing key is never involved.
+
+[`ci.yml`](.github/workflows/ci.yml) runs on every branch push, pull request
+and manual run:
+
+```text
+changes ─────────────────────┐
+                             ▼
+static ──┬──────────▶ plugin × N ──┬──▶ ci-ok
+         └──▶ index-dryrun ────────┤
+dependency-review (pull requests) ─┘
+```
+
+`changes` (`scripts/ci-plugins.mjs`) lists the plugins with changed files,
+or every plugin on `main`, on a manual run, for a new branch, and when a
+shared file (package.json, the lock file, tsconfig.json, the plugin CLI
+wrapper, the npm dependency rules, the plugin workflows) changed. `ci-ok` is the one check to require
+in branch protection: it fails when any job failed or was cancelled; a
+skipped job (no plugin changed) counts as passed.
+
+[`weekly.yml`](.github/workflows/weekly.yml) (Mondays and on demand) runs
+`_plugin.yml` for every plugin with `@vestra-player/sdk@latest` installed
+over the locked version in the job (never committed), to find SDK changes
+that break a plugin early.
+
+Hardening: every workflow has `permissions: {}` at the top and grants the
+minimum per job; actions are pinned by commit SHA with the version in a
+comment; every job has a timeout; publish.yml uses no npm cache. Pull
+requests from forks run `ci.yml` without secrets (`pull_request`).
+[`registry.yml`](.github/workflows/registry.yml) and
+[`security-scan.yml`](.github/workflows/security-scan.yml) are the two
+`pull_request_target` workflows: they run the base branch's scripts, read
+the pull request's files as data (`git show`, `git cat-file`) and never
+check out or run its code.
+
+## Security review
+
+The player runs plugins as ordinary Node processes, without a sandbox: a
+plugin can do whatever its user can. Review in this repository is the main
+defence, so every pull request that changes a hosted plugin is scanned, and
+risky code is read by a maintainer before it is merged. (Third-party
+repositories and sideloaded plugins are their users' own risk.)
+
+| Scan | What it looks at | On a finding |
+| --- | --- | --- |
+| [Plugin security scan](.github/workflows/security-scan.yml) (semgrep CE with [`.semgrep/plugin-risk.yml`](.semgrep/plugin-risk.yml)) | Every file of each plugin the pull request changes, `tests/` included | Labels the pull request `security-review` and comments; does not fail |
+| [CodeQL](.github/workflows/codeql.yml) (`security-extended`) | `plugins/` and `scripts/`: data flow such as injection, path traversal, unsafe downloads | Code scanning alerts and pull request annotations |
+| Dependency review ([`ci.yml`](.github/workflows/ci.yml)) | npm packages a pull request adds or updates | Fails on high or critical vulnerabilities and on a license outside the [allowlist](#npm-dependencies) |
+| osv-scanner ([`_static.yml`](.github/workflows/_static.yml), [`weekly.yml`](.github/workflows/weekly.yml)) | Every lockfile: the repository's and each plugin's | Fails on any known vulnerability or malicious package (OSV includes the OpenSSF malicious-packages feed); [exceptions](#osv-scanner-exceptions) |
+| [Scorecard](.github/workflows/scorecard.yml) (weekly) | The repository's own supply chain practices | Code scanning alerts |
+
+### The plugin risk rules
+
+`.semgrep/plugin-risk.yml` marks code a reviewer must read. The module
+rules match every way Node loads a module by name: `import`,
+`export … from`, `require`, `import()`, `getBuiltinModule` (on `process` or
+an alias),
+`module.require` and the main module's `require`.
+
+| Rule | Marks |
+| --- | --- |
+| `vestra-child-process` | `child_process` or `cluster`: running other programs |
+| `vestra-dynamic-code` | `eval`, `new Function`, `vm`, a `Worker` with `eval` or from a `data:`/`blob:` URL, a string passed to `setTimeout`/`setInterval` |
+| `vestra-dynamic-import` | `import()` or `require()` of a path that is not a string literal, `createRequire`, `module.require`, the main module's `require`, `Module._load`, any reference to `getBuiltinModule` (member, destructured name or string) |
+| `vestra-native-addon` | `.node` addons, `process.dlopen`, `process.binding`, `wasi`, `inspector` |
+| `vestra-raw-network` | `net`, `tls`, `dgram`, `http2`, servers |
+| `vestra-network-host` | hard-coded URLs and IP addresses |
+| `vestra-path-outside-plugin` | absolute system paths, `..` segments, the home directory, profile directory variables (`APPDATA`, `HOME`, …) |
+| `vestra-credentials` | SSH, cloud and npm credentials, browser profiles and cookies, wallets, token variables, enumerating, spreading or sending `process.env` |
+| `vestra-obfuscation` | long base64 or hex literals, `eval(atob(…))`, long `String.fromCharCode` lists |
+
+A finding is a place to read, not a verdict: a plugin may download and run
+a helper program (with the user's consent, checking a signed checksum), and
+VestraTube runs YouTube's player script in a worker; such code can be
+legitimate, and the review decides. The pull request is labelled for:
+
+- **new findings**, those not already on the base branch (same rule, file
+  and matched code; moved lines do not count). A new plugin is flagged for
+  everything;
+- **known findings in files the pull request changes**, listed in a
+  collapsed section: changing where `bin` comes from in an existing
+  `spawn(bin, args)` is no new finding, but it needs the same review;
+- **files the scan cannot vouch for**, new or changed: symbolic links,
+  submodules, committed `node_modules`, `tsconfig*.json`/`jsconfig.json`,
+  files over 16 MiB, files semgrep
+  skipped or failed on, and every file that is neither code nor a known data
+  type (JSON, Markdown, text, translations, `.slint`, shaders, images,
+  license texts). HTML, `.vue`, binaries, archives, scripts for other
+  interpreters and files without an extension are read by hand.
+
+An update to a reviewed plugin that touches none of its flagged files is
+not labelled. The scan **fails closed**: if it fails or times out, the pull
+request is labelled with a "scan failed" comment.
+
+How the scan stays trustworthy: it runs from the base branch
+(`pull_request_target`), so a pull request cannot change the rules, the
+script or the workflow that judge it; it reads the exact commit of the
+push; `nosemgrep` comments and
+`.semgrepignore` files in a pull request are ignored; the pull request's
+files are read as data and never run; semgrep runs in a container without
+network; no secrets are involved, and only the job that writes the label
+and the comment has a write token. The rules' samples
+(`.semgrep/tests/plugin-risk/bad.ts` must trigger every rule, `good.ts`
+none) run in `_static.yml`, so a change to the rules is tested in its own
+pull request; the scan uses the changed rules once they are on `main`.
+
+### `security-review`
+
+- The label means that a maintainer must read the flagged code before the
+  pull request is merged. The comment lists each finding with a link.
+- **Who clears it:** a maintainer who is not the pull request's author. They
+  read every finding and check that the code does what the plugin's README
+  says, that it only touches the network hosts, programs and files it
+  needs, and that anything downloaded or run is verified (pinned host,
+  checksum or signature) and happens with the user's consent. Then they
+  remove the label and leave a short review comment saying what was
+  checked.
+- The label stays when a later push has nothing to review; a later push
+  that has something adds it again and updates the comment.
+- Code that must not be merged gets a review asking for changes. A plugin
+  version found to be harmful after its release is
+  [revoked](#revoking-a-version).
+- Authors: say in the pull request description why the plugin needs what
+  the scan flags. That makes the review fast.
+
+Run the rules locally (semgrep CE: `pipx run semgrep`, or the
+`semgrep/semgrep` image):
+
+```sh
+semgrep scan --metrics=off --disable-nosem --config .semgrep/plugin-risk.yml plugins/<name>
+semgrep --test --config .semgrep/plugin-risk.yml .semgrep/tests/plugin-risk/bad.ts
+```
+
+[`scripts/security-scan.mjs`](scripts/security-scan.mjs) is what CI runs
+around semgrep (extract the changed plugins at the base and head commits,
+compare, write the report); its tests are
+`scripts/tests/security-scan.test.mjs`.
+
+### osv-scanner exceptions
+
+osv-scanner fails CI (and therefore publishing) on any known vulnerability
+in a locked dependency, whatever its severity: OSV's malicious-package
+entries often carry no severity, osv-scanner has no severity threshold, and
+the fix is usually a dependency update. When there is no fixed version yet
+and the vulnerable code is not reachable from the plugin, a maintainer adds
+an exception to [`osv-scanner.toml`](osv-scanner.toml) at the repository
+root (CI passes it with `--config`, so it covers every plugin's lockfile):
+
+```toml
+[[IgnoredVulns]]
+id = "GHSA-xxxx-xxxx-xxxx"
+ignoreUntil = 2026-12-31   # CI fails again after this date
+reason = "plugins/<name>: <package> <version>; <function> is not used. Remove when <fixed version> is out."
+```
+
+A malicious package (`MAL-…`) never gets an exception: remove it. Locally:
+`osv-scanner scan source --config osv-scanner.toml --lockfile package-lock.json --recursive plugins`.
+
+## Registered third-party plugins (planned)
+
+A registered plugin is **built from source** (as on Flathub): its author
+registers a public repository and a commit in `registry/<plugin id>.toml`,
+CI builds the package, a maintainer reviews the source, and the merge
+publishes it.
+
+> **Status:** registrations are validated (format, id prefix, owners), but
+> building and publishing third-party plugins is not implemented yet.
+> `build-index` refuses to publish while a registration exists (so the CI
+> index dry run fails on a registration pull request), and registrations are
+> not merged until the third-party build job lands. The format and the rules
+> below are final; the flow after the pull request describes how it will
+> work.
+
+### The registration file
+
+One file named after the plugin id:
+
+```toml
+# registry/someone.cool-visualizer.toml
+repository = "https://github.com/someone/cool-visualizer"
+commit = "3f2a9c1d4b5e6f708192a3b4c5d6e7f8091a2b3c"
+path = "."            # optional, default "."
+owners = ["someone"]
+```
+
+| Key | Rule |
+| --- | --- |
+| file name | the plugin id plus `.toml`; equals `id` in the manifest |
+| `repository` | `https://github.com/<owner>/<repo>`, no trailing `/` or `.git`; `<owner>` must be the id's prefix |
+| `commit` | the full 40-digit lowercase commit id to build |
+| `path` | the directory that holds `manifest.json`, relative, no `..` |
+| `owners` | GitHub logins allowed to change or remove this file later; must include the author |
+
+No other keys (there is no `channel`). `npm run registry` checks it.
+
+### The id
+
+- The id is `<owner>.<plugin name>`, where `<owner>` is the GitHub user or
+  organization that owns `repository` (compared without case). For
+  `https://github.com/someone/cool-visualizer`, the id must start with
+  `someone.`. Letters, digits, `.`, `-` and `_` only.
+- `vestra.` is reserved for the player's built-in (official) plugins, and
+  an id cannot repeat an existing one, a hosted plugin's included (even with
+  different case).
+- Only the player's built-ins are official. Every plugin in this
+  repository's index, hosted or registered, is a third-party plugin; the
+  index's `official: true` marks the repository the player trusts by
+  default, not its plugins.
+
+### Owners
+
+- A new registration must list the pull request author in `owners`.
+- After that, only an owner listed on `main` may change the file (a new
+  `commit`, a new `path`, adding or removing owners) or remove it. A
+  maintainer can step in for an abandoned registration.
+- The [`Registry owners`](.github/workflows/registry.yml) check enforces this
+  from the base branch's copy of the script, so a pull request cannot change
+  the check that judges it.
+
+### The planned flow
+
+On the pull request (`Add someone.cool-visualizer`, or
+`Update someone.cool-visualizer to 1.2.0`):
+
+- **Registry owners** ([`registry.yml`](.github/workflows/registry.yml)) checks that the author is in `owners` of a new registration, or already an owner of one they change. It runs from the base branch and never runs the pull request's code.
+- **CI** ([`ci.yml`](.github/workflows/ci.yml)) validates the file (`npm run registry`) and dry-runs the publish flow. Today that dry run fails on any registration (third-party builds are not implemented), which is what keeps registrations from being merged; once they are, it builds and tests the plugin from the registered commit.
+- **Review**: a maintainer reads the source at the commit (for an update, the diff since the previous one): that it does what its README says, that the capabilities match, and how it uses files, the network and child processes.
+
+After the merge, [`publish.yml`](.github/workflows/publish.yml) builds the package at the commit without secrets, releases it as `<id>-v<version>` with a build provenance attestation, signs the index in a separate job that never runs plugin code, and deploys it.
+
+- **Update**: the author bumps `version` in the manifest, commits, and opens a pull request that changes `commit`. A version is published once and never rebuilt.
+- **Withdraw**: an owner opens a pull request that deletes the file.
+- **Revoke**: owners can ask a maintainer to add a broken or harmful version to [`revoked.json`](#revoking-a-version).
+
+## Revoking a version
+
+`revoked.json` is maintained by hand. To revoke, add an entry in a pull
+request:
+
+```json
+[
+  {
+    "id": "someone.cool-visualizer",
+    "versions": ">=1.0.0 <1.2.0",
+    "reason": "Deletes files outside its data directory. Update to 1.2.0."
+  }
+]
+```
+
+- `id`: the plugin id (not a `vestra.` id: the built-ins are not in this
+  index). `reason`: 1–500 characters, shown to users.
+- `versions`: an exact version (`1.2.0`) or a range: comparators `<`, `<=`,
+  `>`, `>=`, `=` joined by spaces (all must hold), alternatives joined by
+  `||`, or `*` for every version. Examples: `<1.2.3`, `>=1.0.0 <1.2.0`,
+  `0.1.0 || >=0.3.0 <0.3.2`. No `^`, `~`, `x` or hyphen ranges.
+- **Append-only.** Add new entries at the end. Never remove, edit or
+  reorder an entry once it is on `main`: the store remembers every
+  revocation it has seen and rejects an index that lacks one as a replayed
+  old index, so a dropped entry would make every store ignore the official
+  index. A wrong entry stays; publish a fixed version (and, if the range was
+  too wide, say so in the plugin's changelog). CI (`npm run registry` against
+  the pull request's base, and the `Registry owners` check from the base
+  branch's script) and the signing job (against the previously signed index)
+  refuse a change that breaks this.
+- The entry is copied into the index's `revoked` unchanged on the next
+  publish. The store disables an installed version that matches and tells
+  the user why; the package stays downloadable for the record.
+- Owners of a plugin (hosted or registered) can ask for a revocation;
+  maintainers can revoke any version.
+
+## Retiring a hosted plugin
+
+A plugin that is no longer offered (its owner or a maintainer decides) is
+delisted, not revoked:
+
+1. In one pull request, delete `plugins/<name>/` and its line in
+   `plugins/owners.toml`, and remove or reword every other mention of it in
+   the repository (docs, comments, test fixtures that only used it as an
+   example).
+2. The next publish drops it from `index.json` (the build logs
+   `<id>: no longer in the repository, dropped from the index`); the signing
+   job accepts a plugin that is absent as a whole, and only refuses a listed
+   plugin that loses a version.
+3. Its Releases stay, so the published packages remain downloadable for the
+   record. Nobody can install it from the store any more.
+4. Installed copies keep working. The store keeps them under All and
+   Installed with the note "The repository no longer offers this plugin; the
+   store no longer checks it for updates (it still checks for
+   revocations)". There is no update path; users can disable or uninstall
+   it.
+5. Do not add a `revoked.json` entry just to retire a plugin. Revoke only
+   when installed copies are harmful or broken
+   ([above](#revoking-a-version)): the store still applies the official
+   index's `revoked` to a delisted plugin, so "delist + `*`" disables it on
+   users' machines.
+
+Retired plugins: `zysilm.vestrabili` (2026-11-12, last version 0.5.2;
+delisted without a revocation).
+
+## Publishing
+
+Every push to `main` runs [`publish.yml`](.github/workflows/publish.yml):
+
+```text
+plugins ──▶ static ──┬──▶ plugin × N ──┬──▶ build ──▶ release-and-sign ──┬──▶ attest
+                     └─────────────────┘                                 └──▶ deploy
+```
+
+0. **plugins, static, plugin × N**: the same reusable checks as `ci.yml`,
+   for every plugin, without the npm cache. Nothing is built for release
+   unless they pass.
+1. **build** (no secrets, no token while plugin code runs): `npm ci`, packs every plugin whose version has no Release yet with
+   `vestra-plugin pack`; writes the unsigned `index.json` and the store
+   assets. A version that is already released is never released again (it
+   is packed once more into a scratch directory only to read its
+   translations for `index.json`); earlier versions come from the published
+   index.
+2. **release-and-sign** (environment `plugins-index`, secret
+   `VESTRA_INDEX_SIGNING_KEY`, plus `VESTRA_INDEX_SIGNING_KEY_NEXT` during a
+   [key rotation](#key-rotation)): runs no plugin code and no `npm ci`. It
+   checks the build artifact as untrusted data (each package's and store
+   asset's sha256 and size against the index; the version history, `revoked`
+   (append-only) and `generated` (previous + 1) against the previously signed
+   index; `revoked` against `revoked.json`; nothing on the site but
+   `index.json` and the assets it references), creates the Releases with
+   `gh release create`, and signs `index.json`.
+3. **attest** (`id-token: write`, `attestations: write`, this job only; runs
+   no repository code): a SLSA build provenance attestation
+   (`actions/attest-build-provenance`) for each new `.vxp`, the same bytes
+   that release-and-sign checked and released. Verify one with
+   `gh attestation verify <file>.vxp --repo vestrasys/vestra-player-plugins`.
+4. **deploy**: publishes the signed site to GitHub Pages.
+
+Build and signing are separate jobs so that code from plugins (build
+scripts, dependencies, tests, and later third-party sources) never runs where
+the signing key is.
+
+What gets published (the repository must be **public**; Releases downloads
+and Pages of a private repository need authentication or a paid plan):
+
+| What | Where |
+| --- | --- |
+| Package | Release `<id>-v<version>`, asset `<id>-<version>.vxp`: `https://github.com/vestrasys/vestra-player-plugins/releases/download/<id>-v<version>/<id>-<version>.vxp` |
+| Index | `https://vestrasys.github.io/vestra-player-plugins/index.json` |
+| Signature | `index.json.sig` next to it: one or more base64 Ed25519 signatures over the exact bytes of `index.json`, one per line (no final line break); valid when any of them verifies with a trusted key, [`keys/index-signing.pub.pem`](keys/index-signing.pub.pem) |
+| Store assets | `assets/<id>/<version>/README.md`, `CHANGELOG.md`, `icon.<png\|jpg\|jpeg>` next to the index (newest version only) |
+
+### `index.json`
+
+```json
+{
+  "schema": 1,
+  "generated": 7,
+  "name": "Vestra Player official repository",
+  "official": true,
+  "plugins": [
+    {
+      "id": "zysilm.vestratube",
+      "name": "VestraTube", "author": "zysilm", "punchline": "…", "description": "…",
+      "tags": ["online video", "YouTube", "download"], "license": "Apache-2.0",
+      "iconUrl": null, "iconSha256": null, "iconSize": null,
+      "readmeUrl": "https://…/README.md", "readmeSha256": "…", "readmeSize": 812,
+      "changelogUrl": "https://…/CHANGELOG.md", "changelogSha256": "…", "changelogSize": 240,
+      "sourceUrl": "https://github.com/vestrasys/vestra-player-plugins/tree/main/plugins/vestratube",
+      "translations": {
+        "zh-Hans": { "name": "VestraTube", "punchline": "…", "description": "…",
+                     "tags": ["网络视频", "YouTube", "下载"] }
+      },
+      "versions": [
+        { "version": "0.3.0", "apiVersion": "vestra/1", "minPlayerVersion": "0.2.0",
+          "capabilities": ["…"], "downloadUrl": "https://…/zysilm.vestratube-0.3.0.vxp",
+          "sha256": "…", "size": 9370, "published": "2026-10-21T…Z" }
+      ]
+    }
+  ],
+  "revoked": [],
+  "extensions": {}
+}
+```
+
+- Plugin fields come from the newest version's `manifest.json`; a field the
+  manifest leaves out is `null` (`tags`: `[]`, `name`: the id).
+- A plugin no longer in `plugins/` (removed, or renamed to a new id) is
+  dropped from the next index; its Releases stay (see
+  [Retiring a hosted plugin](#retiring-a-hosted-plugin)). A renamed plugin starts a
+  new version history under its new id. (When youtube and bilibili moved
+  from `vestra.*` to `zysilm.*`, and again when they became
+  `zysilm.vestratube` and `zysilm.vestrabili`, the old entries were dropped
+  this way; `revoked.json` needed no entry, since the player had not been
+  released.)
+- `versions` is newest first. There are no release channels and no download
+  counts (ecosystem plan 1.6 items 8 and 9).
+- `published` is when CI built the version.
+- `generated` is a sequence number: the previously signed index's
+  `generated` + 1 on every publish (1 on the first publish, and when the
+  previous index predates the field). `release-and-sign` refuses any other
+  value. It is not a date and may skip numbers from a client's point of view
+  (a client does not see every publish). **Clients** remember the highest
+  `generated` they have accepted from this repository and reject a signed
+  index whose `generated` is lower (a replayed old index); an index without
+  `generated` counts as 0, so once a client has seen one with the field it
+  rejects any without it. The same value again is fine (an unchanged index
+  fetched twice).
+- Each store asset has `<asset>Url`, `<asset>Sha256` (lowercase hex sha256 of
+  the file) and `<asset>Size` (bytes) for `icon`, `readme` and `changelog`;
+  all three are `null` when the plugin has no such file. They follow the
+  flat `sha256`/`size` pair of a version entry. The signature covers them, so
+  a client that checks the downloaded file against them gets the same
+  guarantee for README, changelog and icon as for the package. Limits (the
+  store's read limits; the build fails above them): icon 512 KiB, README and
+  changelog 256 KiB each.
+- `translations` (optional) holds the display fields `name`, `punchline`,
+  `description` and `tags` in other languages, keyed by the player's
+  language tag (`zh-Hans`, `ja`, `ko`, `de`, `fr`, `es`; never `en`, which
+  is the entry's own fields). They come from the plugin's catalogs: the
+  SDK's `vestra-plugin i18n extract` puts the manifest's display fields into
+  `locales/messages.pot` (msgid = the English text, no context),
+  `vestra-plugin pack` compiles each `locales/<lang>.po` into
+  `dist/locales/<lang>.json`, and the build reads those from the package of
+  the newest version, like the English fields from the plugin's source. A
+  field is present only when that language translates it, a language only
+  when it translates at least one field, and `translations` only when some
+  language does. `tags` then has one entry per tag of the plugin, in the
+  same order, with an untranslated tag in English (the way the player shows
+  them). A store shows `translations[<interface language>].<field>` when
+  present and the English field otherwise. The signature covers it, and
+  `indexProblems` (`scripts/lib/publishing.mjs`) checks its shape in the
+  build and the signing job.
+- Compatibility: `generated`, the asset fields and `translations` were added
+  within `schema` 1. Clients ignore unknown keys (the store does), so older
+  clients read the new index unchanged; this repository's own scripts still
+  read an index from before them as the previous index.
+
+Try it locally (no network; writes to a temporary directory and prints the
+index):
+
+```sh
+npm run index:dry-run
+```
+
+### Key rotation
+
+The trusted public keys are every `keys/*.pub.pem`: they check the
+previously published index and the signing keys (`sign-index` refuses a
+private key that matches none of them). `index.json.sig` carries one
+signature per signing key, and a client accepts the index when any signature
+verifies with any key it trusts. That makes a planned rotation possible
+without a flag day:
+
+1. **New key, dual signing.** `node scripts/generate-signing-key.mjs
+   <private file outside the repository> keys/index-signing-next.pub.pem`.
+   Commit the public key; put the private key into the secret
+   `VESTRA_INDEX_SIGNING_KEY_NEXT` of the `plugins-index` environment (then
+   delete the file). From the next publish on, `index.json.sig` has two
+   lines: old key, new key.
+2. **Players learn the new key.** A player release embeds both public keys
+   in the store (`src/plugins/store/keys/`). Old players keep verifying the
+   old key's signature, new ones either.
+3. **Drop the old key** once the players that only know the old key are no
+   longer supported: move the new private key into
+   `VESTRA_INDEX_SIGNING_KEY`, delete `VESTRA_INDEX_SIGNING_KEY_NEXT`,
+   replace `keys/index-signing.pub.pem` with the new public key and delete
+   `keys/index-signing-next.pub.pem`, in one commit. The previous index on
+   Pages is signed with both keys, so it still verifies.
+4. A later player release removes the old key from the store.
+
+If the old private key leaked, skip the waiting: set the new key as
+`VESTRA_INDEX_SIGNING_KEY` right away (no `_NEXT`), ship a player that trusts
+only the new key, and keep the old public key in `keys/` until the first
+index signed with the new key is live (the build checks the previous index
+with `keys/`), then remove it. Players that only trust the old key cannot
+tell an attacker's index signed with the leaked key from ours; see the
+store design §6.3.
+
+Check a published or local index with any set of keys:
+
+```sh
+node scripts/verify-index.mjs keys/*.pub.pem https://vestrasys.github.io/vestra-player-plugins/
+```
+
+### The signing key
+
+The index is signed in the `release-and-sign` job of
+[`publish.yml`](.github/workflows/publish.yml) with an Ed25519 key held in the
+`VESTRA_INDEX_SIGNING_KEY` secret of the `plugins-index` environment (and a
+second one in `VESTRA_INDEX_SIGNING_KEY_NEXT` during a rotation). The public
+key is [`keys/index-signing.pub.pem`](keys/index-signing.pub.pem); the
+player and the store plugin embed it, so replacing the key needs a player
+release ([key rotation](#key-rotation)). `node scripts/generate-signing-key.mjs <private> <public>` makes a
+new pair (the private key file gets mode 600 and is never printed).

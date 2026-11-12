@@ -243,7 +243,7 @@ export async function buildIndex({
   if (dependencies.length) throw new Error(dependencies.join("\n"));
   if (registry.entries.length)
     // Third-party plugins are built from their registered source in this job
-    // (no secrets), each in isolation; not implemented yet (CONTRIBUTING.md).
+    // (no secrets), each in isolation; not implemented yet (MAINTAINING.md).
     throw new Error(
       `third-party builds are not implemented yet; cannot publish ${registry.entries.map((entry) => entry.id).join(", ")}`,
     );
