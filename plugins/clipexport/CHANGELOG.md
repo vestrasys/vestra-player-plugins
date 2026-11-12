@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.1
+
+**Who must change: nobody.** No new permission and the same player (0.7.6 or later). Settings carry over.
+
+- While Animated GIF or Animated WebP is chosen, a small dimmed line under Advanced ▸ Quality says what it writes: `GIF · 480 px long edge · 15 fps · up to 60 s`, `WebP · 640 px long edge · 20 fps · up to 60 s`. It takes the place of the hidden H.264 rows; the ⓘ beside Fast | Precise still says it too. The numbers are the encoder's own.
+- English, Simplified Chinese, German, Spanish, French, Japanese and Korean.
+
 ## 0.5.0
 
 **Who must change: nobody.** No new permission and the same player (0.7.6 or later). Settings carry over; the Quality choice keeps what it was.

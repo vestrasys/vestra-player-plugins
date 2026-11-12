@@ -189,11 +189,11 @@ msgstr "アニメーション画像を書き出せませんでした。"
 msgid "Export failed: {}"
 msgstr "書き出しに失敗しました：{}"
 
-#: main.ts:180 ui/tab.slint:1486 ui/tab.slint:1988
+#: main.ts:180 ui/tab.slint:1496 ui/tab.slint:2011
 msgid "Clip"
 msgstr "クリップ"
 
-#: main.ts:227 ui/tab.slint:776
+#: main.ts:227 ui/tab.slint:786
 msgid "Show in Folder"
 msgstr "フォルダーに表示"
 
@@ -213,7 +213,7 @@ msgstr "既存のフォルダを選択してください。"
 msgid "Clip folder: {}"
 msgstr "クリップのフォルダ：{}"
 
-#: main.ts:487 ui/tab.slint:1794
+#: main.ts:487 ui/tab.slint:1817
 msgid "Export Clip"
 msgstr "クリップを書き出す"
 
@@ -221,141 +221,141 @@ msgstr "クリップを書き出す"
 msgid "Exporting the last {} seconds"
 msgstr "最後の {} 秒を書き出しています"
 
-#: main.ts:812
+#: main.ts:823
 msgid "Added as part {}"
 msgstr "パート {} として追加しました"
 
-#: main.ts:848
+#: main.ts:859
 msgid "Collection cleared."
 msgstr "コレクションを空にしました。"
 
-#: main.ts:848 main.ts:1060
+#: main.ts:859 main.ts:1073
 msgid "Undo"
 msgstr "元に戻す"
 
 #. {} is a part number of the Collection (1, 2, …).
-#: main.ts:910 ui/parts.slint:76
+#: main.ts:921 ui/parts.slint:76
 msgid "Part {} is missing: locate it or remove it"
 msgstr "パート {} が見つかりません：場所を指定するか削除してください"
 
 #. {} is a part number of the Collection.
-#: main.ts:910 ui/parts.slint:78
+#: main.ts:921 ui/parts.slint:78
 msgid "Part {} has changed: locate it or remove it"
 msgstr "パート {} が変更されました：場所を指定するか削除してください"
 
 #. {} is a part number of the Collection.
-#: main.ts:910 ui/parts.slint:80
+#: main.ts:921 ui/parts.slint:80
 msgid "Part {} is no longer known: remove it"
 msgstr "パート {} はもう記録されていません：削除してください"
 
 #. {} is a part number of the Collection.
-#: main.ts:910 ui/parts.slint:82
+#: main.ts:921 ui/parts.slint:82
 msgid "Part {} has no video: remove it"
 msgstr "パート {} には映像がありません：削除してください"
 
 #. {} is a part number of the Collection.
-#: main.ts:910 ui/parts.slint:84
+#: main.ts:921 ui/parts.slint:84
 msgid "Part {} is outside its file: remove it"
 msgstr "パート {} はファイルの範囲外です：削除してください"
 
-#: main.ts:924 main.ts:1484
+#: main.ts:937 main.ts:1500
 msgid "Export Collection"
 msgstr "コレクションを書き出す"
 
-#: main.ts:1060
+#: main.ts:1073
 msgid "Transition applied to every join."
 msgstr "このトランジションをすべてのつなぎ目に適用しました。"
 
-#: main.ts:1097 manifest.json
+#: main.ts:1110 manifest.json
 msgid "Clip Export"
 msgstr "クリップ書き出し"
 
-#: main.ts:1248 main.ts:1514
+#: main.ts:1264 main.ts:1530
 msgid "The Clip Export tab could not open."
 msgstr "「クリップ書き出し」タブを開けませんでした。"
 
-#: main.ts:1483
+#: main.ts:1499
 msgid "Export Clip…"
 msgstr "クリップを書き出す…"
 
-#: main.ts:1483 main.ts:1484 main.ts:1574
+#: main.ts:1499 main.ts:1500 main.ts:1590
 msgid "Export"
 msgstr "エクスポート"
 
-#: main.ts:1483 main.ts:1484 main.ts:1579 ui/tab.slint:1694
+#: main.ts:1499 main.ts:1500 main.ts:1595 ui/tab.slint:1717
 msgid "Nothing to export"
 msgstr "書き出せるものがありません"
 
-#: main.ts:1484
+#: main.ts:1500
 msgid "Clip Export Tab"
 msgstr "「クリップ書き出し」タブ"
 
-#: main.ts:1484
+#: main.ts:1500
 msgid "Export Clip Range"
 msgstr "クリップ範囲を書き出す"
 
-#: main.ts:1484 ui/tab.slint:1728
+#: main.ts:1500 ui/tab.slint:1751
 msgid "Set Clip Start"
 msgstr "クリップの開始を設定"
 
-#: main.ts:1484 ui/tab.slint:1748
+#: main.ts:1500 ui/tab.slint:1771
 msgid "Set Clip End"
 msgstr "クリップの終了を設定"
 
-#: main.ts:1484
+#: main.ts:1500
 msgid "Export Tasks…"
 msgstr "書き出しタスク…"
 
-#: main.ts:1484
+#: main.ts:1500
 msgid "Clip Export Settings…"
 msgstr "クリップ書き出しの設定…"
 
-#: main.ts:1484
+#: main.ts:1500
 msgid "Clip Folder…"
 msgstr "クリップのフォルダ…"
 
-#: main.ts:1484 ui/tab.slint:1955
+#: main.ts:1500 ui/tab.slint:1978
 msgid "Open Clip Folder"
 msgstr "クリップのフォルダを開く"
 
-#: main.ts:1484
+#: main.ts:1500
 msgid "Show Last Clip in Folder"
 msgstr "最新のクリップをフォルダーに表示"
 
-#: main.ts:1484 ui/tab.slint:1853
+#: main.ts:1500 ui/tab.slint:1876
 msgid "Add Range to Collection"
 msgstr "範囲をコレクションに追加"
 
-#: main.ts:1484
+#: main.ts:1500
 msgid "Show Collection"
 msgstr "コレクションを表示"
 
-#: main.ts:1484
+#: main.ts:1500
 msgid "Clear Collection"
 msgstr "コレクションを空にする"
 
-#: main.ts:1484
+#: main.ts:1500
 msgid "Undo Clear Collection"
 msgstr "コレクションを空にしたのを元に戻す"
 
-#: main.ts:1484 ui/tab.slint:1015
+#: main.ts:1500 ui/tab.slint:1025
 msgid "Remove from Collection"
 msgstr "コレクションから削除"
 
-#: main.ts:1484
+#: main.ts:1500
 msgid "Undo Apply to All"
 msgstr "すべてに適用を元に戻す"
 
-#: main.ts:1537
+#: main.ts:1553
 msgid "Clip start: {}"
 msgstr "クリップの開始：{}"
 
-#: main.ts:1542
+#: main.ts:1558
 msgid "Clip end: {}"
 msgstr "クリップの終了：{}"
 
 #. {} is 10, 30, 60 or 120.
-#: main.ts:1573 ui/tab.slint:1782
+#: main.ts:1589 ui/tab.slint:1805
 msgid "Export Last {} Seconds"
 msgstr "最後の {} 秒を書き出す"
 
@@ -385,11 +385,11 @@ msgstr "クリップ"
 msgid "export"
 msgstr "書き出し"
 
-#: model.ts:216 ui/tab.slint:229
+#: model.ts:216 ui/tab.slint:236
 msgid "No Audio"
 msgstr "音声なし"
 
-#: model.ts:217 ui/tab.slint:229
+#: model.ts:217 ui/tab.slint:236
 msgid "Current Track"
 msgstr "現在のトラック"
 
@@ -410,7 +410,7 @@ msgid "none"
 msgstr "なし"
 
 #. {} is frames per second.
-#: ui/parts.slint:92 ui/tab.slint:1614
+#: ui/parts.slint:92 ui/tab.slint:1637
 msgid "{} fps"
 msgstr "{} fps"
 
@@ -522,35 +522,35 @@ msgstr "書き出しを開始しました。「結果」で確認できます。
 msgid "Restarted."
 msgstr "もう一度開始しました。"
 
-#: ui/parts.slint:163 ui/tab.slint:552
+#: ui/parts.slint:163 ui/tab.slint:562
 msgid "Fast"
 msgstr "高速"
 
-#: ui/parts.slint:164 ui/tab.slint:553
+#: ui/parts.slint:164 ui/tab.slint:563
 msgid "Precise"
 msgstr "正確"
 
-#: ui/parts.slint:170 ui/tab.slint:1590 ui/tab.slint:1591
+#: ui/parts.slint:170 ui/tab.slint:1600 ui/tab.slint:1601
 msgid "Same as source"
 msgstr "ソースと同じ"
 
-#: ui/parts.slint:171 ui/tab.slint:1563 ui/tab.slint:1590 ui/tab.slint:1591
+#: ui/parts.slint:171 ui/tab.slint:1573 ui/tab.slint:1600 ui/tab.slint:1601
 msgid "High quality"
 msgstr "高画質"
 
-#: ui/parts.slint:172 ui/tab.slint:1590 ui/tab.slint:1591
+#: ui/parts.slint:172 ui/tab.slint:1600 ui/tab.slint:1601
 msgid "Small file"
 msgstr "小さいファイル"
 
-#: ui/parts.slint:173 ui/tab.slint:1590 ui/tab.slint:1591
+#: ui/parts.slint:173 ui/tab.slint:1600 ui/tab.slint:1601
 msgid "Animated GIF"
 msgstr "アニメーション GIF"
 
-#: ui/parts.slint:174 ui/tab.slint:1590 ui/tab.slint:1591
+#: ui/parts.slint:174 ui/tab.slint:1600 ui/tab.slint:1601
 msgid "Animated WebP"
 msgstr "アニメーション WebP"
 
-#: ui/parts.slint:175 ui/tab.slint:1590
+#: ui/parts.slint:175 ui/tab.slint:1600
 msgid "Custom"
 msgstr "カスタム"
 
@@ -576,7 +576,7 @@ msgstr "{} 日前"
 #. {} is a number of seconds.
 #. {} is a clip's length in seconds ("3.5").
 #. {} is a length in seconds ("1.0").
-#: ui/parts.slint:194 ui/tab.slint:706 ui/tab.slint:985 ui/tab.slint:1077 ui/tab.slint:1443 ui/tab.slint:1444 ui/tab.slint:1445 ui/tab.slint:1446 ui/tab.slint:1678 ui/tab.slint:2029
+#: ui/parts.slint:194 ui/tab.slint:716 ui/tab.slint:995 ui/tab.slint:1087 ui/tab.slint:1453 ui/tab.slint:1454 ui/tab.slint:1455 ui/tab.slint:1456 ui/tab.slint:1701 ui/tab.slint:2052
 msgid "{} s"
 msgstr "{} 秒"
 
@@ -596,486 +596,491 @@ msgid "about {0}–{1} min"
 msgstr "約 {0}～{1} 分"
 
 #. {0} is the time a Fast cut starts at (the keyframe), {1} how many seconds before the typed start.
-#: ui/tab.slint:611
+#: ui/tab.slint:621
 msgid "{0} (−{1} s)"
 msgstr "{0}（{1} 秒前）"
 
-#: ui/tab.slint:655
+#: ui/tab.slint:665
 msgid "Default name"
 msgstr "既定の名前"
 
-#: ui/tab.slint:728
+#: ui/tab.slint:738
 msgid "File moved or deleted"
 msgstr "ファイルは移動または削除されました"
 
-#: ui/tab.slint:729
+#: ui/tab.slint:739
 msgid "Failed: {}"
 msgstr "失敗：{}"
 
 #. {} is a time range.
-#: ui/tab.slint:732
+#: ui/tab.slint:742
 msgid "Queued · {}"
 msgstr "待機中 · {}"
 
 #. {} is a percentage.
-#: ui/tab.slint:734 ui/tab.slint:891
+#: ui/tab.slint:744 ui/tab.slint:901
 msgid "Finishing…"
 msgstr "仕上げ中…"
 
 #. {0} is a percentage, {1} seconds.
-#: ui/tab.slint:737
+#: ui/tab.slint:747
 msgid "Exporting · {0} % · about {1} s left"
 msgstr "書き出し中 · {0}% · 残り約 {1} 秒"
 
 #. {} is a percentage.
-#: ui/tab.slint:739
+#: ui/tab.slint:749
 msgid "Exporting · {} %"
 msgstr "書き出し中 · {}%"
 
 #. {0} is a task state (Exporting), {1} the time spent (0:12).
-#: ui/tab.slint:741 ui/tab.slint:1562
+#: ui/tab.slint:751 ui/tab.slint:1572
 msgid "{0} · {1}"
 msgstr "{0} · {1}"
 
-#: ui/tab.slint:743
+#: ui/tab.slint:753
 msgid "{} MB"
 msgstr "{} MB"
 
-#: ui/tab.slint:761 ui/tab.slint:859
+#: ui/tab.slint:771 ui/tab.slint:869
 msgid "Cancel"
 msgstr "キャンセル"
 
-#: ui/tab.slint:766
+#: ui/tab.slint:776
 msgid "Retry"
 msgstr "再試行"
 
-#: ui/tab.slint:771
+#: ui/tab.slint:781
 msgid "Open"
 msgstr "開く"
 
-#: ui/tab.slint:781
+#: ui/tab.slint:791
 msgid "Remove from List"
 msgstr "一覧から削除"
 
 #. {} is the file or folder name.
-#: ui/tab.slint:856
+#: ui/tab.slint:866
 msgid "Exporting {}"
 msgstr "{} を書き出し中"
 
 #. {0} is the transition being written, {1} how many the merged export has.
-#: ui/tab.slint:887
+#: ui/tab.slint:897
 msgid "transition {0} / {1}"
 msgstr "トランジション {0} / {1}"
 
 #. {0} is the part being written, {1} how many parts the merged export has.
-#: ui/tab.slint:889
+#: ui/tab.slint:899
 msgid "part {0} / {1}"
 msgstr "パート {0} / {1}"
 
-#: ui/tab.slint:892
+#: ui/tab.slint:902
 msgid "{} %"
 msgstr "{}%"
 
 #. {} is a number of seconds.
-#: ui/tab.slint:894
+#: ui/tab.slint:904
 msgid "about {} s left"
 msgstr "残り約 {} 秒"
 
 #. {} is the number of exports waiting (1–4).
-#: ui/tab.slint:897
+#: ui/tab.slint:907
 msgid "+{} queued"
 msgstr "ほか {} 件待機中"
 
-#: ui/tab.slint:1005
+#: ui/tab.slint:1015
 msgid "Locate…"
 msgstr "場所を指定…"
 
-#: ui/tab.slint:1046
+#: ui/tab.slint:1056
 msgid "Transitions: Precise only"
 msgstr "トランジション：正確のみ"
 
 #. {0} is a transition with its direction ("Slide ←"), {1} its length in seconds ("1.5").
-#: ui/tab.slint:1049
+#: ui/tab.slint:1059
 msgid "{0} · {1} s"
 msgstr "{0} · {1} 秒"
 
 #. {0} and {1} are part numbers ("Part 2 → 3"); then what happens to the sound.
-#: ui/tab.slint:1051
+#: ui/tab.slint:1061
 msgid "Part {0} → {1}. Click to change."
 msgstr "パート {0} → {1}。クリックで変更。"
 
 #. {} is a number of parts (2 or more).
-#: ui/tab.slint:1192
+#: ui/tab.slint:1202
 msgid "1 part"
 msgstr "1 パート"
 
 #. {} is a number of parts (2 or more).
-#: ui/tab.slint:1192
+#: ui/tab.slint:1202
 msgid "{} parts"
 msgstr "{} パート"
 
-#: ui/tab.slint:1210
+#: ui/tab.slint:1220
 msgid "transitions off in Fast"
 msgstr "高速ではトランジションなし"
 
 #. {} is the seconds the transition takes off the length ("1.0").
-#: ui/tab.slint:1212
+#: ui/tab.slint:1222
 msgid "1 transition −{} s"
 msgstr "トランジション 1 つ −{} 秒"
 
 #. {0} is a number of transitions (2 or more), {1} the seconds they take off ("2.5").
-#: ui/tab.slint:1214
+#: ui/tab.slint:1224
 msgid "{0} transitions −{1} s"
 msgstr "トランジション {0} 個 −{1} 秒"
 
-#: ui/tab.slint:1234
+#: ui/tab.slint:1244
 msgid "Export Merged"
 msgstr "結合して書き出す"
 
-#: ui/tab.slint:1239
+#: ui/tab.slint:1249
 msgid "Export the parts as one file into the clip folder"
 msgstr "パートを 1 つのファイルにしてクリップのフォルダーに書き出す"
 
-#: ui/tab.slint:1245 ui/tab.slint:1808
+#: ui/tab.slint:1255 ui/tab.slint:1831
 msgid "Export As…"
 msgstr "名前を付けて書き出す…"
 
-#: ui/tab.slint:1247
+#: ui/tab.slint:1257
 msgid "Export the parts as one file you choose"
 msgstr "パートを 1 つのファイルにして、選んだ場所に書き出す"
 
-#: ui/tab.slint:1278
+#: ui/tab.slint:1288
 msgid "Fast cut copies the streams: lossless and done in seconds, but a clip can only start on a keyframe."
 msgstr "高速カットはストリームをコピーします。無劣化で数秒で終わりますが、クリップはキーフレームからしか始められません。"
 
 #. {0} and {2} are times, {1} seconds.
-#: ui/tab.slint:1282
+#: ui/tab.slint:1292
 msgid "It will start at {0}, {1} s before your start, and end at {2}."
 msgstr "{0} から始まり（指定した開始より {1} 秒前）、{2} で終わります。"
 
 #. {0} and {1} are times.
-#: ui/tab.slint:1284
+#: ui/tab.slint:1294
 msgid "It will start at {0} and end at {1}."
 msgstr "{0} から始まり、{1} で終わります。"
 
-#: ui/tab.slint:1285
+#: ui/tab.slint:1295
 msgid "It starts on the keyframe at or before your start."
 msgstr "指定した開始位置かその前のキーフレームから始まります。"
 
-#: ui/tab.slint:1286
+#: ui/tab.slint:1296
 msgid "Its streams do not fit in MP4, so it is saved as MKV."
 msgstr "ストリームが MP4 に収まらないため、MKV で保存します。"
 
-#: ui/tab.slint:1287
+#: ui/tab.slint:1297
 msgid "Pick Precise to start on the exact frame."
 msgstr "正確なフレームから始めるには「正確」を選んでください。"
 
-#: ui/tab.slint:1288
+#: ui/tab.slint:1298
 msgid "Precise re-encodes from the exact frame, and can include video effects and subtitles."
 msgstr "「正確」は正確なフレームから再エンコードし、映像効果と字幕も含められます。"
 
 #. {0} and {1} are times.
-#: ui/tab.slint:1290
+#: ui/tab.slint:1300
 msgid "Precise re-encodes from the exact frame {0} to {1}, and can include video effects and subtitles."
 msgstr "「正確」は {0} のフレームから {1} まで再エンコードし、映像効果と字幕も含められます。"
 
 #. what the Animated GIF and Animated WebP qualities write.
-#: ui/tab.slint:1293
+#: ui/tab.slint:1303
 msgid "Animated GIF: at most 480 px and 15 fps, no sound, loops, up to 60 s."
 msgstr "アニメーション GIF：最大 480 px・15 fps、音声なし、ループ、最長 60 秒。"
 
-#: ui/tab.slint:1294
+#: ui/tab.slint:1304
 msgid "Animated WebP: at most 640 px and 20 fps, no sound, loops, up to 60 s."
 msgstr "アニメーション WebP：最大 640 px・20 fps、音声なし、ループ、最長 60 秒。"
 
 #. {0} seconds of media, {1} megabytes ("46" or "55–80"), {2} a time span ("2 s", "about 1–3 min").
-#: ui/tab.slint:1299
+#: ui/tab.slint:1309
 msgid "Length {0} s · ≈ {1} MB · ≈ {2}"
 msgstr "長さ {0} 秒 · 約 {1} MB · 約 {2}"
 
 #. {0} seconds of media, {1} a time span ("2 s", "about 1–3 min").
-#: ui/tab.slint:1301
+#: ui/tab.slint:1311
 msgid "Length {0} s · ≈ {1}"
 msgstr "長さ {0} 秒 · 約 {1}"
 
 #. {0} is a part number; {1} and {2} are what differs (a size, a codec, a frame rate) in that part and in part 1.
-#: ui/tab.slint:1312
+#: ui/tab.slint:1322
 msgid "Fast: part {0} is {1}, part 1 is {2}"
 msgstr "高速：パート {0} は {1}、パート 1 は {2}"
 
-#: ui/tab.slint:1318
+#: ui/tab.slint:1328
 msgid "Switched to Precise: transitions need re-encoding."
 msgstr "正確に切り替えました：トランジションには再エンコードが必要です。"
 
-#: ui/tab.slint:1319
+#: ui/tab.slint:1329
 msgid "Transitions: Precise only. Fast joins with cuts."
 msgstr "トランジション：正確のみ。高速はカットでつなぎます。"
 
-#: ui/tab.slint:1322
+#: ui/tab.slint:1332
 msgid "Fast copies the streams: only when every part has the same codecs, size, frame rate and audio."
 msgstr "高速はストリームをコピーします：すべてのパートのコーデック、サイズ、フレームレート、音声が同じ場合のみ使えます。"
 
 #. {0} is a size in pixels (3840×1714), {1} frames per second.
-#: ui/tab.slint:1326
+#: ui/tab.slint:1336
 msgid "Precise re-encodes every part to {0} · {1} fps like part 1: other sizes get black bars, audio is resampled to 48 kHz stereo. Quality: the Clip page's Advanced."
 msgstr "正確はすべてのパートをパート 1 と同じ {0} · {1} fps に再エンコードします：サイズが違うものは黒帯が付き、音声は 48 kHz ステレオに変換されます。品質：クリップページの「詳細」。"
 
-#: ui/tab.slint:1327
+#: ui/tab.slint:1337
 msgid "Precise re-encodes every part to the first part's size and frame rate: other sizes get black bars, audio is resampled to 48 kHz stereo. Quality: the Clip page's Advanced."
 msgstr "正確はすべてのパートを最初のパートのサイズとフレームレートに再エンコードします：サイズが違うものは黒帯が付き、音声は 48 kHz ステレオに変換されます。品質：クリップページの「詳細」。"
 
 #. {0} and {1} are part numbers: the transition from part 1 into part 2.
-#: ui/tab.slint:1414
+#: ui/tab.slint:1424
 msgid "Transition {0} → {1}"
 msgstr "トランジション {0} → {1}"
 
 #. the Escape key as printed on keyboards (closes the picker).
-#: ui/tab.slint:1416
+#: ui/tab.slint:1426
 msgid "Esc"
 msgstr "Esc"
 
-#: ui/tab.slint:1433
+#: ui/tab.slint:1443
 msgid "Direction"
 msgstr "方向"
 
-#: ui/tab.slint:1442
+#: ui/tab.slint:1452
 msgid "Duration"
 msgstr "長さ"
 
 #. {} is the longest transition at this junction in seconds ("8.2").
-#: ui/tab.slint:1460
+#: ui/tab.slint:1470
 msgid "Up to {} s here (half of the shorter part)"
 msgstr "ここでは最長 {} 秒（短い方のパートの半分）"
 
-#: ui/tab.slint:1465
+#: ui/tab.slint:1475
 msgid "Apply to All"
 msgstr "すべてに適用"
 
-#: ui/tab.slint:1466
+#: ui/tab.slint:1476
 msgid "Use for every join and for new parts"
 msgstr "すべてのつなぎ目と新しいパートに使う"
 
 #. {} is the number of junctions (places between two parts).
-#: ui/tab.slint:1471
+#: ui/tab.slint:1481
 msgid "1 join"
 msgstr "つなぎ目 1 か所"
 
 #. {} is the number of junctions (places between two parts).
-#: ui/tab.slint:1471
+#: ui/tab.slint:1481
 msgid "{} joins"
 msgstr "つなぎ目 {} か所"
 
-#: ui/tab.slint:1486
+#: ui/tab.slint:1496
 msgid "Results ({})"
 msgstr "結果（{}）"
 
-#: ui/tab.slint:1486
+#: ui/tab.slint:1496
 msgid "Results"
 msgstr "結果"
 
-#: ui/tab.slint:1486
+#: ui/tab.slint:1496
 msgid "Settings"
 msgstr "設定"
 
-#: ui/tab.slint:1496
+#: ui/tab.slint:1506
 msgid "Show or hide this tab"
 msgstr "このタブを表示/非表示"
 
-#: ui/tab.slint:1557
+#: ui/tab.slint:1567
 msgid "Advanced"
 msgstr "詳細"
 
-#: ui/tab.slint:1563 ui/tab.slint:1586
+#: ui/tab.slint:1573 ui/tab.slint:1596
 msgid "Same as source (stream copy)"
 msgstr "ソースと同じ（ストリームコピー）"
 
-#: ui/tab.slint:1574 ui/tab.slint:1641
+#: ui/tab.slint:1584 ui/tab.slint:1664
 msgid "Audio"
 msgstr "音声"
 
-#: ui/tab.slint:1585
+#: ui/tab.slint:1595
 msgid "Quality"
 msgstr "画質"
 
-#: ui/tab.slint:1595
+#: ui/tab.slint:1605
 msgid "High quality (H.264 + AAC in MP4)"
 msgstr "高画質（MP4、H.264 + AAC）"
 
-#: ui/tab.slint:1602
+#. {0} is the format (GIF or WebP), {1} pixels on the longer side of the picture, {2} frames per second, {3} the longest image in seconds.
+#: ui/tab.slint:1613 ui/tab.slint:1614
+msgid "{0} · {1} px long edge · {2} fps · up to {3} s"
+msgstr "{0} · 長辺 {1} px · {2} fps · 最長 {3} 秒"
+
+#: ui/tab.slint:1625
 msgid "Resolution"
 msgstr "解像度"
 
-#: ui/tab.slint:1604 ui/tab.slint:1614
+#: ui/tab.slint:1627 ui/tab.slint:1637
 msgid "Source"
 msgstr "ソース"
 
-#: ui/tab.slint:1611
+#: ui/tab.slint:1634
 msgid "Frame rate"
 msgstr "フレームレート"
 
-#: ui/tab.slint:1621
+#: ui/tab.slint:1644
 msgid "Source bitrate"
 msgstr "ソースのビットレート"
 
-#: ui/tab.slint:1621
+#: ui/tab.slint:1644
 msgid "Quality number {}"
 msgstr "品質値 {}"
 
-#: ui/tab.slint:1632
+#: ui/tab.slint:1655
 msgid "Speed"
 msgstr "速度"
 
-#: ui/tab.slint:1634
+#: ui/tab.slint:1657
 msgid "Faster"
 msgstr "速い"
 
-#: ui/tab.slint:1634
+#: ui/tab.slint:1657
 msgid "Balanced"
 msgstr "バランス"
 
-#: ui/tab.slint:1634
+#: ui/tab.slint:1657
 msgid "Smaller"
 msgstr "小さく"
 
-#: ui/tab.slint:1644
+#: ui/tab.slint:1667
 msgid "AAC {} kb/s"
 msgstr "AAC {} kbps"
 
-#: ui/tab.slint:1653
+#: ui/tab.slint:1676
 msgid "Reset"
 msgstr "リセット"
 
-#: ui/tab.slint:1659
+#: ui/tab.slint:1682
 msgid "Include video effects"
 msgstr "ビデオエフェクトを含める"
 
-#: ui/tab.slint:1665
+#: ui/tab.slint:1688
 msgid "Burn in subtitles"
 msgstr "字幕を焼き込む"
 
-#: ui/tab.slint:1670
+#: ui/tab.slint:1693
 msgid "Effects and subtitles: Precise only"
 msgstr "効果と字幕：「正確」のみ"
 
-#: ui/tab.slint:1675
+#: ui/tab.slint:1698
 msgid "Range"
 msgstr "範囲"
 
-#: ui/tab.slint:1693
+#: ui/tab.slint:1716
 msgid "This picture is made by a plugin"
 msgstr "この映像はプラグインが生成しています"
 
-#: ui/tab.slint:1698
+#: ui/tab.slint:1721
 msgid "There is no file to cut."
 msgstr "カットするファイルがありません。"
 
-#: ui/tab.slint:1699
+#: ui/tab.slint:1722
 msgid "Open a local file to cut clips."
 msgstr "クリップを切り出すにはローカルファイルを開いてください。"
 
-#: ui/tab.slint:1700
+#: ui/tab.slint:1723
 msgid "Open a local video file to cut clips."
 msgstr "クリップを切り出すにはローカルの動画ファイルを開いてください。"
 
-#: ui/tab.slint:1714
+#: ui/tab.slint:1737
 msgid "Start"
 msgstr "開始"
 
-#: ui/tab.slint:1724 ui/tab.slint:1744
+#: ui/tab.slint:1747 ui/tab.slint:1767
 msgid "Now"
 msgstr "現在"
 
-#: ui/tab.slint:1735
+#: ui/tab.slint:1758
 msgid "End"
 msgstr "終了"
 
-#: ui/tab.slint:1765
+#: ui/tab.slint:1788
 msgid "Use A-B range"
 msgstr "A-B 範囲を使う"
 
-#: ui/tab.slint:1768
+#: ui/tab.slint:1791
 msgid "Copy the A-B loop into Start and End"
 msgstr "A-B リピートを開始と終了にコピー"
 
 #. {0} and {1} are the A and B times of the loop.
-#: ui/tab.slint:1770
+#: ui/tab.slint:1793
 msgid "A {0} · B {1}"
 msgstr "A {0} · B {1}"
 
 #. {} is 10, 30, 60 or 120.
-#: ui/tab.slint:1776
+#: ui/tab.slint:1799
 msgid "Last {} s"
 msgstr "最後の {} 秒"
 
-#: ui/tab.slint:1801
+#: ui/tab.slint:1824
 msgid "Export as {} into the clip folder"
 msgstr "{} としてクリップのフォルダーに書き出す"
 
-#: ui/tab.slint:1802
+#: ui/tab.slint:1825
 msgid "Export the range into the clip folder"
 msgstr "範囲をクリップのフォルダーに書き出す"
 
-#: ui/tab.slint:1810
+#: ui/tab.slint:1833
 msgid "Export the range into a file you choose"
 msgstr "範囲を選んだファイルに書き出す"
 
-#: ui/tab.slint:1823
+#: ui/tab.slint:1846
 msgid "Use Precise"
 msgstr "「正確」を使う"
 
-#: ui/tab.slint:1837 ui/tab.slint:1994
+#: ui/tab.slint:1860 ui/tab.slint:2017
 msgid "Collection"
 msgstr "コレクション"
 
-#: ui/tab.slint:1850
+#: ui/tab.slint:1873
 msgid "Add"
 msgstr "追加"
 
 #. {} is the number the new part gets in the Collection.
-#: ui/tab.slint:1856
+#: ui/tab.slint:1879
 msgid "as part {}"
 msgstr "パート {} として"
 
-#: ui/tab.slint:1864
+#: ui/tab.slint:1887
 msgid "Clear"
 msgstr "空にする"
 
-#: ui/tab.slint:1878
+#: ui/tab.slint:1901
 msgid "Join ranges from any local videos into one file:"
 msgstr "ローカル動画の範囲を 1 つのファイルにまとめます："
 
-#: ui/tab.slint:1879
+#: ui/tab.slint:1902
 msgid "set a range above, then + Add."
 msgstr "上で範囲を設定して「+ 追加」。"
 
-#: ui/tab.slint:1947
+#: ui/tab.slint:1970
 msgid "No clips yet."
 msgstr "クリップはまだありません。"
 
-#: ui/tab.slint:1957
+#: ui/tab.slint:1980
 msgid "Clear Finished"
 msgstr "完了したものを消去"
 
-#: ui/tab.slint:1974
+#: ui/tab.slint:1997
 msgid "Save to"
 msgstr "保存先"
 
-#: ui/tab.slint:1981
+#: ui/tab.slint:2004
 msgid "Save to the media folder when possible"
 msgstr "可能な場合はメディアと同じフォルダに保存"
 
-#: ui/tab.slint:1986
+#: ui/tab.slint:2009
 msgid "File name"
 msgstr "ファイル名"
 
-#: ui/tab.slint:2003
+#: ui/tab.slint:2026
 msgid "Click a variable to add it to the file name. Existing files are never overwritten: a number is added."
 msgstr "変数をクリックすると、ファイル名に追加されます。既存のファイルは上書きされず、番号が付きます。"
 
-#: ui/tab.slint:2023
+#: ui/tab.slint:2046
 msgid "Last N s"
 msgstr "最後の N 秒"
 
-#: ui/tab.slint:2026
+#: ui/tab.slint:2049
 msgid "Last clip length"
 msgstr "「最後の N 秒」の長さ"

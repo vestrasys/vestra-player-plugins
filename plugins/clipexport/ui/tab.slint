@@ -125,6 +125,13 @@ export struct Support {
     progress: bool,
 }
 
+// The fixed picture of an animated quality (animated.ts): pixels on the long edge, frames per second, the longest image in seconds.
+export struct AnimatedSpec {
+    box: int,
+    fps: int,
+    seconds: int,
+}
+
 // The A-B loop, as clock times.
 export struct Ab {
     shown: bool,
@@ -232,6 +239,9 @@ export global ClipBridge {
     in-out property <bool> burn;
     // 0 Same as source, 1 High quality, 2 Small file, 3 Animated GIF, 4 Animated WebP, 5 Custom.
     in-out property <int> preset-index: 1;
+    // What Animated GIF and Animated WebP write (the plugin's constants, animated.ts), for the line under Quality.
+    in property <AnimatedSpec> gif-spec;
+    in property <AnimatedSpec> webp-spec;
     in-out property <float> enc-crf: 18;
     // "Same as source": the source video's bitrate instead of the quality number.
     in property <bool> enc-source;
@@ -1594,7 +1604,20 @@ export component ClipExportTab inherits Rectangle {
                                     }
                                     if !root.fast && !ClipBridge.support.encode: Line { text: @tr("High quality (H.264 + AAC in MP4)"); }
                                 }
-                                // The H.264 rows; an animated image's encoding is fixed (the ⓘ says what it is).
+                                // An animated quality's fixed picture, under the chooser in place of the H.264 rows (aligned with it).
+                                if root.animated: HorizontalLayout {
+                                    padding-left: 68px;
+                                    Text {
+                                        text: ClipBridge.preset-index == 3
+                                            // TRANSLATORS: {0} is the format (GIF or WebP), {1} pixels on the longer side of the picture, {2} frames per second, {3} the longest image in seconds.
+                                            ? @tr("{0} · {1} px long edge · {2} fps · up to {3} s", "GIF", ClipBridge.gif-spec.box, ClipBridge.gif-spec.fps, ClipBridge.gif-spec.seconds)
+                                            : @tr("{0} · {1} px long edge · {2} fps · up to {3} s", "WebP", ClipBridge.webp-spec.box, ClipBridge.webp-spec.fps, ClipBridge.webp-spec.seconds);
+                                        color: Theme.text-dim;
+                                        font-size: Theme.font-xs;
+                                        overflow: elide;
+                                    }
+                                }
+                                // The H.264 rows; an animated image's encoding is fixed (the line above says what it is).
                                 if !root.fast && ClipBridge.support.encode && !root.animated: VerticalLayout {
                                     spacing: 5px;
                                     HorizontalLayout {
