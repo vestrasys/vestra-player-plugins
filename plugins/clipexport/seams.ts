@@ -112,24 +112,28 @@ export function showDone(plugin: Plugin, args: (string | number)[], actions: Osd
  * The clip's range on the seek bar while the tab shows (R3), as a
  * `selection` range of this plugin's timeline layer; `null` removes it. The
  * same range is not sent twice; a new source clears the layer by itself.
+ * While the Highlights page shows, the suggestions left are dim `region`
+ * bands beside it (at most 20 of the layer's 100 ranges).
  */
-export function rangeMarker(plugin: Plugin, title: Text) {
+export function rangeMarker(plugin: Plugin, title: Text, regionTitle: Text = title) {
   let layer: ReturnType<Plugin["timeline"]["layer"]> | null = null;
   let last = "none";
   return {
-    set(range: { start: number; end: number } | null) {
+    set(range: { start: number; end: number } | null, regions: readonly { start: number; end: number }[] = []) {
       // Clearing reads no player state: it also runs when the tab goes to the background.
-      if (!range) {
+      if (!range && !regions.length) {
         if (layer && last !== "none") layer.setRanges([]);
         last = "none";
         return;
       }
       const state = plugin.player.state;
       const duration = state.duration ?? Infinity;
-      const ranges = range.start < Math.min(range.end, duration)
-        ? [{ start: Math.max(0, range.start), end: Math.min(range.end, duration), style: "selection" as const, title }]
-        : [];
-      const key = JSON.stringify([state.sourceId, ranges.map((r) => [r.start, r.end])]);
+      const fit = (r: { start: number; end: number }) => r.start < Math.min(r.end, duration);
+      const ranges = [
+        ...regions.filter(fit).map((r) => ({ start: Math.max(0, r.start), end: Math.min(r.end, duration), style: "region" as const, title: regionTitle })),
+        ...(range && fit(range) ? [{ start: Math.max(0, range.start), end: Math.min(range.end, duration), style: "selection" as const, title }] : []),
+      ].slice(-100);
+      const key = JSON.stringify([state.sourceId, ranges.map((r) => [r.start, r.end, r.style])]);
       if (key === last || (!layer && !ranges.length)) return;
       last = key;
       layer ??= plugin.timeline.layer();

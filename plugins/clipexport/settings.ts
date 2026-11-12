@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { Scope } from "@vestra-player/sdk";
 import { encodeOf, lastSeconds, METHODS } from "./clip.ts";
 import type { Encode, Method } from "./clip.ts";
+import { COUNTS, DEFAULT_COUNT } from "./highlights.ts";
 import { COLLECTION_TEMPLATE, normalTemplate } from "./names.ts";
 import { transitionOf } from "./transitions.ts";
 import type { Transition } from "./transitions.ts";
@@ -32,17 +33,21 @@ export interface Settings {
   page: Page;
   /** Seconds of work per second of media of the last Precise export on this machine (the time estimate); null before one. */
   preciseSpeed: number | null;
+  /** How many suggestions the Highlights page lists (5, 10 or 20). */
+  highlightCount: number;
 }
 
-/** The pages of the tab, as its sub-tab strip orders them (0.4.0: the Collection is a section of the Clip page). */
-export const PAGES = ["clip", "results", "settings"] as const;
+/** The pages of the tab, as its sub-tab strip orders them (0.4.0: the Collection is a section of the Clip page; 0.6.0: Highlights). */
+export const PAGES = ["clip", "highlights", "results", "settings"] as const;
 export type Page = (typeof PAGES)[number];
+/** The pages 0.1.x numbered (it kept the index). */
+const NUMBERED: readonly Page[] = ["clip", "results", "settings"];
 /**
  * A stored page: its name; 0.2.x and 0.3.x kept "collection" (now the Clip
- * page); 0.1.x kept its index among Clip, Results, Settings (the same order).
+ * page); 0.1.x kept its index among Clip, Results, Settings.
  */
 const pageOf = (value: unknown): Page =>
-  value === "collection" ? "clip" : PAGES.includes(value as Page) ? (value as Page) : Number.isInteger(value) ? (PAGES[value as number] ?? "clip") : "clip";
+  value === "collection" ? "clip" : PAGES.includes(value as Page) ? (value as Page) : Number.isInteger(value) ? (NUMBERED[value as number] ?? "clip") : "clip";
 
 /** The user's Videos folder, else the home folder. */
 export const defaultFolder = () => {
@@ -79,6 +84,7 @@ export function settingsOf(stored: unknown, folder = defaultFolder()): Settings 
     newTransition: transitionOf(s.newTransition),
     page: pageOf(s.page),
     preciseSpeed: s.preciseSpeed === null || s.preciseSpeed === undefined ? null : inRange(s.preciseSpeed, 0.01, 1000, 0) || null,
+    highlightCount: (COUNTS as readonly unknown[]).includes(s.highlightCount) ? (s.highlightCount as number) : DEFAULT_COUNT,
   };
 }
 
