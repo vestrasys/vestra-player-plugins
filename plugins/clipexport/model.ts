@@ -70,6 +70,7 @@ export const REASON = {
   noAnimatedEncoder: "The player's FFmpeg cannot write this format. Choose another quality.",
   animatedTooLong: "Animated GIF and WebP are at most 60 seconds long. Choose a shorter range.",
   animatedFailed: "Could not write the animated image.",
+  noScanFfmpeg: "Finding highlights needs FFmpeg.",
 } as const;
 export type Reason = keyof typeof REASON;
 

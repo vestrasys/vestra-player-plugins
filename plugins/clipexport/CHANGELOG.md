@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.6.0
+
+**Who must change: nobody.** No new permission and the same player (0.7.6 or later). Settings, the Collection and Results carry over; the sub-tab shown last stays the same page (the pages after Clip move one place to the right).
+
+- **Highlights**, a new sub-tab between Clip and Results (design clipexport-highlights, step 1: loudness only). It finds the moments of the video playing where the sound rises (a crowd, a reaction, a big scene) and suggests ranges around them, for stand-up, talk shows, streams and sports. It measures loudness only, and its intro says no more; the sound model of a later step (laughter, applause, cheering) widens it.
+  - Nothing starts by itself: **Find Highlights** (the button, or the command of that name in the command palette, category Export) scans the file. The player's FFmpeg measures the momentary loudness (EBU R 128, `ebur128`) of the sound track playing, five minutes of the video per run, in the background with progress, time left and Cancel; switching sub-tabs or hiding the sidebar keeps it running, opening another file cancels it. A two-hour 1080p film took 16 s on our test laptop (one core per run), with no dropped or late frames in the video playing (1080p30 and 2160p60).
+  - A **strip** shows the whole video: its loudness as one area, a band for each suggestion (the selected one in the accent), the playhead. A click seeks; a click on a band selects that suggestion; hovering shows the time.
+  - **Suggestions** in time order, the **5 · 10 · 20** strongest, each with its times, its length and kind (Loud), and in its tooltip how many LU its loudest moment is above the video's average. A range starts at the pause before the loud moment (at least 4 s, at most 60 s before: what caused the reaction) and ends at the first pause after it; without a pause there, at the quietest moment. Ranges are 6–90 s; overlapping ones merge.
+  - A click on a row selects it, jumps to its start (playing stays playing) and makes it the **Range**: the Clip page's Start and End, the accent band on the seek bar. Set Clip Start / End and the row's Start and End buttons move its edges, and the row shows them. A double click plays it.
+  - **+** adds it to the Collection as the last part ("Added as part N"), **×** dismisses it; it leaves the list, and the footer says how many of how many are left. **Add All** (a plain button) adds every suggestion left in time order, as many as fit (the Collection holds 100 parts).
+  - While the page shows, the suggestions left are dim **region bands on the seek bar** beside the Range.
+  - Each result is kept in the plugin's data folder, one small file per video and sound track (the 50 most recently used): reopening the file shows it at once, "Scanned 3 d ago · loudness only", with Scan Again. A file whose size or time changed says so and is scanned again.
+  - The sound track playing is scanned (ffmpeg's stream among the file's own audio tracks); an external track cannot be, so the file's first track is, and the Scanned line says so. A file without an audio stream (ffprobe counts them first) says it has no sound.
+  - The sub-tabs are as wide as their labels, so all four fit a 280 px sidebar; in a tab narrower than 317 px Highlights shows no count, and where a language's labels still do not fit, Highlights is the one shortened.
+  - The page also says when there is no local file, when the file has no sound, when nothing stood out, and when FFmpeg is missing.
+- English, Simplified Chinese, German, Spanish, French, Japanese and Korean.
+
 ## 0.5.1
 
 **Who must change: nobody.** No new permission and the same player (0.7.6 or later). Settings carry over.

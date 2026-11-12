@@ -6,7 +6,7 @@
 import { LineEdit, ListView, ScrollView } from "std-widgets.slint";
 import { Theme } from "@vestra/theme.slint";
 import { Icon } from "@vestra/icons.slint";
-import { Button, Check, Choice, KeyHint, RadioGroup, Slider, Tabs, ToolTipArea, ToolTipKey } from "@vestra/widgets.slint";
+import { Button, Check, Choice, KeyHint, RadioGroup, Slider, Tab, ToolTipArea, ToolTipKey } from "@vestra/widgets.slint";
 import { VestraFocus } from "@vestra/focus.slint";
 import { Status, Words } from "parts.slint";
 
@@ -23,6 +23,8 @@ export struct Keys {
     add: string,
     merge: string,
     remove: string,
+    // Find Highlights.
+    highlights: string,
 }
 
 // One part of the Collection: its number, file, range and the state of its file
@@ -213,6 +215,54 @@ export struct ResultRow {
     revealable: bool,
 }
 
+// The Highlights page (design clipexport-highlights): its state and the numbers its lines say.
+// `state`: "none" (no local file), "loading", "ready", "scanning", "noSound", "nothing", "changed", "done", "error".
+export struct Highlights {
+    state: string,
+    // The file and its duration (the Range card's row).
+    name: string,
+    duration: string,
+    // A scan: how far (%) and the minutes left (-1 while unknown).
+    percent: int,
+    left: int,
+    // Minutes since the scan; it measured loudness only.
+    scanned: int,
+    loudness: bool,
+    // The track playing is another file's (external): the file's first audio track was scanned.
+    first: bool,
+    // A problem (`error`): a reason code, or the player's or ffmpeg's own message.
+    reason: string,
+    raw: string,
+    // The 5 · 10 · 20 segment chosen (0, 1, 2).
+    count: int,
+    // Suggestions left in the list, of how many were picked; their total length ("5:08").
+    remaining: int,
+    total: int,
+    length: string,
+}
+
+// The heat strip: the curve and the bands as paths (1000 × 100 and 1000 × 10 view boxes), the video's length in
+// seconds (the hover time). The playhead is a property of its own (`heat-head`): a position tick leaves the paths alone.
+export struct HeatView {
+    curve: string,
+    bands: string,
+    // The selected suggestion's band (and its column above).
+    picked: string,
+    seconds: int,
+}
+
+// One suggestion: its times (with tenths, and without for a narrow tab), length ("28.6"), kind, how far its
+// loudest moment is above the video's average (LU), whether it is selected (the Range).
+export struct HighlightRow {
+    id: string,
+    range: string,
+    brief: string,
+    badge: string,
+    kind: string,
+    lu: string,
+    selected: bool,
+}
+
 export global ClipBridge {
     // "local", "network", "stream" or "none" (model.ts `tabMode`).
     in property <string> mode: "none";
@@ -220,7 +270,7 @@ export global ClipBridge {
     in property <bool> can-last;
     in property <Keys> keys;
     in property <Support> support;
-    // The sub-tab shown (0 Clip, 1 Results, 2 Settings), remembered; the plugin sets it for commands.
+    // The sub-tab shown (0 Clip, 1 Highlights, 2 Results, 3 Settings), remembered; the plugin sets it for commands.
     in-out property <int> page;
     // Show Collection: a new value focuses the list and scrolls it into view.
     in property <int> list-focus;
@@ -286,6 +336,12 @@ export global ClipBridge {
     in property <Picker> picker;
     // The thumbnails of the two parts for the tile previews: the upper part, then the lower one.
     in property <[image]> picker-pictures;
+    // Highlights
+    in property <Highlights> highlights;
+    in property <HeatView> heat;
+    // The playhead on the strip (0–1, -1 none).
+    in property <float> heat-head: -1;
+    in property <[HighlightRow]> highlight-rows;
 
     callback set-page(int);
     callback set-method(int);
@@ -338,6 +394,18 @@ export global ClipBridge {
     // (part id, kind, direction, duration as typed or a preset)
     callback set-transition(string, string, string, string);
     callback apply-all(string);
+    // Highlights: Find Highlights (and Scan Again), Cancel, the 5 · 10 · 20 segment (its index).
+    callback find-highlights();
+    callback cancel-scan();
+    callback set-highlight-count(int);
+    // A row: click selects it (the Range), double-click plays it, + adds it to the Collection, × dismisses it.
+    callback select-highlight(string);
+    callback play-highlight(string);
+    callback add-highlight(string);
+    callback dismiss-highlight(string);
+    callback add-all-highlights();
+    // A click on the strip, at this share of its width (0–1).
+    callback heat-clicked(float);
 }
 
 // Glyphs of this tab only, in the V-Line style of @vestra/icons.slint (1.5px round-capped lines), 14×12 boxes.
@@ -357,6 +425,8 @@ global Glyphs {
     out property <string> plus: "M 7 2 V 10 M 3 6 H 11";
     out property <string> grip: "M 5 2.5 L 5.01 2.5 M 9 2.5 L 9.01 2.5 M 5 6 L 5.01 6 M 9 6 L 9.01 6 M 5 9.5 L 5.01 9.5 M 9 9.5 L 9.01 9.5";
     out property <string> warn: "M 7 1.5 L 12.5 10.5 H 1.5 Z M 7 5 V 7.3 M 7 9 L 7 9.05";
+    // Three bars of a sound level (Find Highlights).
+    out property <string> sound: "M 3.5 5 V 7 M 7 2.5 V 9.5 M 10.5 4 V 8";
 }
 
 component Glyph inherits Path {
@@ -1276,6 +1346,234 @@ component RangeCard inherits Rectangle {
     }
 }
 
+// The Highlights page's heat strip: the whole video in a well, the loudness as one area (one Path, never an element
+// per sample), a band per suggestion under it (one Path), the selected one in the accent with a column above it,
+// the playhead. A click seeks, or selects the suggestion whose band it hits (the plugin decides); hovering shows the time.
+component HeatStrip inherits Rectangle {
+    in property <HeatView> heat;
+    in property <float> head: -1;
+    callback clicked(float);
+    height: 44px;
+    background: Theme.bg-list;
+    border-width: 1px;
+    border-color: Theme.line;
+    border-radius: Theme.radius-control;
+    clip: true;
+    if root.heat.picked != "": Path {
+        x: 1px;
+        y: 1px;
+        width: root.width - 2px;
+        height: 34px;
+        viewbox-width: 1000;
+        viewbox-height: 10;
+        commands: root.heat.picked;
+        fill: Theme.accent;
+        opacity: 0.45;
+    }
+    if root.heat.curve != "": Path {
+        x: 1px;
+        y: 1px;
+        width: root.width - 2px;
+        height: 34px;
+        viewbox-width: 1000;
+        viewbox-height: 100;
+        commands: root.heat.curve;
+        fill: Theme.text-dim;
+        opacity: 0.55;
+    }
+    if root.heat.bands != "": Path {
+        x: 1px;
+        y: 37px;
+        width: root.width - 2px;
+        height: 5px;
+        viewbox-width: 1000;
+        viewbox-height: 10;
+        commands: root.heat.bands;
+        fill: Theme.text-dim;
+    }
+    if root.heat.picked != "": Path {
+        x: 1px;
+        y: 37px;
+        width: root.width - 2px;
+        height: 5px;
+        viewbox-width: 1000;
+        viewbox-height: 10;
+        commands: root.heat.picked;
+        fill: Theme.accent;
+    }
+    if root.head >= 0: Rectangle {
+        x: 1px + root.head * (root.width - 2px) - 1px;
+        y: 2px;
+        width: 2px;
+        height: root.height - 4px;
+        border-radius: 1px;
+        background: Theme.text;
+    }
+    ToolTipArea {
+        text: root.heat.seconds > 0 && touch.has-hover ? Words.hms(round(touch.mouse-x / touch.width * root.heat.seconds)) : "";
+        touch := TouchArea {
+            mouse-cursor: pointer;
+            clicked => { root.clicked(self.mouse-x / self.width); }
+        }
+    }
+}
+
+// The scan in progress (the export card's look): name, Cancel, the bar, percent and the time left.
+component ScanCard inherits Rectangle {
+    in property <int> percent;
+    in property <int> left;
+    vertical-stretch: 0;
+    background: Theme.bg-list;
+    border-width: 1px;
+    border-color: Theme.line;
+    border-radius: Theme.radius-control;
+    VerticalLayout {
+        padding: 6px;
+        spacing: 4px;
+        HorizontalLayout {
+            spacing: 5px;
+            Line { text: @tr("Scanning sound"); color: Theme.text; }
+            IconAction {
+                glyph: Glyphs.close;
+                tip: @tr("Cancel");
+                clicked => { ClipBridge.cancel-scan(); }
+            }
+        }
+        Rectangle {
+            height: 3px;
+            border-radius: 1px;
+            background: Theme.line;
+            Rectangle {
+                x: 0px;
+                width: parent.width * root.percent / 100;
+                border-radius: 1px;
+                background: Theme.accent-fill;
+            }
+        }
+        // TRANSLATORS: {0} is a percentage, {1} a number of minutes.
+        Line { text: root.left >= 0 ? @tr("{0} % · about {1} min left", root.percent, root.left) : @tr("{} %", root.percent); }
+    }
+}
+
+// One suggestion (the Collection row's look): a tile with its length, the times, the kind, + and ×; a click
+// selects it (it becomes the Range), a double-click plays it from its start. The selected row has Start and End
+// under it: the Range card's Now buttons, which move the selected suggestion's edges.
+component HighlightItem inherits Rectangle {
+    in property <HighlightRow> entry;
+    in property <bool> narrow;
+    height: root.entry.selected ? 72px : 46px;
+    background: root.entry.selected ? Theme.selected-bg : area.has-hover ? Theme.hover-bg : transparent;
+    ToolTipArea {
+        y: 0px;
+        width: root.width;
+        height: 46px;
+        // TRANSLATORS: {} is how many loudness units (LU) the suggestion's loudest moment is above the video's average.
+        text: @tr("+{} LU above the video's average", root.entry.lu);
+        area := TouchArea {
+            width: root.width;
+            height: 46px;
+            clicked => { ClipBridge.select-highlight(root.entry.id); }
+            double-clicked => {
+                ClipBridge.play-highlight(root.entry.id);
+                VestraFocus.release();
+            }
+        }
+        HorizontalLayout {
+            width: root.width;
+            height: 46px;
+            padding-left: 4px;
+            padding-right: 4px;
+            spacing: 6px;
+            VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 64px;
+                    height: 36px;
+                    border-radius: 3px;
+                    clip: true;
+                    background: Theme.bg-video;
+                    Glyph { x: 3px; y: 3px; glyph: Glyphs.film; color: Theme.text-dim; }
+                    Rectangle {
+                        x: parent.width - self.width - 2px;
+                        y: parent.height - self.height - 2px;
+                        width: hl-badge.preferred-width + 6px;
+                        height: 12px;
+                        border-radius: 2px;
+                        background: Theme.bg-bar;
+                        hl-badge := Text {
+                            // TRANSLATORS: {} is a clip's length in seconds ("3.5").
+                            text: @tr("{} s", root.entry.badge);
+                            color: Theme.text;
+                            font-size: Theme.font-xs;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                spacing: 2px;
+                horizontal-stretch: 1;
+                // A narrow tab drops the tenths.
+                Text { text: root.narrow ? root.entry.brief : root.entry.range; color: Theme.text; font-family: Theme.font-mono; font-size: Theme.font-body; overflow: elide; }
+                Text { text: root.entry.kind == "loud" ? @tr("Loud") : root.entry.kind; color: Theme.text-dim; font-size: Theme.font-xs; overflow: elide; }
+            }
+            VerticalLayout {
+                alignment: center;
+                IconAction {
+                    glyph: Glyphs.plus;
+                    tip: @tr("Add to Collection");
+                    clicked => { ClipBridge.add-highlight(root.entry.id); }
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                IconAction {
+                    glyph: Glyphs.close;
+                    tip: @tr("Dismiss");
+                    clicked => { ClipBridge.dismiss-highlight(root.entry.id); }
+                }
+            }
+        }
+    }
+    if root.entry.selected: HorizontalLayout {
+        y: 46px;
+        height: 22px;
+        padding-left: 74px;
+        padding-right: 8px;
+        spacing: 4px;
+        Action {
+            text: @tr("Start");
+            glyph: Glyphs.target;
+            key: ClipBridge.keys.start;
+            show-key: !root.narrow;
+            tip: @tr("Set Clip Start");
+            tip-keys: [{ key: ClipBridge.keys.start, text: "" }];
+            clicked => { ClipBridge.clip-now("start"); }
+        }
+        Action {
+            text: @tr("End");
+            glyph: Glyphs.target;
+            key: ClipBridge.keys.end;
+            show-key: !root.narrow;
+            tip: @tr("Set Clip End");
+            tip-keys: [{ key: ClipBridge.keys.end, text: "" }];
+            clicked => { ClipBridge.clip-now("end"); }
+        }
+        Rectangle { horizontal-stretch: 1; }
+        Text {
+            // TRANSLATORS: {} is a clip's length in seconds ("3.5").
+            text: @tr("{} s", root.entry.badge);
+            color: Theme.text-dim;
+            font-family: Theme.font-mono;
+            font-size: Theme.font-xs;
+            vertical-alignment: center;
+        }
+    }
+    Rectangle { y: parent.height - 1px; height: 1px; background: Theme.line; }
+}
+
 export component ClipExportTab inherits Rectangle {
     background: Theme.bg-panel;
     // The width classes: narrow < 317 px (key caps move to the tooltips).
@@ -1340,6 +1638,22 @@ export component ClipExportTab inherits Rectangle {
     private property <int> drag-to: -1;
     // The template the variable chips add to: the row that had the focus last.
     private property <string> template-target: "clip";
+    // The Highlights page: after a scan with suggestions (the review), or with none (nothing stood out).
+    private property <string> hl-state: ClipBridge.highlights.state;
+    private property <bool> hl-review: root.hl-state == "done";
+    private property <bool> hl-scanned: root.hl-review || root.hl-state == "nothing";
+    // The sub-tabs' labels: Highlights counts what is left, except in a narrow tab (design §7). The tabs are sized
+    // from `tab-labels`, which never depends on the tab's width (that would make the width depend on itself).
+    private property <[string]> tab-labels: [
+        @tr("Clip"),
+        // TRANSLATORS: {} is how many suggestions are left on the Highlights page.
+        root.hl-review && ClipBridge.highlights.remaining > 0 ? @tr("Highlights ({})", ClipBridge.highlights.remaining) : @tr("Highlights"),
+        ClipBridge.unseen > 0 ? @tr("Results ({})", ClipBridge.unseen) : @tr("Results"),
+        @tr("Settings"),
+    ];
+    private property <string> highlights-label: root.narrow ? @tr("Highlights") : root.tab-labels[1];
+    // What the four tabs ask for: 74 px each as in Tabs, a longer label its own width.
+    private property <length> tabs-width: max(74px, measure-clip.preferred-width + 12px) + max(74px, measure-highlights.preferred-width + 12px) + max(74px, measure-results.preferred-width + 12px) + max(74px, measure-settings.preferred-width + 12px);
 
     // The transition picker: where it opens, and the tile the arrow keys light (-1: none).
     private property <length> picker-y;
@@ -1486,21 +1800,73 @@ export component ClipExportTab inherits Rectangle {
     }
 
     VerticalLayout {
-        // The sub-tabs, and the tab's own key at the end where it fits (none by default).
+        // The sub-tabs: four of the library's Tab in a row of their own. The Tabs strip gives each tab at least 74 px,
+        // and 4 × 74 px is more than a 280 px sidebar. Here each tab asks for those 74 px (as in Tabs, a longer label its
+        // own width) and gives way down to its label's width (Tab's own font, measured by texts that are never
+        // shown). In a narrow tab Highlights drops its count, and where even that does not fit it is the one that
+        // elides (design §7). Left/Right/Home/End while the row has the focus pick a tab, as
+        // in Tabs. The tab's own key goes at the end where it fits (none by default).
         Rectangle {
             vertical-stretch: 0;
+            height: 31px;
             background: Theme.bg-bar;
-            HorizontalLayout {
-                strip := Tabs {
-                    horizontal-stretch: 1;
-                    model: [@tr("Clip"), ClipBridge.unseen > 0 ? @tr("Results ({})", ClipBridge.unseen) : @tr("Results"), @tr("Settings")];
-                    emphasis: [false, ClipBridge.unseen > 0, false];
-                    current-index <=> ClipBridge.page;
-                    selected(index) => { root.show-page(index); }
+            measure-clip := Text { visible: false; text: root.tab-labels[0]; font-size: Theme.font-tab; }
+            measure-highlights := Text { visible: false; text: root.tab-labels[1]; font-size: Theme.font-tab; }
+            measure-results := Text { visible: false; text: root.tab-labels[2]; font-size: Theme.font-tab; }
+            measure-settings := Text { visible: false; text: root.tab-labels[3]; font-size: Theme.font-tab; }
+            strip-keys := FocusScope {
+                x: 0;
+                y: 0;
+                width: 0;
+                height: 0;
+                focus-on-click: false;
+                key-pressed(event) => {
+                    if event.text == Key.LeftArrow { root.show-page(max(0, ClipBridge.page - 1)); return accept; }
+                    if event.text == Key.RightArrow { root.show-page(min(3, ClipBridge.page + 1)); return accept; }
+                    if event.text == Key.Home { root.show-page(0); return accept; }
+                    if event.text == Key.End { root.show-page(3); return accept; }
+                    return reject;
                 }
+            }
+            HorizontalLayout {
+                Tab {
+                    text: root.tab-labels[0];
+                    selected: ClipBridge.page == 0;
+                    focused: strip-keys.has-focus && ClipBridge.page == 0;
+                    min-width: measure-clip.preferred-width + 12px;
+                    preferred-width: max(74px, self.min-width);
+                    clicked => { root.show-page(0); }
+                }
+                Tab {
+                    text: root.highlights-label;
+                    selected: ClipBridge.page == 1;
+                    focused: strip-keys.has-focus && ClipBridge.page == 1;
+                    // The one that gives way: down to a few letters and the ellipsis.
+                    min-width: min(measure-highlights.preferred-width + 12px, 44px);
+                    preferred-width: max(74px, measure-highlights.preferred-width + 12px);
+                    clicked => { root.show-page(1); }
+                }
+                Tab {
+                    text: root.tab-labels[2];
+                    selected: ClipBridge.page == 2;
+                    emphasis: ClipBridge.unseen > 0;
+                    focused: strip-keys.has-focus && ClipBridge.page == 2;
+                    min-width: measure-results.preferred-width + 12px;
+                    preferred-width: max(74px, self.min-width);
+                    clicked => { root.show-page(2); }
+                }
+                Tab {
+                    text: root.tab-labels[3];
+                    selected: ClipBridge.page == 3;
+                    focused: strip-keys.has-focus && ClipBridge.page == 3;
+                    min-width: measure-settings.preferred-width + 12px;
+                    preferred-width: max(74px, self.min-width);
+                    clicked => { root.show-page(3); }
+                }
+                Rectangle { horizontal-stretch: 1; }
                 Rectangle {
-                    // Dropped, not cut, when the strip needs the room.
-                    width: ClipBridge.keys.panel != "" && root.width >= strip.min-width + 60px ? panel-key.preferred-width + 12px : 0px;
+                    // Dropped, not cut, when the tabs need the room.
+                    width: ClipBridge.keys.panel != "" && root.width >= root.tabs-width + 60px ? panel-key.preferred-width + 12px : 0px;
                     visible: self.width > 0;
                     ToolTipArea {
                         text: @tr("Show or hide this tab");
@@ -1962,9 +2328,193 @@ export component ClipExportTab inherits Rectangle {
                 }
             }
 
-            // ---------------------------------------------------------------- Results
+            // ---------------------------------------------------------------- Highlights
+            // Design clipexport-highlights, step 1 (loudness only): the file, the heat strip, then what the state says
+            // (before a scan, the scan, no sound, nothing found, a changed file, a problem) or the review: when it was
+            // scanned, the suggestions (5 · 10 · 20) in a ListView, and a footer with Add All. Nothing is exported here.
             VerticalLayout {
                 visible: ClipBridge.page == 1;
+                // Not a local file (S6): one line.
+                if root.hl-state == "none": VerticalLayout {
+                    padding: 10px;
+                    padding-top: 14px;
+                    alignment: start;
+                    Line { align: center; color: Theme.text; text: @tr("Open a local video file to find highlights."); }
+                }
+                if root.hl-state != "none": VerticalLayout {
+                    vertical-stretch: 1;
+                    padding: 10px;
+                    padding-top: 6px;
+                    spacing: 6px;
+                    // The file and its duration (the Range card's row).
+                    HorizontalLayout {
+                        spacing: 5px;
+                        VerticalLayout { alignment: center; Glyph { glyph: Glyphs.film; } }
+                        Line { text: ClipBridge.highlights.name; color: Theme.text; }
+                        Text { text: ClipBridge.highlights.duration; color: Theme.text-dim; font-family: Theme.font-mono; font-size: Theme.font-xs; vertical-alignment: center; }
+                    }
+                    HeatStrip {
+                        heat: ClipBridge.heat;
+                        head: ClipBridge.heat-head;
+                        clicked(ratio) => { ClipBridge.heat-clicked(ratio); }
+                    }
+                    // After a scan: when (it measured loudness only), Scan Again, what it listens to.
+                    if root.hl-scanned: HorizontalLayout {
+                        spacing: 4px;
+                        Line {
+                            // TRANSLATORS: {} is how long ago ("3 d ago").
+                            text: (ClipBridge.highlights.scanned < 1 ? @tr("Scanned just now") : @tr("Scanned {}", Words.ago(ClipBridge.highlights.scanned)))
+                                + (ClipBridge.highlights.loudness ? " · " + @tr("loudness only") : "")
+                                // The track playing is another file's: the file's own first track was scanned.
+                                + (ClipBridge.highlights.first ? " · " + @tr("the file's first audio track") : "");
+                        }
+                        IconAction {
+                            glyph: Glyphs.retry;
+                            tip: @tr("Scan Again");
+                            clicked => { ClipBridge.find-highlights(); }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            ToolTipArea {
+                                width: 18px;
+                                height: 18px;
+                                text: @tr("Listens to the sound only: it cannot see the picture. A range starts at the pause before the reaction and ends after it.");
+                                Glyph { x: 2px; y: 3px; glyph: Glyphs.info; }
+                            }
+                        }
+                    }
+                    // Before a scan (S1) and after a problem: what it finds, and for what.
+                    if root.hl-state == "ready" || root.hl-state == "error": VerticalLayout {
+                        spacing: 2px;
+                        padding-top: 6px;
+                        // Step 1 measures loudness only: the intro promises no more (the sound model, step 3, widens it).
+                        Line { align: center; color: Theme.text; text: @tr("Finds the moments where the sound rises:"); }
+                        Line { align: center; color: Theme.text; text: @tr("a crowd, a reaction, a big scene."); }
+                        Line { align: center; text: @tr("Best on stand-up, talk shows, streams and sports."); }
+                    }
+                    // A changed file (S5).
+                    if root.hl-state == "changed": Line { align: center; color: Theme.text; text: @tr("The file changed since the last scan."); }
+                    // A problem: the page's one red line (FFmpeg missing, a failed scan).
+                    if root.hl-state == "error": Line { align: center; color: Theme.danger; text: Words.reason(ClipBridge.highlights.reason, ClipBridge.highlights.raw); }
+                    if root.hl-state == "ready" || root.hl-state == "changed" || root.hl-state == "error": HorizontalLayout {
+                        Action {
+                            horizontal-stretch: 1;
+                            min-height: Theme.button-primary-height;
+                            primary: true;
+                            text: @tr("Find Highlights");
+                            glyph: Glyphs.sound;
+                            // Its key (none by default) in the tooltip: a cap in the button would tie the page's width to `narrow`.
+                            show-key: false;
+                            tip: ClipBridge.keys.highlights != "" ? @tr("Find Highlights") : "";
+                            tip-keys: [{ key: ClipBridge.keys.highlights, text: "" }];
+                            clicked => { ClipBridge.find-highlights(); }
+                        }
+                    }
+                    // The scan (S2): it goes on in the background.
+                    if root.hl-state == "scanning": ScanCard {
+                        percent: ClipBridge.highlights.percent;
+                        left: ClipBridge.highlights.left;
+                    }
+                    if root.hl-state == "scanning": Line { align: center; text: @tr("Runs in the background: keep watching."); }
+                    // No sound (S3), nothing found (S4).
+                    if root.hl-state == "noSound": Line { align: center; color: Theme.text; text: @tr("This video has no sound to scan."); }
+                    if root.hl-state == "nothing": VerticalLayout {
+                        spacing: 2px;
+                        padding-top: 6px;
+                        Line { align: center; color: Theme.text; text: @tr("Nothing stood out in this video."); }
+                        Line { align: center; text: @tr("This listens for audience sound: films and"); }
+                        Line { align: center; text: @tr("music often have none."); }
+                    }
+                    // The review: how many are left, how many to show.
+                    if root.hl-review: HorizontalLayout {
+                        spacing: 4px;
+                        Heading { horizontal-stretch: 0; text: @tr("Suggestions"); }
+                        Text {
+                            horizontal-stretch: 0;
+                            height: 24px;
+                            text: ClipBridge.highlights.remaining;
+                            color: Theme.text-dim;
+                            font-size: Theme.font-xs;
+                            vertical-alignment: bottom;
+                        }
+                        Rectangle { horizontal-stretch: 1; }
+                        VerticalLayout {
+                            alignment: end;
+                            HorizontalLayout {
+                                spacing: 2px;
+                                Segment { horizontal-stretch: 0; text: "5"; on: ClipBridge.highlights.count == 0; clicked => { ClipBridge.set-highlight-count(0); } }
+                                Segment { horizontal-stretch: 0; text: "10"; on: ClipBridge.highlights.count == 1; clicked => { ClipBridge.set-highlight-count(1); } }
+                                Segment { horizontal-stretch: 0; text: "20"; on: ClipBridge.highlights.count == 2; clicked => { ClipBridge.set-highlight-count(2); } }
+                            }
+                        }
+                    }
+                    // The suggestions in an inset well; Slint's ListView builds only the rows in view.
+                    if root.hl-review: Rectangle {
+                        vertical-stretch: 1;
+                        min-height: 3 * 46px + 2px;
+                        background: Theme.bg-list;
+                        border-width: 1px;
+                        border-color: Theme.line;
+                        border-radius: Theme.radius-control;
+                        clip: true;
+                        ListView {
+                            x: 1px;
+                            y: 1px;
+                            width: parent.width - 2px;
+                            height: parent.height - 2px;
+                            for row in ClipBridge.highlight-rows: HighlightItem {
+                                entry: row;
+                                narrow: root.narrow;
+                            }
+                        }
+                    }
+                    if !root.hl-review: Rectangle { vertical-stretch: 1; }
+                }
+                // The footer: how many are left and their length, Add All (a plain button: reviewing first is the intended path).
+                if root.hl-review: Rectangle {
+                    vertical-stretch: 0;
+                    background: Theme.bg-bar;
+                    Rectangle { y: 0px; height: 1px; background: Theme.line; }
+                    HorizontalLayout {
+                        padding: 10px;
+                        padding-top: 7px;
+                        padding-bottom: 8px;
+                        spacing: 6px;
+                        Text {
+                            horizontal-stretch: 0;
+                            text: ClipBridge.highlights.remaining != ClipBridge.highlights.total
+                                // TRANSLATORS: {0} suggestions are left of the {1} listed.
+                                ? @tr("{0} of {1} left", ClipBridge.highlights.remaining, ClipBridge.highlights.total)
+                                // TRANSLATORS: {} is a number of suggestions (2 or more).
+                                : ClipBridge.highlights.total == 1 ? @tr("1 suggestion") : @tr("{} suggestions", ClipBridge.highlights.total);
+                            color: Theme.text;
+                            font-size: Theme.font-body;
+                            font-weight: 700;
+                            vertical-alignment: center;
+                        }
+                        Text {
+                            horizontal-stretch: 0;
+                            text: ClipBridge.highlights.length;
+                            color: Theme.text-dim;
+                            font-family: Theme.font-mono;
+                            font-size: Theme.font-xs;
+                            vertical-alignment: center;
+                        }
+                        Rectangle { horizontal-stretch: 1; }
+                        Action {
+                            text: @tr("Add All");
+                            glyph: Glyphs.plus;
+                            enabled: ClipBridge.highlights.remaining > 0 && !ClipBridge.add-from.full;
+                            tip: ClipBridge.add-from.full ? Words.reason("collectionFull", "") : "";
+                            clicked => { ClipBridge.add-all-highlights(); }
+                        }
+                    }
+                }
+            }
+
+            // ---------------------------------------------------------------- Results
+            VerticalLayout {
+                visible: ClipBridge.page == 2;
                 padding: 8px;
                 spacing: 6px;
                 if ClipBridge.results.length == 0: Line { text: @tr("No clips yet."); }
@@ -1984,7 +2534,7 @@ export component ClipExportTab inherits Rectangle {
 
             // ---------------------------------------------------------------- Settings
             settings-page := ScrollView {
-                visible: ClipBridge.page == 2;
+                visible: ClipBridge.page == 3;
                 viewport-width: settings-content.width;
                 viewport-height: settings-content.preferred-height;
                 settings-content := VerticalLayout {

@@ -10,6 +10,8 @@ import { ANIMATED, encoderProbe, extensionOf, MAX_ANIMATED_SECONDS } from "./ani
 import { blockingNote, Collection, copyNote, exportParts, lengthClock, listKey, partStates, partTicks, retryDelay, targetNote, totalLength, UNDO_MS } from "./collection.ts";
 import type { Part } from "./collection.ts";
 import { finisher, inflightStore, sweepWork } from "./finish.ts";
+import { analyse, audioStreamArgs, audioStreamCount, averageOf, bandAt, bandsPath, COUNTS, curveOf, curvePath, HighlightStore, pick, RATE, scanLoudness, short, shortTerm, total as lengthText } from "./highlights.ts";
+import type { Candidate, HighlightScan } from "./highlights.ts";
 import { capturer } from "./form.ts";
 import { anyTransition, capOf, CUT, DIRECTIONS, FIRST_DURATION, junctionTicks, KINDS, mergeEncode, PRESET_DURATIONS, sourceBitrate, timing, typedDuration } from "./transitions.ts";
 import type { Direction, Kind, Plan, Transition } from "./transitions.ts";
@@ -58,6 +60,7 @@ const TITLE = {
   "clip.collectionUndo": "Undo Clear Collection",
   "clip.collectionRemove": "Remove from Collection",
   "clip.collectionUndoApply": "Undo Apply to All",
+  "clip.highlights": "Find Highlights",
 } as const;
 type CommandId = keyof typeof TITLE;
 
@@ -177,7 +180,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   const inflight = inflightStore(plugin);
   const swept = workFolder ? sweepWork(workFolder, inflight).catch((error) => console.error(`[clipexport] work folder: ${message(error)}`)) : Promise.resolve();
   const exporter = capturer(plugin, tasks, workFolder ? finisher(plugin, workFolder, { inflight, ...(options.freeSpace ? { freeSpace: options.freeSpace } : {}) }) : undefined);
-  const marker = rangeMarker(plugin, text("Clip"));
+  const marker = rangeMarker(plugin, text("Clip"), text("Highlights"));
   /** The encoder of an animated image in the player's ffmpeg (asked once). */
   const findEncoder = encoderProbe(plugin);
   let sequence = 0;
@@ -545,6 +548,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     panel.set({ clipStart: form.start, clipEnd: form.end });
     rememberForm();
     probeSoon();
+    // The selected suggestion is the Range: Now, Set Clip Start / End and the like move its edges.
+    if (!automatic) followRange();
   }
   /**
    * Start and End belong to the file they were set on, as LosslessCut keeps
@@ -1105,6 +1110,346 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     };
   }
 
+  // ---------------------------------------------------------------- highlights
+  // Design clipexport-highlights, step 1: the loudness of the sound (ffmpeg) gives suggested ranges; the selected one
+  // is the Range, + adds it to the Collection, × dismisses it. A scan runs only when the user asks for it.
+  let highlightFolder: string | null = null;
+  try {
+    highlightFolder = join(plugin.dataDirectory, "highlights");
+  } catch {
+    // no data directory: a scan is kept while its file stays open
+  }
+  const kept = new HighlightStore(highlightFolder);
+  type HighlightStatus = "loading" | "ready" | "noSound" | "changed" | "done" | "error";
+  /**
+   * The page's file: `key` is the source and its sound track (another track is another scan), `status` what
+   * the page shows (a scan running for it shows instead), `saved` its scan, `selected` the suggestion that
+   * is the Range.
+   */
+  const hl = {
+    key: "", path: "", stream: 0, sourceId: 0, status: "loading" as HighlightStatus, problem: { reason: "", raw: "" } as Problem<string>, saved: null as HighlightScan | null, selected: "",
+    /** The track playing is not the file's own (an external one): the file's first track is scanned instead. */
+    first: false,
+    /** The read of the kept scan for this file (Find Highlights waits for it). */
+    loading: Promise.resolve() as Promise<void>,
+  };
+  /** The scan running (one at a time): its file, how far it got, the curve so far, the status to go back to on Cancel. */
+  type Scan = { key: string; path: string; sourceId: number; duration: number; abort: AbortController; started: number; done: number; curve: number[]; average: number | null; before: HighlightStatus };
+  let scan: Scan | null = null;
+  plugin.onDispose(() => scan?.abort.abort());
+  /** The strip's curve of a kept scan, made once. */
+  let curveFor: { saved: HighlightScan; path: string } | null = null;
+  /**
+   * The file's own audio tracks (the player's tracks inside the file, in its order: ffmpeg's `0:a:N`). The track
+   * playing is scanned; an external track (another file) cannot be, so the file's first track is, and the page says so.
+   */
+  const ownTracks = (state: PlayerState) => (state.audioTracks ?? []).filter((track) => !track.external && track.exportable !== false);
+  const streamOf = (state: PlayerState) => {
+    const index = ownTracks(state).findIndex((track) => track.selected);
+    return { stream: Math.max(0, index), first: index < 0 && (state.audioTracks ?? []).some((track) => track.selected) };
+  };
+  /** The player lists the tracks and the file has none of its own: no sound to scan (S3). */
+  const silentFile = (state: PlayerState) => state.phase === "ready" && Array.isArray(state.audioTracks) && !ownTracks(state).length;
+
+  /** The page's file for this state (its kept scan is read when the file or track changed); `null` without a local file (S6). */
+  function highlightsFor(state: PlayerState) {
+    if (!clippable(state) || !state.source) return null;
+    const { stream, first } = streamOf(state);
+    const key = `${state.sourceId}:${stream}`;
+    if (key !== hl.key) {
+      // Another file opened during a scan: the scan stops (D12).
+      if (scan && scan.sourceId !== state.sourceId) cancelScan();
+      // What the last file's page still had to write goes now (its timer would write the next file's scan otherwise).
+      flushKeep();
+      Object.assign(hl, { key, path: state.source, stream, first, sourceId: state.sourceId, status: "loading", problem: { reason: "", raw: "" }, saved: null, selected: "" });
+      hl.loading = loadHighlights(key, state.source, stream, silentFile(state));
+    } else {
+      hl.first = first;
+      if (hl.status === "ready" && silentFile(state)) hl.status = "noSound";
+    }
+    return hl;
+  }
+  async function loadHighlights(key: string, path: string, stream: number, silent: boolean) {
+    const stamp = await kept.stamp(path, stream);
+    const found = stamp ? await kept.load(stamp) : null;
+    if (hl.key !== key || hl.status !== "loading") return;
+    if (found === "changed") hl.status = "changed";
+    else if (found) Object.assign(hl, { saved: found, status: "done" });
+    else hl.status = silent ? "noSound" : "ready";
+    // Past the file reads: the page changed outside SDK-invoked code.
+    plugin.update();
+  }
+  /** Writes of the page's scan (what was added, dismissed, moved), gathered for half a second; `flushKeep` writes them now. */
+  let pendingKeep: { saved: HighlightScan; timer: ReturnType<typeof setTimeout> } | null = null;
+  function keepSoon(saved: HighlightScan) {
+    if (pendingKeep && pendingKeep.saved !== saved) flushKeep();
+    if (pendingKeep) clearTimeout(pendingKeep.timer);
+    const timer = setTimeout(flushKeep, 500);
+    timer.unref?.();
+    pendingKeep = { saved, timer };
+  }
+  function flushKeep() {
+    if (!pendingKeep) return;
+    clearTimeout(pendingKeep.timer);
+    const { saved } = pendingKeep;
+    pendingKeep = null;
+    void kept.save(saved);
+  }
+  plugin.onDispose(flushKeep);
+
+  /** How many audio streams the file has (ffprobe); `null` when ffprobe cannot say. */
+  async function audioStreams(path: string, signal: AbortSignal) {
+    if (!(await plugin.tools.available("ffprobe").catch(() => false))) return null;
+    try {
+      const { stdout } = await plugin.tools.run("ffprobe", audioStreamArgs(path), { timeoutMs: 15_000, maxOutput: 64 << 10, signal });
+      return audioStreamCount(new TextDecoder().decode(stdout));
+    } catch (error) {
+      if (!signal.aborted) console.error(`[clipexport] highlights: audio streams: ${message(error)}`);
+      return null;
+    }
+  }
+
+  /** Find Highlights (the button, Scan Again, the command): scan the sound of the file playing. */
+  async function findHighlights() {
+    const seen = await player.refresh();
+    const view = highlightsFor(seen);
+    if (!view || !seen.duration) return;
+    if (scan?.key === view.key) return;
+    cancelScan();
+    if (silentFile(seen)) return void (hl.status = "noSound");
+    const key = view.key;
+    const fail = (problem: Problem<string>) => {
+      if (hl.key !== key) return;
+      Object.assign(hl, { status: "error", problem });
+      plugin.update();
+    };
+    if (!(await plugin.tools.available("ffmpeg").catch(() => false))) return fail({ reason: "noScanFfmpeg", raw: "" });
+    const stamp = await kept.stamp(view.path, view.stream);
+    if (!stamp) return fail({ reason: "cannotRead", raw: "" });
+    if (hl.key !== key || scan) return;
+    const job: Scan = {
+      key, path: view.path, sourceId: view.sourceId, duration: seen.duration, abort: new AbortController(),
+      started: Date.now(), done: 0, curve: [], average: null, before: hl.status === "loading" ? "ready" : hl.status,
+    };
+    scan = job;
+    hl.selected = "";
+    plugin.update();
+    try {
+      // The stream asked for must be in the file: ffmpeg's own refusal (exit 127, "Invalid argument") says nothing useful.
+      const streams = await audioStreams(job.path, job.abort.signal);
+      job.abort.signal.throwIfAborted();
+      if (streams !== null && streams <= view.stream) {
+        if (hl.key === key) hl.status = "noSound";
+        return;
+      }
+      const values = await scanLoudness((args, options) => plugin.tools.run("ffmpeg", args, options), job.path, view.stream, job.duration, {
+        signal: job.abort.signal,
+        between: async (done, values) => {
+          // The strip fills in from the left: the curve of what was measured so far.
+          const upTo = Math.ceil(done * RATE);
+          Object.assign(job, { done, curve: curveOf(shortTerm(values, upTo)), average: averageOf(values, upTo) });
+          plugin.update();
+          // Another file opened while the tab was hidden: the scan stops (D12).
+          if ((await player.refresh()).sourceId !== job.sourceId) job.abort.abort();
+        },
+      });
+      const result = analyse(values, job.duration);
+      const saved: HighlightScan = { version: 1, ...stamp, scanned: Date.now(), mode: "loudness", duration: job.duration, average: result.average, curve: result.curve, candidates: result.candidates, handled: {}, edits: {} };
+      await kept.save(saved);
+      if (hl.key === key) Object.assign(hl, { saved, status: "done", selected: "" });
+    } catch (error) {
+      if (job.abort.signal.aborted) {
+        if (hl.key === key && scan === job) hl.status = job.before;
+      } else if (/matches no streams|does not contain any stream/i.test(message(error))) {
+        if (hl.key === key) hl.status = "noSound";
+      } else if ((error as { code?: string }).code === "unavailable") {
+        fail({ reason: "noScanFfmpeg", raw: "" });
+      } else {
+        console.error(`[clipexport] highlights scan: ${message(error)}`);
+        fail(problemOf(error));
+      }
+    } finally {
+      if (scan === job) scan = null;
+      plugin.update();
+    }
+  }
+  /** Cancel: the partial result is discarded; the page shows what it showed before. */
+  function cancelScan() {
+    const job = scan;
+    if (!job) return;
+    scan = null;
+    job.abort.abort();
+    if (hl.key === job.key) hl.status = job.before;
+  }
+
+  /** The suggestions listed: the chosen number of the strongest, those added or dismissed left out, with the user's edges, in time order. */
+  function suggestions(saved: HighlightScan) {
+    const { left, total: picked } = pick(saved.candidates, settings.highlightCount, saved.handled);
+    const rows = left.map((candidate) => ({ ...candidate, ...saved.edits[candidate.id] })).sort((a, b) => a.start - b.start);
+    return { rows, picked };
+  }
+  const suggestionOf = (id: string) => (hl.saved ? suggestions(hl.saved).rows.find((row) => row.id === id) : undefined);
+  /** The selected suggestion follows the Range (Now, Set Clip Start / End, typing on the Clip page): its row shows the new edges. */
+  function followRange() {
+    const saved = hl.saved;
+    if (!hl.selected || !saved || form.sourceId !== hl.sourceId) return;
+    const range = typedRange();
+    const row = suggestionOf(hl.selected);
+    if ("error" in range || !row || (row.start === range.start && row.end === range.end)) return;
+    saved.edits[hl.selected] = { start: range.start, end: range.end };
+    keepSoon(saved);
+  }
+  /** A click on a row (or its band on the strip): it is selected, the player jumps to its start, it becomes the Range. */
+  async function selectHighlight(id: string, play = false) {
+    const row = suggestionOf(id);
+    if (!row) return;
+    hl.selected = id;
+    const seen = await player.refresh();
+    if (seen.sourceId !== hl.sourceId) return;
+    setRange({ start: row.start, end: row.end });
+    try {
+      // Playing stays playing, paused stays paused; a double click plays.
+      await player.seek(row.start, { ifCurrent: seen });
+      if (play) await player.setPaused(false, { ifCurrent: seen });
+    } catch (error) {
+      console.error(`[clipexport] highlights: ${message(error)}`);
+    }
+  }
+  /** + and Add All: the suggestions as the last parts of the Collection (as many as fit); they leave the list. */
+  async function addHighlights(ids: string[]) {
+    const saved = hl.saved;
+    if (!saved) return;
+    const rows = suggestions(saved).rows.filter((row) => ids.includes(row.id));
+    const added = await addRanges(rows, rows.length === 1);
+    if (hl.saved !== saved || !added.length) return;
+    for (const row of added) saved.handled[row.id] = "added";
+    if (added.some((row) => row.id === hl.selected)) hl.selected = "";
+    keepSoon(saved);
+  }
+  function dismissHighlight(id: string) {
+    const saved = hl.saved;
+    if (!saved || !suggestionOf(id)) return;
+    saved.handled[id] = "dismissed";
+    if (hl.selected === id) hl.selected = "";
+    keepSoon(saved);
+  }
+  /** The strip: a click on a band selects its suggestion; elsewhere it seeks. */
+  async function heatClicked(ratio: number) {
+    const seen = await player.refresh();
+    if (!clippable(seen) || !seen.duration || !Number.isFinite(ratio)) return;
+    const band = hl.saved && hl.status === "done" && !scan ? bandAt(suggestions(hl.saved).rows, ratio, seen.duration) : null;
+    if (band) return selectHighlight(band.id);
+    await player.seek(Math.max(0, Math.min(1, ratio)) * seen.duration, { ifCurrent: seen }).catch((error) => console.error(`[clipexport] highlights: ${message(error)}`));
+  }
+  /**
+   * Ranges of the file playing as the last parts of the Collection, in order, as many as fit (the rest is said
+   * with the Collection's limit); one file reference for all. `say`: "Added as part N".
+   */
+  async function addRanges<T extends { start: number; end: number }>(ranges: T[], say: boolean): Promise<T[]> {
+    if (ui.adding || !ranges.length) return [];
+    ui.adding = true; // exclusion before the first await
+    try {
+      const seen = await player.refresh();
+      if (!clippable(seen)) throw new Failure(tabMode(seen) === "local" ? "needDuration" : "addLocal");
+      // The suggestions are the page's file's: another file playing now is not theirs.
+      if (seen.sourceId !== hl.sourceId) throw new Failure("changed");
+      if (collection.full()) throw new Failure("collectionFull");
+      const added = await serial(async () => {
+        const file = await plugin.media.sources.remember({ ifCurrent: seen }).catch((error) => {
+          throw sourceError(error);
+        });
+        const made: { range: T; part: Part }[] = [];
+        for (const range of ranges) {
+          if (collection.full()) break;
+          made.push({ range, part: collection.add({ token: file.token, name: file.name, start: range.start, end: Math.min(range.end, file.duration || range.end) }, settings.newTransition) });
+        }
+        return made;
+      });
+      if (say && added.length) shown(osd.show("Added as part {}", [collection.parts.length]));
+      if (added.length < ranges.length) sayProblem({ reason: "collectionFull", raw: "" });
+      plugin.update();
+      void recheck();
+      // One frame capture at a time; the file's bit rate is read once for all its parts.
+      for (const { part } of added) thumbQueue = thumbQueue.then(() => (disposed ? undefined : partThumbnail(part, seen)));
+      const first = added[0]?.part;
+      if (first) {
+        void partBitrate(first, seen.source).then(() => {
+          const bitrate = collection.find(first.id)?.bitrate;
+          if (bitrate) for (const { part } of added.slice(1)) if (collection.find(part.id)) collection.update(part, { bitrate });
+        });
+      }
+      return added.map(({ range }) => range);
+    } catch (error) {
+      sayProblem(problemOf(error));
+      return [];
+    } finally {
+      ui.adding = false;
+    }
+  }
+  let thumbQueue: Promise<void> = Promise.resolve();
+  /** Deactivated: frame captures still queued do not start. */
+  let disposed = false;
+  plugin.onDispose(() => void (disposed = true));
+  /** The strip's paths as last sent: the same object while they are the same, so a playhead tick sends only the playhead. */
+  let heatSent = { curve: "", bands: "", picked: "", seconds: 0 };
+  const heatOf = (next: typeof heatSent) => (Object.entries(next).every(([key, value]) => heatSent[key as keyof typeof heatSent] === value) ? heatSent : (heatSent = next));
+
+  /** The Highlights page: its state, the strip, the rows; the sub-tab's count. */
+  function highlightView(state: PlayerState) {
+    const view = highlightsFor(state);
+    const empty = { state: "none", name: "", duration: "", percent: 0, left: -1, scanned: 0, loudness: true, first: false, reason: "", raw: "", count: COUNTS.indexOf(settings.highlightCount as never), remaining: 0, total: 0, length: "" };
+    if (!view || !state.duration) return { highlights: empty, heat: heatOf({ curve: "", bands: "", picked: "", seconds: 0 }), head: -1, highlightRows: [], regions: [] as Candidate[] };
+    const duration = state.duration;
+    const head = state.position !== null ? Math.max(0, Math.min(1, state.position / duration)) : -1;
+    const running = scan && scan.key === view.key ? scan : null;
+    const saved = view.status === "done" ? view.saved : null;
+    const { rows, picked } = saved ? suggestions(saved) : { rows: [] as Candidate[], picked: 0 };
+    let curve = "";
+    if (running) curve = curvePath(running.curve, running.average, duration, running.done);
+    else if (saved) {
+      if (curveFor?.saved !== saved) curveFor = { saved, path: curvePath(saved.curve, saved.average, saved.duration) };
+      curve = curveFor.path;
+    }
+    const selected = rows.find((row) => row.id === view.selected);
+    const others = rows.filter((row) => row !== selected);
+    // Time left from the measured rate (as the export card), once a window is done.
+    const spent = running ? (Date.now() - running.started) / 1000 : 0;
+    const left = running && running.done > 0 && spent >= 1.5 ? Math.max(1, Math.round(((running.duration - running.done) * spent) / running.done / 60)) : -1;
+    const narrowTimes = (row: Candidate) => `${short(row.start, false)} – ${short(row.end, false)}`;
+    return {
+      highlights: {
+        ...empty,
+        state: running ? "scanning" : saved && !saved.candidates.length ? "nothing" : view.status,
+        name: basename(view.path),
+        // As the Range card shows it.
+        duration: clock(duration),
+        percent: running ? Math.min(100, Math.floor((running.done / running.duration) * 100)) : 0,
+        left,
+        scanned: saved ? minutesSince(saved.scanned) : 0,
+        loudness: true,
+        first: view.first,
+        reason: view.problem.reason,
+        raw: view.problem.raw.slice(0, 200),
+        remaining: rows.length,
+        total: picked,
+        length: lengthText(rows.reduce((sum, row) => sum + (row.end - row.start), 0)),
+      },
+      heat: heatOf({ curve, bands: running ? "" : bandsPath(others, duration), picked: selected && !running ? bandsPath([selected], duration) : "", seconds: Math.round(duration) }),
+      // Its own property: a position tick sends this number, not the strip's paths.
+      head,
+      highlightRows: running ? [] : rows.map((row) => ({
+        id: row.id,
+        range: `${short(row.start)} – ${short(row.end)}`,
+        brief: narrowTimes(row),
+        badge: (row.end - row.start).toFixed(1),
+        kind: "loud",
+        lu: String(Math.round(row.peak)),
+        selected: row === selected,
+      })),
+      regions: running ? [] : others,
+    };
+  }
+
   // ---------------------------------------------------------------- the tab
   // A short title: the default sidebar width shows it whole beside Playlist and Chapters.
   const panel: Panel = plugin.panels.mount("sidebar", "ui/tab.slint", { title: "Clip Export" });
@@ -1132,6 +1477,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       keys: {
         clip: keyOf("clip.export"), last: keyOf("clip.last"), panel: keyOf("clip.panel"),
         start: keyOf("clip.start"), end: keyOf("clip.end"), add: keyOf("clip.collectionAdd"), merge: keyOf("clip.collectionExport"), remove: keyOf("clip.collectionRemove"),
+        highlights: keyOf("clip.highlights"),
       },
       ...collectionView(),
       collectionPreview: `${renderName(settings.collectionTemplate, { source: shownSource(), start: 242.3, end: 259, now: new Date(), n: sequence + 1 }, COLLECTION_TEMPLATE)}${extensionOf(animatedNow(method()))}`,
@@ -1180,9 +1526,15 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     lastSource = isLocal(state.source) ? state.source : null;
     const ab = abRange(state);
     const view = clipView(state);
-    // R3: the clip's range on the seek bar while the tab shows (taken away when it goes, in `follow`).
-    marker.set(view.span);
+    const found = highlightView(state);
+    // R3: the clip's range on the seek bar while the tab shows (taken away when it goes, in `follow`); the
+    // suggestions left as dim bands while the Highlights page shows.
+    marker.set(view.span, settings.page === "highlights" ? found.regions : []);
     return {
+      highlights: found.highlights,
+      heat: found.heat,
+      heatHead: found.head,
+      highlightRows: found.highlightRows,
       mode: tabMode(state),
       canClip: clippable(state),
       audioLabels: audioChoices(state, text).labels,
@@ -1302,6 +1654,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     Object.assign(form, { start: String(start), end: String(end), sourceId: player.state.sourceId });
     rememberForm();
     probeSoon();
+    followRange();
   });
   on("clipNow", async (field: string) => {
     const position = (await player.refresh()).position ?? 0;
@@ -1474,6 +1827,21 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     store();
     panel.set({ collectionTemplate: settings.collectionTemplate });
   });
+  // Highlights
+  on("findHighlights", () => findHighlights());
+  on("cancelScan", () => cancelScan());
+  on("setHighlightCount", (index: number) => {
+    const count = COUNTS[Number(index)];
+    if (!count || settings.highlightCount === count) return;
+    settings.highlightCount = count;
+    store();
+  });
+  on("selectHighlight", (id: string) => selectHighlight(String(id)));
+  on("playHighlight", (id: string) => selectHighlight(String(id), true));
+  on("addHighlight", (id: string) => addHighlights([String(id)]));
+  on("dismissHighlight", (id: string) => dismissHighlight(String(id)));
+  on("addAllHighlights", () => addHighlights(hl.saved ? suggestions(hl.saved).rows.map((row) => row.id) : []));
+  on("heatClicked", (ratio: number) => heatClicked(Number(ratio)));
   on("focusChanged", (focused: boolean) => panel.setInteraction({ focused: focused === true }));
   plugin.onError((error) => {
     console.error(`[clipexport] ${error.message}`);
@@ -1577,6 +1945,19 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   /** The Undo button of the "applied to every join" message (an OSD button runs a command), while Undo is offered. */
   entry("clip.collectionUndoApply", 487, undoApply, { ...inCollection, enabled: () => !!applyUndo });
   entry("clip.collectionRemove", 486, removeSelected, { ...inCollection, bindings: ["Delete"], focus: "panel", enabled: () => !!selected && collectionShown() });
+  /**
+   * Find Highlights: the Highlights page; a file not scanned yet (or changed since) is scanned. A scan
+   * starts only on this command or the page's button, never by itself.
+   */
+  entry("clip.highlights", 488, async () => {
+    await showTab("highlights");
+    const seen = await player.refresh();
+    const view = highlightsFor(seen);
+    if (!view || scan?.key === view.key) return;
+    // The read of its kept scan that showing the page started.
+    await view.loading;
+    if (hl.key === view.key && ["ready", "changed", "error"].includes(hl.status)) await findHighlights();
+  }, inTab);
   /**
    * Export Last N Seconds (Ctrl+Shift+R): its title states the length the
    * user chose in Settings, so the command is declared again when it changes
