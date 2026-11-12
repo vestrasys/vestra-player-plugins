@@ -487,9 +487,10 @@ test("the tab: a muted line under Quality says what GIF or WebP writes, from the
   // Translated in every language the plugin ships, with the same four placeholders.
   const locales = (await readdir(new URL("../locales/", import.meta.url))).filter((file) => file.endsWith(".po"));
   assert.ok(locales.length >= 6, "the shipped languages");
+  const literal = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   for (const file of locales) {
     const po = await readFile(new URL(`../locales/${file}`, import.meta.url), "utf8");
-    const translated = new RegExp(String.raw`msgid "${template.replace(/[{}]/g, "\\$&")}"\r?\nmsgstr "([^"]+)"`).exec(po);
+    const translated = new RegExp(String.raw`msgid "${literal(template)}"\r?\nmsgstr "([^"]+)"`).exec(po);
     assert.ok(translated, `${file}: translated`);
     assert.deepEqual(translated[1]!.match(/\{\d\}/g)!.sort(), ["{0}", "{1}", "{2}", "{3}"], `${file}: placeholders`);
   }
