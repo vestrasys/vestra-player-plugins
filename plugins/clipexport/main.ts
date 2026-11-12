@@ -133,7 +133,13 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   } catch {
     // no data directory: rows show their icon only
   }
-  const ui = { clipBusy: false, clipStatus: status(), resultsStatus: status(), adding: false, collectionBusy: false, picker: "" };
+  /**
+   * `picker`: the part whose junction's picker is open ("" closed); `pickerSerial`: counts the opens (the tab shows the
+   * popup on a new one, so the popup only ever shows a picker the plugin opened); `switched`: a transition picked in
+   * Fast switched the method to Precise (the footer says so until the user picks a method); `listFocus`: counts
+   * Show Collection (the tab focuses the list and scrolls it into view).
+   */
+  const ui = { clipBusy: false, clipStatus: status(), resultsStatus: status(), adding: false, collectionBusy: false, picker: "", pickerSerial: 0, switched: false, listFocus: 0 };
   const collection = new Collection(plugin);
   let partFolder: string | null = null;
   try {
@@ -784,7 +790,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       void partThumbnail(part, seen);
       void partBitrate(part, seen.source);
     } catch (error) {
-      // The Collection page has no status line (its red line is for what blocks the export): the message says it.
+      // The Collection has no status line (its red line is for what blocks the export): the message says it.
       sayProblem(problemOf(error));
     } finally {
       ui.adding = false;
@@ -794,18 +800,20 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     const part = collection.remove(id);
     if (!part) return;
     if (selected === id) selected = null;
+    if (!collection.parts.length) ui.switched = false;
     dropPartThumb(part);
     void forgetUnused([part.token]);
     void recheck();
   }
-  /** The Collection page is the one on screen (Delete acts on its selection only then). */
-  const collectionShown = () => tabShown() && settings.page === "collection";
+  /** The Clip page, with the Collection, is the one on screen (Delete acts on its selection only then). */
+  const collectionShown = () => tabShown() && settings.page === "clip";
   /** Delete (while the list has the focus): the selected part. */
   const removeSelected = () => selected && collectionShown() && removePart(selected);
   /** Clear Collection: empty at once, with Undo on the message for a while (no confirmation dialog). */
   function clearCollection() {
     if (!collection.parts.length) return;
     expireUndo();
+    ui.switched = false;
     const parts = collection.clear();
     const timer = setTimeout(expireUndo, UNDO_MS);
     timer.unref?.();
@@ -936,14 +944,18 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       kind: part.transition.kind,
       dir: part.transition.dir,
       duration: part.transition.duration.toFixed(1),
-      // Every junction, a Cut too: in Fast a chip does not open the picker (`openJoin`), so none may look clickable.
-      off: fastNow,
+      // Fast joins with cuts: a transition is kept, greyed and struck (a Cut has nothing to strike); its chip still opens the picker.
+      off: fastNow && part.transition.kind !== "cut",
     }));
   }
   /** The footer's sum: the written length (overlaps taken off, unless Fast joins with cuts) and the transitions. */
   function collectionInfo(checked: boolean) {
     const fastNow = collectionMethod() === "fast";
     const junctions = collection.parts.slice(0, -1).filter((part) => part.transition.kind !== "cut");
+    // "Switched to Precise" stays only while it explains something: a transition is set and the method is still the
+    // Precise it switched to. Once every junction is a Cut again (picked, Undo of Apply to All, removed, cleared) or
+    // the method is Fast, the note is done and does not come back by itself.
+    if (ui.switched && (fastNow || junctions.length === 0)) ui.switched = false;
     // What the export takes off: each overlap on whole frames, held to half the shorter part, at the merge's frame rate.
     const fps = freshCheck()?.encode?.fps ?? 30;
     const t = timing(collection.parts.map((part) => part.end - part.start), collection.parts.map((part) => part.transition), fps);
@@ -952,6 +964,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     return {
       count: collection.parts.length, total: lengthClock(length), checked, undo: !!undo,
       transitions: junctions.length, saved: saved.toFixed(1), off: fastNow && junctions.length > 0,
+      switched: ui.switched,
     };
   }
   /** The picker of the junction below part `ui.picker`, while it is open: its kind, direction, duration, the limit, the two parts' pictures. */
@@ -959,10 +972,11 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     const index = ui.picker ? collection.indexOf(ui.picker) : -1;
     const part = collection.parts[index];
     const next = collection.parts[index + 1];
-    if (!part || !next) return { shown: false, id: "", from: 0, to: 0, kind: "cut", dir: "left", duration: "1.0", cap: "", custom: false, joins: 0 };
+    // Closed (or its junction gone: removed, moved last): the tab closes the popup; it never shows this empty one.
+    if (!part || !next) return { shown: false, serial: ui.pickerSerial, id: "", from: 0, to: 0, kind: "cut", dir: "left", duration: "1.0", cap: "", custom: false, joins: 0 };
     const tr = part.transition;
     return {
-      shown: true, id: part.id, from: index + 1, to: index + 2, kind: tr.kind, dir: tr.dir,
+      shown: true, serial: ui.pickerSerial, id: part.id, from: index + 1, to: index + 2, kind: tr.kind, dir: tr.dir,
       duration: tr.duration.toFixed(1), cap: capOf(part, next).toFixed(1),
       custom: !(PRESET_DURATIONS as readonly number[]).includes(tr.duration),
       joins: collection.parts.length - 1,
@@ -988,6 +1002,16 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     const typed = typedDuration(duration, cap);
     const seconds = before.kind === "cut" && k !== "cut" ? Math.min(cap, FIRST_DURATION) : typed ?? before.duration;
     collection.setTransition(id, { kind: k, dir: d, duration: seconds });
+    if (k !== "cut") preciseForTransitions();
+  }
+  /**
+   * A transition picked while Fast would join the parts: the method becomes Precise (a transition needs re-encoding),
+   * and the footer says so. A Cut keeps Fast. Parts Fast cannot join are Precise already: nothing changes.
+   */
+  function preciseForTransitions() {
+    if (collectionMethod() !== "fast") return;
+    setMethod("precise");
+    ui.switched = true;
   }
   /** Apply to All: this junction's transition on every junction and as the default for new parts; Undo on the message. */
   function applyToAll(id: string) {
@@ -996,6 +1020,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     expireApplyUndo();
     const transition = { ...part.transition };
     const before = collection.applyAll(transition);
+    if (transition.kind !== "cut") preciseForTransitions();
     const timer = setTimeout(expireApplyUndo, UNDO_MS);
     timer.unref?.();
     applyUndo = { before, defaultBefore: { ...settings.newTransition }, timer };
@@ -1019,7 +1044,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     store();
     applyUndo = null;
   }
-  /** The Collection page's footer and notes. */
+  /** The Collection section and its footer: rows, sum, notes, the picker. */
   function collectionView() {
     const fresh = freshCheck();
     return {
@@ -1094,6 +1119,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       besideMedia: settings.besideMedia,
       preview: `${renderName(settings.template, { source: shownSource(), start: 242.3, end: 259, now: new Date(), n: sequence + 1 })}.mp4`,
       page: PAGES.indexOf(settings.page),
+      listFocus: ui.listFocus,
       unseen,
     };
   });
@@ -1124,7 +1150,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       addFrom: addFrom(state),
     };
   }
-  /** The Collection page's Add from: the file playing, its duration, the marked range's length, whether it can be added. */
+  /** The Range card's file and + Add: the file playing, its duration, the marked range's length, whether it can be added. */
   function addFrom(state: PlayerState) {
     const range = typedRange();
     const can = clippable(state);
@@ -1173,10 +1199,10 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     if (!Number.isInteger(index) || !page) return;
     if (page === "results") unseen = 0;
     if (settings.page === page) return;
-    // A selection is the Collection page's: another page in front leaves nothing for Delete to remove.
+    // A selection is the Clip page's (its Collection): another page in front leaves nothing for Delete to remove.
     selected = null;
     settings.page = page;
-    // The picker belongs to the Collection page.
+    // The picker belongs to the Clip page's Collection.
     ui.picker = "";
     store();
   }
@@ -1218,7 +1244,11 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   const on = (name: string, run: (...args: never[]) => unknown) => panel.on(name, run as (...args: unknown[]) => unknown);
   on("setPage", (index: number) => setPage(Number(index)));
   // Clip
-  on("setMethod", (index: number) => setMethod(METHODS[Number(index)]!));
+  on("setMethod", (index: number) => {
+    // The user's own pick: the note that a transition switched the method goes.
+    ui.switched = false;
+    setMethod(METHODS[Number(index)]!);
+  });
   on("clipEdited", (start: string, end: string) => {
     // Typed while the tab shows the source playing: the marks are its.
     Object.assign(form, { start: String(start), end: String(end), sourceId: player.state.sourceId });
@@ -1370,9 +1400,12 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   on("exportMergedAs", () => exportCollection(true));
   // Transitions: the picker of a junction opens and closes; a pick applies at once.
   on("openJoin", (id: string) => {
-    // Fast joins with cuts: a chip does not open the picker (its tooltip says why).
-    if (collectionMethod() === "fast" || collection.indexOf(String(id)) < 0) return;
+    // Any junction above the last part, in Fast too (a transition picked there switches to Precise); the tab shows
+    // the popup when the serial changes, so a refused open shows nothing.
+    const index = collection.indexOf(String(id));
+    if (index < 0 || index >= collection.parts.length - 1) return;
     ui.picker = String(id);
+    ui.pickerSerial++;
   });
   on("closeJoin", () => void (ui.picker = ""));
   on("setTransition", (id: string, kind: string, dir: string, duration: string) => setTransition(String(id), String(kind), String(dir), String(duration)));
@@ -1478,7 +1511,13 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   const inCollection = { home: "clip.collection" };
   /** Add Range to Collection: the Clip page's Start and End of the file playing, as the last part; playback does not change. */
   entry("clip.collectionAdd", 481, () => addPart(true), { ...inCollection, ...canExport });
-  entry("clip.collection", 482, () => showTab("collection"));
+  /** Show Collection: the Clip page, its list focused and scrolled into view (the Collection is a section of that page). */
+  entry("clip.collection", 482, async () => {
+    await showTab("clip");
+    // After the tab is shown: a tab built by this show gets the new value as a change, which is what scrolls.
+    ui.listFocus++;
+    plugin.update();
+  });
   /** Export Collection: Export Merged, into the clip folder; a problem is said on screen. */
   entry("clip.collectionExport", 483, () => exportCollection(false, true), inCollection);
   entry("clip.collectionClear", 484, clearCollection, inCollection);

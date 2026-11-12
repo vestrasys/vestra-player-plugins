@@ -247,7 +247,7 @@ test("the junction rows: Cut by default (0.2.x output unchanged), a first pick g
     await eventually(() => rows(host)[1]!.duration, "5.0", "a typed value over the limit is the limit (half of 10 s)");
     host.mounted().emit("set-transition", b, "wipe", "up", "1.5");
     await eventually(() => [rows(host)[1]!.kind, rows(host)[1]!.duration], ["wipe", "1.5"], "changing the kind keeps the length");
-    await eventually(() => tab(host)["collection-info"], { count: 3, total: "0:29.0", checked: true, undo: false, transitions: 2, saved: "2.0", off: false });
+    await eventually(() => tab(host)["collection-info"], { count: 3, total: "0:29.0", checked: true, undo: false, transitions: 2, saved: "2.0", off: false, switched: false });
     // A reorder carries a part's outgoing transition; moved to the last place it loses it.
     host.mounted().emit("move-part", b, 2);
     await eventually(() => rows(host).map((r) => [r.id, r.kind]), [[a, "crossfade"], [c, "cut"], [b, "cut"]]);
@@ -256,7 +256,7 @@ test("the junction rows: Cut by default (0.2.x output unchanged), a first pick g
   }
 });
 
-test("Fast with matching files: the transitions are kept but greyed, the export joins with cuts and no ffmpeg runs; the picker does not open", async () => {
+test("Fast with matching files: transitions are kept but greyed, the export joins with cuts and no ffmpeg runs; Precise applies them again", async () => {
   const host = new TestHost();
   play(host, "/media/one.mp4");
   const { stop } = await start(host);
@@ -266,7 +266,7 @@ test("Fast with matching files: the transitions are kept but greyed, the export 
     play(host, "/media/two.mp4");
     await add(host, "0", "4");
     const [a] = rows(host).map((r) => r.id);
-    // Precise first: set it, then pick Fast.
+    // Precise first: set it, then pick Fast (the user's choice: the transition stays, greyed).
     host.mounted().emit("set-method", 1);
     host.mounted().emit("open-join", a);
     host.mounted().emit("set-transition", a, "crossfade", "left", "1");
@@ -274,9 +274,6 @@ test("Fast with matching files: the transitions are kept but greyed, the export 
     host.mounted().emit("set-method", 0);
     await eventually(() => [rows(host)[0]!.off, (tab(host)["collection-info"] as { off: boolean; total: string }).off, (tab(host)["collection-info"] as { total: string }).total], [true, true, "0:08.0"]);
     host.mounted().emit("close-join");
-    host.mounted().emit("open-join", a);
-    await host.settle();
-    assert.equal((tab(host).picker as { shown: boolean }).shown, false, "a chip does not open the picker in Fast");
     const runs = fakeFfmpeg(host);
     host.mounted().emit("export-merged");
     await until(() => host.osd.some((line) => line.startsWith("Clip exported as")), "the export");
@@ -291,8 +288,7 @@ test("Fast with matching files: the transitions are kept but greyed, the export 
   }
 });
 
-test("a chip opens the picker exactly when it is clickable: every junction, Cut or not, in Fast and in Precise", async () => {
-  // A chip that is clickable (not `off`) shows the picker at once; one the plugin then refuses read "Transition 0 → 0" and ignored every pick.
+test("a transition picked in Fast switches the method to Precise and says so; a Cut keeps Fast; parts Fast cannot join change nothing", async () => {
   const host = new TestHost();
   play(host, "/media/one.mp4");
   const { stop } = await start(host);
@@ -301,43 +297,133 @@ test("a chip opens the picker exactly when it is clickable: every junction, Cut 
     await add(host, "10", "14");
     await add(host, "20", "24");
     const [a, b] = rows(host).map((r) => r.id);
-    const method = () => tab(host)["collection-method-index"];
-    const picker = () => tab(host).picker as { shown: boolean; id: string; from: number; to: number };
-    async function opens(id: string) {
-      host.mounted().emit("close-join");
-      host.mounted().emit("open-join", id);
-      await host.settle();
-      return picker().shown;
-    }
-    async function agree(what: string) {
+    const method = () => tab(host)["method-index"];
+    const info = () => tab(host)["collection-info"] as { off: boolean; switched: boolean };
+    const picker = () => tab(host).picker as { shown: boolean; kind: string };
+    await eventually(() => [method(), tab(host)["collection-method-index"]], [0, 0], "Fast, and Fast can join these parts");
+    // The chip opens the picker in Fast too.
+    host.mounted().emit("open-join", a);
+    await eventually(() => [picker().shown, picker().kind], [true, "cut"]);
+    // A Cut keeps Fast.
+    host.mounted().emit("set-transition", a, "cut", "left", "");
+    await host.settle();
+    assert.deepEqual([method(), info().switched], [0, false], "a Cut keeps Fast");
+    // A transition: Precise, one line says so, the picker stays open on it.
+    host.mounted().emit("set-transition", a, "crossfade", "left", "");
+    await eventually(() => [rows(host)[0]!.kind, method(), tab(host)["collection-method-index"], info().switched, info().off], ["crossfade", 1, 1, true, false]);
+    assert.deepEqual([picker().shown, picker().kind], [true, "crossfade"]);
+    // Back to Cut: nothing needs Precise any more, so the line goes (the method stays as it is); it does not come back
+    // by itself when a transition is picked again in Precise (nothing is switched then).
+    host.mounted().emit("set-transition", a, "cut", "left", "");
+    await eventually(() => [rows(host)[0]!.kind, method(), info().switched], ["cut", 1, false]);
+    host.mounted().emit("set-transition", a, "crossfade", "left", "");
+    await eventually(() => rows(host)[0]!.kind, "crossfade");
+    await host.settle();
+    assert.equal(info().switched, false, "picked in Precise: no switch to speak of");
+    // In Fast again, a transition switches and says so once more.
+    host.mounted().emit("set-method", 0);
+    host.mounted().emit("set-transition", a, "wipe", "left", "");
+    await eventually(() => [rows(host)[0]!.kind, method(), info().switched], ["wipe", 1, true]);
+    // The user's own pick of a method takes the line away (and Fast greys the transition again).
+    host.mounted().emit("set-method", 0);
+    await eventually(() => [method(), info().switched, info().off, rows(host)[0]!.off], [0, false, true, true]);
+    // Apply to All of a transition in Fast: Precise as well.
+    host.mounted().emit("open-join", a);
+    host.mounted().emit("apply-all", a);
+    await eventually(() => [method(), info().switched, rows(host)[0]!.kind, rows(host)[1]!.kind], [1, true, "wipe", "wipe"]);
+    // Undo of Apply to All, then the last transition back to Cut: the line goes with it.
+    await host.command("clip.collectionUndoApply").run();
+    await eventually(() => [rows(host)[0]!.kind, rows(host)[1]!.kind, info().switched], ["wipe", "cut", true], "one transition left: still Precise because of it");
+    host.mounted().emit("set-transition", a, "cut", "left", "");
+    await eventually(() => [rows(host)[0]!.kind, info().switched], ["cut", false]);
+    // Clear takes the line away with the parts.
+    host.mounted().emit("set-method", 0);
+    host.mounted().emit("set-transition", a, "slide", "left", "");
+    await eventually(() => info().switched, true);
+    host.mounted().emit("clear-parts");
+    await eventually(() => [(tab(host)["collection-info"] as { count: number }).count, info().switched], [0, false]);
+    void b;
+  } finally {
+    await stop();
+  }
+});
+
+test("parts Fast cannot join: Precise already, a transition picked there switches nothing", async () => {
+  const host = new TestHost();
+  host.mediaFiles.set("/media/wide.mp4", WIDE);
+  play(host, "/media/one.mp4");
+  const { stop } = await start(host);
+  try {
+    await add(host, "0", "4");
+    play(host, "/media/wide.mp4");
+    await add(host, "0", "4");
+    const [a] = rows(host).map((r) => r.id);
+    await eventually(() => [tab(host)["method-index"], tab(host)["collection-method-index"]], [0, 1], "Fast chosen, the merge is Precise");
+    host.mounted().emit("open-join", a);
+    host.mounted().emit("set-transition", a, "slide", "up", "");
+    await eventually(() => rows(host)[0]!.kind, "slide");
+    await host.settle();
+    assert.deepEqual([tab(host)["method-index"], (tab(host)["collection-info"] as { switched: boolean }).switched], [0, false], "the clip's Fast stays; nothing to say");
+  } finally {
+    await stop();
+  }
+});
+
+test("the picker never shows empty: it opens only on a junction (a serial per open), and closes when its junction goes", async () => {
+  // 0.3.0 showed "Transition 0 → 0" with nothing to pick when the tab showed the popup before the plugin had opened it.
+  const host = new TestHost();
+  play(host, "/media/one.mp4");
+  const { stop } = await start(host);
+  try {
+    await add(host, "0", "4");
+    await add(host, "10", "14");
+    await add(host, "20", "24");
+    const [a, b, c] = rows(host).map((r) => r.id);
+    const picker = () => tab(host).picker as { shown: boolean; serial: number; id: string; from: number; to: number };
+    // Shown always comes with a real junction: from n into n + 1.
+    const valid = () => !picker().shown || (picker().from >= 1 && picker().to === picker().from + 1 && picker().id !== "");
+    let serial = picker().serial;
+    assert.equal(picker().shown, false);
+    // Every junction opens, in Fast and in Precise, each open a new serial (the tab shows the popup on it).
+    for (const methodIndex of [0, 1]) {
+      host.mounted().emit("set-method", methodIndex);
       for (const [index, row] of rows(host).entries()) {
         if (!row.join) continue;
-        const shown = await opens(row.id);
-        assert.equal(shown, !row.off, `${what}: part ${index + 1}'s chip is ${row.off ? "off" : "clickable"}, the picker ${shown ? "opens" : "does not"}`);
-        if (shown) assert.deepEqual([picker().id, picker().from, picker().to], [row.id, index + 1, index + 2]);
+        host.mounted().emit("open-join", row.id);
+        await eventually(() => [picker().shown, picker().serial, picker().from, picker().to], [true, serial + 1, index + 1, index + 2]);
+        serial++;
+        assert.ok(valid());
       }
     }
-    // The default: Fast (the files match), every junction a Cut.
-    await eventually(method, 0, "Fast");
-    await agree("Fast, all cuts");
-    assert.ok(rows(host).filter((r) => r.join).every((r) => r.off), "Fast: every chip is greyed, a Cut too (design §4.4)");
-    // Precise: every chip opens its picker, and a pick applies.
-    host.mounted().emit("set-method", 1);
-    await eventually(method, 1, "Precise");
-    await agree("Precise, all cuts");
+    // The last part has no junction, an unknown part none either: refused, no new serial (no popup).
+    host.mounted().emit("close-join");
+    await eventually(() => picker().shown, false);
+    for (const id of [c, "nope"]) {
+      host.mounted().emit("open-join", id);
+      await host.settle();
+      assert.deepEqual([picker().shown, picker().serial], [false, serial], `open-join ${id}`);
+    }
+    // Open on a junction, then it goes: moved last, or its part removed. The picker closes (the tab closes the popup).
+    host.mounted().emit("open-join", b);
+    await eventually(() => [picker().shown, picker().id], [true, b]);
+    host.mounted().emit("move-part", b, 2);
+    await eventually(() => picker().shown, false, "its part moved last: no junction below it");
+    assert.ok(valid());
     host.mounted().emit("open-join", a);
-    host.mounted().emit("set-transition", a, "crossfade", "left", "1");
-    await eventually(() => rows(host)[0]!.kind, "crossfade");
-    // Back to Fast with one transition set and one Cut: both chips greyed, neither opens.
-    host.mounted().emit("set-method", 0);
-    await eventually(method, 0, "Fast again");
-    await agree("Fast, a transition and a cut");
-    // A reorder in Fast, then Precise: the moved junctions open with their new numbers.
-    host.mounted().emit("move-part", b, 0);
-    await eventually(() => rows(host)[0]!.id, b);
-    host.mounted().emit("set-method", 1);
-    await eventually(method, 1, "Precise again");
-    await agree("Precise after a reorder");
+    await eventually(() => [picker().shown, picker().id], [true, a]);
+    host.mounted().emit("remove-part", a);
+    await eventually(() => picker().shown, false, "its part removed");
+    // Leaving the page closes it too.
+    const [first] = rows(host).map((r) => r.id);
+    host.mounted().emit("open-join", first);
+    await eventually(() => picker().shown, true);
+    host.mounted().emit("set-page", 1);
+    await eventually(() => picker().shown, false, "another page in front");
+    // The tab's side: the popup shows only on a new serial with the picker shown, and closes when it is not.
+    const slint = await readFile(new URL("../ui/tab.slint", import.meta.url), "utf8");
+    assert.equal(slint.split("picker-popup.show()").length - 1, 1, "one place shows the popup");
+    assert.match(slint, /changed picker-serial => \{\s*if ClipBridge\.picker\.shown \{ picker-popup\.show\(\); \}/);
+    assert.match(slint, /changed picker-shown => \{\s*if !self\.picker-shown \{ picker-popup\.close\(\); \}/);
   } finally {
     await stop();
   }

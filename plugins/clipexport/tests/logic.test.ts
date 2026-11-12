@@ -223,7 +223,8 @@ test("settings fall back field by field; new fields have their defaults", () => 
   assert.equal(s.collectionTemplate, "{name}_collection_{date}");
   // 0.1.x kept the page as its index among Clip, Results, Settings.
   assert.deepEqual([0, 1, 2].map((page) => settingsOf({ page }, "/videos").page), ["clip", "results", "settings"]);
-  assert.deepEqual(["collection", "results", "nope"].map((page) => settingsOf({ page }, "/videos").page), ["collection", "results", "clip"]);
+  // 0.2.x and 0.3.x had a Collection page: it is a section of the Clip page now.
+  assert.deepEqual(["collection", "results", "settings", "nope"].map((page) => settingsOf({ page }, "/videos").page), ["clip", "results", "settings", "clip"]);
   assert.equal(settingsOf({ template: "{n}" }, "/videos").template, "{n}");
 });
 
