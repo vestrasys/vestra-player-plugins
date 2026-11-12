@@ -1,6 +1,6 @@
 {
   "id": "zysilm.clipexport",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "apiVersion": "vestra/1",
   "entry": "main.ts",
   "capabilities": [

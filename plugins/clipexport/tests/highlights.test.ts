@@ -1,27 +1,33 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, readdir, readFile, rm, utimes, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
-import { startPlugin, TestHost } from "@vestra-player/sdk/testing";
+import { HostError, startPlugin, TestHost } from "@vestra-player/sdk/testing";
 import {
-  analyse, bandAt, bandsPath, CACHE_LIMIT, curvePath, emptyValues, HighlightStore, keptName, loudnessArgs, MAX_LENGTH, MIN_BAND, MIN_LENGTH, parseMomentary, pick, RATE, savedOf, scanLoudness, short, total, WINDOW,
+  analyse, bandAt, bandsPath, CACHE_LIMIT, curvePath, emptyValues, HighlightStore, keptName, loudnessArgs, MAX_LENGTH, MIN_BAND, MIN_LENGTH, nextAfter, parseMomentary, pick, RATE, savedOf, scanLoudness, short,
+  stepFrom, thumbName, total, WINDOW,
 } from "../highlights.ts";
 import type { HighlightScan } from "../highlights.ts";
 import activate from "../main.ts";
 import { clock, parseTime, REASON } from "../model.ts";
+import { PART_THUMB, thumbArgs } from "../results.ts";
 import { eventually } from "./fakes.ts";
 
 const ID = "zysilm.clipexport";
 const directory = new URL("..", import.meta.url);
 const tab = (host: TestHost) => host.mounted().props;
-type Highlights = { state: string; name: string; percent: number; left: number; scanned: number; loudness: boolean; first: boolean; reason: string; raw: string; count: number; remaining: number; total: number; length: string };
-type Row = { id: string; range: string; brief: string; badge: string; kind: string; lu: string; selected: boolean };
+type Highlights = { state: string; name: string; percent: number; left: number; scanned: number; loudness: boolean; first: boolean; reason: string; raw: string; count: number; remaining: number; total: number; length: string; picked: number };
+type Row = { id: string; range: string; brief: string; badge: string; kind: string; lu: string; selected: boolean; thumb: unknown; restore: number };
 type Heat = { curve: string; bands: string; picked: string; seconds: number };
 const page = (host: TestHost) => (tab(host).highlights ?? {}) as Highlights;
-const rows = (host: TestHost) => (tab(host)["highlight-rows"] ?? []) as Row[];
+const allRows = (host: TestHost) => (tab(host)["highlight-rows"] ?? []) as Row[];
+/** The suggestions listed (the list's last row can be Restore N dismissed instead). */
+const rows = (host: TestHost) => allRows(host).filter((row) => row.restore === 0);
+/** Restore N dismissed: its N, 0 without the row. */
+const restoreRow = (host: TestHost) => allRows(host).find((row) => row.restore > 0)?.restore ?? 0;
 const heat = (host: TestHost) => tab(host).heat as Heat;
 const tick = () => new Promise((done) => setTimeout(done, 5));
 async function until(predicate: () => boolean | Promise<boolean>, what = "condition") {
@@ -44,6 +50,9 @@ function talk(t: number) {
   if (t >= 420 && t < 426) return -20;
   return t % 6 < 0.8 ? -120.691 : -30;
 }
+/** A reaction every 120 s, of five loudnesses in turn: 24 of them in 3000 s. */
+const many = (t: number) => (t % 120 >= 60 && t % 120 < 64 ? -12 + (Math.floor(t / 120) % 5) : t % 6 < 0.8 ? -120 : -30);
+
 /**
  * What ffmpeg prints for one window (`loudnessArgs`): a frame line and its momentary loudness per 100 ms, the
  * first one 5.33 ms in (AAC's 256 samples of priming at 48 kHz). As the real one, it leaves out a last frame
@@ -60,6 +69,8 @@ function momentaryOutput(args: string[], loud: (t: number) => number) {
   return out;
 }
 const isScan = (args: string[]) => args.some((arg) => arg.includes("ebur128"));
+/** The scan's ffmpeg runs so far (thumbnails run ffmpeg too, in the background: never count all runs). */
+const scans = (host: TestHost) => host.tools.calls.filter((call) => call.tool === "ffmpeg" && isScan(call.args)).length;
 /** Pretend to be ffmpeg: the scan's windows from `loud`; other runs (thumbnails) give nothing. `gate` holds a window until it resolves. */
 function fakeFfmpeg(host: TestHost, loud: (t: number) => number = talk, gate?: () => Promise<void>) {
   host.tools.handle("ffmpeg", async (args) => {
@@ -131,7 +142,8 @@ test("the analysis: silence has no average and nothing; an even talk has nothing
 test("5 · 10 · 20: the strongest of all, in time order; added and dismissed ones leave the list but still count", () => {
   const candidates = [10, 50, 30, 70, 20, 60].map((start, i) => ({ id: String(start), start, end: start + 8, peak: [3, 9, 5, 8, 7, 6][i]! }));
   assert.deepEqual(pick(candidates, 3, {}).left.map((c) => c.id), ["20", "50", "70"], "peaks 9, 8 and 7, in time order");
-  assert.deepEqual(pick(candidates, 3, { 20: "dismissed" }), { left: [candidates[1], candidates[3]], total: 3 });
+  assert.deepEqual(pick(candidates, 3, { 20: "dismissed" }), { left: [candidates[1], candidates[3]], total: 3, dismissed: ["20"] });
+  assert.deepEqual(pick(candidates, 3, { 20: "dismissed", 10: "dismissed", 50: "added" }).dismissed, ["20"], "Restore counts the dismissed among those picked");
   assert.deepEqual(pick(candidates, 20, { 50: "added" }).left.map((c) => c.id), ["10", "20", "30", "60", "70"]);
   assert.equal(pick(candidates, 20, {}).total, 6, "fewer candidates: fewer rows");
 });
@@ -304,7 +316,7 @@ test("the page: no local file (S6); a file not scanned (S1); Find Highlights sca
     assert.equal("head" in heat(host), false);
     assert.equal(heat(host).bands.split("Z").length - 1, 2, "a band per suggestion");
     const kept = await readdir(join(setup.data, "highlights"));
-    assert.equal(kept.length, 1, "one small file for the video");
+    assert.equal(kept.filter((name) => name.endsWith(".json")).length, 1, "one small file for the video");
     await stop();
 
     // Reopened: the kept result at once, no scan.
@@ -316,7 +328,7 @@ test("the page: no local file (S6); a file not scanned (S1); Find Highlights sca
       await showHighlights(again);
       await eventually(() => page(again).state, "done", "R1 at once");
       await eventually(() => rows(again).length, 2);
-      assert.equal(again.tools.calls.length, 0);
+      assert.equal(scans(again), 0);
     } finally {
       await second.stop();
     }
@@ -362,13 +374,14 @@ test("a row is the Range: a click selects it, seeks to its start and fills Start
     assert.equal(parts.length, 1);
     assert.match(parts[0]!.range, /^03:10\.000 – /, "the edited range");
     await eventually(() => [page(host).remaining, page(host).total], [1, 2], "1 of 2 left");
-    // × dismisses: nothing left.
+    // × dismisses: nothing left but Restore 1 dismissed.
     host.mounted().emit("dismiss-highlight", second!.id);
     await eventually(() => rows(host).length, 0);
     await eventually(() => page(host).remaining, 0);
+    await eventually(() => restoreRow(host), 1);
     // The kept file remembers what was done.
     await until(async () => {
-      const [name] = await readdir(join(setup.data, "highlights"));
+      const [name] = (await readdir(join(setup.data, "highlights"))).filter((file) => file.endsWith(".json"));
       const saved = JSON.parse(await readFile(join(setup.data, "highlights", name!), "utf8"));
       return saved.handled[first!.id] === "added" && saved.handled[second!.id] === "dismissed" && saved.edits[first!.id]?.start === 190;
     }, "kept");
@@ -383,8 +396,6 @@ test("a row is the Range: a click selects it, seeks to its start and fills Start
 
 test("Add All adds every suggestion left, in time order, as one file; past 100 parts it adds what fits and says so", async () => {
   const setup = await withMedia(3000);
-  // A reaction every 120 s: 24 of them.
-  const many = (t: number) => (t % 120 >= 60 && t % 120 < 64 ? -12 + (Math.floor(t / 120) % 5) : t % 6 < 0.8 ? -120 : -30);
   const host = new TestHost();
   fakeFfmpeg(host, many);
   setup.play(host);
@@ -481,10 +492,10 @@ test("Find Highlights (command palette): opens the Highlights page and scans a f
     await host.settle();
     await eventually(() => tab(host).page, 1);
     await eventually(() => page(host).state, "done");
-    const scans = host.tools.calls.length;
+    const scanned = scans(host);
     await command.run();
     await host.settle();
-    assert.equal(host.tools.calls.length, scans, "a scanned file is not scanned again");
+    assert.equal(scans(host), scanned, "a scanned file is not scanned again");
     // Another page: the dim bands leave the seek bar, the Range stays.
     host.mounted().emit("select-highlight", rows(host)[1]!.id);
     await until(() => (host.timeline.rangeLayers.get(ID) ?? []).some((r) => r.style === "region"), "a region band");
@@ -493,6 +504,303 @@ test("Find Highlights (command palette): opens the Highlights page and scans a f
     await until(() => (host.timeline.rangeLayers.get(ID) ?? []).every((r) => r.style === "selection"), "only the Range");
   } finally {
     await stop();
+    await setup.cleanup();
+  }
+});
+
+test("the list keys and the row helpers: Down from none takes the first, Up the last, both held at the ends; after Enter or Delete the next row, or the one before the last", () => {
+  const ids = ["a", "b", "c"];
+  assert.deepEqual([stepFrom(ids, "", 1), stepFrom(ids, "", -1), stepFrom(ids, "a", 1), stepFrom(ids, "c", 1), stepFrom(ids, "a", -1), stepFrom([], "", 1)], ["a", "c", "b", "c", "a", ""]);
+  assert.deepEqual([nextAfter(ids, "a"), nextAfter(ids, "c"), nextAfter(["a"], "a"), nextAfter(ids, "x")], ["b", "b", "", ""]);
+  // A row's picture is named by its suggestion and its start (tenths): a moved start is another picture.
+  assert.equal(thumbName("1958", 195.8), "1958-1958.jpg");
+  assert.notEqual(thumbName("1958", 190), thumbName("1958", 195.8));
+  assert.equal(thumbName("../x", 1), "x-10.jpg");
+  // The picture: the first keyframe from the row's start (an input seek), one thread, a small JPEG on standard output.
+  const args = thumbArgs("/v/standup.mp4", PART_THUMB, 195.8);
+  assert.deepEqual(args.slice(args.indexOf("-ss"), args.indexOf("-ss") + 4), ["-ss", "195.800", "-i", "/v/standup.mp4"]);
+  assert.ok(args.includes("nokey") && args.join(" ").includes("-threads 1") && args.at(-1) === "-");
+  assert.equal(thumbArgs("/v/clip.mp4").includes("-ss"), false, "a Results thumbnail: the clip's first keyframe");
+  assert.equal(args.includes("-noaccurate_seek") || args.includes("passthrough"), false);
+  // The retry: the keyframe at or before the start, kept although it is timed before the seek point.
+  const before = thumbArgs("/v/standup.mp4", PART_THUMB, 195.8, true);
+  assert.deepEqual(before.slice(before.indexOf("-noaccurate_seek"), before.indexOf("-noaccurate_seek") + 3), ["-noaccurate_seek", "-ss", "195.800"]);
+  assert.deepEqual(before.slice(before.indexOf("-fps_mode"), before.indexOf("-fps_mode") + 2), ["-fps_mode", "passthrough"]);
+});
+
+test("kept thumbnails: a folder beside each scan; those no suggestion shows go; they go with a changed file and with a pruned scan", async () => {
+  const folder = await mkdtemp(join(tmpdir(), "clipexport-hl-thumbs-"));
+  const store = new HighlightStore(folder);
+  const scan = (path: string): HighlightScan => ({ version: 1, path, size: 5, mtimeMs: 1000, stream: 0, scanned: 1, mode: "loudness", duration: 60, average: -30, curve: [], candidates: [], handled: {}, edits: {} });
+  try {
+    await store.save(scan("/v/a.mp4"));
+    const pictures = store.thumbFolder("/v/a.mp4", 0)!;
+    assert.equal(pictures, join(folder, keptName("/v/a.mp4", 0).replace(/\.json$/, "")));
+    await mkdir(pictures, { recursive: true });
+    await writeFile(join(pictures, "10-100.jpg"), "a");
+    await writeFile(join(pictures, "20-200.jpg"), "b");
+    assert.deepEqual([...(await store.thumbs("/v/a.mp4", 0, new Set(["10-100.jpg"])))], ["10-100.jpg"]);
+    assert.deepEqual(await readdir(pictures), ["10-100.jpg"], "the other one went");
+    // A changed file: its scan and its pictures go.
+    assert.equal(await store.load({ path: "/v/a.mp4", size: 6, mtimeMs: 1000, stream: 0 }), "changed");
+    assert.deepEqual(await readdir(folder), []);
+    // A picture folder without its scan (pruned by an older version) goes at the next write.
+    await mkdir(join(folder, "0123456789abcdef01234567"), { recursive: true });
+    await store.save(scan("/v/b.mp4"));
+    assert.deepEqual(await readdir(folder), [keptName("/v/b.mp4", 0)]);
+  } finally {
+    await rm(folder, { recursive: true, force: true });
+  }
+});
+
+test("list keys: Down and Up select and jump; Enter adds the selected one and selects the next; Delete dismisses it and selects the next; Restore N dismissed; off the page Enter does nothing", async () => {
+  const setup = await withMedia(3000);
+  const host = new TestHost();
+  fakeFfmpeg(host, many);
+  setup.play(host);
+  const { stop } = await startIn(host, setup.data);
+  try {
+    await showHighlights(host);
+    await eventually(() => page(host).state, "ready");
+    host.mounted().emit("set-highlight-count", 0);
+    host.mounted().emit("find-highlights");
+    await eventually(() => page(host).state, "done");
+    await eventually(() => rows(host).length, 5);
+    assert.equal(host.osd.some((line) => /highlights? found/.test(line)), false, "found on screen: no message");
+    // The fake ffmpeg gives no picture: the first row is tried twice (from its start, then the keyframe before it); with
+    // no picture of this file made yet, no more are asked for it (an audio file).
+    const pictureRuns = () => host.tools.calls.filter((call) => call.tool === "ffmpeg" && !isScan(call.args));
+    await until(() => pictureRuns().length === 2, "the first picture and its retry");
+    await host.settle();
+    assert.deepEqual(pictureRuns().map((call) => call.args.includes("-noaccurate_seek")), [false, true]);
+    const ids = rows(host).map((row) => row.id);
+    const selected = () => rows(host).find((row) => row.selected)?.id ?? "";
+    // Down from none: the first row, jumped to; the list keeps it in view (`picked`).
+    host.mounted().emit("step-highlight", 1);
+    await eventually(selected, ids[0]);
+    await eventually(() => page(host).picked, 0);
+    await until(() => host.seeks.length === 1, "the jump");
+    host.mounted().emit("step-highlight", 1);
+    await eventually(selected, ids[1]);
+    await eventually(() => page(host).picked, 1);
+    host.mounted().emit("step-highlight", -1);
+    await eventually(selected, ids[0]);
+    host.mounted().emit("step-highlight", -1);
+    await host.settle();
+    await eventually(selected, ids[0], "held at the top");
+    // Enter (a key of the panel's content): added, and the next one is selected and jumped to.
+    const seeks = host.seeks.length;
+    await host.press("Enter", { panel: true });
+    await until(() => host.osd.includes("Added as part 1"), "Added as part 1");
+    await eventually(() => rows(host).map((row) => row.id), ids.slice(1));
+    await eventually(selected, ids[1]);
+    await eventually(() => page(host).picked, 0);
+    await until(() => host.seeks.length > seeks, "the jump to the next");
+    // Delete (the list's own key): dismissed, the next one selected; Restore 1 dismissed at the end of the list.
+    host.mounted().emit("dismiss-selected");
+    await eventually(() => rows(host).map((row) => row.id), ids.slice(2));
+    await eventually(selected, ids[2]);
+    await eventually(() => restoreRow(host), 1);
+    assert.equal(allRows(host).at(-1)?.restore, 1, "the last row");
+    // The last row: after it, the one before is selected.
+    host.mounted().emit("select-highlight", ids[4]);
+    await eventually(selected, ids[4]);
+    host.mounted().emit("dismiss-selected");
+    await eventually(selected, ids[3]);
+    await eventually(() => restoreRow(host), 2);
+    // Another page: Enter adds nothing (the command is off), the selection stays the Range.
+    host.mounted().emit("set-page", 0);
+    await host.settle();
+    await eventually(() => host.command("clip.highlightAdd").state.enabled, false);
+    await host.press("Enter", { panel: true }).catch(() => {});
+    await host.settle();
+    assert.equal((tab(host).parts as unknown[]).length, 1);
+    // Restore: the dismissed ones come back in time order; the kept file forgets them.
+    host.mounted().emit("set-page", 1);
+    host.mounted().emit("restore-highlights");
+    await eventually(() => rows(host).map((row) => row.id), ids.slice(1));
+    await eventually(() => restoreRow(host), 0);
+    await until(async () => {
+      const [name] = (await readdir(join(setup.data, "highlights"))).filter((file) => file.endsWith(".json"));
+      const saved = JSON.parse(await readFile(join(setup.data, "highlights", name!), "utf8"));
+      return saved.handled[ids[0]!] === "added" && Object.keys(saved.handled).length === 1;
+    }, "kept");
+  } finally {
+    await stop();
+    await setup.cleanup();
+  }
+});
+
+/** The start an ffmpeg picture run asks for, and whether it is the retry (the keyframe before). */
+const pictureOf = (args: string[]) => ({ start: Number(args[args.indexOf("-ss") + 1]), before: args.includes("-noaccurate_seek") });
+
+test("a row whose picture fails is that row's failure once others worked: a run that fails or gives nothing is tried once more from the keyframe before; the other rows get theirs", async () => {
+  const setup = await withMedia(3000);
+  const host = new TestHost();
+  // Pictures wait until the rows are known (the test decides which ones fail).
+  let known: () => void = () => {};
+  const rowsKnown = new Promise<void>((done) => (known = done));
+  let failing = { timeout: -1, empty: -1 };
+  host.tools.handle("ffmpeg", async (args) => {
+    if (isScan(args)) return { stdout: momentaryOutput(args, many) };
+    await rowsKnown;
+    const { start, before } = pictureOf(args);
+    // A timeout both ways; nothing after the start (the last keyframe interval) but a keyframe before it.
+    if (Math.abs(start - failing.timeout) < 0.01) throw new HostError("timeout", "ffmpeg timed out");
+    if (Math.abs(start - failing.empty) < 0.01 && !before) return { stdout: "" };
+    return { stdout: "jpeg bytes" };
+  });
+  setup.play(host);
+  const { stop } = await startIn(host, setup.data);
+  try {
+    await showHighlights(host);
+    await eventually(() => page(host).state, "ready");
+    host.mounted().emit("set-highlight-count", 0);
+    host.mounted().emit("find-highlights");
+    await eventually(() => rows(host).length, 5);
+    const starts = rows(host).map((row) => parseTime(row.range.split(" – ")[0]!)!);
+    failing = { timeout: starts[1]!, empty: starts[2]! };
+    known();
+    await until(() => rows(host).filter((row) => row.thumb !== null && row.thumb !== undefined).length === 4, "four pictures");
+    await host.settle();
+    assert.deepEqual(rows(host).map((row) => row.thumb !== null && row.thumb !== undefined), [true, false, true, true, true], "the timed-out row keeps its icon");
+    const runs = host.tools.calls.filter((call) => call.tool === "ffmpeg" && !isScan(call.args)).map((call) => pictureOf(call.args));
+    const of = (start: number) => runs.filter((run) => Math.abs(run.start - start) < 0.01).map((run) => run.before);
+    assert.deepEqual(starts.map(of), [[false], [false, true], [false, true], [false], [false]], "a failed row tried once more, the keyframe before");
+  } finally {
+    await stop();
+    await setup.cleanup();
+  }
+});
+
+test("without FFmpeg no picture is asked for; another file opened while a picture is made stops it (nothing of it is kept), and the new file's pictures are made", async () => {
+  const setup = await withMedia();
+  const host = new TestHost();
+  fakeFfmpeg(host);
+  setup.play(host);
+  const { stop } = await startIn(host, setup.data);
+  try {
+    await showHighlights(host);
+    await eventually(() => page(host).state, "ready");
+    host.mounted().emit("find-highlights");
+    await eventually(() => rows(host).length, 2);
+  } finally {
+    await stop();
+  }
+  // FFmpeg missing: the kept result shows, no ffmpeg run, the rows keep their icons.
+  const bare = new TestHost();
+  setup.play(bare);
+  const second = await startIn(bare, setup.data);
+  try {
+    await showHighlights(bare);
+    await eventually(() => rows(bare).length, 2);
+    await bare.settle();
+    assert.equal(bare.tools.calls.length, 0);
+    assert.ok(rows(bare).every((row) => row.thumb === null || row.thumb === undefined));
+  } finally {
+    await second.stop();
+  }
+  // A picture of the first file is being made when another file opens: it is stopped (the test host's run cannot be
+  // killed, so it ends after the file changed), nothing of it is written, and the queue goes on with the new file.
+  const third = new TestHost();
+  let finish: () => void = () => {};
+  const held = new Promise<void>((done) => (finish = done));
+  third.tools.handle("ffmpeg", async (args) => {
+    if (isScan(args)) return { stdout: momentaryOutput(args, talk) };
+    if (args[args.indexOf("-i") + 1] === setup.media) await held;
+    return { stdout: "jpeg bytes" };
+  });
+  setup.play(third);
+  const last = await startIn(third, setup.data);
+  try {
+    await showHighlights(third);
+    await eventually(() => rows(third).length, 2);
+    await until(() => third.tools.calls.some((call) => !isScan(call.args)), "the first file's picture running");
+    const other = join(setup.data, "other.mp4");
+    await writeFile(other, "other media bytes");
+    setup.play(third, other);
+    await eventually(() => page(third).state, "ready");
+    finish();
+    await third.settle();
+    const pictures = (await readdir(join(setup.data, "highlights"), { withFileTypes: true })).filter((entry) => entry.isDirectory());
+    assert.deepEqual(pictures, [], "the stopped picture is not kept");
+    assert.equal(third.tools.calls.filter((call) => !isScan(call.args)).length, 1, "and no other picture of that file is asked for");
+    third.mounted().emit("find-highlights");
+    await eventually(() => rows(third).length, 2);
+    await until(() => rows(third).every((row) => row.thumb !== null && row.thumb !== undefined), "the new file's pictures");
+  } finally {
+    await last.stop();
+    await setup.cleanup();
+  }
+});
+
+test("row thumbnails: none while the page is hidden; a scan ending then says so on the video with Show; then ffmpeg makes one per row from the file, one at a time; reopened they show without ffmpeg; a changed file's go", async () => {
+  const setup = await withMedia();
+  const host = new TestHost();
+  const pictures: string[][] = [];
+  let running = 0;
+  let most = 0;
+  host.tools.handle("ffmpeg", async (args) => {
+    if (isScan(args)) return { stdout: momentaryOutput(args, talk) };
+    pictures.push(args);
+    most = Math.max(most, ++running);
+    await new Promise((done) => setTimeout(done, 10));
+    running--;
+    return { stdout: "jpeg bytes" };
+  });
+  setup.play(host);
+  const { stop } = await startIn(host, setup.data);
+  try {
+    await showHighlights(host);
+    await eventually(() => page(host).state, "ready");
+    // The Clip page in front while the scan runs: the scan's end is said on the video (D13).
+    host.mounted().emit("set-page", 0);
+    await eventually(() => tab(host).page, 0);
+    host.mounted().emit("find-highlights");
+    await until(() => host.osd.includes("2 highlights found"), "2 highlights found");
+    assert.deepEqual(host.osdActions.at(-1), [{ title: "Show", command: "clip.highlights" }]);
+    await host.settle();
+    assert.equal(pictures.length, 0, "no picture while the page is not on screen");
+    // Show: the Highlights page, the found ones, no second scan.
+    const scanned = scans(host);
+    await host.pressOsdAction(0);
+    await eventually(() => tab(host).page, 1);
+    await until(() => rows(host).length === 2 && rows(host).every((row) => row.thumb !== null && row.thumb !== undefined), "both pictures");
+    assert.equal(scans(host), scanned);
+    assert.equal(most, 1, "one ffmpeg run at a time");
+    assert.equal(pictures.length, 2);
+    const starts = pictures.map((args) => Number(args[args.indexOf("-ss") + 1]));
+    assert.deepEqual(starts.map((start) => short(start)), rows(host).map((row) => row.range.split(" – ")[0]), "each at its row's start");
+    assert.ok(pictures.every((args) => args[args.indexOf("-i") + 1] === setup.media && args.join(" ").includes("-threads 1")));
+    const kept = (await readdir(join(setup.data, "highlights"), { withFileTypes: true })).filter((entry) => entry.isDirectory());
+    assert.equal(kept.length, 1);
+    assert.equal((await readdir(join(setup.data, "highlights", kept[0]!.name))).length, 2, "kept beside the scan");
+    await stop();
+
+    // Reopened: the pictures at once, no ffmpeg.
+    const again = new TestHost();
+    let runs = 0;
+    again.tools.handle("ffmpeg", () => {
+      runs++;
+      return { stdout: "" };
+    });
+    setup.play(again);
+    const second = await startIn(again, setup.data);
+    try {
+      await showHighlights(again);
+      await until(() => rows(again).length === 2 && rows(again).every((row) => row.thumb !== null && row.thumb !== undefined), "the kept pictures");
+      await again.settle();
+      assert.equal(runs, 0);
+      // The file changed: its scan and its pictures go.
+      await writeFile(setup.media, "changed media bytes");
+      setup.play(again);
+      await eventually(() => page(again).state, "changed");
+      assert.deepEqual(await readdir(join(setup.data, "highlights")), []);
+    } finally {
+      await second.stop();
+    }
+  } finally {
+    await stop().catch(() => {});
     await setup.cleanup();
   }
 });
@@ -579,3 +887,42 @@ test("with a real ffmpeg: a talk with pauses and one loud burst gives one range 
   }
 });
 
+
+test("with a real ffmpeg: a row's picture is a small JPEG of the first keyframe from its start, not of the file's start", { skip: !haveFfmpeg && "no ffmpeg (set VESTRA_FFMPEG)" }, async () => {
+  const folder = await mkdtemp(join(tmpdir(), "clipexport-hl-thumb-"));
+  try {
+    // Black for 5 s, then white; a keyframe every second.
+    const file = join(folder, "cut.mp4");
+    const source = "color=c=black:s=640x360:r=25:d=5[a];color=c=white:s=640x360:r=25:d=5[b];[a][b]concat=n=2:v=1:a=0";
+    await promisify(execFile)(FFMPEG, ["-hide_banner", "-loglevel", "error", "-y", "-filter_complex", source, "-c:v", "libx264", "-g", "25", "-pix_fmt", "yuv420p", file]);
+    const picture = async (at: number, before = false) => {
+      const { stdout } = await promisify(execFile)(FFMPEG, thumbArgs(file, PART_THUMB, at, before), { encoding: "buffer", maxBuffer: 1 << 20 });
+      assert.deepEqual([...(stdout as Buffer).subarray(0, 2)], [0xff, 0xd8], "a JPEG");
+      assert.ok((stdout as Buffer).length < 64 << 10, "small");
+      return stdout as Buffer;
+    };
+    const dark = await picture(1);
+    const light = await picture(7);
+    // From 4.5 s: the next keyframe (5 s, white); the retry takes the one before (4 s, black).
+    const next = await picture(4.5);
+    const earlier = await picture(4.5, true);
+    // In the last keyframe interval there is no keyframe after the start: ffmpeg succeeds with nothing; the retry has one.
+    const { stdout: none } = await promisify(execFile)(FFMPEG, thumbArgs(file, PART_THUMB, 9.5), { encoding: "buffer", maxBuffer: 1 << 20 });
+    assert.equal((none as Buffer).length, 0, "nothing after the last keyframe");
+    const last = await picture(9.5, true);
+    // Each picture decoded to one grey value (its mean brightness).
+    const grey = async (jpeg: Buffer, name: string) => {
+      const input = join(folder, name);
+      await writeFile(input, jpeg);
+      const { stdout } = await promisify(execFile)(FFMPEG, ["-hide_banner", "-loglevel", "error", "-i", input, "-vf", "scale=1:1:flags=area,format=gray", "-f", "rawvideo", "-"], { encoding: "buffer" });
+      return (stdout as Buffer)[0]!;
+    };
+    assert.ok((await grey(dark, "dark.jpg")) < 40, "from 1 s: black");
+    assert.ok((await grey(light, "light.jpg")) > 215, "from 7 s: white");
+    assert.ok((await grey(next, "next.jpg")) > 215, "from 4.5 s: the keyframe at 5 s");
+    assert.ok((await grey(earlier, "earlier.jpg")) < 40, "the retry from 4.5 s: the keyframe at 4 s");
+    assert.ok((await grey(last, "last.jpg")) > 215, "the retry from 9.5 s: the keyframe at 9 s");
+  } finally {
+    await rm(folder, { recursive: true, force: true });
+  }
+});

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.2
+
+**Who must change: nobody.** No new permission and the same player (0.7.6 or later). Kept Highlights results, settings, the Collection and Results carry over.
+
+- **Highlights**, review comfort (design clipexport-highlights, step 2):
+  - **Row pictures**: each suggestion shows the first keyframe from its start, so you can tell the moments apart. FFmpeg makes them from the file (the player does not seek), one at a time on one core, in the queue the Collection's thumbnails use, only for the rows listed and only while the page shows. When there is no keyframe after the start (the last few seconds of a file) or the run fails, it is tried once more from the keyframe before the start; a row that still has none keeps its icon. A file of which no picture can be made (no video in it), or no FFmpeg, gets none, and opening another file stops the picture being made. They are kept beside the result (a folder per kept scan) and show at once when the file is opened again; a moved start gets a new picture; they go with the result (a changed file, the 50-file limit) and, after Scan Again, for the suggestions not found again.
+  - **List keys**: after a click on a row, **Up** and **Down** select the row above or below and jump there (the list keeps it in view), **Enter** adds the selected one to the Collection and **Delete** dismisses it, each then selecting (and jumping to) the next, and **Esc** gives the keys back to the video. Enter is the new command **Add Highlight to Collection** (a key of the tab's content, like Delete in the Collection); **Dismiss Highlight** is in the command palette with no key by default, Delete being the list's own key (a second default Delete in the tab would collide with Remove from Collection).
+  - **Restore N dismissed**, the last row of the list while any is dismissed, brings the dismissed ones back.
+  - A scan that finishes while the Highlights page is not on screen says so on the video: "10 highlights found" (or "Nothing stood out in this video."), with **Show**, which opens the page.
+- English, Simplified Chinese, German, Spanish, French, Japanese and Korean.
+
 ## 0.6.1
 
 **Who must change: nobody.** No new permission and the same player (0.7.6 or later). Settings, the Collection and Results carry over.

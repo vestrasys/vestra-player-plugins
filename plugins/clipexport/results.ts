@@ -1,5 +1,5 @@
-import { mkdir, stat, writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { mkdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { basename, dirname, join } from "node:path";
 import type { Scope } from "@vestra-player/sdk";
 import type { Method } from "./clip.ts";
 
@@ -135,13 +135,19 @@ const THUMB_TIMEOUT_MS = 10_000;
 /**
  * ffmpeg's arguments for one small JPEG of a clip's first keyframe on stdout:
  * one thread, as the playlist's thumbnails, so the player keeps the other
- * cores.
+ * cores. `at` (seconds): the first keyframe from there (a Highlights row's
+ * start), found by seeking the input; only keyframes are decoded. `before`:
+ * the keyframe at or before `at` instead (the seek lands there and keeps it),
+ * for a start in the last keyframe interval, after which there is none.
  */
-export function thumbArgs(path: string, size: { width: number; height: number } = { width: THUMB_W, height: THUMB_H }) {
+export function thumbArgs(path: string, size: { width: number; height: number } = { width: THUMB_W, height: THUMB_H }, at?: number, before = false) {
   return [
     "-nostdin", "-v", "error", "-threads", "1", "-skip_frame", "nokey",
+    ...(at === undefined ? [] : [...(before ? ["-noaccurate_seek"] : []), "-ss", Math.max(0, at).toFixed(3)]),
     "-i", path,
     "-map", "0:V:0", "-an", "-sn", "-dn", "-frames:v", "1", "-filter_threads", "1",
+    // The keyframe before the seek point is timed before it: the default frame-rate handling would drop it.
+    ...(before ? ["-fps_mode", "passthrough"] : []),
     "-vf", `scale=${size.width}:${size.height}:force_original_aspect_ratio=decrease:flags=bilinear,format=yuvj420p`,
     "-threads", "1", "-q:v", "5", "-f", "image2pipe", "-c:v", "mjpeg", "-",
   ];
@@ -172,19 +178,33 @@ export async function makeThumb(plugin: Scope, folder: string | null, item: Save
 /** A Collection row's thumbnail: twice the row's 64×36, so the data directory keeps small files (max side 256). */
 export const PART_THUMB = { width: 256, height: 144 };
 /**
- * Scale the picture at `input` (a captured frame) down to `size` with ffmpeg,
- * the same way as the Results thumbnails, into `output`; its file name, or ""
- * when ffmpeg is missing or fails.
+ * Scale the picture at `input` (a captured frame; or a video, from `at`
+ * seconds, see `thumbArgs`) down to `size` with ffmpeg, the same way as the
+ * Results thumbnails, into `output`; its file name, or "" when ffmpeg is
+ * missing or fails (or `signal` stopped it). The picture is written under a
+ * temporary name and then renamed, so a half-written one is never kept.
  */
-export async function scaleThumb(plugin: Scope, input: string, output: string, size: { width: number; height: number }): Promise<string> {
+export async function scaleThumb(
+  plugin: Scope, input: string, output: string, size: { width: number; height: number },
+  options: { at?: number; before?: boolean; signal?: AbortSignal } = {},
+): Promise<string> {
+  const temporary = `${output}.${process.pid}.tmp`;
   try {
     if (!(await plugin.tools.available("ffmpeg"))) return "";
-    const { stdout } = await plugin.tools.run("ffmpeg", thumbArgs(input, size), { timeoutMs: THUMB_TIMEOUT_MS, maxOutput: 1 << 20 });
+    const { stdout } = await plugin.tools.run("ffmpeg", thumbArgs(input, size, options.at, options.before), {
+      timeoutMs: THUMB_TIMEOUT_MS, maxOutput: 1 << 20, ...(options.signal ? { signal: options.signal } : {}),
+    });
+    // Stopped while it ran (another file, deactivated): nothing is written.
+    options.signal?.throwIfAborted();
     if (!stdout.length) return "";
-    await writeFile(output, stdout);
+    // Its folder is made with the first picture in it.
+    await mkdir(dirname(output), { recursive: true });
+    await writeFile(temporary, stdout);
+    await rename(temporary, output);
     return basename(output);
   } catch (error) {
-    console.error(`[clipexport] thumbnail: ${(error as Error).message}`);
+    if (!options.signal?.aborted) console.error(`[clipexport] thumbnail: ${(error as Error).message}`);
+    await rm(temporary, { force: true }).catch(() => {});
     return "";
   }
 }
