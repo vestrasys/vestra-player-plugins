@@ -379,10 +379,13 @@ test("the merged Collection as a GIF: with a crossfade the parts blend first, th
     await until(() => leftovers(data, folder).length === 0, "no work files left");
     // Over a minute written: refused before anything starts.
     await add("/media/three.mp4", "0", "58");
-    const before = host.exports.length;
+    // Merges only: the new part's thumbnail is a frame export of its own, which may land at any time after the row shows.
+    const merges = () => host.exports.filter((e) => Array.isArray(e.parts)).length;
+    const before = merges();
     host.mounted().emit("export-merged");
     await until(() => host.osd.includes(`Export failed: ${REASON.animatedTooLong}`), "the refusal");
-    assert.equal(host.exports.length, before);
+    assert.equal(merges(), before, "no merge started");
+    assert.equal(runs.length, 4, "no image run either");
   } finally {
     await stop();
     await cleanup();
