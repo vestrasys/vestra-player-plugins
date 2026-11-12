@@ -135,7 +135,7 @@ export function encodersOf(text: string): Set<string> {
   const names = new Set<string>();
   for (const line of text.split(/\r?\n/)) {
     // A name (the legend's ` V..... = Video` has none).
-    const match = /^\s*[VAS][F.][S.][X.][B.][D.]\s+([A-Za-z0-9_][\w.-]*)\s/.exec(line);
+    const match = /^\s*[ASV][F.][S.][X.][B.][D.]\s+([A-Za-z0-9_][\w.-]*)\s/.exec(line);
     if (match) names.add(match[1]!);
   }
   return names;
