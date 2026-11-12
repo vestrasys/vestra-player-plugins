@@ -1,6 +1,6 @@
 # osv-scanner configuration for every lockfile in the repository (the
 # repository's and each plugin's; CI passes it with --config, see
-# CONTRIBUTING.md "Security review"). osv-scanner fails CI on any known
+# MAINTAINING.md "Security review"). osv-scanner fails CI on any known
 # vulnerability or malicious package in a locked dependency.
 #
 # A reviewed exception, when a fixed version does not exist yet and the

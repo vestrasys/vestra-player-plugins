@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * The plugin security scan of a pull request (.github/workflows/
- * security-scan.yml; CONTRIBUTING.md "Security review"). Node built-ins
+ * security-scan.yml; MAINTAINING.md "Security review"). Node built-ins
  * only: it runs from the base branch and reads the pull request's files as
  * data (git), never runs them.
  *
@@ -315,7 +315,7 @@ export function render({
       `**${plural(problems.length, "file")} the scan cannot vouch for**`,
     );
   lines.push(
-    `${parts.join(", ")}. This pull request is labelled \`security-review\`: a maintainer reads the code below and removes the label when it is acceptable (CONTRIBUTING.md, "Security review"). A finding is a place to read, not a verdict.`,
+    `${parts.join(", ")}. This pull request is labelled \`security-review\`: a maintainer reads the code below and removes the label when it is acceptable (MAINTAINING.md, "Security review"). A finding is a place to read, not a verdict.`,
     "",
   );
   if (added.length) lines.push("### New findings", "", ...table(added), "");
