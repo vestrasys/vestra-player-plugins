@@ -9,11 +9,11 @@ import { exportParts, lengthClock, listKey, moved, partsOf, partStates, partTick
 import activate from "../main.ts";
 import { clock, parseTime, REASON } from "../model.ts";
 import { dateOf } from "../names.ts";
-import { eventually, words } from "./fakes.ts";
+import { checkDestinations, eventually, words } from "./fakes.ts";
 
 const ID = "zysilm.clipexport";
 const directory = new URL("..", import.meta.url);
-const start = (host = new TestHost(), locale: Locale = "en", dataDirectory?: string) => startPlugin(activate, { directory, host, locale, dataDirectory });
+const start = (host = new TestHost(), locale: Locale = "en", dataDirectory?: string) => (checkDestinations(host), startPlugin(activate, { directory, host, locale, dataDirectory }));
 const tab = (host: TestHost) => host.mounted().props;
 type Row = { id: string; number: number; name: string; range: string; badge: string; current: boolean; state: string; selected: boolean; thumb: unknown };
 const rows = (host: TestHost) => (tab(host).parts ?? []) as Row[];

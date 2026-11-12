@@ -8,6 +8,8 @@ import type { Progress } from "./seams.ts";
 /** The plugin's step after the player's export: the work file, what it adds to the progress, the run itself and its cleanup. */
 export interface Finish {
   merged: string;
+  /** `merged`, once the work folder is there (`workReady`): the player's job writes it. */
+  ready(): Promise<string>;
   /** Seconds of output the step writes (the progress adds them to the merge's). */
   length: number;
   plan: unknown;
@@ -242,15 +244,17 @@ export class Tasks {
   async #run(task: Task): Promise<{ job: ExportJob; state: JobState }> {
     const { spec } = task;
     let job: ExportJob;
+    // With a step of the plugin's after it, the player writes into the work folder: made first (a fresh install has none).
+    const destination = task.finish ? await task.finish.ready() : task.destination;
     if (task.parts) {
-      job = await this.#plugin.media.export(partsExport(task.parts, task.finish ? task.finish.merged : task.destination, spec.method, task.finish ? (task.finish.plan as { merge: Encode }).merge : spec.encode)).catch((error: { code?: string; message?: string }) => {
+      job = await this.#plugin.media.export(partsExport(task.parts, destination, spec.method, task.finish ? (task.finish.plan as { merge: Encode }).merge : spec.encode)).catch((error: { code?: string; message?: string }) => {
         // Refused before it started (a token the player no longer has, a part the check did not see): one of the plugin's reasons.
         throw new Failure(jobError({ code: error.code ?? "unknown", message: error.message ?? String(error) }, spec));
       });
     } else {
       if (!task.snapshot) throw new Failure("released");
       // An animated image: the player writes the clip into the work folder first.
-      job = await task.snapshot.export(clipExport(task.finish ? task.finish.merged : task.destination, spec.end, spec.method, task.finish ? (task.finish.plan as { merge: Encode }).merge : spec.encode));
+      job = await task.snapshot.export(clipExport(destination, spec.end, spec.method, task.finish ? (task.finish.plan as { merge: Encode }).merge : spec.encode));
     }
     task.active = job;
     task.jobs.push(job);
