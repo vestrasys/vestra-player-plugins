@@ -201,9 +201,10 @@ export class Tasks {
           else {
             const { state } = await this.#run(task);
             if (state.status === "completed" && task.finish) {
-              // The plain merge is written: the plugin's own step makes the transitions.
+              // The plain merge (or the clip) is written: the plugin's own step makes the transitions or the animated image.
               task.output = await this.#finish(task, task.finish, state);
-              task.actual = { start: 0, end: task.finish.length };
+              // A clip holds the range the player wrote; a merge its output's length from 0.
+              task.actual = task.parts ? { start: 0, end: task.finish.length } : actualRange(state, { start: task.spec.start, end: task.spec.end });
               task.status = task.output ? "completed" : "cancelled";
               if (!task.output) task.cancel = true;
             } else if (state.status === "completed" && state.outcome && "destination" in state.outcome) {
@@ -248,7 +249,8 @@ export class Tasks {
       });
     } else {
       if (!task.snapshot) throw new Failure("released");
-      job = await task.snapshot.export(clipExport(task.destination, spec.end, spec.method, spec.encode));
+      // An animated image: the player writes the clip into the work folder first.
+      job = await task.snapshot.export(clipExport(task.finish ? task.finish.merged : task.destination, spec.end, spec.method, task.finish ? (task.finish.plan as { merge: Encode }).merge : spec.encode));
     }
     task.active = job;
     task.jobs.push(job);

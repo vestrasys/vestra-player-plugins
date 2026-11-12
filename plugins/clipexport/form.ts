@@ -27,15 +27,18 @@ export function captureError(error: unknown) {
  * state the user acted on (`seen`), so a source change while a save panel was
  * open exports nothing. A retry reuses a retained snapshot when it has one.
  */
-/** Builds the plugin's step of a merged export with transitions, for its final destination. */
+/** Builds the plugin's step after the player's export (transitions, an animated image), for its final destination. */
 export type Finisher = (plan: unknown, destination: string) => Finish;
 
 export function capturer(plugin: Scope, tasks: Tasks, finisher?: Finisher) {
   const { player } = plugin;
   let stopped = false;
 
-  /** `destination`: the clip's file, made unique (`name (1).mp4` when it exists). */
-  async function start(spec: Spec, seen: PlayerState | null, destination: string, reuse?: Snapshot): Promise<Task> {
+  /**
+   * `destination`: the clip's file, made unique (`name (1).mp4` when it exists).
+   * `plan`: an animated image, which the plugin's step writes from the player's clip.
+   */
+  async function start(spec: Spec, seen: PlayerState | null, destination: string, reuse?: Snapshot, plan?: unknown): Promise<Task> {
     if (tasks.full()) throw new Failure("queueFull");
     let snapshot = reuse;
     try {
@@ -54,7 +57,8 @@ export function capturer(plugin: Scope, tasks: Tasks, finisher?: Finisher) {
       if (!snapshot) throw new Failure("expired");
       if (stopped) throw new Failure("cancelled");
       const target = await uniqueFile(destination, new Set(tasks.list.map((task) => resolve(task.destination))));
-      const task = tasks.add({ spec: { ...spec, start: snapshot.time }, sourceId: seen?.sourceId ?? 0, source: snapshot.source, snapshot, destination: target });
+      const finish = plan && finisher ? finisher(plan, target) : undefined;
+      const task = tasks.add({ spec: { ...spec, start: snapshot.time }, sourceId: seen?.sourceId ?? 0, source: snapshot.source, snapshot, destination: target, ...(finish ? { finish } : {}) });
       snapshot = undefined;
       return task;
     } finally {
@@ -81,12 +85,12 @@ export function capturer(plugin: Scope, tasks: Tasks, finisher?: Finisher) {
     if (task.parts) return startParts({ ...task.spec }, task.parts, task.destination, task.finish?.plan);
     if (tasks.retained(task)) {
       const snapshot = tasks.take(task);
-      return start({ ...task.spec }, null, task.destination, snapshot).then((next) => {
+      return start({ ...task.spec }, null, task.destination, snapshot, task.finish?.plan).then((next) => {
         next.sourceId = task.sourceId;
         return next;
       });
     }
-    return start({ ...task.spec }, await player.refresh(), task.destination);
+    return start({ ...task.spec }, await player.refresh(), task.destination, undefined, task.finish?.plan);
   }
 
   return {

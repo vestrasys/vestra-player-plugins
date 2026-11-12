@@ -63,6 +63,10 @@ export global Words {
         if (code == "noFfmpeg") { return @tr("The transitions need FFmpeg, which the player could not find."); }
         if (code == "transitionFailed") { return @tr("Could not write the transitions."); }
         if (code == "undoFull") { return @tr("There is no room to bring the cleared parts back: the Collection holds at most 100. Remove parts, then Undo again."); }
+        if (code == "noAnimatedFfmpeg") { return @tr("Animated GIF and WebP need FFmpeg, which the player could not find."); }
+        if (code == "noAnimatedEncoder") { return @tr("The player's FFmpeg cannot write this format. Choose another quality."); }
+        if (code == "animatedTooLong") { return @tr("Animated GIF and WebP are at most 60 seconds long. Choose a shorter range."); }
+        if (code == "animatedFailed") { return @tr("Could not write the animated image."); }
         return raw;
     }
 
@@ -166,6 +170,8 @@ export global Words {
         if (p == "source") { return @tr("Same as source"); }
         if (p == "high") { return @tr("High quality"); }
         if (p == "small") { return @tr("Small file"); }
+        if (p == "gif") { return @tr("Animated GIF"); }
+        if (p == "webp") { return @tr("Animated WebP"); }
         if (p == "custom") { return @tr("Custom"); }
         return "";
     }

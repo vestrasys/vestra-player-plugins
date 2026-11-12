@@ -3,7 +3,8 @@ import { basename, dirname, join } from "node:path";
 import type { JobState, Scope } from "@vestra-player/sdk";
 import { Failure, uniqueFile } from "./model.ts";
 import type { Finish } from "./tasks.ts";
-import { estimated, layoutOf, parsePts, progressTime, ptsArgs, spaceNeeded, timeoutFor, timing, transitionArgs, transitionAt } from "./transitions.ts";
+import { animatedArgs } from "./animated.ts";
+import { anyTransition, estimated, layoutOf, parsePts, progressTime, ptsArgs, spaceNeeded, timeoutFor, timing, transitionArgs, transitionAt } from "./transitions.ts";
 import type { Layout, Plan } from "./transitions.ts";
 
 /** The progress file is read this often while the transitions are written. */
@@ -96,7 +97,8 @@ const defaultFree = async (folder: string) => {
 
 /**
  * The plugin's step of a merged export with transitions (design ruling: no
- * host change). The player writes the plain merge into `<dataDirectory>/work`;
+ * host change), and of an animated GIF or WebP of a clip or a merge (0.5.0,
+ * animated.ts). The player writes the plain merge (or the clip) into `<dataDirectory>/work`;
  * this measures where each part is in it (ffprobe of the frame timestamps),
  * writes the filter graph into a file there, checks the free space beside
  * the destination and runs the player's ffmpeg (`plugin.tools.run`) into a
@@ -123,9 +125,16 @@ export function finisher(plugin: Scope, workFolder: string, env: FinishEnv = {})
         const input = state.outcome && "destination" in state.outcome ? state.outcome.destination : merged;
         // The merge (Precise) writes each part for its length as asked (-t), whatever its frames: the windows to measure.
         const asked = p.lengths;
-        const layout = (await measure(plugin, input, asked, signal)) ?? estimated(asked, p.fps);
-        const { args, graph, length } = transitionArgs({ input, output: partial, progress, script, lengths: layout, transitions: p.transitions, fps: p.fps, audio: p.audio, encode: p.encode, bitrate: p.bitrate });
-        if (p.encode.rate === "source" && !(p.bitrate && p.bitrate > 0)) throw new Failure("noSourceBitrate");
+        // An animated image of a clip or a merge without transitions takes the whole file: nothing to measure.
+        const blends = anyTransition(p.transitions);
+        const layout = (blends || !p.output ? await measure(plugin, input, asked, signal) : null) ?? estimated(asked, p.fps);
+        const { args, graph, length } = p.output
+          ? animatedArgs({
+            input, output: partial, progress, script, format: p.output, ...(p.encoder ? { encoder: p.encoder } : {}),
+            transitions: blends ? { lengths: layout, transitions: p.transitions, fps: p.fps } : null, length: planned.written / p.fps,
+          })
+          : transitionArgs({ input, output: partial, progress, script, lengths: layout, transitions: p.transitions, fps: p.fps, audio: p.audio, encode: p.encode, bitrate: p.bitrate });
+        if (!p.output && p.encode.rate === "source" && !(p.bitrate && p.bitrate > 0)) throw new Failure("noSourceBitrate");
         // Room for the final file beside the destination: about the merge's size.
         const mergeBytes = (await stat(input).catch(() => null))?.size ?? 0;
         const free = await freeSpace(dirname(destination)).catch(() => Infinity);
@@ -150,7 +159,8 @@ export function finisher(plugin: Scope, workFolder: string, env: FinishEnv = {})
         } catch (error) {
           const code = (error as { code?: string }).code;
           if (code === "aborted" || signal.aborted) throw error;
-          console.error(`[clipexport] transitions: ${code}: ${(error as Error).message}`);
+          console.error(`[clipexport] ${p.output ?? "transitions"}: ${code}: ${(error as Error).message}`);
+          if (p.output) throw new Failure(code === "unavailable" ? "noAnimatedFfmpeg" : "animatedFailed");
           throw new Failure(code === "unavailable" ? "noFfmpeg" : "transitionFailed");
         } finally {
           clearInterval(poll);

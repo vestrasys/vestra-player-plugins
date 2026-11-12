@@ -158,8 +158,21 @@ export function timeline(range: { start: number; end: number }, actual: { start:
 }
 
 // ---------------------------------------------------------------- Precise quality (R6)
+/** What a Precise cut writes: an H.264 + AAC MP4 (the player's encode), or an animated GIF or WebP (the plugin's ffmpeg step after it). */
+export type Format = "mp4" | "gif" | "webp";
+export type Animated = Exclude<Format, "mp4">;
+/** The animated image a Precise cut writes (GIF or WebP, without sound); `null` for an MP4. */
+export const animatedOf = (encode: Encode | undefined): Animated | null => (encode && encode.format !== "mp4" ? encode.format : null);
+
 /** The encode options of a Precise cut (request R6): finite choices, never free FFmpeg arguments. */
 export interface Encode {
+  /**
+   * `mp4`: the player writes the file. `gif` / `webp` (0.5.0): the player
+   * writes an MP4 into the plugin's work folder with the fields below (fixed
+   * for these presets), then the plugin's ffmpeg makes the animated image of
+   * it (animated.ts).
+   */
+  format: Format;
   /** `crf`: a quality level; `source`: the source video's average bitrate ("Same as source"; the CRF is then unused). */
   rate: "crf" | "source";
   /** 14–30: lower is a better picture and a bigger file. */
@@ -171,18 +184,26 @@ export interface Encode {
   fps: 0 | 60 | 30;
   audio: 128 | 192 | 256;
 }
-export type Preset = "source" | "high" | "small" | "custom";
-export const PRESETS: readonly Exclude<Preset, "custom">[] = ["source", "high", "small"];
+export type Preset = "source" | "high" | "small" | "gif" | "webp" | "custom";
+/** The Quality chooser's order; Custom, when it shows, comes after them. */
+export const PRESETS: readonly Exclude<Preset, "custom">[] = ["source", "high", "small", "gif", "webp"];
 /**
  * The three presets (design §3.5). `high` is the encoding clips always had
  * (CRF 18, x264 veryfast, AAC 192 kb/s, the source's size and rate), so the
  * default output does not change. `source` aims at the source video's
  * average bitrate (`videoBitrate: "source"`); `small` is CRF 26 at most 1080p.
+ * `gif` and `webp` (0.5.0): the H.264 fields are those of the intermediate
+ * MP4 the player writes for the plugin's ffmpeg step: the best quality (CRF
+ * 14, fast), at most 720p (the image is at most 640 px on its longer side, so
+ * 720 lines always hold it) and 30 fps (the image has 15 or 20).
  */
+const INTERMEDIATE = { rate: "crf", crf: 14, speed: "faster", height: 720, fps: 30, audio: 128 } as const;
 export const PRESET_ENCODE: Readonly<Record<Exclude<Preset, "custom">, Encode>> = {
-  source: { rate: "source", crf: 18, speed: "balanced", height: 0, fps: 0, audio: 256 },
-  high: { rate: "crf", crf: 18, speed: "faster", height: 0, fps: 0, audio: 192 },
-  small: { rate: "crf", crf: 26, speed: "balanced", height: 1080, fps: 0, audio: 128 },
+  source: { format: "mp4", rate: "source", crf: 18, speed: "balanced", height: 0, fps: 0, audio: 256 },
+  high: { format: "mp4", rate: "crf", crf: 18, speed: "faster", height: 0, fps: 0, audio: 192 },
+  small: { format: "mp4", rate: "crf", crf: 26, speed: "balanced", height: 1080, fps: 0, audio: 128 },
+  gif: { format: "gif", ...INTERMEDIATE },
+  webp: { format: "webp", ...INTERMEDIATE },
 };
 export const SPEEDS: readonly Encode["speed"][] = ["faster", "balanced", "smaller"];
 export const HEIGHTS: readonly Encode["height"][] = [0, 1080, 720, 480];
@@ -192,12 +213,18 @@ export const crfOf = (value: unknown) => {
   const n = Math.round(Number(value));
   return Number.isFinite(n) ? Math.min(30, Math.max(14, n)) : 18;
 };
-/** Any valid encode options from stored data, field by field; High quality's for the rest. */
+/**
+ * Any valid encode options from stored data, field by field; High quality's
+ * for the rest. An animated format gets its preset's fixed fields; 0.4.x
+ * settings (no format) are an MP4.
+ */
 export function encodeOf(value: unknown): Encode {
   const v = (typeof value === "object" && value !== null ? value : {}) as Partial<Record<keyof Encode, unknown>>;
   const high = PRESET_ENCODE.high;
   const pick = <T>(list: readonly T[], item: unknown, fallback: T) => (list.includes(item as T) ? (item as T) : fallback);
+  if (v.format === "gif" || v.format === "webp") return { ...PRESET_ENCODE[v.format] };
   return {
+    format: "mp4",
     rate: v.rate === "source" ? "source" : "crf",
     crf: v.crf === undefined ? high.crf : crfOf(v.crf),
     speed: pick(SPEEDS, v.speed, high.speed),
@@ -208,7 +235,7 @@ export function encodeOf(value: unknown): Encode {
 }
 /** The preset whose options these are, `custom` when none (the Quality box then says Custom). */
 export function presetOf(encode: Encode): Preset {
-  const key = (e: Encode) => JSON.stringify([e.rate, e.rate === "crf" ? e.crf : 0, e.speed, e.height, e.fps, e.audio]);
+  const key = (e: Encode) => JSON.stringify([e.format, e.rate, e.rate === "crf" ? e.crf : 0, e.speed, e.height, e.fps, e.audio]);
   return PRESETS.find((preset) => key(PRESET_ENCODE[preset]) === key(encode)) ?? "custom";
 }
 
@@ -246,8 +273,16 @@ export interface Estimate {
 /** A conservative disk speed for stream copies, bytes per second. */
 const COPY_SPEED = 50e6;
 /**
+ * Megabytes per second of an animated image at its preset (GIF 480 px 15 fps,
+ * WebP 640 px 20 fps): a wide range, as the content decides (measured on
+ * 0.5.0's samples: detailed film about 0.4 MB/s as GIF and 0.17 as WebP, a
+ * still screen a small fraction of that). The source's size does not count.
+ */
+const ANIMATED_MB_PER_SECOND = { gif: [0.1, 0.5], webp: [0.04, 0.2] } as const;
+/**
  * Size and time of a clip (proposal §3.5), all approximate ("≈"):
  * - Fast: the source's share of its file size; time from a slow disk.
+ * - Animated GIF or WebP: a wide range per second of the image.
  * - Precise: a range around the source's average rate, scaled by the
  *   quality number (each 6 CRF about halves the size) and the height cap;
  *   time from the last Precise export measured on this machine (seconds of
@@ -262,7 +297,12 @@ export function estimate(input: { method: Method; length: number; fileBytes: num
     return { length, sizelow: share === null ? 0 : mb(share), sizehigh: share === null ? 0 : mb(share), timelow: time, timehigh: time };
   }
   let sizelow = 0, sizehigh = 0;
-  if (share !== null) {
+  const animated = animatedOf(encode);
+  if (animated) {
+    const [low, high] = ANIMATED_MB_PER_SECOND[animated];
+    sizelow = mb(length * low * 1e6);
+    sizehigh = mb(length * high * 1e6);
+  } else if (share !== null) {
     // A source bitrate: about the source's share, with peaks up to 1.5 times it.
     const quality = encode.rate === "source" ? 1 : Math.pow(2, (18 - encode.crf) / 6);
     const scale = encode.height && height && height > encode.height ? Math.pow(encode.height / height, 2) : 1;

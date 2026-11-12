@@ -119,7 +119,7 @@ test("the filter graph: trim each part out of the merge, xfade + acrossfade (qsi
 });
 
 test("ffmpeg's arguments: the Precise settings (CRF, x264 preset, yuv420p, AAC 48 kHz stereo at the tab's rate), -progress into a file, MP4", () => {
-  const encode = { rate: "crf", crf: 20, speed: "balanced", height: 720, fps: 30, audio: 128 } as const;
+  const encode = { format: "mp4", rate: "crf", crf: 20, speed: "balanced", height: 720, fps: 30, audio: 128 } as const;
   const { args, graph, length } = transitionArgs({ input: "/w/merge.mp4", output: "/out/.x.mp4.partial", progress: "/w/merge.mp4.progress", script: "/w/merge.mp4.graph", lengths: [4, 4], transitions: [tr("wipe", 1, "up"), CUT], fps: 30, audio: true, encode, threads: 3 });
   assert.equal(length, 7);
   const at = (flag: string) => args[args.indexOf(flag) + 1];
@@ -168,7 +168,7 @@ test("every Wipe and Slide direction, checked on the frames: the new picture mov
       "-filter_complex", "[0:v][1:v]hstack[a];[a][2:v]concat=n=2:v=1:a=0[v]", "-map", "[v]", "-map", "3:a",
       "-c:v", "ffv1", "-c:a", "pcm_s16le", "-ac", "2", merged]);
     assert.equal(make.status, 0, String(make.stderr));
-    const encode = { rate: "crf", crf: 14, speed: "faster", height: 0, fps: 0, audio: 192 } as const;
+    const encode = { format: "mp4", rate: "crf", crf: 14, speed: "faster", height: 0, fps: 0, audio: 192 } as const;
     // The frame half-way through the blend (1.0–2.0 s): which colour each quarter shows, left to right, then top and bottom.
     const look = (file: string) => {
       const raw = spawnSync(FFMPEG, ["-v", "error", "-ss", "1.5", "-i", file, "-frames:v", "1", "-vf", "scale=4:2:flags=area", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"]).stdout as Buffer;
@@ -665,7 +665,7 @@ test("100 parts with fades through black: the graph is a file (it is longer than
   // Long parts at 60 fps: frame numbers of six digits, as an hour-long Collection has.
   const lengths = Array.from({ length: 100 }, () => 61.234);
   const transitions = lengths.map((_, i) => (i < 99 ? tr("fadeBlack", 0.5) : CUT));
-  const { args, graph } = transitionArgs({ input: "C:\\work\\merge-1.mp4", output: "C:\\videos\\.a.mp4.partial", progress: "p", script: "C:\\work\\merge-1.mp4.graph", lengths, transitions, fps: 60, audio: true, encode: { rate: "crf", crf: 18, speed: "faster", height: 0, fps: 0, audio: 192 }, threads: 4 });
+  const { args, graph } = transitionArgs({ input: "C:\\work\\merge-1.mp4", output: "C:\\videos\\.a.mp4.partial", progress: "p", script: "C:\\work\\merge-1.mp4.graph", lengths, transitions, fps: 60, audio: true, encode: { format: "mp4", rate: "crf", crf: 18, speed: "faster", height: 0, fps: 0, audio: 192 }, threads: 4 });
   assert.ok(graph.length > 32_767, `${graph.length} characters of graph`);
   assert.ok(args.join(" ").length < 2_000, "the command line stays short");
 });
@@ -711,7 +711,7 @@ test("with a real ffmpeg: parts merged the player's way (fractional lengths at 6
     // The transitions on the measured layout: every part's own colour in the middle of its stretch; picture and sound as long.
     const transitions = [tr("crossfade", 0.3), tr("wipe", 0.3, "left"), tr("fadeBlack", 0.3), CUT];
     const out = join(dir, "out.mp4");
-    const built = encodeWith({ input: merged, output: out, progress: join(dir, "p.txt"), script: join(dir, "g.txt"), lengths: layout, transitions, fps: 60, audio: true, encode: { rate: "crf", crf: 18, speed: "faster", height: 0, fps: 0, audio: 192 }, threads: 2 });
+    const built = encodeWith({ input: merged, output: out, progress: join(dir, "p.txt"), script: join(dir, "g.txt"), lengths: layout, transitions, fps: 60, audio: true, encode: { format: "mp4", rate: "crf", crf: 18, speed: "faster", height: 0, fps: 0, audio: 192 }, threads: 2 });
     const run = spawnSync(FFMPEG, built.args);
     assert.equal(run.status, 0, String(run.stderr));
     const t = timing(layout, transitions, 60);
@@ -740,7 +740,7 @@ test("with a real ffmpeg: parts merged the player's way (fractional lengths at 6
     const many = join(dir, "many.mkv");
     spawnSync(FFMPEG, ["-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=s=32x16:r=10:d=50", "-f", "lavfi", "-i", "sine=d=50:r=48000", "-c:v", "ffv1", "-c:a", "pcm_s16le", "-ac", "2", many]);
     const lengths100 = Array.from({ length: 100 }, () => 0.5);
-    const long = encodeWith({ input: many, output: join(dir, "many-out.mp4"), progress: join(dir, "p2.txt"), script: join(dir, "g2.txt"), lengths: lengths100, transitions: lengths100.map((_, i) => (i < 99 ? tr("fadeBlack", 0.2) : CUT)), fps: 10, audio: true, encode: { rate: "crf", crf: 30, speed: "faster", height: 0, fps: 0, audio: 128 }, threads: 2 });
+    const long = encodeWith({ input: many, output: join(dir, "many-out.mp4"), progress: join(dir, "p2.txt"), script: join(dir, "g2.txt"), lengths: lengths100, transitions: lengths100.map((_, i) => (i < 99 ? tr("fadeBlack", 0.2) : CUT)), fps: 10, audio: true, encode: { format: "mp4", rate: "crf", crf: 30, speed: "faster", height: 0, fps: 0, audio: 128 }, threads: 2 });
     const ran = spawnSync(FFMPEG, long.args);
     assert.equal(ran.status, 0, String(ran.stderr));
     const length = Number(probe(["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", join(dir, "many-out.mp4")]).trim());
@@ -889,7 +889,7 @@ for (const fps of [30, 60]) test(`with a real ffmpeg at ${fps} fps: every ordere
         // a → b at junctions 1–2, b → a at 3–4: every ordered pair, at the start and in the middle of the chain.
         const transitions = [a, b, a, b, CUT];
         const out = join(dir, `${a.kind}-${b.kind}.mp4`);
-        const built = encodeWith({ input: merged, output: out, progress: join(dir, "p.txt"), script: join(dir, "g.txt"), lengths: layout, transitions, fps, audio: true, encode: { rate: "crf", crf: 30, speed: "faster", height: 0, fps: 0, audio: 128 }, threads: 2 });
+        const built = encodeWith({ input: merged, output: out, progress: join(dir, "p.txt"), script: join(dir, "g.txt"), lengths: layout, transitions, fps, audio: true, encode: { format: "mp4", rate: "crf", crf: 30, speed: "faster", height: 0, fps: 0, audio: 128 }, threads: 2 });
         const run = spawnSync(FFMPEG, built.args);
         if (run.status !== 0) {
           failures.push(`${a.kind} → ${b.kind}: ${String(run.stderr).trim().split(/\r?\n/).at(-1)}`);
@@ -948,7 +948,7 @@ test("with a real ffmpeg: the sound stays with the picture over many transitions
       ["transitions between cuts", [tr("crossfade", 0.3), CUT, tr("slide", 0.3), CUT, tr("fadeBlack", 0.3), CUT, tr("wipe", 0.3), CUT, tr("fadeWhite", 0.3), CUT]],
     ] as const) {
       const out = join(dir, "out.mp4");
-      const built = encodeWith({ input: merged, output: out, progress: join(dir, "p.txt"), script: join(dir, "g.txt"), lengths: layout, transitions: [...transitions], fps: 30, audio: true, encode: { rate: "crf", crf: 30, speed: "faster", height: 0, fps: 0, audio: 256 }, threads: 2 });
+      const built = encodeWith({ input: merged, output: out, progress: join(dir, "p.txt"), script: join(dir, "g.txt"), lengths: layout, transitions: [...transitions], fps: 30, audio: true, encode: { format: "mp4", rate: "crf", crf: 30, speed: "faster", height: 0, fps: 0, audio: 256 }, threads: 2 });
       const run = spawnSync(FFMPEG, built.args);
       assert.equal(run.status, 0, `${name}: ${String(run.stderr)}`);
       const t = timing(layout, [...transitions], 30);

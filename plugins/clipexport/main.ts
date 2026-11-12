@@ -2,15 +2,16 @@ import { access, constants, mkdir, readdir, rm, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import type { CommandOptions, ExportCheck, ExportPart, ImageRef, Panel, PanelState, Plugin, PlayerState, Text } from "@vestra-player/sdk";
 import {
-  abRange, AUDIO_RATES, codecArgs, crfOf, defaultRange, effectiveMethod, estimate, exportEncoding, fastContainer, HEIGHTS, keyframeArgs, LAST_SECONDS, lastRange, lastSeconds,
+  abRange, animatedOf, AUDIO_RATES, codecArgs, crfOf, defaultRange, effectiveMethod, estimate, exportEncoding, fastContainer, HEIGHTS, keyframeArgs, LAST_SECONDS, lastRange, lastSeconds,
   METHODS, NO_TIMELINE, parseCodec, parseKeyframes, PRESET_ENCODE, presetOf, PRESETS, RATES, snapStart, SPEEDS, timeline, timelineWindow,
 } from "./clip.ts";
-import type { Encode, Method } from "./clip.ts";
+import type { Animated, Encode, Method } from "./clip.ts";
+import { encoderProbe, extensionOf, MAX_ANIMATED_SECONDS } from "./animated.ts";
 import { blockingNote, Collection, copyNote, exportParts, lengthClock, listKey, partStates, partTicks, retryDelay, targetNote, totalLength, UNDO_MS } from "./collection.ts";
 import type { Part } from "./collection.ts";
 import { finisher, inflightStore, sweepWork } from "./finish.ts";
 import { capturer } from "./form.ts";
-import { anyTransition, capOf, DIRECTIONS, FIRST_DURATION, junctionTicks, KINDS, mergeEncode, PRESET_DURATIONS, sourceBitrate, timing, typedDuration } from "./transitions.ts";
+import { anyTransition, capOf, CUT, DIRECTIONS, FIRST_DURATION, junctionTicks, KINDS, mergeEncode, PRESET_DURATIONS, sourceBitrate, timing, typedDuration } from "./transitions.ts";
 import type { Direction, Kind, Plan, Transition } from "./transitions.ts";
 import { audioChoices, clippable, clock, Failure, isLocal, message, notClippable, parseRange, parseTime, problemOf, REASON, tabMode, withExtension } from "./model.ts";
 import type { Problem, Reason, Spec } from "./model.ts";
@@ -106,6 +107,9 @@ export interface Options {
   freeSpace: (folder: string) => Promise<number>;
 }
 
+/** The frame rate a clip's intermediate MP4 is planned with (the animated presets' ceiling); the image has its own (animated.ts). */
+const ANIMATED_FPS = 30;
+
 /** Megabytes as a number for the tab ("8.1", "71"); the tab adds the unit in the user's language. "" when unknown. */
 const mb = (bytes: number) => (bytes <= 0 ? "" : bytes < 10e6 ? (bytes / 1e6).toFixed(1) : String(Math.round(bytes / 1e6)));
 const minutesSince = (time: number) => Math.max(0, Math.floor((Date.now() - time) / 60_000));
@@ -174,6 +178,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   const swept = workFolder ? sweepWork(workFolder, inflight).catch((error) => console.error(`[clipexport] work folder: ${message(error)}`)) : Promise.resolve();
   const exporter = capturer(plugin, tasks, workFolder ? finisher(plugin, workFolder, { inflight, ...(options.freeSpace ? { freeSpace: options.freeSpace } : {}) }) : undefined);
   const marker = rangeMarker(plugin, text("Clip"));
+  /** The encoder of an animated image in the player's ffmpeg (asked once). */
+  const findEncoder = encoderProbe(plugin);
   let sequence = 0;
   const nextNumber = () => ++sequence;
 
@@ -426,7 +432,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     const fileBytes = isLocal(state.source) ? fileSize(state.source) : null;
     const guess = estimate({ method: chosen, length, fileBytes, duration: state.duration, encode: settings.encode, secondsPerSecond: settings.preciseSpeed, height: null });
     const sizeText = guess.sizehigh <= 0 ? "" : guess.sizelow === guess.sizehigh ? `${guess.sizelow}` : `${Math.round(guess.sizelow)}–${Math.round(guess.sizehigh)}`;
-    const extension = container === "mkv" ? ".mkv" : ".mp4";
+    const extension = container === "mkv" ? ".mkv" : extensionOf(animatedNow(chosen));
     return {
       error: "",
       field: "",
@@ -460,17 +466,21 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     if (!clippable(seen)) throw new Failure(notClippable(seen));
     const chosen = method();
     const precise = chosen === "precise";
+    const animated = animatedNow(chosen);
+    // An animated image: checked before the save dialog (its length, the encoder), written by the plugin's step.
+    const plan = animated ? await animatedPlan(animated, [range.end - range.start], [CUT], ANIMATED_FPS, range.end - range.start) : undefined;
     const spec: Spec = {
       start: range.start, end: range.end,
       processed: precise && form.processed, subtitles: precise && form.processed && form.burn,
-      track: audioChoices(seen, text).values[form.audioIndex] ?? "none",
+      // An animated image has no sound: the clip is read without it.
+      track: animated ? "none" : (audioChoices(seen, text).values[form.audioIndex] ?? "none"),
       method: chosen,
       // R6: the tab's encoder settings.
       encode: precise && support.encodeOptions ? { ...settings.encode } : undefined,
     };
     const snapped = chosen === "fast" && probe.source === seen.source ? snapStart(probe.keyframes, range.start) : null;
     const container = chosen === "fast" ? fastContainer(probe.source === seen.source ? probe.video : null, audioCodec(seen)) : "mp4";
-    const extension = container === "mkv" ? ".mkv" : ".mp4";
+    const extension = container === "mkv" ? ".mkv" : extensionOf(animated);
     const name = `${renderName(settings.template, { source: seen.source, start: snapped ?? range.start, end: range.end, now: new Date(), n: nextNumber() })}${extension}`;
     let destination: string;
     if (ask) {
@@ -479,7 +489,9 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       // The container follows the format (LosslessCut's rule): Precise writes MP4 whatever the typed extension said.
       destination = withExtension(picked, extension);
     } else destination = join(await targetFolder(seen.source), name);
-    await exporter.start(spec, seen, destination);
+    // What a crash left in the work folder is gone first.
+    if (plan) await swept;
+    await exporter.start(spec, seen, destination, undefined, plan);
     ui.clipStatus = status("clip-started");
   }
   /** The fields hold a range the user chose: not empty and not what the plugin last filled in. */
@@ -553,6 +565,19 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     store();
     probeSoon();
   };
+  /** The animated image a Precise export writes now (the Quality chooser's GIF or WebP); null for an MP4 or a Fast cut. */
+  const animatedNow = (chosen: Method): Animated | null => (chosen === "precise" && support.encodeOptions ? animatedOf(settings.encode) : null);
+  /**
+   * What the plugin's step needs for an animated image, checked before
+   * anything starts: the written length (at most a minute, animated.ts), the
+   * work folder, and an encoder in the player's ffmpeg.
+   */
+  async function animatedPlan(format: Animated, lengths: number[], transitions: Transition[], fps: number, written: number): Promise<Plan> {
+    if (written > MAX_ANIMATED_SECONDS + 0.0005) throw new Failure("animatedTooLong");
+    if (!workFolder) throw new Failure("animatedFailed");
+    const encoder = await findEncoder(format);
+    return { output: format, encoder, transitions, lengths, fps, audio: false, encode: { ...PRESET_ENCODE[format] }, merge: { ...PRESET_ENCODE[format] } };
+  }
   const setEncode = (next: Encode) => {
     settings.encode = next;
     store();
@@ -884,8 +909,14 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       // The red line under the buttons says it (from the same check); a key says it on screen.
       if (first) return void (say && shown(osd.show(BLOCKING[first.problem], [first.part + 1])));
       const chosen: Method = method() === "fast" && answer.copy.ok ? "fast" : "precise";
-      // The container follows the format: a re-encode is MP4, a copy what the check says the player writes.
-      const extension = chosen === "fast" && answer.copy.ok ? `.${answer.copy.container}` : ".mp4";
+      const animated = animatedNow(chosen);
+      const transitions = parts.map((part) => part.transition);
+      const lengths = parts.map((part) => part.end - part.start);
+      // An animated image: its written length (the overlaps taken off) and the encoder are checked before the save dialog.
+      const fps = answer.encode?.fps ?? ANIMATED_FPS;
+      const animatedStep = animated ? await animatedPlan(animated, lengths, transitions, fps, timing(lengths, transitions, fps).written / fps) : undefined;
+      // The container follows the format: a re-encode is MP4 (or the animated image), a copy what the check says the player writes.
+      const extension = chosen === "fast" && answer.copy.ok ? `.${answer.copy.container}` : extensionOf(animated);
       const head = parts[0]!;
       const name = `${renderName(settings.collectionTemplate, { source: head.name, start: head.start, end: parts.at(-1)!.end, now: new Date(), n: nextNumber() }, COLLECTION_TEMPLATE)}${extension}`;
       let destination: string;
@@ -899,14 +930,14 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
         encode: chosen === "precise" && support.encodeOptions ? { ...settings.encode } : undefined,
       };
       // Precise with a transition: the plain merge, then the plugin writes the transitions (Fast joins with cuts, Q2 a).
-      const transitions = parts.map((part) => part.transition);
-      const plan: Plan | undefined = chosen === "precise" && workFolder && anyTransition(transitions) && answer.encode
+      // An animated image: the plain merge, then the plugin writes the image (with the transitions, if any).
+      const plan: Plan | undefined = animatedStep ?? (chosen === "precise" && workFolder && anyTransition(transitions) && answer.encode
         ? {
-          transitions, lengths: parts.map((part) => part.end - part.start), fps: answer.encode.fps, audio: !!answer.encode.audio,
+          transitions, lengths, fps: answer.encode.fps, audio: !!answer.encode.audio,
           encode: settings.encode, merge: mergeEncode(settings.encode),
           bitrate: settings.encode.rate === "source" ? sourceBitrate(parts) : null,
         }
-        : undefined;
+        : undefined);
       // "Same as source" with transitions aims at the parts' own bit rate: unknown, it asks for another quality.
       if (plan && plan.encode.rate === "source" && !plan.bitrate) throw new Failure("noSourceBitrate");
       // What a crash left in the work folder is gone first.
@@ -1090,7 +1121,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
         start: keyOf("clip.start"), end: keyOf("clip.end"), add: keyOf("clip.collectionAdd"), merge: keyOf("clip.collectionExport"), remove: keyOf("clip.collectionRemove"),
       },
       ...collectionView(),
-      collectionPreview: `${renderName(settings.collectionTemplate, { source: shownSource(), start: 242.3, end: 259, now: new Date(), n: sequence + 1 }, COLLECTION_TEMPLATE)}.mp4`,
+      collectionPreview: `${renderName(settings.collectionTemplate, { source: shownSource(), start: 242.3, end: 259, now: new Date(), n: sequence + 1 }, COLLECTION_TEMPLATE)}${extensionOf(animatedNow(collectionMethod()))}`,
       support: { fast: support.fastCut, encode: support.encodeOptions, progress: support.progress },
       methodIndex: METHODS.indexOf(method()),
       audioIndex: form.audioIndex,
@@ -1098,7 +1129,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       burn: form.burn,
       presetIndex: (() => {
         const preset = presetOf(settings.encode);
-        return preset === "custom" ? 3 : PRESETS.indexOf(preset);
+        // Custom comes after the presets in the Quality chooser.
+        return preset === "custom" ? PRESETS.length : PRESETS.indexOf(preset);
       })(),
       encCrf: settings.encode.crf,
       encSource: settings.encode.rate === "source",
@@ -1117,7 +1149,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       resultsStatus: ui.resultsStatus,
       folder: settings.folder,
       besideMedia: settings.besideMedia,
-      preview: `${renderName(settings.template, { source: shownSource(), start: 242.3, end: 259, now: new Date(), n: sequence + 1 })}.mp4`,
+      preview: `${renderName(settings.template, { source: shownSource(), start: 242.3, end: 259, now: new Date(), n: sequence + 1 })}${extensionOf(animatedNow(method()))}`,
       page: PAGES.indexOf(settings.page),
       listFocus: ui.listFocus,
       unseen,
@@ -1282,6 +1314,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     if (preset) setEncode({ ...PRESET_ENCODE[preset] });
   });
   on("setEncode", (field: string, value: number) => {
+    // The animated presets' encoding is fixed (the tab hides these rows for them).
+    if (animatedOf(settings.encode)) return;
     const next = { ...settings.encode };
     const n = Math.round(Number(value));
     // Moving the quality number leaves "Same as source" for a quality level.

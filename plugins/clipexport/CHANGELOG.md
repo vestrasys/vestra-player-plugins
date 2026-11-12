@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.0
+
+**Who must change: nobody.** No new permission and the same player (0.7.6 or later). Settings carry over; the Quality choice keeps what it was.
+
+- **Animated GIF and Animated WebP**, two more choices in Advanced ▸ Quality (Precise only; Fast still copies the streams). The clip, or the merged Collection, becomes a looping image without sound, saved as `.gif` or `.webp` (a name typed in Export As… gets that extension).
+  - GIF: at most 480 px on the longer side and 15 fps; one 256-colour palette made from the clip itself (`palettegen`), applied with ordered (Bayer) dithering and only the changed area of each frame (`paletteuse`), FFmpeg's documented recipe for good GIFs. Error-diffusion dithering made the files nearly twice as large in our measurements.
+  - WebP: libwebp's animated encoder at its default quality (75) and effort (4), at most 640 px and 20 fps; about a third of the GIF's size.
+  - Smaller videos are not enlarged. Video effects, burned-in subtitles and the Collection's transitions are in the image as in a Precise MP4; the audio choice is greyed (no sound).
+  - At most **60 seconds**: a longer range (a merged Collection: its length after the transitions) is refused before the save dialog, with the reason on the Clip page. Size estimates in the Export button's tip are a wide range per second.
+  - The player writes an MP4 (at most 720p and 30 fps, best quality) into the plugin's work folder; the player's FFmpeg then writes the image beside the destination under a hidden name, which becomes the file when it is complete. Cancel, a failure and success leave no work file; Retry runs it again.
+  - The plugin asks the player's FFmpeg which encoders it has: without a WebP encoder, Animated WebP says "The player's FFmpeg cannot write this format" and Animated GIF still works; without FFmpeg both say it is missing. Nothing starts in either case.
+  - The ⓘ beside Fast | Precise says what the chosen image will be. The H.264 rows (resolution, frame rate, quality number, speed, AAC bitrate) are hidden while an animated choice is selected; Custom now comes after the two new choices.
+- English, Simplified Chinese, German, Spanish, French, Japanese and Korean.
+
 ## 0.4.0
 
 **Who must change: nobody.** No new permission and the same player (0.7.6 or later). Settings, the Collection and its transitions carry over; a tab last left on the Collection page opens on the Clip page, which now holds the Collection. Command ids and keys are unchanged.
