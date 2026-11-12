@@ -266,7 +266,7 @@ test("plugins/: the id is <owner>.<directory>, owner from plugins/owners.toml", 
   );
   const stray = await hosted(
     { vestratube: "zysilm.vestratube" },
-    'vestratube = "zysilm"\nvestrabili = "zysilm"\n',
+    'vestratube = "zysilm"\nretired = "zysilm"\n',
   );
-  assert.match(stray.problems.join(), /vestrabili is not a plugin directory/);
+  assert.match(stray.problems.join(), /retired is not a plugin directory/);
 });
