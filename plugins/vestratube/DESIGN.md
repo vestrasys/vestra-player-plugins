@@ -309,11 +309,11 @@ and nested `ImageRef` values directly, with no local type bridge.
 ```text
 Requesting plugin / code location
   zysilm.vestratube (then zysilm.youtube 0.4.0), plugins/vestratube/main.ts (the resolver). The same
-  applies to zysilm.vestrabili (Bilibili's URLs expire after 2 hours).
+  applies to any resolver whose stream URLs expire.
 
 User action and expected result
   The user plays a YouTube video, pauses it for longer than the stream URL
-  lives (YouTube: `expire` ≈ 6 h after resolving; Bilibili: 2 h), or plays a
+  lives (YouTube: `expire` ≈ 6 h after resolving), or plays a
   very long video, and then resumes or seeks. Expected: playback continues
   at the same position.
 
@@ -351,14 +351,14 @@ Whether it breaks an existing contract, and which plugins it affects
   Additive (a new behaviour for a failure that today ends playback; an
   optional field). It changes what happens after a stream error, so the
   maintainer should decide whether it counts as "a change to existing
-  behaviour" (§1.6 rule 2). Affected: zysilm.vestratube, zysilm.vestrabili; no
+  behaviour" (§1.6 rule 2). Affected: zysilm.vestratube; no
   built-in plugin uses web resolvers.
 
 Minimal acceptance scenario
   A test resolver returns a URL that answers 403 after the first N bytes;
   playback seeks past N; the host resolves again and playback continues at
-  that position with the same sourceId. Real: Bilibili, pause 2 h 5 min,
-  resume.
+  that position with the same sourceId. Real: YouTube, pause past the
+  URL's `expire` (about 6 h), resume.
 ```
 
 Status: filed here for the maintainer; nothing in 0.4.0 depends on it.

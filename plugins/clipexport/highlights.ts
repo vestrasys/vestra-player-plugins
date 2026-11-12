@@ -466,7 +466,7 @@ export const keptName = (path: string, stream: number) => `${createHash("sha256"
 /**
  * The kept scans in `<data>/highlights/`: one JSON file per video and sound
  * track, named by a hash of its path and track. A file is the same file
- * while its size and modification time are (VestraBili's stamp); a changed
+ * while its size and modification time are; a changed
  * one drops its result. The 50 most recently used are kept.
  */
 export class HighlightStore {

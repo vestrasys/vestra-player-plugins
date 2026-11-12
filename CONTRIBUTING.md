@@ -205,7 +205,7 @@ Tests: `scripts/tests/file-licenses.test.mjs` (the FSF texts it uses are in
 
 ```text
 plugins/<name>/   hosted third-party plugins (id <owner>.<name>): manifest.json, main.ts,
-                  .slint UI, tests/, README.md, CHANGELOG.md (vestratube, vestrabili, vestranes)
+                  .slint UI, tests/, README.md, CHANGELOG.md (vestratube, vestranes)
 plugins/owners.toml  the owner of each hosted plugin
 registry/         third-party registrations, registry/<id>.toml (see the README)
 revoked.json      revoked plugin versions, copied into the index
@@ -379,10 +379,10 @@ an alias),
 | `vestra-credentials` | SSH, cloud and npm credentials, browser profiles and cookies, wallets, token variables, enumerating, spreading or sending `process.env` |
 | `vestra-obfuscation` | long base64 or hex literals, `eval(atob(…))`, long `String.fromCharCode` lists |
 
-A finding is a place to read, not a verdict: VestraBili runs yt-dlp and
-downloads it (with the user's consent, checking the release's signed
-checksums), and VestraTube runs YouTube's player script in a worker; both
-are legitimate and reviewed. The pull request is labelled for:
+A finding is a place to read, not a verdict: a plugin may download and run
+a helper program (with the user's consent, checking a signed checksum), and
+VestraTube runs YouTube's player script in a worker; such code can be
+legitimate, and the review decides. The pull request is labelled for:
 
 - **new findings**, those not already on the base branch (same rule, file
   and matched code; moved lines do not count). A new plugin is flagged for
@@ -537,6 +537,35 @@ request:
 - Owners of a plugin (hosted or registered) can ask for a revocation;
   maintainers can revoke any version.
 
+## Retiring a hosted plugin
+
+A plugin that is no longer offered (its owner or a maintainer decides) is
+delisted, not revoked:
+
+1. In one pull request, delete `plugins/<name>/` and its line in
+   `plugins/owners.toml`, and remove or reword every other mention of it in
+   the repository (docs, comments, test fixtures that only used it as an
+   example).
+2. The next publish drops it from `index.json` (the build logs
+   `<id>: no longer in the repository, dropped from the index`); the signing
+   job accepts a plugin that is absent as a whole, and only refuses a listed
+   plugin that loses a version.
+3. Its Releases stay, so the published packages remain downloadable for the
+   record. Nobody can install it from the store any more.
+4. Installed copies keep working. The store keeps them under All and
+   Installed with the note "The repository no longer offers this plugin; the
+   store no longer checks it for updates (it still checks for
+   revocations)". There is no update path; users can disable or uninstall
+   it.
+5. Do not add a `revoked.json` entry just to retire a plugin. Revoke only
+   when installed copies are harmful or broken
+   ([above](#revoking-a-version)): the store still applies the official
+   index's `revoked` to a delisted plugin, so "delist + `*`" disables it on
+   users' machines.
+
+Retired plugins: `zysilm.vestrabili` (2026-11-12, last version 0.5.2;
+delisted without a revocation).
+
 ## Publishing
 
 Every push to `main` runs [`publish.yml`](.github/workflows/publish.yml):
@@ -621,7 +650,8 @@ and Pages of a private repository need authentication or a paid plan):
 - Plugin fields come from the newest version's `manifest.json`; a field the
   manifest leaves out is `null` (`tags`: `[]`, `name`: the id).
 - A plugin no longer in `plugins/` (removed, or renamed to a new id) is
-  dropped from the next index; its Releases stay. A renamed plugin starts a
+  dropped from the next index; its Releases stay (see
+  [Retiring a hosted plugin](#retiring-a-hosted-plugin)). A renamed plugin starts a
   new version history under its new id. (When youtube and bilibili moved
   from `vestra.*` to `zysilm.*`, and again when they became
   `zysilm.vestratube` and `zysilm.vestrabili`, the old entries were dropped
