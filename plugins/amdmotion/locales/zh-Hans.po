@@ -1,0 +1,122 @@
+msgid ""
+msgstr ""
+"Language: zh-Hans\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#: main.ts:59
+msgid "Switching…"
+msgstr "正在切换…"
+
+#: main.ts:60 main.ts:63 main.ts:79
+msgid "Off"
+msgstr "关"
+
+#: main.ts:60
+msgid "On"
+msgstr "开"
+
+#: main.ts:62
+msgid "Not available on this computer"
+msgstr "此电脑不可用"
+
+#: main.ts:68
+msgid "On: {} → {} fps on {}"
+msgstr "开：{} → {} fps（{}）"
+
+#: main.ts:68
+msgid "On: {} → {} fps"
+msgstr "开：{} → {} fps"
+
+#: main.ts:70
+msgid "The GPU uses the faster motion search to keep up."
+msgstr "GPU 正用较快的运动搜索以跟上速度。"
+
+#: main.ts:74
+msgid "Waiting"
+msgstr "等待中"
+
+#: main.ts:75
+msgid "On: applies when a video plays"
+msgstr "开：播放视频时生效"
+
+#: main.ts:79
+msgid "Double Frame Rate"
+msgstr "双倍帧率"
+
+#: main.ts:79
+msgid "Match Display"
+msgstr "匹配显示器"
+
+#: main.ts:101
+msgid "AMD motion smoothing unavailable: {}"
+msgstr "AMD 运动平滑不可用：{}"
+
+#: main.ts:107
+msgid "{} (waiting: {})"
+msgstr "{}（等待中：{}）"
+
+#: main.ts:107 main.ts:108
+msgid "AMD motion smoothing: off"
+msgstr "AMD 运动平滑：关"
+
+#: main.ts:107 main.ts:108
+msgid "AMD motion smoothing: double frame rate"
+msgstr "AMD 运动平滑：双倍帧率"
+
+#: main.ts:107 main.ts:108
+msgid "AMD motion smoothing: match display"
+msgstr "AMD 运动平滑：匹配显示器"
+
+#: main.ts:144
+msgid "AMD Motion Smoothing…"
+msgstr "AMD 运动平滑…"
+
+#: manifest.json motion.slint:24
+msgid "AMD Motion Smoothing"
+msgstr "AMD 运动平滑"
+
+#: manifest.json
+msgid "Smoother motion with real in-between frames from your AMD Radeon GPU"
+msgstr "用 AMD Radeon GPU 生成真实的中间帧，让画面运动更流畅"
+
+#: manifest.json
+msgid "Doubles the video's frame rate while it plays, with in-between frames made by the motion estimation of AMD's frame-rate converter (AMF) on your AMD Radeon GPU: not blended frames. Video ▸ AMD Motion Smoothing… opens a window to choose Off, Double Frame Rate or Match Display (the doubled frames paced to the display, with GPU rendering) and shows what runs or why not. Needs Windows with an AMD Radeon GPU and the AMD graphics driver; it does nothing on other GPUs or systems. Off by default; remembers your choice."
+msgstr "播放时把视频帧率提高一倍，中间帧由 AMD Radeon GPU 上 AMD 帧率转换器（AMF）的运动估计生成，而不是两帧混合。“视频 ▸ AMD 运动平滑…”打开一个窗口，可选“关”“双倍帧率”或“匹配显示器”（双倍后的帧再按显示器刷新率输出，需 GPU 渲染），并显示当前效果或不能使用的原因。需要装有 AMD Radeon GPU 和 AMD 显卡驱动的 Windows；在其他 GPU 或系统上不起作用。默认关闭，会记住你的选择。"
+
+#: manifest.json
+msgid "video"
+msgstr "视频"
+
+#: manifest.json
+msgid "motion"
+msgstr "运动"
+
+#: manifest.json
+msgid "smoothing"
+msgstr "平滑"
+
+#: manifest.json
+msgid "frame rate"
+msgstr "帧率"
+
+#: manifest.json
+msgid "amd"
+msgstr "amd"
+
+#: motion.slint:51
+msgid "Mode"
+msgstr "模式"
+
+#: motion.slint:68
+msgid "Double Frame Rate shows twice the frames, with real in-between frames made by the GPU's motion estimation. Match Display also paces them to the display (GPU rendering only). Doubling makes film look like video, so it is off by default."
+msgstr "“双倍帧率”显示两倍的帧，中间帧由 GPU 的运动估计真实生成。“匹配显示器”还会按显示器刷新率输出（仅 GPU 渲染）。帧率翻倍会让电影看起来像录像，所以默认关闭。"
+
+#: motion.slint:100
+msgid "Needs Windows with an AMD Radeon GPU and the AMD graphics driver. The player decides what the GPU can keep up with: large or fast videos are not offered."
+msgstr "需要装有 AMD Radeon GPU 和 AMD 显卡驱动的 Windows。播放器会判断 GPU 能否跟上：过大或帧率过高的视频不提供此功能。"
+
+#: motion.slint:106
+msgid "Close"
+msgstr "关闭"

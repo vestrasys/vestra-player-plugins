@@ -1,0 +1,109 @@
+// The AMD Motion Smoothing window: the mode (Off, Double Frame Rate, Match Display), what it does and what it needs,
+// and the status line (what runs, or why not) with the player's reason under it.
+// Width 400 (content 400 − 28 = 372), as Shader Upscale's window; the height follows the content.
+// Texts are @tr (English source; locales/<lang>.po translate them); the modes, the status and the reason come from main.ts.
+import { Theme } from "@vestra/theme.slint";
+import { Button, Choice } from "@vestra/widgets.slint";
+
+// A paragraph that wraps; its height follows the text (0 when empty).
+component Paragraph {
+    in property <string> text;
+    in property <color> color: Theme.text-list;
+    height: root.text == "" ? 0px : body.preferred-height;
+    body := Text {
+        width: 100%;
+        text: root.text;
+        color: root.color;
+        font-size: Theme.font-body;
+        wrap: word-wrap;
+        vertical-alignment: top;
+    }
+}
+
+export component MotionWindow inherits Window {
+    title: @tr("AMD Motion Smoothing");
+    preferred-width: 400px;
+    min-width: 400px;
+    max-width: 400px;
+    preferred-height: body.preferred-height;
+    min-height: body.preferred-height;
+    max-height: body.preferred-height;
+    background: Theme.bg-panel;
+    // The modes and the chosen one.
+    in property <[string]> modes;
+    in-out property <int> mode-index;
+    in property <bool> busy;
+    // The status line and its tone: 0 off, 1 running, 2 waiting, 3 not available.
+    in property <string> status;
+    in property <int> tone;
+    // The player's reason, under the status line ("" = nothing more to say).
+    in property <string> detail;
+    callback pick-mode(int);
+    callback close-window();
+
+    body := VerticalLayout {
+        padding: Theme.dialog-padding;
+        spacing: 8px;
+        HorizontalLayout {
+            spacing: 8px;
+            Text {
+                width: 90px;
+                text: @tr("Mode");
+                color: Theme.text-dim;
+                font-size: Theme.font-body;
+                horizontal-alignment: right;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+            Choice {
+                horizontal-stretch: 1;
+                enabled: !root.busy;
+                model: root.modes;
+                current-index <=> root.mode-index;
+                window-height: root.height;
+                selected(index) => { root.pick-mode(index); }
+            }
+        }
+        Paragraph {
+            text: @tr("Double Frame Rate shows twice the frames, with real in-between frames made by the GPU's motion estimation. Match Display also paces them to the display (GPU rendering only). Doubling makes film look like video, so it is off by default.");
+        }
+        Rectangle { height: 1px; background: Theme.line; }
+        HorizontalLayout {
+            spacing: 8px;
+            VerticalLayout {
+                alignment: start;
+                Rectangle {
+                    width: 8px;
+                    height: Theme.button-height;
+                    Rectangle {
+                        width: 8px;
+                        height: 8px;
+                        border-radius: 4px;
+                        background: root.tone == 1 ? Theme.playing : root.tone == 2 ? Theme.accent : root.tone == 3 ? Theme.danger : Theme.icon-disabled;
+                    }
+                }
+            }
+            Text {
+                horizontal-stretch: 1;
+                min-height: Theme.button-height;
+                text: root.status;
+                color: Theme.text;
+                font-size: Theme.font-title;
+                font-weight: 700;
+                vertical-alignment: center;
+                wrap: word-wrap;
+            }
+        }
+        if root.detail != "": Paragraph { text: root.detail; }
+        Rectangle { height: 1px; background: Theme.line; }
+        Paragraph {
+            text: @tr("Needs Windows with an AMD Radeon GPU and the AMD graphics driver. The player decides what the GPU can keep up with: large or fast videos are not offered.");
+            color: Theme.text-dim;
+        }
+        HorizontalLayout {
+            height: Theme.button-height;
+            alignment: end;
+            Button { text: @tr("Close"); clicked => { root.close-window(); } }
+        }
+    }
+}
