@@ -66,12 +66,16 @@ export const REASON = {
   noFfmpeg: "The transitions need FFmpeg, which the player could not find.",
   transitionFailed: "Could not write the transitions.",
   undoFull: "There is no room to bring the cleared parts back: the Collection holds at most 100. Remove parts, then Undo again.",
+  noAnimatedFfmpeg: "Animated GIF and WebP need FFmpeg, which the player could not find.",
+  noAnimatedEncoder: "The player's FFmpeg cannot write this format. Choose another quality.",
+  animatedTooLong: "Animated GIF and WebP are at most 60 seconds long. Choose a shorter range.",
+  animatedFailed: "Could not write the animated image.",
 } as const;
 export type Reason = keyof typeof REASON;
 
 /** The reasons an export job ends with (`jobError`, a released input). */
-export type JobReason = "space" | "exists" | "permission" | "encoder" | "exportFailed" | "released" | "fastImpossible" | "noSourceBitrate" | "partMissing" | "partChanged" | "partUnknown" | "noFfmpeg" | "transitionFailed";
-const JOB_REASONS: readonly Reason[] = ["space", "exists", "permission", "encoder", "exportFailed", "released", "fastImpossible", "noSourceBitrate", "partMissing", "partChanged", "partUnknown", "noFfmpeg", "transitionFailed"];
+export type JobReason = "space" | "exists" | "permission" | "encoder" | "exportFailed" | "released" | "fastImpossible" | "noSourceBitrate" | "partMissing" | "partChanged" | "partUnknown" | "noFfmpeg" | "transitionFailed" | "noAnimatedFfmpeg" | "animatedFailed";
+const JOB_REASONS: readonly Reason[] = ["space", "exists", "permission", "encoder", "exportFailed", "released", "fastImpossible", "noSourceBitrate", "partMissing", "partChanged", "partUnknown", "noFfmpeg", "transitionFailed", "noAnimatedFfmpeg", "animatedFailed"];
 
 /** A failure in the plugin's own words: `code` names its text in {@link REASON}. */
 export class Failure extends Error {
@@ -157,9 +161,10 @@ export const usable = (state: PlayerState) =>
 /**
  * A chosen file name with the extension of what will be written: the
  * container follows the format (as LosslessCut does), so a re-encode named
- * `.mkv` in the save dialog becomes `.mp4` instead of an MP4 inside an MKV name.
+ * `.mkv` in the save dialog becomes `.mp4` instead of an MP4 inside an MKV name
+ * (and an animated GIF named `.mp4` becomes `.gif`).
  */
-export const withExtension = (path: string, extension: string) => `${path.replace(/\.(mp4|mkv)$/i, "")}${extension}`;
+export const withExtension = (path: string, extension: string) => `${path.replace(/\.(mp4|mkv|gif|webp)$/i, "")}${extension}`;
 
 /** A local file path (not a URL). */
 export const isLocal = (source: string | null): source is string =>

@@ -230,7 +230,7 @@ export global ClipBridge {
     in-out property <int> audio-index: 1;
     in-out property <bool> processed;
     in-out property <bool> burn;
-    // 0 Same as source, 1 High quality, 2 Small file, 3 Custom.
+    // 0 Same as source, 1 High quality, 2 Small file, 3 Animated GIF, 4 Animated WebP, 5 Custom.
     in-out property <int> preset-index: 1;
     in-out property <float> enc-crf: 18;
     // "Same as source": the source video's bitrate instead of the quality number.
@@ -1271,6 +1271,8 @@ export component ClipExportTab inherits Rectangle {
     // The width classes: narrow < 317 px (key caps move to the tooltips).
     private property <bool> narrow: root.width < 317px;
     private property <bool> fast: ClipBridge.support.fast && ClipBridge.method-index == 0;
+    // Precise writes an animated image (the Quality chooser's Animated GIF or Animated WebP): no sound, its encoding is fixed.
+    private property <bool> animated: !root.fast && ClipBridge.support.encode && (ClipBridge.preset-index == 3 || ClipBridge.preset-index == 4);
     // What the ⓘ beside Fast / Precise explains: the method, and where this clip will start.
     private property <string> method-tip: root.fast
         ? @tr("Fast cut copies the streams: lossless and done in seconds, but a clip can only start on a keyframe.")
@@ -1283,9 +1285,13 @@ export component ClipExportTab inherits Rectangle {
                     : @tr("It starts on the keyframe at or before your start.")))
             + (ClipBridge.note.container == "mkv" ? " " + @tr("Its streams do not fit in MP4, so it is saved as MKV.") : "")
             + " " + @tr("Pick Precise to start on the exact frame.")
-        : ClipBridge.note.start == "" ? @tr("Precise re-encodes from the exact frame, and can include video effects and subtitles.")
-        // TRANSLATORS: {0} and {1} are times.
-        : @tr("Precise re-encodes from the exact frame {0} to {1}, and can include video effects and subtitles.", ClipBridge.note.start, ClipBridge.note.end);
+        : (ClipBridge.note.start == "" ? @tr("Precise re-encodes from the exact frame, and can include video effects and subtitles.")
+            // TRANSLATORS: {0} and {1} are times.
+            : @tr("Precise re-encodes from the exact frame {0} to {1}, and can include video effects and subtitles.", ClipBridge.note.start, ClipBridge.note.end))
+            + (!root.animated ? ""
+                // TRANSLATORS: what the Animated GIF and Animated WebP qualities write.
+                : " " + (ClipBridge.preset-index == 3 ? @tr("Animated GIF: at most 480 px and 15 fps, no sound, loops, up to 60 s.")
+                    : @tr("Animated WebP: at most 640 px and 20 fps, no sound, loops, up to 60 s.")));
     // The estimate in the Export button's tip (length, size and time, each approximate).
     private property <string> estimate-text: ClipBridge.estimate.length == "" ? ""
         : ClipBridge.estimate.size != ""
@@ -1551,7 +1557,9 @@ export component ClipExportTab inherits Rectangle {
                                 title: @tr("Advanced");
                                 open: ClipBridge.advanced-open;
                                 // TRANSLATORS: what the closed Advanced rows hold now: an audio choice and a quality.
-                                summary: @tr("{0} · {1}", ClipBridge.audio-labels[ClipBridge.audio-index],
+                                // An animated image has no sound: its quality alone.
+                                summary: root.animated ? Words.preset(ClipBridge.preset-index == 3 ? "gif" : "webp")
+                                    : @tr("{0} · {1}", ClipBridge.audio-labels[ClipBridge.audio-index],
                                     root.fast ? @tr("Same as source (stream copy)") : ClipBridge.support.encode ? Words.preset(ClipBridge.preset-index == 0 ? "source" : ClipBridge.preset-index == 1 ? "high" : ClipBridge.preset-index == 2 ? "small" : "custom") : @tr("High quality"));
                                 toggled(open) => {
                                     ClipBridge.advanced-open = open;
@@ -1566,6 +1574,8 @@ export component ClipExportTab inherits Rectangle {
                                     Label { width: 64px; text: @tr("Audio"); }
                                     Choice {
                                         model: ClipBridge.audio-labels;
+                                        // An animated image has no sound (the ⓘ beside Fast / Precise says so).
+                                        enabled: !root.animated;
                                         current-index <=> ClipBridge.audio-index;
                                         selected(index) => { ClipBridge.set-audio(index); }
                                     }
@@ -1575,15 +1585,17 @@ export component ClipExportTab inherits Rectangle {
                                     Label { width: 64px; text: @tr("Quality"); }
                                     if root.fast: Line { text: @tr("Same as source (stream copy)"); }
                                     if !root.fast && ClipBridge.support.encode: Choice {
-                                        model: ClipBridge.preset-index == 3
-                                            ? [@tr("Same as source"), @tr("High quality"), @tr("Small file"), @tr("Custom")]
-                                            : [@tr("Same as source"), @tr("High quality"), @tr("Small file")];
+                                        // Custom (index 5) shows only while the settings are none of the presets.
+                                        model: ClipBridge.preset-index == 5
+                                            ? [@tr("Same as source"), @tr("High quality"), @tr("Small file"), @tr("Animated GIF"), @tr("Animated WebP"), @tr("Custom")]
+                                            : [@tr("Same as source"), @tr("High quality"), @tr("Small file"), @tr("Animated GIF"), @tr("Animated WebP")];
                                         current-index <=> ClipBridge.preset-index;
                                         selected(index) => { ClipBridge.set-preset(index); }
                                     }
                                     if !root.fast && !ClipBridge.support.encode: Line { text: @tr("High quality (H.264 + AAC in MP4)"); }
                                 }
-                                if !root.fast && ClipBridge.support.encode: VerticalLayout {
+                                // The H.264 rows; an animated image's encoding is fixed (the ⓘ says what it is).
+                                if !root.fast && ClipBridge.support.encode && !root.animated: VerticalLayout {
                                     spacing: 5px;
                                     HorizontalLayout {
                                         spacing: 4px;

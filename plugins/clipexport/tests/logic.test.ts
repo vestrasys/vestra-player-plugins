@@ -143,12 +143,12 @@ test("the small timeline: about 30 s around the clip, ratios of what was typed a
 });
 
 test("Precise presets: High quality is the encoding clips always had; any change is Custom; stored options fall back field by field", () => {
-  assert.deepEqual(PRESET_ENCODE.high, { rate: "crf", crf: 18, speed: "faster", height: 0, fps: 0, audio: 192 });
+  assert.deepEqual(PRESET_ENCODE.high, { format: "mp4", rate: "crf", crf: 18, speed: "faster", height: 0, fps: 0, audio: 192 });
   assert.equal(presetOf(PRESET_ENCODE.small), "small");
   assert.equal(presetOf(PRESET_ENCODE.source), "source");
   assert.equal(presetOf({ ...PRESET_ENCODE.source, crf: 25 }), "source", "the CRF does not count with a source bitrate");
   assert.equal(presetOf({ ...PRESET_ENCODE.high, crf: 19 }), "custom");
-  assert.deepEqual(encodeOf({ rate: "vbr", crf: 99, speed: "warp", height: 720, fps: 30, audio: 1 }), { rate: "crf", crf: 30, speed: "faster", height: 720, fps: 30, audio: 192 });
+  assert.deepEqual(encodeOf({ rate: "vbr", crf: 99, speed: "warp", height: 720, fps: 30, audio: 1 }), { format: "mp4", rate: "crf", crf: 30, speed: "faster", height: 720, fps: 30, audio: 192 });
   assert.equal(encodeOf({ rate: "source" }).rate, "source");
   assert.deepEqual(encodeOf(null), PRESET_ENCODE.high);
 });

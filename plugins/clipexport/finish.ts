@@ -3,7 +3,8 @@ import { basename, dirname, join } from "node:path";
 import type { JobState, Scope } from "@vestra-player/sdk";
 import { Failure, uniqueFile } from "./model.ts";
 import type { Finish } from "./tasks.ts";
-import { estimated, layoutOf, parsePts, progressTime, ptsArgs, spaceNeeded, timeoutFor, timing, transitionArgs, transitionAt } from "./transitions.ts";
+import { animatedArgs } from "./animated.ts";
+import { anyTransition, estimated, layoutOf, parsePts, progressTime, ptsArgs, spaceNeeded, timeoutFor, timing, transitionArgs, transitionAt } from "./transitions.ts";
 import type { Layout, Plan } from "./transitions.ts";
 
 /** The progress file is read this often while the transitions are written. */
@@ -96,7 +97,8 @@ const defaultFree = async (folder: string) => {
 
 /**
  * The plugin's step of a merged export with transitions (design ruling: no
- * host change). The player writes the plain merge into `<dataDirectory>/work`;
+ * host change), and of an animated GIF or WebP of a clip or a merge (0.5.0,
+ * animated.ts). The player writes the plain merge (or the clip) into `<dataDirectory>/work`;
  * this measures where each part is in it (ffprobe of the frame timestamps),
  * writes the filter graph into a file there, checks the free space beside
  * the destination and runs the player's ffmpeg (`plugin.tools.run`) into a
@@ -112,6 +114,8 @@ export function finisher(plugin: Scope, workFolder: string, env: FinishEnv = {})
     const progress = `${merged}.progress`;
     const script = `${merged}.graph`;
     const partial = partialOf(destination);
+    // A GIF's palette (its first run) and that run's graph and progress files.
+    const palette = `${merged}.palette.png`;
     const planned = timing(p.lengths, p.transitions, p.fps);
     return {
       merged,
@@ -123,21 +127,36 @@ export function finisher(plugin: Scope, workFolder: string, env: FinishEnv = {})
         const input = state.outcome && "destination" in state.outcome ? state.outcome.destination : merged;
         // The merge (Precise) writes each part for its length as asked (-t), whatever its frames: the windows to measure.
         const asked = p.lengths;
-        const layout = (await measure(plugin, input, asked, signal)) ?? estimated(asked, p.fps);
-        const { args, graph, length } = transitionArgs({ input, output: partial, progress, script, lengths: layout, transitions: p.transitions, fps: p.fps, audio: p.audio, encode: p.encode, bitrate: p.bitrate });
-        if (p.encode.rate === "source" && !(p.bitrate && p.bitrate > 0)) throw new Failure("noSourceBitrate");
+        // An animated image of a clip or a merge without transitions takes the whole file: nothing to measure.
+        const blends = anyTransition(p.transitions);
+        const layout = (blends || !p.output ? await measure(plugin, input, asked, signal) : null) ?? estimated(asked, p.fps);
+        // The runs in order: one for the transitions and for WebP, two for a GIF (the palette first).
+        const { passes, length } = p.output
+          ? animatedArgs({
+            input, output: partial, progress, script, palette, format: p.output, ...(p.encoder ? { encoder: p.encoder } : {}),
+            transitions: blends ? { lengths: layout, transitions: p.transitions, fps: p.fps } : null, length: planned.written / p.fps,
+          })
+          : (() => {
+            const built = transitionArgs({ input, output: partial, progress, script, lengths: layout, transitions: p.transitions, fps: p.fps, audio: p.audio, encode: p.encode, bitrate: p.bitrate });
+            return { passes: [{ args: built.args, graph: built.graph, script, progress }], length: built.length };
+          })();
+        if (!p.output && p.encode.rate === "source" && !(p.bitrate && p.bitrate > 0)) throw new Failure("noSourceBitrate");
         // Room for the final file beside the destination: about the merge's size.
         const mergeBytes = (await stat(input).catch(() => null))?.size ?? 0;
         const free = await freeSpace(dirname(destination)).catch(() => Infinity);
         if (free < spaceNeeded(mergeBytes)) throw new Failure("space");
-        await writeFile(script, graph);
         const t = timing(layout, p.transitions, p.fps);
         const count = t.overlaps.filter((o) => o > 0).length;
+        // The progress of run `index` of n: each run is an equal share of the output's seconds.
+        let index = 0;
         const poll = setInterval(() => {
-          void readFile(progress, "utf8").then(
+          const pass = passes[index];
+          if (!pass) return;
+          const done = index;
+          void readFile(pass.progress, "utf8").then(
             (text) => {
               const at = progressTime(text);
-              if (at !== null) report(at, transitionAt(t.offsets, t.overlaps, p.fps, at), count);
+              if (at !== null && done === index) report((done * length + Math.min(at, length)) / passes.length, transitionAt(t.offsets, t.overlaps, p.fps, at), count);
             },
             () => {},
           );
@@ -146,11 +165,17 @@ export function finisher(plugin: Scope, workFolder: string, env: FinishEnv = {})
         report(0, count ? 1 : 0, count);
         await env.inflight?.add(partial);
         try {
-          await plugin.tools.run("ffmpeg", args, { timeoutMs: timeoutFor(length), maxOutput: 1 << 20, signal });
+          for (; index < passes.length; index++) {
+            const pass = passes[index]!;
+            await writeFile(pass.script, pass.graph);
+            await plugin.tools.run("ffmpeg", pass.args, { timeoutMs: timeoutFor(length), maxOutput: 1 << 20, signal });
+            if (signal.aborted) break;
+          }
         } catch (error) {
           const code = (error as { code?: string }).code;
           if (code === "aborted" || signal.aborted) throw error;
-          console.error(`[clipexport] transitions: ${code}: ${(error as Error).message}`);
+          console.error(`[clipexport] ${p.output ?? "transitions"}: ${code}: ${(error as Error).message}`);
+          if (p.output) throw new Failure(code === "unavailable" ? "noAnimatedFfmpeg" : "animatedFailed");
           throw new Failure(code === "unavailable" ? "noFfmpeg" : "transitionFailed");
         } finally {
           clearInterval(poll);
@@ -163,7 +188,7 @@ export function finisher(plugin: Scope, workFolder: string, env: FinishEnv = {})
         return written;
       },
       async cleanup() {
-        await Promise.all([merged, progress, script, partial].map((file) => rm(file, { force: true }).catch(() => {})));
+        await Promise.all([merged, progress, script, partial, palette, `${palette}.graph`, `${palette}.progress`].map((file) => rm(file, { force: true }).catch(() => {})));
         await env.inflight?.remove(partial).catch(() => {});
       },
     };

@@ -1,5 +1,5 @@
 import { availableParallelism } from "node:os";
-import type { Encode } from "./clip.ts";
+import type { Animated, Encode } from "./clip.ts";
 
 /**
  * Transitions between the Collection's parts (design clip-transitions, ruling
@@ -316,8 +316,15 @@ export function transitionAt(offsets: readonly number[], overlaps: readonly numb
 /** Time allowed for the final encode: two minutes, plus twenty seconds per second of video (4K on one slow machine). */
 export const timeoutFor = (length: number) => Math.round(120_000 + Math.max(0, length) * 20_000);
 
-/** What a merged export with transitions needs after the player's merge (kept with the task for a retry). */
+/**
+ * What the plugin's step needs after the player's export (kept with the task
+ * for a retry): a merged export with transitions, or an animated image of a
+ * clip (one length, a Cut) or of a merge (with or without transitions).
+ */
 export interface Plan {
+  /** 0.5.0: the animated image the step writes (from the encode's format) and the encoder found for it; an MP4 with the transitions when absent. */
+  output?: Animated;
+  encoder?: string;
   /** Each part's transition into the next (the last is Cut). */
   transitions: Transition[];
   /** Each part's length as asked (the merge's own report wins when it has one). */
