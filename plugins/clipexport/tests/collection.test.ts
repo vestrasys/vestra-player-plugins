@@ -39,11 +39,11 @@ async function add(host: TestHost, from: string, to: string) {
   host.mounted().emit("add-part", from, to);
   await until(() => rows(host).length === count + 1, `part ${count + 1}`);
 }
-/** The tab in front, at the Collection page. */
+/** The tab in front at the Clip page, which holds the Collection (Show Collection). */
 async function showCollection(host: TestHost) {
   await host.command("clip.collection").run();
   await host.settle();
-  await eventually(() => tab(host).page, 1);
+  await eventually(() => tab(host).page, 0);
 }
 /** A temporary clip folder chosen through Clip Folder…. */
 async function withFolder(host: TestHost) {
@@ -74,7 +74,7 @@ test("vertical slice: the marked range of two files becomes two parts; Export Me
       [2, `${clock(10)} – ${clock(12.5)}`, "2.5"],
     ]);
     await eventually(() => rows(host).map((row) => row.current), [false, true], "the file playing in the playing colour");
-    await eventually(() => tab(host)["collection-info"], { count: 2, total: lengthClock(5.5), checked: true, undo: false, transitions: 0, saved: "0.0", off: false });
+    await eventually(() => tab(host)["collection-info"], { count: 2, total: lengthClock(5.5), checked: true, undo: false, transitions: 0, saved: "0.0", off: false, switched: false });
     await eventually(() => (tab(host).copy as { ok: boolean }).ok, true, "two files a copy can join");
     assert.equal(tab(host)["collection-method-index"], 0, "Fast");
     host.mounted().emit("export-merged");
@@ -190,11 +190,11 @@ test("reorder, select and Delete, remove: the list is renumbered, kept on disk, 
     host.mounted().emit("select-part", a);
     await eventually(() => rows(host).find((row) => row.id === a)?.selected, true);
     // Another page in front: the selection goes, Delete removes nothing it cannot see.
-    host.mounted().emit("set-page", 0);
-    await eventually(() => rows(host).find((row) => row.id === a)?.selected, false);
-    assert.equal(host.command("clip.collectionRemove").state.enabled, false, "not on the Collection page");
-    assert.equal(rows(host).length, 3);
     host.mounted().emit("set-page", 1);
+    await eventually(() => rows(host).find((row) => row.id === a)?.selected, false);
+    assert.equal(host.command("clip.collectionRemove").state.enabled, false, "not on the Clip page");
+    assert.equal(rows(host).length, 3);
+    host.mounted().emit("set-page", 0);
     host.mounted().emit("select-part", a);
     await until(() => host.command("clip.collectionRemove").state.enabled, "Delete enabled with a selection on the page");
     await host.command("clip.collectionRemove").run();
@@ -719,21 +719,21 @@ test("the time fields fit beside Start and End: not the std LineEdit's 160 px mi
   assert.ok(field, "Field sets its own minimum width");
   // "00:02.000" (clock()'s shortest time) is 54.4 px in Consolas 11 px; the field pads 12 + 12 px.
   assert.ok(Number(field![1]) >= Math.ceil(54.4 + 24), "a time shows whole");
-  // The row works out from the measured labels whether they fit, then the key caps; else the glyphs alone.
-  assert.ok(slint.includes(`marks-fields: 2 * ${field![1]}px`), "the row's sum uses the field's width");
+  // The Range card's rows (one Start / End editor for the clip and the Collection): label, field, Now.
   for (const label of ["Start", "End"])
-    assert.match(slint, new RegExp(String.raw`text: @tr\("${label}"\);\s*glyph: Glyphs\.target;\s*key: ClipBridge\.keys\.\w+;\s*show-text: root\.marks-labels;\s*show-key: root\.marks-caps;`), label);
-  // The fallback without labels fits at the 280 px minimum: two 22 px glyph buttons, the fields, "–", the gaps.
-  assert.ok(22 + 22 + 2 * Number(field![1]) + 6 + 12 <= 280 - 16);
+    assert.match(slint, new RegExp(String.raw`Label \{ text: @tr\("${label}"\); \}\s*Field \{`), label);
+  // At the 280 px minimum: the page's padding (10 + 4) and scroll bar (12), the card's (11 + 8), the 52 px label,
+  // the field, the Now button (8 + 14 + 5 + about 22 + 8 px) and two 4 px gaps.
+  assert.ok(10 + 4 + 12 + 11 + 8 + 52 + Number(field![1]) + 57 + 8 <= 280);
 });
 
 test("an unset Start or End shows no time: the fields' hint is no range that could be read as set (Add to Collection stays off until one is)", async () => {
   const slint = await readFile(new URL("../ui/tab.slint", import.meta.url), "utf8");
-  // Every field bound to the range (the Clip page's two and the Collection page's two), with its hint.
+  // Every field bound to the range (the Range card's Start and End), with its hint.
   const hints = [...slint.matchAll(/placeholder-text: "([^"]*)";[^}]*?text <=> ClipBridge\.clip-(start|end);/g)].map((m) => [m[2], m[1]!] as const);
-  assert.deepEqual(hints.map(([field]) => field), ["start", "end", "start", "end"]);
+  assert.deepEqual(hints.map(([field]) => field), ["start", "end"]);
   for (const [field, hint] of hints) assert.equal(parseTime(hint), null, `the ${field} field's hint "${hint}" reads as a time`);
-  // Empty fields are no range: nothing to add, and the Add from row says no length.
+  // Empty fields are no range: nothing to add (+ Add stays off), and the Range shows no length.
   const host = new TestHost();
   play(host, "/media/one.mp4");
   const { stop } = await start(host);

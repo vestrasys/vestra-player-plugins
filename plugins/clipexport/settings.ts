@@ -34,14 +34,15 @@ export interface Settings {
   preciseSpeed: number | null;
 }
 
-/** The pages of the tab, as its sub-tab strip orders them. */
-export const PAGES = ["clip", "collection", "results", "settings"] as const;
+/** The pages of the tab, as its sub-tab strip orders them (0.4.0: the Collection is a section of the Clip page). */
+export const PAGES = ["clip", "results", "settings"] as const;
 export type Page = (typeof PAGES)[number];
-/** The pages before the Collection page: 0.1.x kept the page as its index among these. */
-const OLD_PAGES = ["clip", "results", "settings"] as const;
-/** A stored page: its name, or (0.1.x) its index among the old pages. */
+/**
+ * A stored page: its name; 0.2.x and 0.3.x kept "collection" (now the Clip
+ * page); 0.1.x kept its index among Clip, Results, Settings (the same order).
+ */
 const pageOf = (value: unknown): Page =>
-  PAGES.includes(value as Page) ? (value as Page) : Number.isInteger(value) ? (OLD_PAGES[value as number] ?? "clip") : "clip";
+  value === "collection" ? "clip" : PAGES.includes(value as Page) ? (value as Page) : Number.isInteger(value) ? (PAGES[value as number] ?? "clip") : "clip";
 
 /** The user's Videos folder, else the home folder. */
 export const defaultFolder = () => {

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0
+
+**Who must change: nobody.** No new permission and the same player (0.7.6 or later). Settings, the Collection and its transitions carry over; a tab last left on the Collection page opens on the Clip page, which now holds the Collection. Command ids and keys are unchanged.
+
+- **One Clip page.** The Clip and Collection sub-tabs are one page: **Output** (Fast | Precise in one row, the ⓘ, Advanced folded), the **Range** card (the file playing, Start and End, Use A-B range, Last N s, **Export Clip**, Export As…), then the **Collection** with its count, **+ Add** and Clear in the header. The sub-tabs are Clip · Results · Settings.
+- While the Collection has parts, a **footer** below the page shows its sum (parts, length, method, transitions), at most one note, **Export Merged** and Export As…. The highlighted button is the output being built: Export Clip while the Collection is empty, Export Merged once it has parts. On a very short tab the footer scrolls with the page, so the list keeps at least three rows.
+- **Show Collection** opens the Clip page with the list in view and focused.
+- **Transitions in Fast**: a junction chip opens the picker in Fast too. Picking a transition switches the method to Precise, and the footer says "Switched to Precise: transitions need re-encoding."; picking Cut keeps Fast. Parts that Fast cannot join behave as before.
+- The picker opens only after the plugin has opened that junction, and closes when its junction goes (part removed or moved last, page left), so it never shows an empty "Transition 0 → 0".
+
 ## 0.3.1
 
 **Who must change: nobody.** No new permission and the same player (0.7.6 or later).

@@ -195,12 +195,16 @@ test("the tab's Slint: a ListView for Results, library widgets, key caps, Theme 
   const slint = await readFile(new URL("../ui/tab.slint", import.meta.url), "utf8");
   const parts = await readFile(new URL("../ui/parts.slint", import.meta.url), "utf8");
   assert.match(slint, /ListView \{\s*vertical-stretch: 1;\s*for row in ClipBridge\.results: ResultItem/);
-  // Real pages: four persistent pages, one shown, switched with `visible`.
-  for (const page of [0, 1, 2, 3]) assert.equal(slint.split(`visible: ClipBridge.page == ${page};`).length - 1, 1, `page ${page}`);
+  // Real pages: three persistent pages (Clip, Results, Settings), one shown, switched with `visible`.
+  for (const page of [0, 1, 2]) assert.equal(slint.split(`visible: ClipBridge.page == ${page};`).length - 1, 1, `page ${page}`);
+  assert.equal(slint.split("visible: ClipBridge.page == 3;").length, 1, "no fourth page");
   assert.match(slint, /current-index <=> ClipBridge\.page;/);
   // No wrapped text: a wrapped line is laid out one line tall and overlapped the rows below it.
   assert.doesNotMatch(slint, /wrap:\s*word-wrap/);
-  assert.doesNotMatch(slint, /jump-|viewport-y =/, "no anchors scrolled to");
+  // One scroll set by the tab: Show Collection brings the list into view (and only when asked).
+  assert.doesNotMatch(slint, /jump-/);
+  assert.equal(slint.split("viewport-y =").length - 1, 1);
+  assert.match(slint, /changed list-request => \{\s*clip-page\.viewport-y = /);
   assert.doesNotMatch(slint, /ComboBox|CheckBox|StandardListView/);
   assert.match(slint, /import \{ Button, Check, Choice, KeyHint, RadioGroup, Slider, Tabs, ToolTipArea, ToolTipKey \} from "@vestra\/widgets\.slint";/);
   assert.match(slint, /KeyHint \{ text: root\.key; \}/);
@@ -214,7 +218,7 @@ test("the tab's Slint: a ListView for Results, library widgets, key caps, Theme 
   // A `for` over bound data only inside the ListView.
   const loops = [...slint.matchAll(/for \w+(?:\[\w+\])? in ([\w.-]+|\[[^\]]*\])/g)].map((m) => m[1]);
   assert.deepEqual(loops.filter((what) => !what!.startsWith("[")), ["ClipBridge.parts", "ClipBridge.results"]);
-  assert.match(slint, /ListView \{\s*for row\[i\] in ClipBridge\.parts: PartItem/, "the Collection is a ListView too");
+  assert.match(slint, /ListView \{[^{}]*for row\[i\] in ClipBridge\.parts: PartItem/, "the Collection is a ListView too");
   // The bridge's callbacks are the ones the plugin handles: each emitted callback reaches main.ts.
   const main = await readFile(new URL("../main.ts", import.meta.url), "utf8");
   const camel = (name: string) => name.replace(/-(\w)/g, (_, c: string) => c.toUpperCase());
@@ -425,7 +429,7 @@ test("Precise: Export saves into the folder with the template's name and the tab
     await until(() => host.system.revealed.length === 2);
     await host.pressOsdAction(1);
     await host.settle();
-    await eventually(() => tab(host).page, 2, "Show in Tab: the Results page");
+    await eventually(() => tab(host).page, 1, "Show in Tab: the Results page");
   } finally {
     await stop();
     await cleanup();
@@ -443,7 +447,7 @@ test("Export Clip… only opens the Clip page; Export Clip Range (Ctrl+Shift+E) 
     await host.settle();
     await eventually(() => (tab(host).keys as { clip: string }).clip, "⇧⌘E", "the Export button shows Export Clip Range's key");
     // No range yet: the key opens the Clip page with the position → +10 s, and exports nothing.
-    host.mounted().emit("set-page", 2);
+    host.mounted().emit("set-page", 1);
     await host.press("Ctrl+Shift+E");
     await host.settle();
     assert.equal(host.layout.sidebar?.owner, 1, "the tab is in front");
@@ -973,6 +977,28 @@ test("task rows changed after an await call plugin.update() (trimming history, a
   assert.equal(tasks.list.at(-1)!.status, "running");
 });
 
+test("0.2.x and 0.3.x kept the Collection page: it opens as the Clip page, which holds the Collection", async () => {
+  const data = await mkdtemp(join(tmpdir(), "clipexport-data-"));
+  try {
+    await writeFile(join(data, "settings.json"), JSON.stringify({ page: "collection", method: "precise" }));
+    const host = new TestHost();
+    ready(host);
+    const { stop } = await start(host, "en", data);
+    try {
+      await host.settle();
+      await eventually(() => tab(host).page, 0, "the Clip page");
+      await eventually(() => tab(host)["method-index"], 1, "the other settings are kept");
+      host.mounted().emit("set-page", 2);
+      await host.settle();
+      await jsonFile(join(data, "settings.json"), (v) => v.page === "settings");
+    } finally {
+      await stop();
+    }
+  } finally {
+    await rm(data, { recursive: true, force: true });
+  }
+});
+
 test("real pages: the last sub-tab is remembered; commands select their page", async () => {
   const data = await mkdtemp(join(tmpdir(), "clipexport-data-"));
   const host = new TestHost();
@@ -983,14 +1009,19 @@ test("real pages: the last sub-tab is remembered; commands select their page", a
     await eventually(() => tab(host).page, 0, "Clip first");
     await host.command("clip.tasks").run();
     await host.settle();
-    await eventually(() => tab(host).page, 2, "Export Tasks… shows Results");
+    await eventually(() => tab(host).page, 1, "Export Tasks… shows Results");
     await host.command("clip.settings").run();
     await host.settle();
-    await eventually(() => tab(host).page, 3, "Clip Export Settings… shows Settings");
+    await eventually(() => tab(host).page, 2, "Clip Export Settings… shows Settings");
+    // Show Collection: the Clip page (the Collection is its section), the list asked into view each time.
+    const asked = Number(tab(host)["list-focus"] ?? 0);
     await host.command("clip.collection").run();
     await host.settle();
-    await eventually(() => tab(host).page, 1, "Show Collection shows the Collection");
-    host.mounted().emit("set-page", 2);
+    await eventually(() => [tab(host).page, tab(host)["list-focus"]], [0, asked + 1], "Show Collection shows the Clip page, list focused");
+    await host.command("clip.collection").run();
+    await host.settle();
+    await eventually(() => tab(host)["list-focus"], asked + 2, "again: the list is asked into view again");
+    host.mounted().emit("set-page", 1);
     await host.settle();
     await jsonFile(join(data, "settings.json"), (v) => v.page === "results");
     await first.stop();
@@ -998,7 +1029,7 @@ test("real pages: the last sub-tab is remembered; commands select their page", a
     ready(again);
     const second = await startPlugin(activate, { directory, host: again, dataDirectory: data, locale: "en" });
     await again.settle();
-    await eventually(() => tab(again).page, 2, "the Results page again after a restart");
+    await eventually(() => tab(again).page, 1, "the Results page again after a restart");
     await again.command("clip.open").run();
     await again.settle();
     await eventually(() => tab(again).page, 0);

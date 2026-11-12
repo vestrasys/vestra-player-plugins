@@ -1,5 +1,6 @@
 // The Clip Export sidebar tab (the clip part of the player's capture design of 2026-11-07).
-// Three pages behind a sub-tab strip (Clip | Results | Settings), each a persistent element
+// Three pages behind a sub-tab strip (Clip | Results | Settings; the Clip page holds the Output, the Range and the
+// Collection, design clipexport-v2 B), each a persistent element
 // shown with `visible`; every row is in a layout and every text is one line (elided, the full text in a
 // tooltip), so nothing overlaps when a row's content changes. Key caps come from `plugin.commands.keys`.
 import { LineEdit, ListView, ScrollView } from "std-widgets.slint";
@@ -50,6 +51,8 @@ export struct PartRow {
 // The transition picker of one junction (part `from` into part `to`), while it is open.
 export struct Picker {
     shown: bool,
+    // Counts the opens the plugin accepted: a new one shows the popup (it never shows a picker the plugin did not open).
+    serial: int,
     id: string,
     from: int,
     to: int,
@@ -63,7 +66,7 @@ export struct Picker {
     joins: int,
 }
 
-// The Collection page's Add from: the file playing, its duration, the marked range's length ("16.7", "" when none).
+// The Range card's file and + Add: the file playing, its duration, the marked range's length ("16.7", "" when none).
 export struct AddFrom {
     can: bool,
     name: string,
@@ -85,6 +88,8 @@ export struct CollectionInfo {
     transitions: int,
     saved: string,
     off: bool,
+    // A transition picked in Fast switched the method to Precise (one line in the footer says so).
+    switched: bool,
 }
 
 // What stops the merged export: the part (from 1) and the check's problem.
@@ -208,8 +213,10 @@ export global ClipBridge {
     in property <bool> can-last;
     in property <Keys> keys;
     in property <Support> support;
-    // The sub-tab shown (0 Clip, 1 Collection, 2 Results, 3 Settings), remembered; the plugin sets it for commands.
+    // The sub-tab shown (0 Clip, 1 Results, 2 Settings), remembered; the plugin sets it for commands.
     in-out property <int> page;
+    // Show Collection: a new value focuses the list and scrolls it into view.
+    in property <int> list-focus;
     // Clips finished since the Results page was last shown (its badge).
     in property <int> unseen;
     in-out property <int> method-index;
@@ -376,15 +383,23 @@ component Action {
     preferred-height: Theme.button-height;
     min-width: max(Theme.button-height, row.min-width);
     preferred-width: row.preferred-width;
+    // Its own width unless a row stretches it (Export Clip, Export Merged).
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
     accessible-role: button;
     accessible-label: root.text != "" ? root.text : root.tip;
     accessible-enabled: root.enabled;
     accessible-action-default => { if root.enabled { root.clicked(); } }
+    // The button fills the room its row gives it (a stretched Export Merged is one wide button, not a centred one).
     ToolTipArea {
+        width: 100%;
+        height: 100%;
         text: root.tip;
         keys: root.tip-keys;
         detail: root.tip-detail;
         Rectangle {
+            width: 100%;
+            height: 100%;
             border-radius: Theme.radius-control;
             background: !root.enabled ? Theme.button-disabled
                 : root.primary ? (touch.pressed ? Theme.accent-press : Theme.accent-fill)
@@ -496,36 +511,47 @@ component Fold {
     TouchArea { clicked => { root.toggled(!root.open); } }
 }
 
-// One choice of the method switch: glyph, name and what it means.
-component MethodChoice inherits Rectangle {
+// One half of the method switch: glyph and name.
+component MethodHalf inherits Rectangle {
     in property <string> glyph;
     in property <string> title;
-    in property <string> detail;
     in property <bool> selected;
-    // false: shown greyed and not clickable (Fast for parts a copy cannot join).
-    in property <bool> enabled: true;
     callback clicked();
-    min-height: 36px;
-    border-radius: Theme.radius-control;
-    background: root.selected ? Theme.selected-bg : touch.has-hover && root.enabled ? Theme.hover-bg : transparent;
+    horizontal-stretch: 1;
+    border-radius: 3px;
+    border-width: root.selected ? 1px : 0px;
+    border-color: Theme.line;
+    background: root.selected ? Theme.selected-bg : touch.has-hover ? Theme.hover-bg : transparent;
     accessible-role: button;
     accessible-label: root.title;
     accessible-checkable: true;
     accessible-checked: root.selected;
-    accessible-enabled: root.enabled;
-    accessible-action-default => { if root.enabled { root.clicked(); } }
-    VerticalLayout {
+    accessible-action-default => { root.clicked(); }
+    HorizontalLayout {
         alignment: center;
-        padding: 3px;
-        HorizontalLayout {
-            alignment: center;
-            spacing: 4px;
-            VerticalLayout { alignment: center; Glyph { glyph: root.glyph; color: !root.enabled ? Theme.icon-disabled : root.selected ? Theme.accent : Theme.text-dim; } }
-            Text { text: root.title; color: !root.enabled ? Theme.text-dim : root.selected ? Theme.text : Theme.text-list; font-size: Theme.font-body; }
-        }
-        Text { text: root.detail; color: Theme.text-dim; font-size: Theme.font-xs; horizontal-alignment: center; overflow: elide; }
+        spacing: 5px;
+        VerticalLayout { alignment: center; Glyph { glyph: root.glyph; color: root.selected ? Theme.text : Theme.text-dim; } }
+        Text { text: root.title; color: root.selected ? Theme.text : Theme.text-list; font-size: Theme.font-body; vertical-alignment: center; }
     }
-    touch := TouchArea { enabled: root.enabled; clicked => { root.clicked(); } }
+    touch := TouchArea { clicked => { root.clicked(); } }
+}
+
+// The method: Fast | Precise in one 26 px row (a segmented control); what they mean is in the ⓘ tip beside it.
+component MethodSwitch inherits Rectangle {
+    // 0 Fast, 1 Precise.
+    in property <int> index;
+    callback picked(int);
+    height: 26px;
+    border-radius: Theme.radius-control;
+    border-width: 1px;
+    border-color: Theme.line;
+    background: Theme.bg-list;
+    HorizontalLayout {
+        padding: 2px;
+        spacing: 2px;
+        MethodHalf { glyph: Glyphs.fast; title: @tr("Fast"); selected: root.index == 0; clicked => { root.picked(0); } }
+        MethodHalf { glyph: Glyphs.precise; title: @tr("Precise"); selected: root.index == 1; clicked => { root.picked(1); } }
+    }
 }
 
 // The small timeline: keyframe ticks, the typed range (outlined), the written range (filled), the playhead.
@@ -809,7 +835,7 @@ component Chip inherits Button {
     }
 }
 
-// The running export, at the top of the Clip and Collection pages (Results has its row too):
+// The running export, at the top of the Clip page (Results has its row too):
 // name and Cancel, the bar (with ticks at the joins of a merged export), method · part · percent · time left.
 component ProgressCard inherits Rectangle {
     in property <Card> card;
@@ -1014,7 +1040,7 @@ component PartItem inherits Rectangle {
             border-radius: 7px;
             border-width: root.entry.kind == "cut" || root.entry.off ? 0px : 1px;
             border-color: chip-touch.has-hover ? Theme.accent : Theme.line;
-            background: root.entry.kind == "cut" ? transparent : chip-touch.has-hover && !root.entry.off ? Theme.hover-bg : Theme.bg-list;
+            background: root.entry.kind == "cut" ? transparent : chip-touch.has-hover ? Theme.hover-bg : Theme.bg-list;
             opacity: root.entry.off ? 0.5 : 1;
             ToolTipArea {
                 text: root.entry.off ? @tr("Transitions: Precise only")
@@ -1022,7 +1048,7 @@ component PartItem inherits Rectangle {
                     // TRANSLATORS: {0} is a transition with its direction ("Slide ←"), {1} its length in seconds ("1.5").
                     : @tr("{0} · {1} s", Words.kind-name(root.entry.kind) + Words.arrow(root.entry.kind, root.entry.dir), root.entry.duration);
                 // TRANSLATORS: {0} and {1} are part numbers ("Part 2 → 3"); then what happens to the sound.
-                detail: root.entry.off ? "" : @tr("Part {0} → {1}. Click to change.", root.entry.number, root.entry.number + 1) + " " + Words.sound(root.entry.kind);
+                detail: @tr("Part {0} → {1}. Click to change.", root.entry.number, root.entry.number + 1) + " " + Words.sound(root.entry.kind);
                 chip-row := HorizontalLayout {
                     padding-left: 5px;
                     padding-right: 5px;
@@ -1057,10 +1083,9 @@ component PartItem inherits Rectangle {
                 // Fast joins with cuts: the chip is struck through.
                 Rectangle { y: parent.height / 2; height: 1px; background: Theme.text-dim; visible: root.entry.off; }
                 chip-touch := TouchArea {
-                    mouse-cursor: root.entry.off ? default : pointer;
-                    clicked => {
-                        if !root.entry.off { root.chip-clicked(chip.absolute-position.y + chip.height, chip.absolute-position.y); }
-                    }
+                    // In Fast too: a transition picked there switches the method to Precise.
+                    mouse-cursor: pointer;
+                    clicked => { root.chip-clicked(chip.absolute-position.y + chip.height, chip.absolute-position.y); }
                 }
             }
         }
@@ -1145,25 +1170,94 @@ component Segment inherits Rectangle {
     touch := TouchArea { clicked => { root.clicked(); } }
 }
 
+// The Collection's footer: the sum, at most one note, then Export Merged (the gradient: the output being built)
+// and Export As…. Below the scrolling Clip page; on a page too short for it, at the end of the page instead.
+component MergeFooter inherits Rectangle {
+    in property <string> note;
+    in property <bool> can-merge;
+    in property <bool> narrow;
+    background: Theme.bg-bar;
+    Rectangle { y: 0px; height: 1px; background: Theme.line; }
+    VerticalLayout {
+        padding: 10px;
+        padding-top: 7px;
+        padding-bottom: 8px;
+        spacing: 5px;
+        HorizontalLayout {
+            spacing: 6px;
+            Line {
+                color: Theme.text;
+                // TRANSLATORS: {} is the Collection's total length ("1:02.2").
+                text: ClipBridge.collection-info.count == 1 ? @tr("1 part · {}", ClipBridge.collection-info.total)
+                    // TRANSLATORS: {0} is a number of parts (2 or more), {1} their total length ("1:02.2").
+                    : @tr("{0} parts · {1}", ClipBridge.collection-info.count, ClipBridge.collection-info.total);
+            }
+            Text {
+                text: Words.method(ClipBridge.collection-method-index == 0 ? "fast" : "precise")
+                    + (ClipBridge.collection-info.transitions == 0 ? ""
+                        : " · " + (ClipBridge.collection-info.off ? @tr("transitions off in Fast")
+                            // TRANSLATORS: {} is the seconds the transition takes off the length ("1.0").
+                            : ClipBridge.collection-info.transitions == 1 ? @tr("1 transition −{} s", ClipBridge.collection-info.saved)
+                            // TRANSLATORS: {0} is a number of transitions (2 or more), {1} the seconds they take off ("2.5").
+                            : @tr("{0} transitions −{1} s", ClipBridge.collection-info.transitions, ClipBridge.collection-info.saved)));
+                color: Theme.text-dim;
+                font-size: Theme.font-body;
+                horizontal-alignment: right;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+        }
+        // At most one note: what blocks the export (red), why Fast cannot join the parts, that a transition
+        // switched to Precise, or that Fast joins with cuts.
+        if root.note != "": Line {
+            color: ClipBridge.blocking.shown ? Theme.danger : Theme.text-dim;
+            text: root.note;
+        }
+        HorizontalLayout {
+            spacing: 4px;
+            Action {
+                horizontal-stretch: 1;
+                min-height: Theme.button-primary-height;
+                primary: true;
+                text: @tr("Export Merged");
+                glyph: Glyphs.film;
+                key: ClipBridge.keys.merge;
+                show-key: !root.narrow;
+                enabled: root.can-merge;
+                tip: ClipBridge.queue-full ? Words.reason("queueFull", "") : @tr("Export the parts as one file into the clip folder");
+                tip-keys: [{ key: ClipBridge.keys.merge, text: "" }];
+                clicked => { ClipBridge.export-merged(); }
+            }
+            Action {
+                min-height: Theme.button-primary-height;
+                text: @tr("Export As…");
+                enabled: root.can-merge;
+                tip: @tr("Export the parts as one file you choose");
+                clicked => { ClipBridge.export-merged-as(); }
+            }
+        }
+    }
+}
+
+// The Range card: an inset panel with an accent edge on the left.
+component RangeCard inherits Rectangle {
+    background: Theme.bg-list;
+    border-width: 1px;
+    border-color: Theme.line;
+    border-radius: Theme.radius-control;
+    clip: true;
+    Rectangle { x: 0px; width: 3px; background: Theme.accent-fill; }
+    VerticalLayout {
+        padding: 8px;
+        padding-left: 11px;
+        @children
+    }
+}
+
 export component ClipExportTab inherits Rectangle {
     background: Theme.bg-panel;
     // The width classes: narrow < 317 px (key caps move to the tooltips).
     private property <bool> narrow: root.width < 317px;
-    // The Collection's Start / End row: two 80 px fields, "–" and four 3 px gaps, and the two buttons
-    // (8 + 8 px padding, a 14 px glyph, 5 px gaps, the label, the key cap). Measured on the labels in the
-    // user's language: labels where they fit, key caps where those fit too, else the glyphs alone (the
-    // label and key stay in the tooltips). The page has 8 px padding on each side.
-    private property <length> marks-room: root.width - 16px;
-    private property <length> marks-fields: 2 * 80px + 6px + 4 * 3px;
-    private property <length> marks-labels-need: 2 * (8px + 8px + 14px + 5px) + start-label.preferred-width + end-label.preferred-width;
-    private property <length> marks-caps-need: (ClipBridge.keys.start != "" ? 5px + start-cap.width : 0px) + (ClipBridge.keys.end != "" ? 5px + end-cap.width : 0px);
-    private property <bool> marks-labels: root.marks-fields + root.marks-labels-need <= root.marks-room;
-    private property <bool> marks-caps: !root.narrow && root.marks-labels && root.marks-fields + root.marks-labels-need + root.marks-caps-need <= root.marks-room;
-    // Measured only (outside every layout, never shown): the labels and key caps of Start and End as the row shows them.
-    start-label := Text { visible: false; text: @tr("Start"); font-size: Theme.font-body; }
-    end-label := Text { visible: false; text: @tr("End"); font-size: Theme.font-body; }
-    start-cap := KeyHint { visible: false; text: ClipBridge.keys.start; }
-    end-cap := KeyHint { visible: false; text: ClipBridge.keys.end; }
     private property <bool> fast: ClipBridge.support.fast && ClipBridge.method-index == 0;
     // What the ⓘ beside Fast / Precise explains: the method, and where this clip will start.
     private property <string> method-tip: root.fast
@@ -1190,15 +1284,29 @@ export component ClipExportTab inherits Rectangle {
     // A clip's problem worth a line on the Clip page (a started or finished export shows in Results instead).
     private property <bool> clip-problem: ClipBridge.clip-status.kind == "error" || ClipBridge.clip-status.kind == "clip-failed" || ClipBridge.clip-status.kind == "no-destination";
 
-    // The Collection: Fast can write the parts (or no check answered yet), what a problem line says.
-    private property <bool> merge-fast-ok: !ClipBridge.copy.checked || ClipBridge.copy.ok;
-    private property <bool> merge-fast: ClipBridge.support.fast && ClipBridge.collection-method-index == 0;
+    // The Collection: what can be merged, and what the footer's one note says.
+    // The footer stays below the page when the tab is tall enough to leave the list its three rows beside it.
+    private property <bool> footer-fixed: root.height >= 360px;
     private property <bool> can-merge: ClipBridge.collection-info.count > 0 && !ClipBridge.blocking.shown && !ClipBridge.collection-busy && !ClipBridge.queue-full;
     // "Fast: part 2 is 1920×818, part 1 is 3840×1714".
     private property <string> fast-why: ClipBridge.copy.checked && !ClipBridge.copy.ok && ClipBridge.copy.part != ""
         // TRANSLATORS: {0} is a part number; {1} and {2} are what differs (a size, a codec, a frame rate) in that part and in part 1.
         ? @tr("Fast: part {0} is {1}, part 1 is {2}", ClipBridge.copy.part, Words.copy-value(ClipBridge.copy.field, ClipBridge.copy.value), Words.copy-value(ClipBridge.copy.field, ClipBridge.copy.expected))
         : "";
+    // The footer's one note, the first that applies: what blocks the export, why Fast cannot join the parts (when Fast
+    // is chosen), that a transition switched to Precise, that Fast joins with cuts.
+    private property <string> merge-note: ClipBridge.blocking.shown ? Words.blocking(ClipBridge.blocking.problem, ClipBridge.blocking.part)
+        : ClipBridge.support.fast && ClipBridge.method-index == 0 && root.fast-why != "" ? root.fast-why
+        : ClipBridge.collection-info.switched ? @tr("Switched to Precise: transitions need re-encoding.")
+        : ClipBridge.collection-info.off ? @tr("Transitions: Precise only. Fast joins with cuts.")
+        : "";
+    // The ⓘ tip's second part while the Collection has parts: how the method applies to the merge.
+    private property <string> merge-tip: @tr("Fast copies the streams: only when every part has the same codecs, size, frame rate and audio.")
+        + " " + (root.fast-why != "" ? root.fast-why + ". " : "")
+        + (ClipBridge.target.shown
+            // TRANSLATORS: {0} is a size in pixels (3840×1714), {1} frames per second.
+            ? @tr("Precise re-encodes every part to {0} · {1} fps like part 1: other sizes get black bars, audio is resampled to 48 kHz stereo. Quality: the Clip page's Advanced.", ClipBridge.target.size, ClipBridge.target.fps)
+            : @tr("Precise re-encodes every part to the first part's size and frame rate: other sizes get black bars, audio is resampled to 48 kHz stereo. Quality: the Clip page's Advanced."));
     // The drag of a Collection row: from which index to which (-1: none).
     private property <int> drag-from: -1;
     private property <int> drag-to: -1;
@@ -1215,8 +1323,23 @@ export component ClipExportTab inherits Rectangle {
         let below = bottom - root.absolute-position.y + 2px;
         root.picker-y = below + root.picker-height <= root.height ? below : max(0px, top - root.absolute-position.y - root.picker-height - 2px);
         root.picker-lit = -1;
+        // The popup shows when the plugin has opened this junction (`picker.serial` changes), never before.
         ClipBridge.open-join(id);
-        picker-popup.show();
+    }
+    private property <int> picker-serial: ClipBridge.picker.serial;
+    private property <bool> picker-shown: ClipBridge.picker.shown;
+    changed picker-serial => {
+        if ClipBridge.picker.shown { picker-popup.show(); }
+    }
+    // Closed by the plugin (Esc, its junction removed or moved last, the page left): the popup goes too.
+    changed picker-shown => {
+        if !self.picker-shown { picker-popup.close(); }
+    }
+    // Show Collection: the list focused and scrolled into view.
+    private property <int> list-request: ClipBridge.list-focus;
+    changed list-request => {
+        clip-page.viewport-y = max(clip-page.height - clip-content.height, -(clip-top.y + collection-head.y));
+        if ClipBridge.collection-info.count > 0 { list-focus.focus(); }
     }
     function pick(kind: string) { ClipBridge.set-transition(ClipBridge.picker.id, kind, ClipBridge.picker.dir, ClipBridge.picker.duration); }
     function show-page(index: int) {
@@ -1342,10 +1465,8 @@ export component ClipExportTab inherits Rectangle {
             HorizontalLayout {
                 strip := Tabs {
                     horizontal-stretch: 1;
-                    // TRANSLATORS: {} is the number of parts in the Collection.
-                    model: [@tr("Clip"), ClipBridge.collection-info.count > 0 ? @tr("Collection {}", ClipBridge.collection-info.count) : @tr("Collection"),
-                        ClipBridge.unseen > 0 ? @tr("Results ({})", ClipBridge.unseen) : @tr("Results"), @tr("Settings")];
-                    emphasis: [false, false, ClipBridge.unseen > 0, false];
+                    model: [@tr("Clip"), ClipBridge.unseen > 0 ? @tr("Results ({})", ClipBridge.unseen) : @tr("Results"), @tr("Settings")];
+                    emphasis: [false, ClipBridge.unseen > 0, false];
                     current-index <=> ClipBridge.page;
                     selected(index) => { root.show-page(index); }
                 }
@@ -1370,532 +1491,433 @@ export component ClipExportTab inherits Rectangle {
         Rectangle {
             vertical-stretch: 1;
 
-            // ---------------------------------------------------------------- Clip
-            clip-page := ScrollView {
+            // ---------------------------------------------------------------- Clip: Output, Range, Collection
+            // One page (design clipexport-v2 B): the method and its Advanced rows apply to the clip and to the merge;
+            // the Range card exports one clip; the Collection adds that range with + Add. Above the footer the page
+            // scrolls as a whole; the list fills the room left (at least three rows) and scrolls in its ListView (a
+            // wheel at its end goes on to the page). The footer stays below while the Collection has parts.
+            VerticalLayout {
                 visible: ClipBridge.page == 0;
-                viewport-width: clip-content.width;
-                viewport-height: clip-content.preferred-height;
-                clip-content := VerticalLayout {
-                    width: clip-page.width - 12px;
-                    padding: 10px;
-                    padding-right: 4px;
-                    spacing: 6px;
-                    alignment: start;
-                    // The running export (Results has its row too).
-                    if ClipBridge.card.shown: ProgressCard { card: ClipBridge.card; }
-                    if !ClipBridge.can-clip: VerticalLayout {
-                        spacing: 4px;
+                clip-page := ScrollView {
+                    vertical-stretch: 1;
+                    viewport-width: clip-content.width;
+                    viewport-height: clip-content.height;
+                    clip-content := VerticalLayout {
+                        width: clip-page.width - 12px;
+                        // At least the page's height: the list takes what the rows above leave.
+                        height: max(self.preferred-height, clip-page.height);
+                        padding: 10px;
                         padding-top: 6px;
-                        Line {
-                            align: center;
-                            color: Theme.text;
-                            text: ClipBridge.mode == "stream" ? @tr("This picture is made by a plugin")
-                                : ClipBridge.mode == "network" ? Words.reason("needLocal", "") : @tr("Nothing to export");
-                        }
-                        Line {
-                            align: center;
-                            text: ClipBridge.mode == "stream" ? @tr("There is no file to cut.")
-                                : ClipBridge.mode == "network" ? @tr("Open a local file to cut clips.")
-                                : @tr("Open a local video file to cut clips.");
-                        }
-                    }
-                    if ClipBridge.can-clip: VerticalLayout {
+                        padding-right: 4px;
                         spacing: 6px;
-                        // Fast / Precise, and what they mean in the ⓘ tip.
-                        HorizontalLayout {
-                            spacing: 2px;
-                            if ClipBridge.support.fast: MethodChoice {
-                                horizontal-stretch: 1;
-                                glyph: Glyphs.fast;
-                                title: @tr("Fast");
-                                detail: root.narrow ? @tr("lossless") : @tr("no re-encode · lossless");
-                                selected: ClipBridge.method-index == 0;
-                                clicked => { ClipBridge.method-index = 0; ClipBridge.set-method(0); }
-                            }
-                            if ClipBridge.support.fast: MethodChoice {
-                                horizontal-stretch: 1;
-                                glyph: Glyphs.precise;
-                                title: @tr("Precise");
-                                detail: root.narrow ? @tr("re-encode") : @tr("re-encode · any frame");
-                                selected: ClipBridge.method-index == 1;
-                                clicked => { ClipBridge.method-index = 1; ClipBridge.set-method(1); }
-                            }
-                            VerticalLayout {
-                                alignment: center;
-                                ToolTipArea {
-                                    width: 18px;
-                                    height: 18px;
-                                    text: root.method-tip;
-                                    Glyph { x: 2px; y: 3px; glyph: Glyphs.info; }
-                                }
-                            }
-                        }
-                        HorizontalLayout {
-                            spacing: 4px;
-                            Label { text: @tr("Start"); }
-                            Field {
-                                font-family: Theme.font-mono;
-                                // No range until Start and End are set: the hint is the format, not a time that could be read as one.
-                                placeholder-text: "-:--.---";
-                                text <=> ClipBridge.clip-start;
-                                edited => { ClipBridge.clip-edited(ClipBridge.clip-start, ClipBridge.clip-end); }
-                                accepted => { root.clip-export(); }
-                            }
-                            Action {
-                                text: @tr("Now");
-                                glyph: Glyphs.target;
-                                key: ClipBridge.keys.start;
-                                show-key: !root.narrow;
-                                tip: @tr("Set Clip Start");
-                                tip-keys: [{ key: ClipBridge.keys.start, text: "" }];
-                                clicked => { ClipBridge.clip-now("start"); }
-                            }
-                        }
-                        HorizontalLayout {
-                            spacing: 4px;
-                            Label { text: @tr("End"); }
-                            Field {
-                                font-family: Theme.font-mono;
-                                placeholder-text: "-:--.---";
-                                text <=> ClipBridge.clip-end;
-                                edited => { ClipBridge.clip-edited(ClipBridge.clip-start, ClipBridge.clip-end); }
-                                accepted => { root.clip-export(); }
-                            }
-                            Action {
-                                text: @tr("Now");
-                                glyph: Glyphs.target;
-                                key: ClipBridge.keys.end;
-                                show-key: !root.narrow;
-                                tip: @tr("Set Clip End");
-                                tip-keys: [{ key: ClipBridge.keys.end, text: "" }];
-                                clicked => { ClipBridge.clip-now("end"); }
-                            }
-                        }
-                        // A typing problem: one line that is always there, empty without one.
-                        Line { color: Theme.danger; text: ClipBridge.field-error == "" ? "" : Words.reason(ClipBridge.field-error, ""); }
-                        HorizontalLayout {
-                            spacing: 4px;
-                            Action {
-                                text: @tr("Use A-B range");
-                                glyph: Glyphs.ab;
-                                enabled: ClipBridge.ab.shown;
-                                tip: ClipBridge.ab.shown ? @tr("Copy the A-B loop into Start and End") : Words.reason("noLoop", "");
-                                // TRANSLATORS: {0} and {1} are the A and B times of the loop.
-                                tip-detail: ClipBridge.ab.shown ? @tr("A {0} · B {1}", ClipBridge.ab.a, ClipBridge.ab.b) : "";
-                                clicked => { ClipBridge.use-ab(); }
-                            }
-                            Rectangle { horizontal-stretch: 1; }
-                            Action {
-                                // TRANSLATORS: {} is 10, 30, 60 or 120.
-                                text: @tr("Last {} s", ClipBridge.last-seconds);
-                                glyph: Glyphs.back;
-                                key: ClipBridge.keys.last;
-                                show-key: !root.narrow;
-                                enabled: ClipBridge.can-last && !ClipBridge.queue-full;
-                                // TRANSLATORS: {} is 10, 30, 60 or 120.
-                                tip: @tr("Export Last {} Seconds", ClipBridge.last-seconds);
-                                tip-keys: [{ key: ClipBridge.keys.last, text: "" }];
-                                clicked => { ClipBridge.last(); }
-                            }
-                        }
-                        // The small timeline: the keyframe a Fast cut starts on is marked, with its time.
-                        if ClipBridge.timeline.shown: MiniTimeline {
-                            line: ClipBridge.timeline;
-                            start: ClipBridge.note.start;
-                            early: ClipBridge.note.early;
-                            end: ClipBridge.note.end;
-                        }
-                        Fold {
-                            title: @tr("Advanced");
-                            open: ClipBridge.advanced-open;
-                            // TRANSLATORS: what the closed Advanced rows hold now: an audio choice and a quality.
-                            summary: @tr("{0} · {1}", ClipBridge.audio-labels[ClipBridge.audio-index],
-                                root.fast ? @tr("Same as source (stream copy)") : ClipBridge.support.encode ? Words.preset(ClipBridge.preset-index == 0 ? "source" : ClipBridge.preset-index == 1 ? "high" : ClipBridge.preset-index == 2 ? "small" : "custom") : @tr("High quality"));
-                            toggled(open) => {
-                                ClipBridge.advanced-open = open;
-                                ClipBridge.set-advanced-open(open);
-                            }
-                        }
-                        if ClipBridge.advanced-open: VerticalLayout {
-                            padding-left: 12px;
-                            spacing: 5px;
+                        clip-top := VerticalLayout {
+                            vertical-stretch: 0;
+                            spacing: 6px;
+                            // The running export (Results has its row too).
+                            if ClipBridge.card.shown: ProgressCard { card: ClipBridge.card; }
+                            // ---- Output: Fast | Precise (what they mean in the ⓘ tip), Advanced folded.
                             HorizontalLayout {
                                 spacing: 4px;
-                                Label { width: 64px; text: @tr("Audio"); }
-                                Choice {
-                                    model: ClipBridge.audio-labels;
-                                    current-index <=> ClipBridge.audio-index;
-                                    selected(index) => { ClipBridge.set-audio(index); }
+                                if ClipBridge.support.fast: MethodSwitch {
+                                    horizontal-stretch: 1;
+                                    index: ClipBridge.method-index;
+                                    picked(index) => { ClipBridge.method-index = index; ClipBridge.set-method(index); }
+                                }
+                                if !ClipBridge.support.fast: Rectangle { horizontal-stretch: 1; }
+                                VerticalLayout {
+                                    alignment: center;
+                                    ToolTipArea {
+                                        width: 18px;
+                                        height: 18px;
+                                        text: root.method-tip;
+                                        detail: ClipBridge.collection-info.count == 0 ? "" : root.merge-tip;
+                                        Glyph { x: 2px; y: 3px; glyph: Glyphs.info; }
+                                    }
                                 }
                             }
-                            HorizontalLayout {
-                                spacing: 4px;
-                                Label { width: 64px; text: @tr("Quality"); }
-                                if root.fast: Line { text: @tr("Same as source (stream copy)"); }
-                                if !root.fast && ClipBridge.support.encode: Choice {
-                                    model: ClipBridge.preset-index == 3
-                                        ? [@tr("Same as source"), @tr("High quality"), @tr("Small file"), @tr("Custom")]
-                                        : [@tr("Same as source"), @tr("High quality"), @tr("Small file")];
-                                    current-index <=> ClipBridge.preset-index;
-                                    selected(index) => { ClipBridge.set-preset(index); }
+                            Fold {
+                                title: @tr("Advanced");
+                                open: ClipBridge.advanced-open;
+                                // TRANSLATORS: what the closed Advanced rows hold now: an audio choice and a quality.
+                                summary: @tr("{0} · {1}", ClipBridge.audio-labels[ClipBridge.audio-index],
+                                    root.fast ? @tr("Same as source (stream copy)") : ClipBridge.support.encode ? Words.preset(ClipBridge.preset-index == 0 ? "source" : ClipBridge.preset-index == 1 ? "high" : ClipBridge.preset-index == 2 ? "small" : "custom") : @tr("High quality"));
+                                toggled(open) => {
+                                    ClipBridge.advanced-open = open;
+                                    ClipBridge.set-advanced-open(open);
                                 }
-                                if !root.fast && !ClipBridge.support.encode: Line { text: @tr("High quality (H.264 + AAC in MP4)"); }
                             }
-                            if !root.fast && ClipBridge.support.encode: VerticalLayout {
+                            if ClipBridge.advanced-open: VerticalLayout {
+                                padding-left: 12px;
                                 spacing: 5px;
                                 HorizontalLayout {
                                     spacing: 4px;
-                                    Label { width: 64px; text: @tr("Resolution"); }
-                                    Choice {
-                                        model: [@tr("Source"), "1080p", "720p", "480p"];
-                                        current-index <=> ClipBridge.enc-height;
-                                        selected(index) => { ClipBridge.set-encode("height", index); }
-                                    }
-                                }
-                                HorizontalLayout {
-                                    spacing: 4px;
-                                    Label { width: 64px; text: @tr("Frame rate"); }
-                                    // TRANSLATORS: {} is frames per second.
-                                    Choice {
-                                        model: [@tr("Source"), @tr("{} fps", 60), @tr("{} fps", 30)];
-                                        current-index <=> ClipBridge.enc-fps;
-                                        selected(index) => { ClipBridge.set-encode("fps", index); }
-                                    }
-                                }
-                                HorizontalLayout {
-                                    spacing: 4px;
-                                    Label { width: 64px; text: ClipBridge.enc-source ? @tr("Source bitrate") : @tr("Quality number {}", round(ClipBridge.enc-crf)); }
-                                    Slider {
-                                        minimum: 14;
-                                        maximum: 30;
-                                        step: 1;
-                                        value <=> ClipBridge.enc-crf;
-                                        released(v) => { ClipBridge.set-encode("crf", round(v)); }
-                                    }
-                                }
-                                HorizontalLayout {
-                                    spacing: 4px;
-                                    Label { width: 64px; text: @tr("Speed"); }
-                                    RadioGroup {
-                                        model: [@tr("Faster"), @tr("Balanced"), @tr("Smaller")];
-                                        current-index <=> ClipBridge.enc-speed;
-                                        selected(index) => { ClipBridge.set-encode("speed", index); }
-                                    }
-                                }
-                                HorizontalLayout {
-                                    spacing: 4px;
                                     Label { width: 64px; text: @tr("Audio"); }
-                                    // TRANSLATORS: {} is the audio bit rate in kilobits per second.
                                     Choice {
-                                        model: [@tr("AAC {} kb/s", 128), @tr("AAC {} kb/s", 192), @tr("AAC {} kb/s", 256)];
-                                        current-index <=> ClipBridge.enc-audio;
-                                        selected(index) => { ClipBridge.set-encode("audio", index); }
+                                        model: ClipBridge.audio-labels;
+                                        current-index <=> ClipBridge.audio-index;
+                                        selected(index) => { ClipBridge.set-audio(index); }
                                     }
                                 }
                                 HorizontalLayout {
-                                    alignment: start;
+                                    spacing: 4px;
+                                    Label { width: 64px; text: @tr("Quality"); }
+                                    if root.fast: Line { text: @tr("Same as source (stream copy)"); }
+                                    if !root.fast && ClipBridge.support.encode: Choice {
+                                        model: ClipBridge.preset-index == 3
+                                            ? [@tr("Same as source"), @tr("High quality"), @tr("Small file"), @tr("Custom")]
+                                            : [@tr("Same as source"), @tr("High quality"), @tr("Small file")];
+                                        current-index <=> ClipBridge.preset-index;
+                                        selected(index) => { ClipBridge.set-preset(index); }
+                                    }
+                                    if !root.fast && !ClipBridge.support.encode: Line { text: @tr("High quality (H.264 + AAC in MP4)"); }
+                                }
+                                if !root.fast && ClipBridge.support.encode: VerticalLayout {
+                                    spacing: 5px;
+                                    HorizontalLayout {
+                                        spacing: 4px;
+                                        Label { width: 64px; text: @tr("Resolution"); }
+                                        Choice {
+                                            model: [@tr("Source"), "1080p", "720p", "480p"];
+                                            current-index <=> ClipBridge.enc-height;
+                                            selected(index) => { ClipBridge.set-encode("height", index); }
+                                        }
+                                    }
+                                    HorizontalLayout {
+                                        spacing: 4px;
+                                        Label { width: 64px; text: @tr("Frame rate"); }
+                                        // TRANSLATORS: {} is frames per second.
+                                        Choice {
+                                            model: [@tr("Source"), @tr("{} fps", 60), @tr("{} fps", 30)];
+                                            current-index <=> ClipBridge.enc-fps;
+                                            selected(index) => { ClipBridge.set-encode("fps", index); }
+                                        }
+                                    }
+                                    HorizontalLayout {
+                                        spacing: 4px;
+                                        Label { width: 64px; text: ClipBridge.enc-source ? @tr("Source bitrate") : @tr("Quality number {}", round(ClipBridge.enc-crf)); }
+                                        Slider {
+                                            minimum: 14;
+                                            maximum: 30;
+                                            step: 1;
+                                            value <=> ClipBridge.enc-crf;
+                                            released(v) => { ClipBridge.set-encode("crf", round(v)); }
+                                        }
+                                    }
+                                    HorizontalLayout {
+                                        spacing: 4px;
+                                        Label { width: 64px; text: @tr("Speed"); }
+                                        RadioGroup {
+                                            model: [@tr("Faster"), @tr("Balanced"), @tr("Smaller")];
+                                            current-index <=> ClipBridge.enc-speed;
+                                            selected(index) => { ClipBridge.set-encode("speed", index); }
+                                        }
+                                    }
+                                    HorizontalLayout {
+                                        spacing: 4px;
+                                        Label { width: 64px; text: @tr("Audio"); }
+                                        // TRANSLATORS: {} is the audio bit rate in kilobits per second.
+                                        Choice {
+                                            model: [@tr("AAC {} kb/s", 128), @tr("AAC {} kb/s", 192), @tr("AAC {} kb/s", 256)];
+                                            current-index <=> ClipBridge.enc-audio;
+                                            selected(index) => { ClipBridge.set-encode("audio", index); }
+                                        }
+                                    }
+                                    HorizontalLayout {
+                                        alignment: start;
+                                        Button {
+                                            small: true;
+                                            text: @tr("Reset");
+                                            clicked => { ClipBridge.reset-encode(); }
+                                        }
+                                    }
+                                }
+                                Check {
+                                    text: @tr("Include video effects");
+                                    checked <=> ClipBridge.processed;
+                                    enabled: !root.fast;
+                                    toggled(on) => { ClipBridge.set-processed(on); }
+                                }
+                                Check {
+                                    text: @tr("Burn in subtitles");
+                                    checked <=> ClipBridge.burn;
+                                    enabled: !root.fast && ClipBridge.processed;
+                                    toggled(on) => { ClipBridge.set-burn(on); }
+                                }
+                                if root.fast: Line { text: @tr("Effects and subtitles: Precise only"); }
+                            }
+
+                            // ---- Range: the old Clip page in a card with an accent edge; one click exports it.
+                            HorizontalLayout {
+                                Heading { horizontal-stretch: 1; text: @tr("Range"); }
+                                if ClipBridge.add-from.length != "": Text {
+                                    // TRANSLATORS: {} is a clip's length in seconds ("3.5").
+                                    text: @tr("{} s", ClipBridge.add-from.length);
+                                    color: Theme.text-dim;
+                                    font-family: Theme.font-mono;
+                                    font-size: Theme.font-xs;
+                                    vertical-alignment: bottom;
+                                }
+                            }
+                            RangeCard {
+                                if !ClipBridge.can-clip: VerticalLayout {
+                                    spacing: 4px;
+                                    padding-top: 2px;
+                                    padding-bottom: 2px;
+                                    Line {
+                                        align: center;
+                                        color: Theme.text;
+                                        text: ClipBridge.mode == "stream" ? @tr("This picture is made by a plugin")
+                                            : ClipBridge.mode == "network" ? Words.reason("needLocal", "") : @tr("Nothing to export");
+                                    }
+                                    Line {
+                                        align: center;
+                                        text: ClipBridge.mode == "stream" ? @tr("There is no file to cut.")
+                                            : ClipBridge.mode == "network" ? @tr("Open a local file to cut clips.")
+                                            : @tr("Open a local video file to cut clips.");
+                                    }
+                                }
+                                if ClipBridge.can-clip: VerticalLayout {
+                                    spacing: 6px;
+                                    // The file playing and its duration.
+                                    if ClipBridge.add-from.name != "": HorizontalLayout {
+                                        spacing: 5px;
+                                        VerticalLayout { alignment: center; Glyph { glyph: Glyphs.film; } }
+                                        Line { text: ClipBridge.add-from.name; color: Theme.text; }
+                                        Text { text: ClipBridge.add-from.duration; color: Theme.text-dim; font-family: Theme.font-mono; font-size: Theme.font-xs; vertical-alignment: center; }
+                                    }
+                                    HorizontalLayout {
+                                        spacing: 4px;
+                                        Label { text: @tr("Start"); }
+                                        Field {
+                                            font-family: Theme.font-mono;
+                                            // No range until Start and End are set: the hint is the format, not a time that could be read as one.
+                                            placeholder-text: "-:--.---";
+                                            text <=> ClipBridge.clip-start;
+                                            edited => { ClipBridge.clip-edited(ClipBridge.clip-start, ClipBridge.clip-end); }
+                                            accepted => { root.clip-export(); }
+                                        }
+                                        Action {
+                                            text: @tr("Now");
+                                            glyph: Glyphs.target;
+                                            key: ClipBridge.keys.start;
+                                            show-key: !root.narrow;
+                                            tip: @tr("Set Clip Start");
+                                            tip-keys: [{ key: ClipBridge.keys.start, text: "" }];
+                                            clicked => { ClipBridge.clip-now("start"); }
+                                        }
+                                    }
+                                    HorizontalLayout {
+                                        spacing: 4px;
+                                        Label { text: @tr("End"); }
+                                        Field {
+                                            font-family: Theme.font-mono;
+                                            placeholder-text: "-:--.---";
+                                            text <=> ClipBridge.clip-end;
+                                            edited => { ClipBridge.clip-edited(ClipBridge.clip-start, ClipBridge.clip-end); }
+                                            accepted => { root.clip-export(); }
+                                        }
+                                        Action {
+                                            text: @tr("Now");
+                                            glyph: Glyphs.target;
+                                            key: ClipBridge.keys.end;
+                                            show-key: !root.narrow;
+                                            tip: @tr("Set Clip End");
+                                            tip-keys: [{ key: ClipBridge.keys.end, text: "" }];
+                                            clicked => { ClipBridge.clip-now("end"); }
+                                        }
+                                    }
+                                    // A typing problem: one line while there is one.
+                                    if ClipBridge.field-error != "": Line { color: Theme.danger; text: Words.reason(ClipBridge.field-error, ""); }
+                                    // The small timeline: the keyframe a Fast cut starts on is marked, with its time.
+                                    if ClipBridge.timeline.shown: MiniTimeline {
+                                        line: ClipBridge.timeline;
+                                        start: ClipBridge.note.start;
+                                        early: ClipBridge.note.early;
+                                        end: ClipBridge.note.end;
+                                    }
+                                    HorizontalLayout {
+                                        spacing: 4px;
+                                        Action {
+                                            text: @tr("Use A-B range");
+                                            glyph: Glyphs.ab;
+                                            enabled: ClipBridge.ab.shown;
+                                            tip: ClipBridge.ab.shown ? @tr("Copy the A-B loop into Start and End") : Words.reason("noLoop", "");
+                                            // TRANSLATORS: {0} and {1} are the A and B times of the loop.
+                                            tip-detail: ClipBridge.ab.shown ? @tr("A {0} · B {1}", ClipBridge.ab.a, ClipBridge.ab.b) : "";
+                                            clicked => { ClipBridge.use-ab(); }
+                                        }
+                                        Rectangle { horizontal-stretch: 1; }
+                                        Action {
+                                            // TRANSLATORS: {} is 10, 30, 60 or 120.
+                                            text: @tr("Last {} s", ClipBridge.last-seconds);
+                                            glyph: Glyphs.back;
+                                            key: ClipBridge.keys.last;
+                                            show-key: !root.narrow;
+                                            enabled: ClipBridge.can-last && !ClipBridge.queue-full;
+                                            // TRANSLATORS: {} is 10, 30, 60 or 120.
+                                            tip: @tr("Export Last {} Seconds", ClipBridge.last-seconds);
+                                            tip-keys: [{ key: ClipBridge.keys.last, text: "" }];
+                                            clicked => { ClipBridge.last(); }
+                                        }
+                                    }
+                                    Rectangle { height: 1px; background: Theme.line; }
+                                    // The gradient goes to the output being built: Export Clip while the Collection is empty.
+                                    HorizontalLayout {
+                                        spacing: 4px;
+                                        Action {
+                                            horizontal-stretch: 1;
+                                            primary: ClipBridge.collection-info.count == 0;
+                                            text: @tr("Export Clip");
+                                            glyph: Glyphs.film;
+                                            key: ClipBridge.keys.clip;
+                                            show-key: !root.narrow;
+                                            enabled: !ClipBridge.clip-busy && !ClipBridge.queue-full && ClipBridge.field-error == "";
+                                            // TRANSLATORS: {} is the clip's file name.
+                                            tip: ClipBridge.queue-full ? Words.reason("queueFull", "")
+                                                : ClipBridge.clip-name != "" ? @tr("Export as {} into the clip folder", ClipBridge.clip-name)
+                                                : @tr("Export the range into the clip folder");
+                                            tip-keys: [{ key: ClipBridge.keys.clip, text: "" }];
+                                            tip-detail: root.estimate-text;
+                                            clicked => { root.clip-export(); }
+                                        }
+                                        Action {
+                                            text: @tr("Export As…");
+                                            enabled: !ClipBridge.clip-busy && !ClipBridge.queue-full && ClipBridge.field-error == "";
+                                            tip: @tr("Export the range into a file you choose");
+                                            clicked => { ClipBridge.export-as(ClipBridge.clip-start, ClipBridge.clip-end); }
+                                        }
+                                    }
+                                    // A problem of the last export: one line (the full text in its tip); a finished export shows in Results.
+                                    if root.clip-problem: HorizontalLayout {
+                                        spacing: 4px;
+                                        Line {
+                                            horizontal-stretch: 1;
+                                            color: Theme.danger;
+                                            text: Words.status(ClipBridge.clip-status);
+                                        }
+                                        if root.fast && ClipBridge.clip-status.reason == "fastImpossible": Action {
+                                            text: @tr("Use Precise");
+                                            glyph: Glyphs.precise;
+                                            clicked => {
+                                                ClipBridge.method-index = 1;
+                                                ClipBridge.set-method(1);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // ---- Collection: its count, + Add (the Range above as the last part) and Clear.
+                            collection-head := HorizontalLayout {
+                                spacing: 4px;
+                                Heading { horizontal-stretch: 0; text: @tr("Collection"); }
+                                if ClipBridge.collection-info.count > 0: Text {
+                                    horizontal-stretch: 0;
+                                    height: 24px;
+                                    text: ClipBridge.collection-info.count;
+                                    color: Theme.text-dim;
+                                    font-size: Theme.font-xs;
+                                    vertical-alignment: bottom;
+                                }
+                                Rectangle { horizontal-stretch: 1; }
+                                VerticalLayout {
+                                    alignment: end;
+                                    Action {
+                                        text: @tr("Add");
+                                        glyph: Glyphs.plus;
+                                        enabled: ClipBridge.add-from.can && ClipBridge.add-from.length != "" && !ClipBridge.add-from.full && !ClipBridge.collection-busy;
+                                        tip: ClipBridge.add-from.full ? Words.reason("collectionFull", "") : @tr("Add Range to Collection");
+                                        tip-keys: [{ key: ClipBridge.keys.add, text: "" }];
+                                        // TRANSLATORS: {} is the number the new part gets in the Collection.
+                                        tip-detail: ClipBridge.add-from.full ? "" : @tr("as part {}", ClipBridge.add-from.next);
+                                        clicked => { root.add-part(); }
+                                    }
+                                }
+                                if ClipBridge.collection-info.count > 0: VerticalLayout {
+                                    alignment: end;
                                     Button {
                                         small: true;
-                                        text: @tr("Reset");
-                                        clicked => { ClipBridge.reset-encode(); }
+                                        text: @tr("Clear");
+                                        clicked => { ClipBridge.clear-parts(); }
                                     }
                                 }
                             }
-                            Check {
-                                text: @tr("Include video effects");
-                                checked <=> ClipBridge.processed;
-                                enabled: !root.fast;
-                                toggled(on) => { ClipBridge.set-processed(on); }
-                            }
-                            Check {
-                                text: @tr("Burn in subtitles");
-                                checked <=> ClipBridge.burn;
-                                enabled: !root.fast && ClipBridge.processed;
-                                toggled(on) => { ClipBridge.set-burn(on); }
-                            }
-                            if root.fast: Line { text: @tr("Effects and subtitles: Precise only"); }
-                        }
-                        HorizontalLayout {
-                            spacing: 4px;
-                            Action {
-                                horizontal-stretch: 1;
-                                primary: true;
-                                text: @tr("Export");
-                                glyph: Glyphs.film;
-                                key: ClipBridge.keys.clip;
-                                show-key: !root.narrow;
-                                enabled: !ClipBridge.clip-busy && !ClipBridge.queue-full && ClipBridge.field-error == "";
-                                // TRANSLATORS: {} is the clip's file name.
-                                tip: ClipBridge.queue-full ? Words.reason("queueFull", "")
-                                    : ClipBridge.clip-name != "" ? @tr("Export as {} into the clip folder", ClipBridge.clip-name)
-                                    : @tr("Export the range into the clip folder");
-                                tip-keys: [{ key: ClipBridge.keys.clip, text: "" }];
-                                tip-detail: root.estimate-text;
-                                clicked => { root.clip-export(); }
-                            }
-                            Action {
-                                text: @tr("Export As…");
-                                enabled: !ClipBridge.clip-busy && !ClipBridge.queue-full && ClipBridge.field-error == "";
-                                tip: @tr("Export the range into a file you choose");
-                                clicked => { ClipBridge.export-as(ClipBridge.clip-start, ClipBridge.clip-end); }
-                            }
-                            // Add Range to Collection; the page stays on Clip.
-                            Action {
-                                text: @tr("Collection");
-                                glyph: Glyphs.plus;
-                                enabled: !ClipBridge.collection-busy && !ClipBridge.add-from.full && ClipBridge.field-error == "";
-                                tip: ClipBridge.add-from.full ? Words.reason("collectionFull", "") : @tr("Add Range to Collection");
-                                tip-keys: [{ key: ClipBridge.keys.add, text: "" }];
-                                // TRANSLATORS: {} is the number the new part gets in the Collection.
-                                tip-detail: ClipBridge.add-from.full ? "" : @tr("as part {}", ClipBridge.add-from.next);
-                                clicked => { root.add-part(); }
-                            }
-                        }
-                        // A problem of the last export: one line (the full text in its tip); a finished export shows in Results.
-                        HorizontalLayout {
-                            spacing: 4px;
-                            Line {
-                                horizontal-stretch: 1;
-                                color: Theme.danger;
-                                text: root.clip-problem ? Words.status(ClipBridge.clip-status) : "";
-                            }
-                            if root.fast && ClipBridge.clip-status.reason == "fastImpossible": Action {
-                                text: @tr("Use Precise");
-                                glyph: Glyphs.precise;
-                                clicked => {
-                                    ClipBridge.method-index = 1;
-                                    ClipBridge.set-method(1);
+                            // Empty: one hint stands in for the list.
+                            if ClipBridge.collection-info.count == 0: Rectangle {
+                                border-width: 1px;
+                                border-color: Theme.line;
+                                border-radius: Theme.radius-control;
+                                VerticalLayout {
+                                    padding: 8px;
+                                    spacing: 2px;
+                                    // Two lines, each one line tall (a wrapped Text is laid out one line tall).
+                                    Line { align: center; text: @tr("Join ranges from any local videos into one file:"); }
+                                    Line { align: center; text: @tr("set a range above, then + Add."); }
                                 }
                             }
+                        }
+                        // The list in an inset well; it has the keyboard focus after a click on a row: Delete removes the
+                        // selected part (a key of the panel's content), Esc cancels a drag or gives the keys back to the video.
+                        list-focus := FocusScope {
+                            vertical-stretch: ClipBridge.collection-info.count > 0 ? 1 : 0;
+                            min-height: ClipBridge.collection-info.count > 0 ? 3 * 63px + 2px : 0px;
+                            preferred-height: self.min-height;
+                            key-pressed(event) => {
+                                if event.text == Key.Escape {
+                                    if root.drag-from >= 0 { root.drag-from = -1; root.drag-to = -1; } else { VestraFocus.release(); }
+                                    return accept;
+                                }
+                                return reject;
+                            }
+                            if ClipBridge.collection-info.count > 0: Rectangle {
+                                background: Theme.bg-list;
+                                border-width: 1px;
+                                border-color: Theme.line;
+                                border-radius: Theme.radius-control;
+                                clip: true;
+                                // Slint's ListView: only the rows in view are built.
+                                ListView {
+                                    x: 1px;
+                                    y: 1px;
+                                    width: parent.width - 2px;
+                                    height: parent.height - 2px;
+                                    for row[i] in ClipBridge.parts: PartItem {
+                                        entry: row;
+                                        narrow: root.narrow;
+                                        dragging: root.drag-from == i && root.drag-to >= 0;
+                                        line-above: root.drag-from >= 0 && root.drag-to == i && root.drag-to < root.drag-from;
+                                        line-below: root.drag-from >= 0 && root.drag-to == i && root.drag-to > root.drag-from;
+                                        pressed => { list-focus.focus(); }
+                                        drag-moved(moved) => { root.drag-move(i, moved); }
+                                        drag-ended => { root.drag-end(); }
+                                        chip-clicked(bottom, top) => { root.open-picker(row.id, bottom, top); }
+                                    }
+                                }
+                            }
+                        }
+                        // The room below the empty Collection's hint.
+                        if ClipBridge.collection-info.count == 0: Rectangle { vertical-stretch: 1; }
+                        if ClipBridge.collection-info.count > 0 && !root.footer-fixed: MergeFooter {
+                            vertical-stretch: 0;
+                            note: root.merge-note;
+                            can-merge: root.can-merge;
+                            narrow: root.narrow;
                         }
                     }
                 }
-            }
-
-            // ---------------------------------------------------------------- Collection
-            // A ScrollView that never scrolls, as the other pages have one: its rows' widths (key caps shown or not
-            // by `narrow`) never decide the tab's width (no binding loop); the list scrolls in its ListView.
-            collection-page := ScrollView {
-                visible: ClipBridge.page == 1;
-                viewport-width: collection-content.width;
-                viewport-height: collection-content.height;
-                collection-content := VerticalLayout {
-                    width: collection-page.width;
-                    height: collection-page.height;
-                    padding: 8px;
-                    padding-top: 4px;
-                    spacing: 5px;
-                    // The running export, the same card as on the Clip page.
-                    if ClipBridge.card.shown: ProgressCard { card: ClipBridge.card; }
-                    // Add from: the file playing and the marks it shares with the Clip page.
-                    Heading { text: @tr("Add from"); }
-                    // The source playing; greyed when it cannot be added (a stream, a plugin's picture), with one line why.
-                    if ClipBridge.add-from.name != "": HorizontalLayout {
-                        spacing: 5px;
-                        VerticalLayout { alignment: center; Glyph { glyph: Glyphs.film; color: ClipBridge.add-from.can ? Theme.text-dim : Theme.icon-disabled; } }
-                        Line { text: ClipBridge.add-from.name; color: ClipBridge.add-from.can ? Theme.text : Theme.text-dim; }
-                        Text { text: ClipBridge.add-from.duration; color: Theme.text-dim; font-family: Theme.font-mono; font-size: Theme.font-xs; vertical-alignment: center; }
-                    }
-                    if !ClipBridge.add-from.can: Line {
-                        text: ClipBridge.mode == "stream" ? @tr("Only local files can be added: this picture is made by a plugin.")
-                            : ClipBridge.mode == "network" ? @tr("Only local files can be added: this video is a stream.")
-                            : @tr("Open a local video to add its ranges.");
-                    }
-                    HorizontalLayout {
-                        spacing: 3px;
-                        Action {
-                            text: @tr("Start");
-                            glyph: Glyphs.target;
-                            key: ClipBridge.keys.start;
-                            show-text: root.marks-labels;
-                            show-key: root.marks-caps;
-                            enabled: ClipBridge.add-from.can;
-                            tip: @tr("Set Clip Start");
-                            tip-keys: [{ key: ClipBridge.keys.start, text: "" }];
-                            clicked => { ClipBridge.clip-now("start"); }
-                        }
-                        Field {
-                            font-family: Theme.font-mono;
-                            // No range until Start and End are set: the hint is the format, not a time that could be read as one.
-                            placeholder-text: "-:--.---";
-                            enabled: ClipBridge.add-from.can;
-                            text <=> ClipBridge.clip-start;
-                            edited => { ClipBridge.clip-edited(ClipBridge.clip-start, ClipBridge.clip-end); }
-                            accepted => { root.add-part(); }
-                        }
-                        Text { text: "–"; color: Theme.text-dim; vertical-alignment: center; }
-                        Field {
-                            font-family: Theme.font-mono;
-                            placeholder-text: "-:--.---";
-                            enabled: ClipBridge.add-from.can;
-                            text <=> ClipBridge.clip-end;
-                            edited => { ClipBridge.clip-edited(ClipBridge.clip-start, ClipBridge.clip-end); }
-                            accepted => { root.add-part(); }
-                        }
-                        Action {
-                            text: @tr("End");
-                            glyph: Glyphs.target;
-                            key: ClipBridge.keys.end;
-                            show-text: root.marks-labels;
-                            show-key: root.marks-caps;
-                            enabled: ClipBridge.add-from.can;
-                            tip: @tr("Set Clip End");
-                            tip-keys: [{ key: ClipBridge.keys.end, text: "" }];
-                            clicked => { ClipBridge.clip-now("end"); }
-                        }
-                    }
-                    HorizontalLayout {
-                        spacing: 6px;
-                        Action {
-                            horizontal-stretch: 1;
-                            text: @tr("Add to Collection");
-                            glyph: Glyphs.plus;
-                            key: ClipBridge.keys.add;
-                            show-key: !root.narrow;
-                            enabled: ClipBridge.add-from.can && ClipBridge.add-from.length != "" && !ClipBridge.add-from.full;
-                            tip: ClipBridge.add-from.full ? Words.reason("collectionFull", "") : @tr("Add Range to Collection");
-                            tip-keys: [{ key: ClipBridge.keys.add, text: "" }];
-                            // TRANSLATORS: {} is the number the new part gets in the Collection.
-                            tip-detail: ClipBridge.add-from.full ? "" : @tr("as part {}", ClipBridge.add-from.next);
-                            clicked => { root.add-part(); }
-                        }
-                        if ClipBridge.add-from.length != "": Text {
-                            // TRANSLATORS: {} is a clip's length in seconds ("3.5").
-                            text: @tr("{} s", ClipBridge.add-from.length);
-                            color: Theme.text-dim;
-                            font-size: Theme.font-xs;
-                            vertical-alignment: center;
-                        }
-                    }
-                    HorizontalLayout {
-                        Heading { horizontal-stretch: 1; text: @tr("Collection"); }
-                        VerticalLayout {
-                            alignment: end;
-                            Button {
-                                small: true;
-                                text: @tr("Clear");
-                                enabled: ClipBridge.collection-info.count > 0;
-                                clicked => { ClipBridge.clear-parts(); }
-                            }
-                        }
-                    }
-                    if ClipBridge.collection-info.count == 0: Line { text: @tr("Set Start and End in any local video, then Add to Collection."); }
-                    // The list has the keyboard focus after a click on a row: Delete removes the selected part (a key of the
-                    // panel's content), Esc cancels a drag or gives the keys back to the video.
-                    list-focus := FocusScope {
-                        vertical-stretch: 1;
-                        key-pressed(event) => {
-                            if event.text == Key.Escape {
-                                if root.drag-from >= 0 { root.drag-from = -1; root.drag-to = -1; } else { VestraFocus.release(); }
-                                return accept;
-                            }
-                            return reject;
-                        }
-                        // Slint's ListView: only the rows in view are built.
-                        ListView {
-                            for row[i] in ClipBridge.parts: PartItem {
-                                entry: row;
-                                narrow: root.narrow;
-                                dragging: root.drag-from == i && root.drag-to >= 0;
-                                line-above: root.drag-from >= 0 && root.drag-to == i && root.drag-to < root.drag-from;
-                                line-below: root.drag-from >= 0 && root.drag-to == i && root.drag-to > root.drag-from;
-                                pressed => { list-focus.focus(); }
-                                drag-moved(moved) => { root.drag-move(i, moved); }
-                                drag-ended => { root.drag-end(); }
-                                chip-clicked(bottom, top) => { root.open-picker(row.id, bottom, top); }
-                            }
-                        }
-                    }
-                    // The footer stays in place (greyed while the list is empty), so the layout does not jump.
-                    Rectangle { height: 1px; background: Theme.line; }
-                    HorizontalLayout {
-                        spacing: 4px;
-                        Line {
-                            color: ClipBridge.collection-info.count > 0 ? Theme.text : Theme.text-dim;
-                            // TRANSLATORS: {} is the Collection's total length ("1:02.2").
-                            text: (ClipBridge.collection-info.count == 1 ? @tr("1 part · {}", ClipBridge.collection-info.total)
-                                // TRANSLATORS: {0} is a number of parts (2 or more), {1} their total length ("1:02.2").
-                                : @tr("{0} parts · {1}", ClipBridge.collection-info.count, ClipBridge.collection-info.total))
-                            + (ClipBridge.collection-info.transitions == 0 ? ""
-                                : " · " + (ClipBridge.collection-info.off ? @tr("transitions off in Fast")
-                                    // TRANSLATORS: {} is the seconds the transition takes off the length ("1.0").
-                                    : ClipBridge.collection-info.transitions == 1 ? @tr("1 transition −{} s", ClipBridge.collection-info.saved)
-                                    // TRANSLATORS: {0} is a number of transitions (2 or more), {1} the seconds they take off ("2.5").
-                                    : @tr("{0} transitions −{1} s", ClipBridge.collection-info.transitions, ClipBridge.collection-info.saved)));
-                        }
-                    }
-                    if ClipBridge.support.fast: HorizontalLayout {
-                        spacing: 2px;
-                        MethodChoice {
-                            horizontal-stretch: 1;
-                            glyph: Glyphs.fast;
-                            title: @tr("Fast");
-                            enabled: root.merge-fast-ok && ClipBridge.collection-info.count > 0;
-                            detail: !root.merge-fast-ok ? (root.narrow ? @tr("not possible") : @tr("not for these parts"))
-                                : root.narrow ? @tr("lossless") : @tr("no re-encode · lossless");
-                            selected: ClipBridge.collection-method-index == 0;
-                            clicked => { ClipBridge.method-index = 0; ClipBridge.set-method(0); }
-                        }
-                        MethodChoice {
-                            horizontal-stretch: 1;
-                            glyph: Glyphs.precise;
-                            title: @tr("Precise");
-                            enabled: ClipBridge.collection-info.count > 0;
-                            detail: root.narrow ? @tr("re-encode") : @tr("re-encode · any mix");
-                            selected: ClipBridge.collection-method-index == 1;
-                            clicked => { ClipBridge.method-index = 1; ClipBridge.set-method(1); }
-                        }
-                        VerticalLayout {
-                            alignment: center;
-                            ToolTipArea {
-                                width: 18px;
-                                height: 18px;
-                                text: @tr("Fast copies the streams: only when every part has the same codecs, size, frame rate and audio.");
-                                detail: (root.fast-why != "" ? root.fast-why + ". " : "")
-                                    + (ClipBridge.target.shown
-                                        // TRANSLATORS: {0} is a size in pixels (3840×1714), {1} frames per second.
-                                        ? @tr("Precise re-encodes every part to {0} · {1} fps like part 1: other sizes get black bars, audio is resampled to 48 kHz stereo. Quality: the Clip page's Advanced.", ClipBridge.target.size, ClipBridge.target.fps)
-                                        : @tr("Precise re-encodes every part to the first part's size and frame rate: other sizes get black bars, audio is resampled to 48 kHz stereo. Quality: the Clip page's Advanced."));
-                                Glyph { x: 2px; y: 3px; glyph: Glyphs.info; }
-                            }
-                        }
-                    }
-                    // Why Fast is not possible: one line (the whole story in the ⓘ tip).
-                    if root.fast-why != "": Line { text: root.fast-why; }
-                    // Fast with transitions set: they are kept, the export joins with cuts (as Effects on the Clip page).
-                    if ClipBridge.collection-info.off: Line { text: @tr("Transitions: Precise only. Fast joins with cuts."); }
-                    HorizontalLayout {
-                        spacing: 4px;
-                        Action {
-                            horizontal-stretch: 1;
-                            primary: true;
-                            text: @tr("Export Merged");
-                            glyph: Glyphs.film;
-                            key: ClipBridge.keys.merge;
-                            show-key: !root.narrow;
-                            enabled: root.can-merge;
-                            tip: ClipBridge.queue-full ? Words.reason("queueFull", "") : @tr("Export the parts as one file into the clip folder");
-                            tip-keys: [{ key: ClipBridge.keys.merge, text: "" }];
-                            clicked => { ClipBridge.export-merged(); }
-                        }
-                        Action {
-                            text: @tr("Export As…");
-                            enabled: root.can-merge;
-                            tip: @tr("Export the parts as one file you choose");
-                            clicked => { ClipBridge.export-merged-as(); }
-                        }
-                    }
-                    // What blocks the export, in red (Export stays greyed while it stands); empty otherwise (action problems go on screen).
-                    Line {
-                        color: Theme.danger;
-                        text: ClipBridge.blocking.shown ? Words.blocking(ClipBridge.blocking.problem, ClipBridge.blocking.part) : "";
-                    }
+                // ---- The footer, below the scrolling page while the Collection has parts (on a page this short it
+                // scrolls with the page, at its end, so the list keeps its room).
+                if ClipBridge.collection-info.count > 0 && root.footer-fixed: MergeFooter {
+                    vertical-stretch: 0;
+                    note: root.merge-note;
+                    can-merge: root.can-merge;
+                    narrow: root.narrow;
                 }
             }
 
             // ---------------------------------------------------------------- Results
             VerticalLayout {
-                visible: ClipBridge.page == 2;
+                visible: ClipBridge.page == 1;
                 padding: 8px;
                 spacing: 6px;
                 if ClipBridge.results.length == 0: Line { text: @tr("No clips yet."); }
@@ -1915,7 +1937,7 @@ export component ClipExportTab inherits Rectangle {
 
             // ---------------------------------------------------------------- Settings
             settings-page := ScrollView {
-                visible: ClipBridge.page == 3;
+                visible: ClipBridge.page == 2;
                 viewport-width: settings-content.width;
                 viewport-height: settings-content.preferred-height;
                 settings-content := VerticalLayout {
