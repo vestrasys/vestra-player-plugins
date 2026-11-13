@@ -6,10 +6,11 @@
  *
  * <package dir> must hold exactly one <id>-<version>.vxp for the plugin's
  * manifest.json. The package is read as a zip: its manifest.json must have
- * the source manifest's id, version, apiVersion and capabilities, its entry
- * must be a .js file inside the package, and no entry may be a .ts file, a
- * test, an absolute path, leave the package or be other than in normal
- * form (".", ".." or empty segments).
+ * the source manifest's id, version and apiVersion and no `capabilities`
+ * (declarations ended with SDK 1.9.0), its entry must be a .js file inside
+ * the package, and no entry may be a .ts file, a test, an absolute path,
+ * leave the package or be other than in normal form (".", ".." or empty
+ * segments).
  *
  * Every package also stays within the size limits (the .vxp and its files
  * unpacked) and holds no node_modules/ and no native code. A plugin with npm
@@ -134,11 +135,10 @@ try {
       problems.push(
         `manifest.json ${field}: ${JSON.stringify(packed[field])}, source has ${JSON.stringify(source[field])}`,
       );
-  if (
-    JSON.stringify(packed.capabilities ?? []) !==
-    JSON.stringify(source.capabilities ?? [])
-  )
-    problems.push("manifest.json capabilities differ from the source manifest");
+  if ("capabilities" in packed)
+    problems.push(
+      "manifest.json has capabilities; SDK 1.9.0 removed them (use plugin.player.subscribe() and await plugin.player.read())",
+    );
   if (typeof packed.entry !== "string" || !packed.entry.endsWith(".js"))
     problems.push(
       `manifest.json entry ${JSON.stringify(packed.entry)} is not a .js file`,

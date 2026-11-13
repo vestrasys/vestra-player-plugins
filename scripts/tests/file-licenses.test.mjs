@@ -285,7 +285,6 @@ const manifest = {
   version: "1.0.0",
   apiVersion: "vestra/1",
   entry: "main.js",
-  capabilities: [],
 };
 async function checkPackage(packed) {
   const directory = await ravuPlugin({
@@ -324,6 +323,20 @@ test("package check: the listed shader and its license texts ship unchanged", as
   });
   assert.equal(modified.status, 1);
   assert.match(modified.stderr, /ravu-lite-r3\.hook differs from the plugin's/);
+});
+
+test("package check: a packed manifest with capabilities is refused (SDK 1.9.0)", async () => {
+  for (const capabilities of [["clipboard"], []]) {
+    const result = await checkPackage({
+      ...packedFiles,
+      "manifest.json": JSON.stringify({ ...manifest, capabilities }),
+    });
+    assert.equal(result.status, 1);
+    assert.match(
+      result.stderr,
+      /manifest\.json has capabilities; SDK 1\.9\.0 removed them/,
+    );
+  }
 });
 
 test("package check: LGPL shader text inside the bundle is refused", async () => {

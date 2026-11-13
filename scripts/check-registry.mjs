@@ -15,9 +15,7 @@
  * request's base, or the commit before a push). The pull request form checks
  * the same between --base and --head.
  *
- * The first form also refuses a hosted plugin whose manifest declares a
- * capability only the player's built-in plugins may declare (the SDK's
- * list; scripts/lib/capabilities.mjs), and applies the static npm dependency rules to every
+ * The first form also applies the static npm dependency rules to every
  * hosted plugin with a package.json (lockfile, sources, licenses, inventory;
  * scripts/lib/dependencies.mjs) and the license rules of every hosted
  * plugin's own files (LGPL only for unmodified shaders listed in
@@ -39,10 +37,6 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { readRevoked } from "./lib/build.mjs";
-import {
-  builtinOnlyCapabilities,
-  builtinOnlyProblems,
-} from "./lib/capabilities.mjs";
 import { dependencyProblems } from "./lib/dependencies.mjs";
 import {
   ownerProblems,
@@ -176,15 +170,6 @@ try {
     problems.push(...registryProblems);
     const hosted = await readHostedPlugins(root);
     problems.push(...hosted.problems);
-    const builtinOnly = await builtinOnlyCapabilities();
-    for (const { name, manifest } of hosted.plugins)
-      problems.push(
-        ...builtinOnlyProblems(
-          manifest,
-          `plugins/${name}/manifest.json`,
-          builtinOnly,
-        ),
-      );
     for (const { name } of hosted.plugins)
       problems.push(
         ...(await dependencyProblems(
@@ -201,7 +186,7 @@ try {
           `registry/${entry.id}.toml: the id belongs to plugins/${ids.get(entry.id.toLowerCase())}`,
         );
     console.log(
-      `${hosted.plugins.length} hosted plugin(s) in plugins/, ${entries.length} registration(s), revoked.json, built-in-only capabilities, file licenses and npm dependencies checked${values["revoked-base"] ? ` (append-only against ${values["revoked-base"]})` : ""}`,
+      `${hosted.plugins.length} hosted plugin(s) in plugins/, ${entries.length} registration(s), revoked.json, file licenses and npm dependencies checked${values["revoked-base"] ? ` (append-only against ${values["revoked-base"]})` : ""}`,
     );
   }
 } catch (error) {

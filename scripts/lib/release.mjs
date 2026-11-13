@@ -186,6 +186,12 @@ export async function checkArtifact({
       const where = `${plugin.id} ${version}`;
       const tag = tagOf(plugin.id, version);
       const name = assetOf(plugin.id, version);
+      // Declared capabilities ended with SDK 1.9.0; only versions in the
+      // signed index keep theirs.
+      if (entry.capabilities !== undefined)
+        problems.push(
+          `${where}: a new version has no capabilities (only versions in the signed index keep theirs)`,
+        );
       if (entry.downloadUrl !== downloadUrlOf(repo, plugin.id, version)) {
         problems.push(
           `${where}: downloadUrl must be ${downloadUrlOf(repo, plugin.id, version)}`,

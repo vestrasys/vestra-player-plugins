@@ -1,7 +1,0 @@
-{
-  "id": "someone.launcher",
-  "version": "1.0.0",
-  "apiVersion": "vestra/1",
-  "entry": "main.ts",
-  "capabilities": ["commands", "commands.run", "palette.lead"]
-}

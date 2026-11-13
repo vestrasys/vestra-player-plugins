@@ -44,7 +44,6 @@ async function repository(version = "1.0.0") {
       version,
       apiVersion: "vestra/1",
       entry: "main.ts",
-      capabilities: ["clipboard"],
       name: "Demo",
     }),
   );

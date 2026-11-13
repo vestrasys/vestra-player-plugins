@@ -48,7 +48,8 @@ plugin.
 ### Manifest
 
 - [ ] `vestra-plugin check` accepts it: `id`, `apiVersion` (`vestra/1`),
-      `entry`, `capabilities`, no unknown fields, and every display field
+      `entry`, no unknown fields (`capabilities` is one since SDK 1.9.0:
+      a manifest declares nothing), and every display field
       within the player's limits (`name` and `author` 64 characters,
       `punchline` 120, `description` 2000, at most 8 `tags` of 24 characters,
       `license` 64, `sourceUrl` an `https:` address, `icon` a PNG or JPEG of
@@ -58,7 +59,8 @@ plugin.
       `punchline`, `description`, `tags`, `license`, `sourceUrl`; `icon` is
       optional. (Review)
 - [ ] `minPlayerVersion` is set when the plugin needs a newer player than
-      0.1. (Review)
+      0.1; a plugin that calls `plugin.player.subscribe()` or
+      `plugin.player.read()` needs 0.9.0. (Review)
 - [ ] Optional: translations. `npx vestra-plugin i18n extract`, then
       `locales/<lang>.po`; the store lists the plugin in those languages too.
       Needs SDK 1.5.13 or later (the command is in npm releases since 1.5.11;
@@ -79,26 +81,35 @@ plugin.
       `vestra-plugin test` passes on macOS, Windows and Linux with Node.js
       26. (CI)
 
-### Capabilities
+### Player events and state
 
-- [ ] Every capability the code uses is declared: `vestra-plugin check`
-      fails on a use of an API member whose capability the manifest lacks.
-      (CI)
-- [ ] No capability that only built-in plugins may declare (`commands.run`,
-      `palette.lead`). (CI)
-- [ ] No capability the plugin does not use. The store lists them on the
-      plugin's page. (Review)
+A manifest declares nothing about what the plugin calls. What a plugin
+follows is an explicit call in its code:
 
-Capabilities limit the player API only, not file or network access: plugins
-run as ordinary Node.js processes without a sandbox. That is why a
-maintainer reads every plugin's source.
+- [ ] A plugin that listens to the player's events (`plugin.player.on`,
+      `onChange`, a filter chain that waits for media) calls
+      `plugin.player.subscribe()`, usually at the start of `activate`.
+      Without it those listeners never fire. (Review; the plugin's tests
+      show it)
+- [ ] A plugin that needs the playback state or the timeline marks at
+      start calls `await plugin.player.read()`. (Review; the plugin's tests
+      show it)
 
-When a version is published, the build also scans its source with the SDK's
-`vestra-plugin scan` and stores the boundary categories the code uses
-(`player`, `plugins`, `clipboard`, `credentials`, …) in the index; the
-store shows them before installing and when an update changes them. You
-declare nothing for it; `npx vestra-plugin scan plugins/<name>` (SDK 1.8.0
-and later) prints what it finds and where.
+Both calls may be repeated without effect. Listing the commands, running
+another plugin's command and leading the command palette stay with the
+player's built-in plugins: the player refuses them to any other plugin.
+
+Nothing limits file or network access either: plugins run as ordinary
+Node.js processes without a sandbox. That is why a maintainer reads every
+plugin's source.
+
+What the store discloses comes only from a scan of the code. When a version
+is published, the build scans its source with the SDK's `vestra-plugin
+scan` and stores the boundary categories the code uses (`player`,
+`plugins`, `clipboard`, `credentials`, …) in the index; the store shows
+them before installing and when an update changes them. You declare
+nothing for it; `npx vestra-plugin scan plugins/<name>` prints what it
+finds and where.
 
 ### Imports
 
@@ -166,9 +177,9 @@ Linux, and some checks the commands above do not include:
   the downloaded upstream file
   ([Third-party files and licenses](#third-party-files-and-licenses));
 - the package check: the packed `.vxp` has the source manifest's id,
-  version, API version and capabilities, a `.js` entry, no `.ts` or test
-  files, no `node_modules`, no native code, and the license files it must
-  ship;
+  version and API version and no `capabilities`, a `.js` entry, no `.ts`
+  or test files, no `node_modules`, no native code, and the license files
+  it must ship;
 - the index dry run: the publish flow end to end with a throwaway key
   (`npm run index:dry-run` runs its first step locally);
 - actionlint and zizmor, which only matter when a pull request changes a
