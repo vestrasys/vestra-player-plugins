@@ -3,7 +3,8 @@ import { basename, dirname, join } from "node:path";
 import type { JobState, Scope } from "@vestra-player/sdk";
 import { Failure, uniqueFile } from "./model.ts";
 import type { Finish } from "./tasks.ts";
-import { animatedArgs } from "./animated.ts";
+import { animatedArgs, lastFrameTime } from "./animated.ts";
+import type { AnimatedPass } from "./animated.ts";
 import { anyTransition, estimated, layoutOf, parsePts, progressTime, ptsArgs, spaceNeeded, timeoutFor, timing, transitionArgs, transitionAt } from "./transitions.ts";
 import type { Layout, Plan } from "./transitions.ts";
 
@@ -123,7 +124,7 @@ export function finisher(plugin: Scope, workFolder: string, env: FinishEnv = {})
     const progress = `${merged}.progress`;
     const script = `${merged}.graph`;
     const partial = partialOf(destination);
-    // A GIF's palette (its first run) and that run's graph and progress files.
+    // A GIF's palette (its first run) and that run's graph, progress and frame-times files.
     const palette = `${merged}.palette.png`;
     const planned = timing(p.lengths, p.transitions, p.fps);
     return {
@@ -141,7 +142,7 @@ export function finisher(plugin: Scope, workFolder: string, env: FinishEnv = {})
         const blends = anyTransition(p.transitions);
         const layout = (blends || !p.output ? await measure(plugin, input, asked, signal) : null) ?? estimated(asked, p.fps);
         // The runs in order: one for the transitions and for WebP, two for a GIF (the palette first).
-        const { passes, length } = p.output
+        const { passes, length }: { passes: AnimatedPass[]; length: number } = p.output
           ? animatedArgs({
             input, output: partial, progress, script, palette, format: p.output, ...(p.encoder ? { encoder: p.encoder } : {}),
             transitions: blends ? { lengths: layout, transitions: p.transitions, fps: p.fps } : null, length: planned.written / p.fps,
@@ -163,9 +164,10 @@ export function finisher(plugin: Scope, workFolder: string, env: FinishEnv = {})
           const pass = passes[index];
           if (!pass) return;
           const done = index;
-          void readFile(pass.progress, "utf8").then(
+          // The GIF palette run: the time of the last frame it read (its one picture is written at the end).
+          void readFile(pass.times ?? pass.progress, "utf8").then(
             (text) => {
-              const at = progressTime(text);
+              const at = pass.times ? lastFrameTime(text) : progressTime(text);
               if (at !== null && done === index) report((done * length + Math.min(at, length)) / passes.length, transitionAt(t.offsets, t.overlaps, p.fps, at), count);
             },
             () => {},
@@ -198,7 +200,7 @@ export function finisher(plugin: Scope, workFolder: string, env: FinishEnv = {})
         return written;
       },
       async cleanup() {
-        await Promise.all([merged, progress, script, partial, palette, `${palette}.graph`, `${palette}.progress`].map((file) => rm(file, { force: true }).catch(() => {})));
+        await Promise.all([merged, progress, script, partial, palette, `${palette}.graph`, `${palette}.progress`, `${palette}.times`].map((file) => rm(file, { force: true }).catch(() => {})));
         await env.inflight?.remove(partial).catch(() => {});
       },
     };

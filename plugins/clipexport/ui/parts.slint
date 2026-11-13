@@ -57,7 +57,7 @@ export global Words {
         if (code == "emptyCollection") { return @tr("The Collection is empty. Add a range first."); }
         if (code == "partMissing") { return @tr("A part's file is missing. Locate it or remove the part."); }
         if (code == "partChanged") { return @tr("A part's file has changed. Locate it or remove the part."); }
-        if (code == "partUnknown") { return @tr("A part's file is no longer known. Remove the part."); }
+        if (code == "partUnknown") { return @tr("The player no longer remembers a part's file. Remove the part and add its range again."); }
         if (code == "cannotRead") { return @tr("The player cannot read this file."); }
         if (code == "noCapability") { return @tr("This version of the player cannot do this."); }
         if (code == "noFfmpeg") { return @tr("The transitions need FFmpeg, which the player could not find."); }
@@ -78,7 +78,7 @@ export global Words {
         // TRANSLATORS: {} is a part number of the Collection.
         if (problem == "changed") { return @tr("Part {} has changed: locate it or remove it", part); }
         // TRANSLATORS: {} is a part number of the Collection.
-        if (problem == "unknown") { return @tr("Part {} is no longer known: remove it", part); }
+        if (problem == "unknown") { return @tr("The player forgot part {}'s file: remove the part and add its range again", part); }
         // TRANSLATORS: {} is a part number of the Collection.
         if (problem == "noVideo") { return @tr("Part {} has no video: remove it", part); }
         // TRANSLATORS: {} is a part number of the Collection.
@@ -131,7 +131,7 @@ export global Words {
     public pure function part-state(state: string) -> string {
         if (state == "missing") { return @tr("File missing"); }
         if (state == "changed") { return @tr("File changed"); }
-        if (state == "unknown") { return @tr("File no longer known"); }
+        if (state == "unknown") { return @tr("File forgotten by the player"); }
         if (state == "noVideo") { return @tr("No video"); }
         if (state == "range") { return @tr("Outside the file"); }
         return "";

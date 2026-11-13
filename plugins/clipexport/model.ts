@@ -60,7 +60,8 @@ export const REASON = {
   emptyCollection: "The Collection is empty. Add a range first.",
   partMissing: "A part's file is missing. Locate it or remove the part.",
   partChanged: "A part's file has changed. Locate it or remove the part.",
-  partUnknown: "A part's file is no longer known. Remove the part.",
+  // The player keeps no reference for the token: forgotten (a development load's references end with the player's run).
+  partUnknown: "The player no longer remembers a part's file. Remove the part and add its range again.",
   cannotRead: "The player cannot read this file.",
   noCapability: "This version of the player cannot do this.",
   noFfmpeg: "The transitions need FFmpeg, which the player could not find.",

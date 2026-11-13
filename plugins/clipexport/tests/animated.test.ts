@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { HostError, startPlugin, TestHost } from "@vestra-player/sdk/testing";
 import activate from "../main.ts";
-import { ANIMATED, animatedArgs, animatedChain, encoderFor, encodersOf, extensionOf, MAX_ANIMATED_SECONDS, scaleFilter } from "../animated.ts";
+import { ANIMATED, animatedArgs, animatedChain, encoderFor, encodersOf, extensionOf, frameTimes, graphValue, lastFrameTime, MAX_ANIMATED_SECONDS, scaleFilter } from "../animated.ts";
 import type { AnimatedPass } from "../animated.ts";
 import { animatedOf, encodeOf, estimate, exportEncoding, PRESET_ENCODE, presetOf, PRESETS } from "../clip.ts";
 import { REASON, withExtension } from "../model.ts";
@@ -117,9 +117,17 @@ test("GIF in two runs (bounded memory): the palette of the whole clip into a PNG
   assert.equal(passes.length, 2);
   const [first, second] = passes as [AnimatedPass, AnimatedPass];
   const picture = "[0:v]fps=15,scale='if(gte(iw,ih),min(480,iw),-2)':'if(gte(iw,ih),-2,min(480,ih))':flags=lanczos,setsar=1[gifv]";
-  assert.equal(first.graph, `${picture};[gifv]palettegen=max_colors=256[out]`);
+  // The palette run prints each frame's time into its own file (its progress: ffmpeg's -progress waits for the palette).
+  assert.equal(first.times, "C:/work/pal.png.times");
+  assert.equal(first.graph, `${picture};[gifv]${frameTimes("C:/work/pal.png.times")},palettegen=max_colors=256[out]`);
+  assert.equal(second.times, undefined);
   assert.equal(second.graph, `${picture};[gifv][1:v]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle[out]`);
   assert.ok(!first.graph.includes("split") && !second.graph.includes("split"), "no frame is kept for a later palette");
+  // A path in the graph: escaped for the option, then for the graph.
+  assert.equal(graphValue(String.raw`C:\w\it's [a],b;c.times`), String.raw`C\\:\\\\w\\\\it\\\'s \[a\]\,b\;c.times`);
+  assert.equal(lastFrameTime(""), null);
+  assert.equal(lastFrameTime("frame:0    pts:0       pts_time:0\nclipexport=1\nframe:44   pts:44      pts_time:2.933333\nclipexport=1\n"), 2.933333);
+  assert.equal(lastFrameTime("frame:44   pts:44      pts_time:2.9"), 2.9, "a line still being written");
   const at = (args: string[], flag: string) => args[args.indexOf(flag) + 1];
   // The palette: one PNG in the work folder, its own graph and progress files beside it.
   assert.deepEqual([first.script, first.progress, at(first.args, "-/filter_complex"), at(first.args, "-progress"), at(first.args, "-frames:v"), at(first.args, "-f"), first.args.at(-1)], ["C:/work/pal.png.graph", "C:/work/pal.png.progress", "C:/work/pal.png.graph", "C:/work/pal.png.progress", "1", "image2", "C:/work/pal.png"]);
@@ -155,7 +163,7 @@ test("a merged image with transitions: the parts are blended first (the picture 
     assert.ok(graph.includes("xfade=transition=fade:duration=1:offset=2.983333[vout];[vout]fps=15,"));
     assert.ok(!graph.includes("[0:a]") && !graph.includes("acrossfade"), "no sound");
   }
-  assert.ok(passes[0]!.graph.endsWith("[gifv]palettegen=max_colors=256[out]"));
+  assert.ok(passes[0]!.graph.endsWith(",palettegen=max_colors=256[out]") && passes[0]!.graph.includes(";[gifv]metadata="));
   assert.ok(passes[1]!.graph.endsWith("[gifv][1:v]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle[out]"));
   assert.equal(animatedChain("webp", "vout", "out"), `[vout]fps=20,${scaleFilter(640)}[out]`);
 });
@@ -211,6 +219,49 @@ test("Animated GIF of a clip: the player writes the clip without sound into the 
     await eventually(() => (tab(host).results as { name: string; state: string; badge: string }[]).map((r) => [r.name, r.state, r.badge]), [["one_00.01.000-00.05.000.gif", "completed", "4.0"]]);
     await eventually(() => statusOf(host).kind, "exported");
   } finally {
+    await stop();
+    await cleanup();
+    await rm(data, { recursive: true, force: true });
+  }
+});
+
+test("Animated GIF: the palette run shows its progress (the frame times it prints), then the image run continues from half", async () => {
+  const data = await mkdtemp(join(tmpdir(), "clipexport-data-"));
+  const host = new TestHost();
+  host.openElsewhere("/media/one.mp4");
+  host.setSource({ position: 2, duration: 120 });
+  const { stop } = await start(host, data);
+  const { folder, cleanup } = await withFolder(host);
+  let release!: () => void;
+  try {
+    let palette: string[] | null = null;
+    host.tools.handle("ffmpeg", (args) => {
+      if (args.includes("-encoders")) return { stdout: ENCODERS };
+      if (!args.includes("-/filter_complex")) return { stdout: new Uint8Array() };
+      writeFileSync(args.at(-1)!, "GIF89a the image");
+      if (palette) {
+        writeFileSync(args[args.indexOf("-progress") + 1]!, "out_time_us=1000000\nprogress=continue\n");
+        return { stdout: new Uint8Array() };
+      }
+      palette = [...args];
+      // ffmpeg's own progress says nothing until the palette is written at the end; the frame times say 2 s of 4.
+      writeFileSync(args[args.indexOf("-progress") + 1]!, "");
+      const graph = readFileSync(args[args.indexOf("-/filter_complex") + 1]!, "utf8");
+      const times = `${args.at(-1)!}.times`;
+      assert.ok(graph.includes(graphValue(times)), "the frame times go beside the palette");
+      writeFileSync(times, "frame:29   pts:29      pts_time:1.933333\nclipexport=1\nframe:30   pts:30      pts_time:2\nclipexport=1\n");
+      return new Promise((done) => (release = () => done({ stdout: new Uint8Array() }))) as never;
+    });
+    await choose(host, 3);
+    host.mounted().emit("export-clip", "0:01", "0:05");
+    await until(() => palette !== null, "the palette run");
+    // The player's 4 s, then the palette run's 2 s of 4 (half of the step's first run): (4 + 1) / 8.
+    await until(() => (tab(host).card as { percent: number }).percent === 63, "the palette run's progress");
+    release();
+    await until(() => host.osd.some((line) => line.startsWith("Clip exported as")), "the export");
+    await until(() => leftovers(data, folder).length === 0, "no work files left (the frame times too)");
+  } finally {
+    release?.();
     await stop();
     await cleanup();
     await rm(data, { recursive: true, force: true });
@@ -639,6 +690,27 @@ test("with a real ffmpeg: GIF and WebP of a 1280×720 clip are 480×270 at 15 fp
     const small = join(dir, "tall.gif");
     encode({ input: tall, output: small, progress: join(dir, "p3"), script: join(dir, "g3"), format: "gif", length: 1, threads: 1 });
     assert.deepEqual([probe(small).width, probe(small).height], [200, 360], "not enlarged");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("with a real ffmpeg: the GIF palette run writes its frame times as it goes (its progress), into a folder whose name needs escaping; the palette is the same as without them", { skip: !haveFfmpeg && "no ffmpeg (set VESTRA_FFMPEG)" }, async () => {
+  const dir = await mkdtemp(join(tmpdir(), "clipexport-anim-real-"));
+  try {
+    const work = join(dir, "it's [a],b;c");
+    await mkdir(work);
+    const clip = join(work, "clip.mp4");
+    run(FFMPEG, ["-v", "error", "-f", "lavfi", "-i", "testsrc2=size=640x360:rate=30:duration=3", "-c:v", "libx264", "-pix_fmt", "yuv420p", clip]);
+    const palette = join(work, "pal.png");
+    const { passes } = encode({ input: clip, output: join(work, "out.gif"), progress: join(work, "p"), script: join(work, "g"), palette, format: "gif", length: 3, threads: 1 });
+    const times = readFileSync(passes[0]!.times!, "utf8");
+    assert.equal(times.split("pts_time:").length - 1, 45, "one line per frame read (15 fps for 3 s)");
+    assert.ok(Math.abs(lastFrameTime(times)! - 44 / 15) < 0.01, "the last frame's time");
+    // The same palette without the frame times: printing them changes no pixel.
+    const plain = join(dir, "plain.png");
+    run(FFMPEG, ["-v", "error", "-y", "-threads", "1", "-i", clip, "-filter_complex", `${animatedChain("gif", "0:v", "gifv")};[gifv]palettegen=max_colors=256[out]`, "-map", "[out]", "-frames:v", "1", "-update", "1", "-f", "image2", plain]);
+    assert.deepEqual(readFileSync(palette), readFileSync(plain));
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
