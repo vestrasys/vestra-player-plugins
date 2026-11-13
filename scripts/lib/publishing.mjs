@@ -15,14 +15,16 @@
  * the previous signed index's + 1 on every publish (1 for the first, and
  * when the previous index has none); each store asset carries its sha256 and
  * size; a plugin's optional `translations` holds its display fields in
- * the languages its package translates them to; everything is covered by
- * the signature.
+ * the languages its package translates them to; a version's optional `scan`
+ * holds the boundary categories its code uses (scripts/lib/scan.mjs);
+ * everything is covered by the signature.
  */
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { idProblems } from "./registry.mjs";
 import { revokedProblems } from "./revoked.mjs";
+import { scanProblems } from "./scan.mjs";
 import { isVersion } from "./semver.mjs";
 import { verifyIndex } from "./signing.mjs";
 
@@ -112,6 +114,7 @@ const VERSION_KEYS = [
   "sha256",
   "size",
   "published",
+  "scan",
 ];
 const TOP_KEYS = [
   "schema",
@@ -300,6 +303,7 @@ export function indexProblems(index, { legacy = false } = {}) {
         Number.isNaN(Date.parse(entry.published))
       )
         problems.push(`${where}: published must be an ISO 8601 date`);
+      problems.push(...scanProblems(entry.scan, where));
     });
   });
   return problems;

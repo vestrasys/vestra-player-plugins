@@ -93,6 +93,13 @@ Capabilities limit the player API only, not file or network access: plugins
 run as ordinary Node.js processes without a sandbox. That is why a
 maintainer reads every plugin's source.
 
+When a version is published, the build also scans its source with the SDK's
+`vestra-plugin scan` and stores the boundary categories the code uses
+(`player`, `plugins`, `clipboard`, `credentials`, …) in the index; the
+store shows them before installing and when an update changes them. You
+declare nothing for it; `npx vestra-plugin scan plugins/<name>` (SDK 1.8.0
+and later) prints what it finds and where.
+
 ### Imports
 
 - [ ] Code imports only Node built-ins, `@vestra-player/sdk`, the plugin's
