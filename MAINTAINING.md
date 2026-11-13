@@ -609,7 +609,8 @@ plugins ──▶ static ──┬──▶ plugin × N ──┬──▶ build
    for every plugin, without the npm cache. Nothing is built for release
    unless they pass.
 1. **build** (no secrets, no token while plugin code runs): `npm ci`, packs every plugin whose version has no Release yet with
-   `vestra-plugin pack`; writes the unsigned `index.json` and the store
+   `vestra-plugin pack`; writes the unsigned `index.json` (with the
+   [capability scan](#indexjson) of each version it adds) and the store
    assets. A version that is already released is never released again (it
    is packed once more into a scratch directory only to read its
    translations for `index.json`); earlier versions come from the published
@@ -668,7 +669,8 @@ and Pages of a private repository need authentication or a paid plan):
       "versions": [
         { "version": "0.3.0", "apiVersion": "vestra/1", "minPlayerVersion": "0.2.0",
           "capabilities": ["…"], "downloadUrl": "https://…/zysilm.vestratube-0.3.0.vxp",
-          "sha256": "…", "size": 9370, "published": "2026-10-21T…Z" }
+          "sha256": "…", "size": 9370, "published": "2026-10-21T…Z",
+          "scan": { "uses": ["clipboard"], "method": "types", "sdk": "1.8.0" } }
       ]
     }
   ],
@@ -725,8 +727,24 @@ and Pages of a private repository need authentication or a paid plan):
   present and the English field otherwise. The signature covers it, and
   `indexProblems` (`scripts/lib/publishing.mjs`) checks its shape in the
   build and the signing job.
-- Compatibility: `generated`, the asset fields and `translations` were added
-  within `schema` 1. Clients ignore unknown keys (the store does), so older
+- `scan` (optional, in a version entry) is the capability scan of that
+  version's source: `uses` lists the boundary categories its code crosses
+  (`player`, `plugins`, `clipboard`, `credentials`, `camera`,
+  `microphone`, `screen`, `notifications`; each once, in this order,
+  `[]` when none), `method` says how the source was read (`types`,
+  `names` or `mixed`; with the last two `uses` is a best effort) and
+  `sdk` is the SDK version whose table decided. The build runs the SDK's
+  `vestra-plugin scan` (SDK 1.8.0 and later) on `plugins/<name>/` for every
+  version it adds to the index and stores these three fields only;
+  `vestra-plugin scan plugins/<name>` prints where each category was
+  found. A version that is published already keeps its entry as signed, so
+  it gets a `scan` only if it was built with one. The store shows `uses`
+  before installing and compares it between two versions; it is a report
+  and gates nothing (files, the network and other programs are outside it:
+  see [Security review](#security-review)). The signature covers it, and
+  `indexProblems` checks its shape (`scripts/lib/scan.mjs`).
+- Compatibility: `generated`, the asset fields, `translations` and `scan`
+  were added within `schema` 1. Clients ignore unknown keys (the store does), so older
   clients read the new index unchanged; this repository's own scripts still
   read an index from before them as the previous index.
 
