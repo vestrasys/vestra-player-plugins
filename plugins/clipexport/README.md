@@ -44,7 +44,7 @@ In the command palette (Ctrl+Shift+P), all under Export: Export Clip Range (Ctrl
 
 ## Requirements
 
-Vestra Player 0.7.6 or later (it remembers the files you add and joins their parts), with its FFmpeg (or `ffmpeg` and `ffprobe` on the `PATH`) for the keyframe preview, the thumbnails in Results, the transitions, the animated GIF and WebP and the Highlights scan (WebP needs an FFmpeg built with libwebp, as the player's is).
+Vestra Player 0.9.0 or later (it remembers the files you add and joins their parts), with its FFmpeg (or `ffmpeg` and `ffprobe` on the `PATH`) for the keyframe preview, the thumbnails in Results, the transitions, the animated GIF and WebP and the Highlights scan (WebP needs an FFmpeg built with libwebp, as the player's is).
 
 ## The sound model, downloads and third-party code
 

@@ -14,7 +14,7 @@ Your choice is remembered and applied again at the next start.
 ## Requirements
 
 - Windows with an **AMD Radeon GPU** and the AMD graphics driver (it brings AMD's AMF runtime). On a laptop with two GPUs the AMD one converts, whichever draws the picture. On other GPUs and systems the window says it is not available and nothing changes.
-- Vestra Player 0.8.1 or later.
+- Vestra Player 0.9.0 or later.
 - *Match Display* needs GPU rendering. With software rendering, *Double Frame Rate* works only where twice the video's rate is the display's (30 fps on a 60 Hz screen).
 
 ## Limits
