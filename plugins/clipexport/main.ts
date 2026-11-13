@@ -16,7 +16,7 @@ import {
 } from "./highlights.ts";
 import type { Candidate, HighlightScan } from "./highlights.ts";
 import { capturer } from "./form.ts";
-import { DownloadError, MODEL_MB, SoundModel } from "./soundmodel.ts";
+import { checkFailed, DownloadError, MODEL_MB, SoundModel } from "./soundmodel.ts";
 import { loudStrength, ranked, strengthOf } from "./sounds.ts";
 import type { Tag } from "./sounds.ts";
 import { ModelError, startTagger } from "./tagger.ts";
@@ -1142,36 +1142,49 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   /** "installed", "none" (F1), the download (F2) and how it ended (F3 failed, F4 checksum, F5 offline). */
   type ModelState = "none" | "installed" | "downloading" | "failed" | "checksum" | "offline";
   const model = { state: "none" as ModelState, reason: "", received: 0, total: 0, started: 0 };
-  void soundModel.installed().then((yes) => {
-    if (!yes || model.state !== "none") return;
-    model.state = "installed";
+  void soundModel.installed().then(async (yes) => {
+    // A load found a file that failed its check (it was deleted): F4 again, also after a restart.
+    const failed = !yes && (await checkFailed(soundModel.folder));
+    if ((!yes && !failed) || model.state !== "none") return;
+    model.state = yes ? "installed" : "checksum";
     // Past the file reads: the page changed outside SDK-invoked code.
     plugin.update();
   });
+  /** The download running (`downloadModel`): the plugin stopping cancels it and waits for its partial files to go. */
+  let downloading: Promise<void> | null = null;
+  let modelStopped = false;
   /**
    * Download and Scan (F1), Retry (F3, F5), Download Again (F4): the model's files, with progress and Cancel; the scan
    * of the page's file starts when it finishes (unless the file has a result or a scan is running).
    */
   async function downloadModel() {
-    if (model.state === "installed" || model.state === "downloading") return;
+    if (model.state === "installed" || model.state === "downloading" || modelStopped) return;
     Object.assign(model, { state: "downloading", reason: "", received: 0, total: MODEL_MB * 1e6, started: Date.now() });
     plugin.update();
     let shownAt = 0;
     try {
-      await soundModel.download((progress) => {
+      downloading = soundModel.download((progress) => {
         Object.assign(model, { received: progress.received, total: progress.total });
-        if (Date.now() - shownAt < 250) return;
+        if (Date.now() - shownAt < 250 || modelStopped) return;
         shownAt = Date.now();
         plugin.update();
       });
+      await downloading;
     } catch (error) {
+      // Stopped meanwhile: the download was cancelled and its partial files went; nothing to show.
+      if (modelStopped) return;
       const kind = error instanceof DownloadError ? error.kind : "failed";
-      // Cancel goes back to F1; the partial file is gone.
-      Object.assign(model, { state: kind === "cancelled" ? "none" : kind, reason: kind === "failed" ? message(error).slice(0, 120) : "" });
+      // Cancel goes back to F1 (to F4 while a failed check is still unresolved: its mark stays); the partial file is gone.
+      const back = kind === "cancelled" ? ((await checkFailed(soundModel.folder)) ? "checksum" : "none") : kind;
+      if (modelStopped) return;
+      Object.assign(model, { state: back, reason: kind === "failed" ? message(error).slice(0, 120) : "" });
       if (kind !== "cancelled") console.error(`[clipexport] sound model download: ${message(error)}`);
       plugin.update();
       return;
+    } finally {
+      downloading = null;
     }
+    if (modelStopped) return;
     model.state = "installed";
     if (settings.highlightLoudness) {
       settings.highlightLoudness = false;
@@ -1179,6 +1192,26 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     }
     plugin.update();
     if (hl.key && ["ready", "changed", "error"].includes(hl.status) && !scan) await findHighlights();
+  }
+  // The plugin stopping (deactivated, idle, disabled) ends a download: it is cancelled and its partial files deleted
+  // before the stop completes, never left to finish (or to leave a part behind) in a plugin that no longer runs.
+  plugin.onDispose(async () => {
+    modelStopped = true;
+    if (!downloading) return;
+    const ended = downloading.catch(() => {});
+    // At most a few seconds (a connection that ignores the abort): a part left then goes at the next download.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<void>((done) => (timer = setTimeout(done, 3000)));
+    await Promise.race([Promise.all([soundModel.cancel(), ended]), late]);
+    clearTimeout(timer);
+  });
+  /**
+   * The page after a scan found the model's files missing or failing their check (F1, or F4 with Download Again):
+   * the offer above the file, never a scan by loudness alone that the user did not choose.
+   */
+  function offerModel(key: string) {
+    if (hl.key !== key) return;
+    Object.assign(hl, { status: hl.status === "changed" ? "changed" : "ready", problem: { reason: "", raw: "" }, selected: "" });
   }
   /** Settings ▸ Remove: the model's files go; the Highlights page offers the download again. */
   async function removeModel() {
@@ -1302,6 +1335,16 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     const view = highlightsFor(seen);
     if (!view || !seen.duration) return;
     if (scan?.key === view.key) return;
+    // Without the model, a scan asked for never measures loudness alone unless Loudness Only is the user's choice
+    // (the button, or that choice saved): it shows the offer instead (F1 Download and Scan, F2 the download running,
+    // F3 Retry, F4 Download Again, F5 Retry; each with Loudness Only). That is Scan Again above a scanned file, in
+    // every one of these states (never downloaded, removed in Settings, a download that failed or found no
+    // connection), and any request after a failed check. Above a file not scanned the page already shows the offer
+    // and no Find Highlights button.
+    if (how === "auto" && model.state !== "installed" && !settings.highlightLoudness && (model.state === "checksum" || view.status === "done")) {
+      offerModel(view.key);
+      return void plugin.update();
+    }
     cancelScan();
     if (silentFile(seen)) return void (hl.status = "noSound");
     const key = view.key;
@@ -1343,14 +1386,14 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       let tags: Tag[] | undefined;
       if (how === "auto" && model.state === "installed") {
         // The files are checked against their pinned SHA-256 before the model reads them; a file that fails is
-        // deleted and the page offers the download again (F1).
+        // deleted and the page shows F4 (the checksum, Download Again), a missing one F1: never loudness alone.
         const files = await soundModel.load();
-        job.abort.signal.throwIfAborted();
         if (!files) {
-          model.state = "none";
-          if (hl.key === key) hl.status = job.before;
+          model.state = (await checkFailed(soundModel.folder)) ? "checksum" : "none";
+          if (scan === job) offerModel(key);
           return;
         }
+        job.abort.signal.throwIfAborted();
         tagger = await startModel(files.wasm, files.model, job.abort.signal);
         const running = tagger;
         const found = await scanSounds(run, (samples, t) => running.tag(samples, t), job.path, view.stream, job.duration, { signal: job.abort.signal, between });

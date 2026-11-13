@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.5
+
+**Who must change: nobody.** No new permission and the same player (0.7.6 or later). Kept Highlights results, the sound model, settings, the Collection and Results carry over.
+
+- **Highlights**:
+  - Fixed: when the sound model's file failed its check before a scan (it is checked on every load), the file was deleted but the page said nothing, and the next Scan Again quietly measured loudness alone ("Scanned just now · loudness only"), with no way to download the model again above a scanned file. The page now shows the checksum state ("The download did not match its checksum and was deleted.") with **Download Again** and **Loudness Only**, where the scan was asked for and every later time one is asked for, also after the plugin or the player restarts, until the model is downloaded again; cancelling that download, or one that fails, keeps it.
+  - **Scan Again** above a scanned file, without the sound model, no longer rescans by loudness alone unless you chose **Loudness Only**: it shows the page's offer instead, the one a file not scanned shows (Download and Scan after Settings ▸ Remove or before any download, Retry after a download that failed or found no connection, Download Again after a failed check; each with Loudness Only). A scan by loudness alone runs only when you choose **Loudness Only** (the button, or that choice kept for the Find Highlights command and Scan Again); a kept result stays until a new scan replaces it.
+  - Fixed: a download of the sound model that was running when the plugin stopped (disabled, updated, or stopped while idle) went on, or left its partial file behind until the next download. It is now cancelled, and its partial file deleted, before the plugin stops.
+- **Clip page**: at the default sidebar width the longer German, French and Korean labels were cut at the right edge ("Exportieren unte", "Exporter sous", "다른 이름으로 내보"; the Last 30 s key cap). A row of the Range card now shows its key caps only where both buttons fit with them; otherwise the keys are in the tooltips, as in a narrow tab. A label that still does not fit ends in an ellipsis instead of being cut, and a button without a tooltip of its own then shows its label in one.
+- **Tabs**: in German the Highlights tab read "Highlights (…" and Einstellungen touched the edge. Where the four labels do not fit with the count of suggestions, Highlights drops the count, as a narrow tab does.
+- English, Simplified Chinese, German, Spanish, French, Japanese and Korean.
+
 ## 0.6.4
 
 **Who must change: nobody.** No new permission and the same player (0.7.6 or later). Kept Highlights results (they read as loudness-only scans), settings, the Collection and Results carry over.

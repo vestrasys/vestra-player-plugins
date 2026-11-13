@@ -1,6 +1,6 @@
 {
   "name": "zysilm-clipexport",
-  "version": "0.6.4",
+  "version": "0.6.5",
   "private": true,
   "type": "module",
   "description": "Clip Export, a Vestra Player plugin: ships ONNX Runtime Web's JavaScript (vendor/, MIT) for the Highlights sound model",
