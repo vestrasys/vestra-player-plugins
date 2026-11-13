@@ -415,6 +415,8 @@ export global ClipBridge {
     callback dismiss-selected();
     // A click on the strip, at this share of its width (0–1).
     callback heat-clicked(float);
+    // The list's rows on screen: the first one in view and how many fit (whole rows), for their pictures.
+    callback highlights-seen(int, int);
 }
 
 // Glyphs of this tab only, in the V-Line style of @vestra/icons.slint (1.5px round-capped lines), 14×12 boxes.
@@ -1629,6 +1631,13 @@ component HighlightList inherits FocusScope {
         if event.text == Key.Escape { VestraFocus.release(); return accept; }
         return reject;
     }
+    // The rows on screen, in whole 46 px rows, for their pictures (the plugin makes them for these and a few around):
+    // reported when the list is made and when a scroll passes a row or the list's height changes, never per pixel.
+    private property <int> first-seen: max(0, floor(-list.content-y / 46px));
+    private property <int> seen-count: max(1, ceil(list.visible-height / 46px));
+    init => { ClipBridge.highlights-seen(root.first-seen, root.seen-count); }
+    changed first-seen => { ClipBridge.highlights-seen(root.first-seen, root.seen-count); }
+    changed seen-count => { ClipBridge.highlights-seen(root.first-seen, root.seen-count); }
     // The rows above the selected one are 46 px each; the selected one is 72 px (its Start and End).
     changed picked => {
         if root.picked >= 0 {

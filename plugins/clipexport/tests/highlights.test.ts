@@ -673,6 +673,57 @@ test("a row whose picture fails is that row's failure once others worked: a run 
   }
 });
 
+test("row pictures only for the rows in view and a few around (design §11): a scroll asks for the rows it brings; a queued row scrolled away leaves its turn and is asked again when it comes back", async () => {
+  const setup = await withMedia(3000);
+  const host = new TestHost();
+  let open: () => void = () => {};
+  let held = true;
+  host.tools.handle("ffmpeg", async (args) => {
+    if (isScan(args)) return { stdout: momentaryOutput(args, many) };
+    if (held) await new Promise<void>((done) => (open = done));
+    return { stdout: "jpeg bytes" };
+  });
+  /** The rows' starts each picture run was for (in the order asked), and which rows have their picture. */
+  const asked = () => host.tools.calls.filter((call) => call.tool === "ffmpeg" && !isScan(call.args)).map((call) => short(pictureOf(call.args).start));
+  const pictured = () => rows(host).map((row) => row.thumb !== null && row.thumb !== undefined);
+  const startOf = (index: number) => rows(host)[index]!.range.split(" – ")[0]!;
+  setup.play(host);
+  const { stop } = await startIn(host, setup.data);
+  try {
+    await showHighlights(host);
+    await eventually(() => page(host).state, "ready");
+    host.mounted().emit("set-highlight-count", 2);
+    host.mounted().emit("find-highlights");
+    await eventually(() => rows(host).length, 20);
+    // Not reported yet: the first eight rows are in view, and four more below get theirs too. The first is being made.
+    await until(() => asked().length === 1, "the first picture");
+    assert.equal(asked()[0], startOf(0));
+    // Scrolled to the end before the queue got further: rows 14–19 (the last four in view, two above) are asked for.
+    host.mounted().emit("highlights-seen", 16, 4);
+    await host.settle();
+    held = false;
+    open();
+    await until(() => pictured().filter(Boolean).length === 7, "the first row's and the six in view");
+    await host.settle();
+    assert.deepEqual(pictured(), rows(host).map((_, i) => i === 0 || i >= 14), "the rows scrolled away left their turns");
+    assert.deepEqual(asked(), [0, 14, 15, 16, 17, 18, 19].map(startOf), "no picture of a row out of view");
+    // A scroll within the same rows reports nothing new: nothing more is asked.
+    host.mounted().emit("highlights-seen", 16, 4);
+    await host.settle();
+    assert.equal(asked().length, 7);
+    // Back to the top: those rows are asked for again and made, each once.
+    host.mounted().emit("highlights-seen", 0, 6);
+    await until(() => pictured().every(Boolean) === false && pictured().slice(0, 10).every(Boolean), "the rows at the top");
+    await host.settle();
+    assert.deepEqual(pictured(), rows(host).map((_, i) => i < 10 || i >= 14), "rows 10–13 stay out of view (0–5 in view, four below)");
+    assert.equal(new Set(asked()).size, asked().length, "each row asked once");
+  } finally {
+    open();
+    await stop();
+    await setup.cleanup();
+  }
+});
+
 test("without FFmpeg no picture is asked for; another file opened while a picture is made stops it (nothing of it is kept), and the new file's pictures are made", async () => {
   const setup = await withMedia();
   const host = new TestHost();
@@ -734,6 +785,46 @@ test("without FFmpeg no picture is asked for; another file opened while a pictur
   }
 });
 
+test("Show on \"N highlights found\" opens the page and never scans: another file opened while the message showed is not scanned; the scanned file, opened again, shows its result", async () => {
+  const setup = await withMedia();
+  const host = new TestHost();
+  fakeFfmpeg(host);
+  setup.play(host);
+  const { stop } = await startIn(host, setup.data);
+  try {
+    await showHighlights(host);
+    await eventually(() => page(host).state, "ready");
+    host.mounted().emit("set-page", 0);
+    await eventually(() => tab(host).page, 0);
+    host.mounted().emit("find-highlights");
+    await until(() => host.osd.includes("2 highlights found"), "2 highlights found");
+    const scanned = scans(host);
+    // Another file, not scanned, opens while the message shows; Show is pressed then.
+    const other = join(setup.data, "other.mp4");
+    await writeFile(other, "other media bytes");
+    setup.play(host, other);
+    await host.settle();
+    await host.pressOsdAction(0);
+    await eventually(() => tab(host).page, 1);
+    await eventually(() => page(host).name, "other.mp4");
+    await eventually(() => page(host).state, "ready", "the other file is offered a scan, not scanned");
+    await host.settle();
+    assert.equal(scans(host), scanned);
+    // The scanned file again: its result, still without a scan. The Find Highlights command still scans a new file.
+    setup.play(host);
+    await eventually(() => rows(host).length, 2);
+    assert.equal(scans(host), scanned);
+    setup.play(host, other);
+    await eventually(() => page(host).state, "ready");
+    await host.command("clip.highlights").run();
+    await eventually(() => page(host).state, "done");
+    assert.ok(scans(host) > scanned);
+  } finally {
+    await stop();
+    await setup.cleanup();
+  }
+});
+
 test("row thumbnails: none while the page is hidden; a scan ending then says so on the video with Show; then ffmpeg makes one per row from the file, one at a time; reopened they show without ffmpeg; a changed file's go", async () => {
   const setup = await withMedia();
   const host = new TestHost();
@@ -758,7 +849,7 @@ test("row thumbnails: none while the page is hidden; a scan ending then says so 
     await eventually(() => tab(host).page, 0);
     host.mounted().emit("find-highlights");
     await until(() => host.osd.includes("2 highlights found"), "2 highlights found");
-    assert.deepEqual(host.osdActions.at(-1), [{ title: "Show", command: "clip.highlights" }]);
+    assert.deepEqual(host.osdActions.at(-1), [{ title: "Show", command: "clip.highlightsShow" }]);
     await host.settle();
     assert.equal(pictures.length, 0, "no picture while the page is not on screen");
     // Show: the Highlights page, the found ones, no second scan.

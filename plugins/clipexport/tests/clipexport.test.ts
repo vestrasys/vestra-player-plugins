@@ -118,6 +118,7 @@ test("one menu item, Video ▸ Export Clip…; the rest is in the command palett
       ["clip.highlights", "", "clip.panel"],
       ["clip.highlightAdd", "Enter", "clip.highlights"],
       ["clip.highlightDismiss", "", "clip.highlights"],
+      ["clip.highlightsShow", "", "clip.highlights"],
       ["clip.last", "Ctrl+Shift+R", "clip.panel"],
     ]);
     assert.deepEqual(host.conflicts, []);
@@ -138,7 +139,7 @@ test("every command has the Export category in the command palette, and every ho
     ready(host);
     const { stop } = await start(host, locale);
     try {
-      assert.equal(host.commands.size, 21);
+      assert.equal(host.commands.size, 22);
       for (const [id, command] of host.commands) {
         assert.equal(command.declaration.category, "Export", id);
         assert.ok(command.display.category?.trim(), `${id}: shows a category in ${locale}`);

@@ -66,6 +66,7 @@ const TITLE = {
   "clip.highlights": "Find Highlights",
   "clip.highlightAdd": "Add Highlight to Collection",
   "clip.highlightDismiss": "Dismiss Highlight",
+  "clip.highlightsShow": "Show Highlights",
 } as const;
 type CommandId = keyof typeof TITLE;
 
@@ -73,7 +74,7 @@ type CommandId = keyof typeof TITLE;
 const BLOCKING = {
   missing: "Part {} is missing: locate it or remove it",
   changed: "Part {} has changed: locate it or remove it",
-  unknown: "Part {} is no longer known: remove it",
+  unknown: "The player forgot part {}'s file: remove the part and add its range again",
   noVideo: "Part {} has no video: remove it",
   range: "Part {} is outside its file: remove it",
 } as const;
@@ -1389,20 +1390,31 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     else dismissHighlight(id);
     if (hl.saved === saved && saved.handled[id] && next && !hl.selected) await selectHighlight(next);
   }
-  /** "N highlights found" on the video, with Show (the Find Highlights command, which opens the page). */
+  /**
+   * "N highlights found" on the video, with Show (Show Highlights, which opens the page and never scans: another file
+   * opened while the message showed is not scanned by it; the page shows that file as it is).
+   */
   function foundSaid(count: number) {
     // TRANSLATORS: the button of "N highlights found" on the video: it opens the Highlights page.
-    const options = { actions: [{ title: text("Show"), command: "clip.highlights" }] };
+    const options = { actions: [{ title: text("Show"), command: "clip.highlightsShow" }] };
     if (count === 0) return shown(osd.show("Nothing stood out in this video.", [], options));
     if (count === 1) return shown(osd.show("1 highlight found", [], options));
     // TRANSLATORS: {} is a number of suggested ranges (2 or more).
     shown(osd.show("{} highlights found", [count], options));
   }
 
-  // Row thumbnails (design step 2): the first keyframe of each listed suggestion, made by ffmpeg from the file (the
-  // player does not seek), one at a time in the queue the Collection's frame captures use, one thread, only while the
-  // page shows. They are kept beside the scan (`highlights/<hash>/`) and go with it.
+  // Row thumbnails (design step 2, §11): the first keyframe of each suggestion on screen, made by ffmpeg from the file
+  // (the player does not seek), one at a time in the queue the Collection's frame captures use, one thread, only while
+  // the page shows. They are kept beside the scan (`highlights/<hash>/`) and go with it.
   const hlThumbRefs = new Map<string, ImageRef>();
+  /**
+   * The rows of the list on screen, as the tab reports them (`highlightsSeen`: the first row in view and how many
+   * fit, in whole rows, so a scroll within a row reports nothing); a list not reported yet shows its first eight.
+   */
+  let hlSeen = { first: 0, count: 8 };
+  /** Rows just outside the list's view get their pictures too: the two above it, the four below it. */
+  const inView = (index: number) => index >= hlSeen.first - 2 && index < hlSeen.first + hlSeen.count + 4;
+  const rowIndex = (id: string) => (hl.saved ? suggestions(hl.saved).rows.findIndex((row) => row.id === id) : -1);
   /** Thumbnails asked for this file (queued, or failed twice: not asked again until another file). */
   const hlThumbWork = new Set<string>();
   /**
@@ -1433,8 +1445,9 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     return null;
   }
   async function makeHighlightThumb(key: string, id: string, start: number, folder: string, name: string) {
-    // Still wanted: the same file, the row listed with this start, the page on screen (else it is asked for when it shows).
-    if (hl.key !== key || hlThumbsOff || suggestionOf(id)?.start !== start || !reviewing()) {
+    // Still wanted: the same file, the row listed with this start and in view, the page on screen (else it is asked
+    // for again when it is): a row scrolled away meanwhile leaves its turn to what is queued behind it.
+    if (hl.key !== key || hlThumbsOff || suggestionOf(id)?.start !== start || !reviewing() || !inView(rowIndex(id))) {
       if (hl.key === key) hlThumbWork.delete(name);
       return;
     }
@@ -1558,7 +1571,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       // Its own property: a position tick sends this number, not the strip's paths.
       head,
       highlightRows: running ? [] : [
-        ...rows.map((row) => ({
+        ...rows.map((row, index) => ({
           id: row.id,
           range: `${short(row.start)} – ${short(row.end)}`,
           brief: narrowTimes(row),
@@ -1566,8 +1579,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
           kind: "loud",
           lu: String(Math.round(row.peak)),
           selected: row === selected,
-          // Asked for only while the page shows (one ffmpeg run at a time); the icon meanwhile.
-          thumb: highlightThumb(row, settings.page === "highlights"),
+          // Asked for only while the page shows and the row is in view (one ffmpeg run at a time); the icon meanwhile.
+          thumb: highlightThumb(row, settings.page === "highlights" && inView(index)),
           restore: 0,
         })),
         // Restore N dismissed: the list's last row (a row of the same ListView), while any is dismissed.
@@ -1974,6 +1987,11 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   // Up and Down while the list has the focus (the tab's own keys: -1 or 1).
   on("stepHighlight", (step: number) => stepHighlight(Number(step)));
   on("heatClicked", (ratio: number) => heatClicked(Number(ratio)));
+  // The list's rows on screen changed (a scroll past a row, another height): the rows come in view ask for pictures.
+  on("highlightsSeen", (first: number, count: number) => {
+    const next = { first: Math.max(0, Math.floor(Number(first)) || 0), count: Math.max(1, Math.min(40, Math.ceil(Number(count)) || 1)) };
+    if (next.first !== hlSeen.first || next.count !== hlSeen.count) hlSeen = next;
+  });
   on("focusChanged", (focused: boolean) => panel.setInteraction({ focused: focused === true }));
   plugin.onError((error) => {
     console.error(`[clipexport] ${error.message}`);
@@ -2098,6 +2116,11 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   const inHighlights = { home: "clip.highlights", focus: "panel" as const, enabled: () => !!hl.selected && reviewing() };
   entry("clip.highlightAdd", 489, () => handleSelected("add"), { ...inHighlights, bindings: ["Enter"] });
   entry("clip.highlightDismiss", 490, () => handleSelected("dismiss"), inHighlights);
+  /**
+   * Show Highlights: the Highlights page of the file playing, as it is; nothing is scanned. The Show button of
+   * "N highlights found" runs it: the scanned file's results while it plays, and no scan of a file opened since.
+   */
+  entry("clip.highlightsShow", 491, () => showTab("highlights"), { home: "clip.highlights" });
   /**
    * Export Last N Seconds (Ctrl+Shift+R): its title states the length the
    * user chose in Settings, so the command is declared again when it changes

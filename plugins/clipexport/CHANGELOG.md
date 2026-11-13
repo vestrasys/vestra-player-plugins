@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.3
+
+**Who must change: nobody.** No new permission and the same player (0.7.6 or later). Kept Highlights results and their pictures, settings, the Collection and Results carry over.
+
+- **Highlights**:
+  - Fixed: **Show** on "N highlights found" ran Find Highlights, so a file opened while the message showed, and not scanned yet, was scanned. Show is now the new command **Show Highlights** (in the command palette too): it opens the Highlights page and never starts a scan. The scanned file shows its result while it plays; another file shows its page as it is.
+  - Row pictures are made only for the rows in view and a few around them (two above, four below), as the design says (§11), no longer for every listed row (up to 20). Scrolling asks for the rows it brings, once per row passed, not per pixel; a row scrolled away before its turn leaves the queue (which the Collection's thumbnails share) to what waits behind it, and gets its picture when it is in view again.
+- **Animated GIF**: its first run (the palette) now shows progress like the rest of the export. FFmpeg reports progress only once every output has started, and the palette's one picture is written at the end, so the bar stood still for half the export; the run now writes each frame's time into a small work file as it goes (FFmpeg's `metadata` filter, unbuffered), which the plugin reads. The palette is the same as before.
+- **Collection**: a part whose file the player no longer remembers said "File no longer known". It now says "File forgotten by the player", and the line under the buttons and the message on the video say to remove the part and add its range again. The player keeps a plugin's file references with its profile; a plugin loaded for development (`--plugin`) has them only for that run, while its data folder, and so its Collection, stays: that is the player's design, and those parts read this way after a restart.
+- Korean: the part count reads "파트 3개" (it was "3개 부분"), and "added as part N" reads "N번째 파트로", without the "(으)로" particle placeholder.
+- English, Simplified Chinese, German, Spanish, French, Japanese and Korean.
+
 ## 0.6.2
 
 **Who must change: nobody.** No new permission and the same player (0.7.6 or later). Kept Highlights results, settings, the Collection and Results carry over.

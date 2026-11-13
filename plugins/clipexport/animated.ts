@@ -83,6 +83,31 @@ export interface AnimatedPass {
   graph: string;
   script: string;
   progress: string;
+  /**
+   * The GIF palette run's frame times (`<palette>.times`), read for its progress instead of `progress`: ffmpeg
+   * reports progress only once every output has started, and the palette's one picture is written at the end.
+   */
+  times?: string;
+}
+
+/**
+ * A value inside a filter graph written to a file: escaped for the option (`\`, `'`, `:`), then for the graph
+ * (`\`, `'`, `[`, `]`, `,`, `;`), FFmpeg's two levels of filter escaping. A Windows path keeps its backslashes.
+ */
+export const graphValue = (value: string) => value.replace(/[\\':]/g, (c) => `\\${c}`).replace(/[\\'[\],;]/g, (c) => `\\${c}`);
+
+/**
+ * The palette run's progress: each frame it reads, before `palettegen`, is printed with its time into `file` as it
+ * goes (`metadata` with `direct`, unbuffered), about 50 bytes a frame (45 kB for a minute at 15 fps).
+ */
+export const frameTimes = (file: string) => `metadata=mode=add:key=clipexport:value=1,metadata=mode=print:key=clipexport:direct=1:file=${graphValue(file)}`;
+
+/** The last frame time in a frame-times file (`frame:N pts:P pts_time:T` lines), in seconds; `null` before the first. */
+export function lastFrameTime(text: string): number | null {
+  const at = text.lastIndexOf("pts_time:");
+  if (at < 0) return null;
+  const value = Number(/^pts_time:(-?[\d.]+(?:e[-+]?\d+)?)/.exec(text.slice(at))?.[1]);
+  return Number.isFinite(value) ? Math.max(0, value) : null;
 }
 
 /**
@@ -114,10 +139,12 @@ export function animatedArgs(o: AnimatedArgs): { passes: AnimatedPass[]; length:
     return { passes: [{ args: [...head, ...graphFlags(o.script), "-map", "[out]", "-an", "-sn", "-dn", ...codec, ...tail(o.progress, o.output)], graph, script: o.script, progress: o.progress }], length };
   }
   const palette = o.palette ?? `${o.output}.palette.png`;
+  const times = `${palette}.times`;
   const first: AnimatedPass = {
-    graph: `${prefix}${animatedChain("gif", from, "gifv")};[gifv]${PALETTEGEN}[out]`,
+    graph: `${prefix}${animatedChain("gif", from, "gifv")};[gifv]${frameTimes(times)},${PALETTEGEN}[out]`,
     script: `${palette}.graph`,
     progress: `${palette}.progress`,
+    times,
     args: [],
   };
   first.args = [...head, ...graphFlags(first.script), "-map", "[out]", "-an", "-sn", "-dn", "-frames:v", "1", "-update", "1", "-f", "image2", ...tail(first.progress, palette)];
