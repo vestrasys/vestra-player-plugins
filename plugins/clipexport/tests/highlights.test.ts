@@ -483,6 +483,8 @@ test("Find Highlights (command palette): opens the Highlights page and scans a f
   const host = new TestHost();
   fakeFfmpeg(host);
   setup.play(host);
+  // Without the sound model the command scans only once the user chose Loudness Only (sounds.test.ts: never a download).
+  await writeFile(join(setup.data, "settings.json"), JSON.stringify({ highlightLoudness: true }));
   const { stop } = await startIn(host, setup.data, "zh-Hans");
   try {
     const command = host.command("clip.highlights");
@@ -790,6 +792,8 @@ test("Show on \"N highlights found\" opens the page and never scans: another fil
   const host = new TestHost();
   fakeFfmpeg(host);
   setup.play(host);
+  // Loudness Only chosen before: the command at the end scans without the sound model.
+  await writeFile(join(setup.data, "settings.json"), JSON.stringify({ highlightLoudness: true }));
   const { stop } = await startIn(host, setup.data);
   try {
     await showHighlights(host);

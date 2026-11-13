@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.4
+
+**Who must change: nobody.** No new permission and the same player (0.7.6 or later). Kept Highlights results (they read as loudness-only scans), settings, the Collection and Results carry over.
+
+- **Highlights**, the sound model (design clipexport-highlights, step 3):
+  - The page now finds the moments the audience reacts to: **laughter, applause, cheering and a crowd**, besides loud peaks. A sound model on this computer listens to each 10 seconds of the sound; a sound counts where it rises above its usual level in the video (stand-up has some laughter all the time), so a laugh no louder than the talk is found too. The video never leaves the computer.
+  - **First use**: above a file not scanned, the page says the model is one download (25 MB, checked after download) and offers **Download and Scan** (the click is the consent; nothing is fetched before it) and **Loudness Only** (the scan of 0.6.x, no download). The download shows its progress with Cancel ("The scan starts when it finishes."); a failed download says why with **Retry**, one that does not match its checksum is deleted (**Download Again**), and without a connection the page says so. Loudness Only is offered in each of these, and when the model cannot start on the computer. The **Find Highlights** command never downloads: without the model it opens the page, or scans by loudness once you chose Loudness Only.
+  - Each suggestion shows its **kind** (Laughter, Applause, Cheering, Crowd, Loud, or two: "Laughter + applause") and a **three-bar strength meter**; its tooltip names each sound with its strength in words (strong, medium, weak) and how far it is above the video's average loudness. No percentages. The list's 5 · 10 · 20 take the suggestions with sounds first, then the loudest.
+  - A scan with the model that finds loud moments only says so above the list: "Only loud moments here. Loud is not always good: check before adding."
+  - **Settings ▸ Highlights**: "Sound model · 25 MB" with **Remove** while it is downloaded.
+  - The model: CED-mini (Apache-2.0, by mispeech), as the ONNX int8 file of k2-fsa's sherpa-onnx, from Hugging Face at a pinned commit (10.4 MB), run by ONNX Runtime Web 1.31.1 (MIT, Microsoft): its WebAssembly file from jsDelivr (14.8 MB), its JavaScript shipped in the plugin (`vendor/`). Both downloads are kept only when they match the SHA-256 pinned in the plugin, and checked again before use. The model runs on a thread of its own, one core, only during a scan; FFmpeg reads the next five minutes of sound meanwhile. A two-hour video took about 3.5–4 minutes on our test laptop (Loudness Only: 20 s), with about 150–250 MB more memory while it ran.
+- English, Simplified Chinese, German, Spanish, French, Japanese and Korean.
+
 ## 0.6.3
 
 **Who must change: nobody.** No new permission and the same player (0.7.6 or later). Kept Highlights results and their pictures, settings, the Collection and Results carry over.

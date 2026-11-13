@@ -241,6 +241,16 @@ export struct Highlights {
     length: string,
     // The selected row's place in the list (-1 none): Up and Down keep it in view.
     picked: int,
+    // A scan with the sound model found only loud moments (R4).
+    only-loud: bool,
+    // The sound model: "none" (F1), "installed", "downloading" (F2), "failed" (F3), "checksum" (F4), "offline" (F5);
+    // the download's size (MB), how much of it arrived (MB), the seconds left (-1 unknown), why it failed.
+    model: string,
+    model-mb: int,
+    dl-done: int,
+    dl-total: int,
+    dl-left: int,
+    dl-reason: string,
 }
 
 // The heat strip: the curve and the bands as paths (1000 × 100 and 1000 × 10 view boxes), the video's length in
@@ -256,12 +266,18 @@ export struct HeatView {
 // One suggestion: its times (with tenths, and without for a narrow tab), length ("28.6"), kind, how far its
 // loudest moment is above the video's average (LU), whether it is selected (the Range), the picture of its start.
 // The list's last row can be Restore N dismissed instead: `restore` is N (0 for a suggestion).
+// `kind` is its strongest sound ("laughter", "applause", "cheering", "crowd") or "loud", `kind2` a second sound
+// (or ""); `level` the meter's bars (1–3), `level1` and `level2` each sound's strength for the tooltip.
 export struct HighlightRow {
     id: string,
     range: string,
     brief: string,
     badge: string,
     kind: string,
+    kind2: string,
+    level: int,
+    level1: int,
+    level2: int,
     lu: string,
     selected: bool,
     thumb: image,
@@ -403,6 +419,12 @@ export global ClipBridge {
     callback find-highlights();
     callback cancel-scan();
     callback set-highlight-count(int);
+    // The sound model: Loudness Only (a scan without it), Download and Scan (also Retry, Download Again), the
+    // download card's Cancel, Settings ▸ Remove.
+    callback loudness-only();
+    callback download-model();
+    callback cancel-download();
+    callback remove-model();
     // A row: click selects it (the Range), double-click plays it, + adds it to the Collection, × dismisses it.
     callback select-highlight(string);
     callback play-highlight(string);
@@ -1429,6 +1451,52 @@ component HeatStrip inherits Rectangle {
     }
 }
 
+// The model's download (F2, the export card's look): its name, Cancel, the bar, how much arrived and the time left.
+component DownloadCard inherits Rectangle {
+    in property <int> done;
+    in property <int> total;
+    in property <int> left;
+    vertical-stretch: 0;
+    background: Theme.bg-list;
+    border-width: 1px;
+    border-color: Theme.line;
+    border-radius: Theme.radius-control;
+    VerticalLayout {
+        padding: 6px;
+        spacing: 4px;
+        HorizontalLayout {
+            spacing: 5px;
+            Line { text: @tr("Downloading sound model"); color: Theme.text; }
+            IconAction {
+                glyph: Glyphs.close;
+                tip: @tr("Cancel");
+                clicked => { ClipBridge.cancel-download(); }
+            }
+        }
+        Rectangle {
+            height: 3px;
+            border-radius: 1px;
+            background: Theme.line;
+            Rectangle {
+                x: 0px;
+                width: root.total > 0 ? parent.width * min(1, root.done / root.total) : 0px;
+                border-radius: 1px;
+                background: Theme.accent-fill;
+            }
+        }
+        // TRANSLATORS: {0} and {1} are megabytes (31 of 74), {2} a number of seconds.
+        Line { text: root.left >= 0 ? @tr("{0} of {1} MB · about {2} s left", root.done, root.total, root.left) : @tr("{0} of {1} MB", root.done, root.total); }
+    }
+}
+
+// Loudness Only: a scan without the sound model (loud moments only); offered wherever the model is missing.
+component LoudnessOnly inherits Action {
+    min-height: Theme.button-primary-height;
+    text: @tr("Loudness Only");
+    tip: @tr("Scan without the model: loud moments only");
+    clicked => { ClipBridge.loudness-only(); }
+}
+
 // The scan in progress (the export card's look): name, Cancel, the bar, percent and the time left.
 component ScanCard inherits Rectangle {
     in property <int> percent;
@@ -1466,6 +1534,17 @@ component ScanCard inherits Rectangle {
     }
 }
 
+// A suggestion's strength (design D8): three bars, as many lit as it is strong (1 weak – 3 strong); no number.
+component StrengthMeter {
+    in property <int> level;
+    width: 9px;
+    height: 8px;
+    // Three fixed bars, rising: lit up to the level.
+    Rectangle { x: 0px; y: 5px; width: 2px; height: 3px; border-radius: 0.5px; background: root.level >= 1 ? Theme.text-list : Theme.line; }
+    Rectangle { x: 3px; y: 2.5px; width: 2px; height: 5.5px; border-radius: 0.5px; background: root.level >= 2 ? Theme.text-list : Theme.line; }
+    Rectangle { x: 6px; y: 0px; width: 2px; height: 8px; border-radius: 0.5px; background: root.level >= 3 ? Theme.text-list : Theme.line; }
+}
+
 // One suggestion (the Collection row's look): its first picture with its length, the times, the kind, + and ×;
 // a click selects it (it becomes the Range), a double-click plays it from its start. The selected row has Start
 // and End under it: the Range card's Now buttons, which move the selected suggestion's edges.
@@ -1480,8 +1559,11 @@ component SuggestionItem inherits Rectangle {
         y: 0px;
         width: root.width;
         height: 46px;
-        // TRANSLATORS: {} is how many loudness units (LU) the suggestion's loudest moment is above the video's average.
-        text: @tr("+{} LU above the video's average", root.entry.lu);
+        // Each sound with its strength in words, then how far the loudness is above the video's average (R2).
+        text: (root.entry.kind2 != "" ? Words.sound-strength(root.entry.kind, root.entry.level1) + "\n" + Words.sound-strength(root.entry.kind2, root.entry.level2) + "\n"
+                : root.entry.kind != "loud" ? Words.sound-strength(root.entry.kind, root.entry.level1) + "\n" : "")
+            // TRANSLATORS: {} is how many loudness units (LU) the suggestion's loudest moment is above the video's average.
+            + @tr("+{} LU above the video's average", root.entry.lu);
         area := TouchArea {
             width: root.width;
             height: 46px;
@@ -1535,7 +1617,18 @@ component SuggestionItem inherits Rectangle {
                 horizontal-stretch: 1;
                 // A narrow tab drops the tenths.
                 Text { text: root.narrow ? root.entry.brief : root.entry.range; color: Theme.text; font-family: Theme.font-mono; font-size: Theme.font-body; overflow: elide; }
-                Text { text: root.entry.kind == "loud" ? @tr("Loud") : root.entry.kind; color: Theme.text-dim; font-size: Theme.font-xs; overflow: elide; }
+                HorizontalLayout {
+                    spacing: 4px;
+                    StrengthMeter { level: root.entry.level; }
+                    Text {
+                        // TRANSLATORS: {0} and {1} are two sounds of one suggestion, the stronger first ("Laughter + applause").
+                        text: root.entry.kind2 != "" ? @tr("{0} + {1}", Words.sound-name(root.entry.kind), Words.sound-name-lower(root.entry.kind2)) : Words.sound-name(root.entry.kind);
+                        color: Theme.text-dim;
+                        font-size: Theme.font-xs;
+                        overflow: elide;
+                        horizontal-stretch: 1;
+                    }
+                }
             }
             VerticalLayout {
                 alignment: center;
@@ -1736,6 +1829,9 @@ export component ClipExportTab inherits Rectangle {
     private property <string> hl-state: ClipBridge.highlights.state;
     private property <bool> hl-review: root.hl-state == "done";
     private property <bool> hl-scanned: root.hl-review || root.hl-state == "nothing";
+    private property <string> hl-model: ClipBridge.highlights.model;
+    // A file not scanned (or changed, or after a problem): the page offers a scan, or the model's download first.
+    private property <bool> hl-offer: root.hl-state == "ready" || root.hl-state == "changed" || root.hl-state == "error";
     // The sub-tabs' labels: Highlights counts what is left, except in a narrow tab (design §7). The tabs are sized
     // from `tab-labels`, which never depends on the tab's width (that would make the width depend on itself).
     private property <[string]> tab-labels: [
@@ -2477,20 +2573,49 @@ export component ClipExportTab inherits Rectangle {
                             }
                         }
                     }
-                    // Before a scan (S1) and after a problem: what it finds, and for what.
-                    if root.hl-state == "ready" || root.hl-state == "error": VerticalLayout {
+                    // Before a scan (S1, F1) and after a problem: what it finds, and for what (not while the model downloads).
+                    if (root.hl-state == "ready" || root.hl-state == "error") && root.hl-model != "downloading": VerticalLayout {
                         spacing: 2px;
                         padding-top: 6px;
-                        // Step 1 measures loudness only: the intro promises no more (the sound model, step 3, widens it).
-                        Line { align: center; color: Theme.text; text: @tr("Finds the moments where the sound rises:"); }
-                        Line { align: center; color: Theme.text; text: @tr("a crowd, a reaction, a big scene."); }
+                        Line { align: center; color: Theme.text; text: @tr("Finds the moments the audience reacts to:"); }
+                        Line { align: center; color: Theme.text; text: @tr("laughter, applause, cheering and loud peaks."); }
                         Line { align: center; text: @tr("Best on stand-up, talk shows, streams and sports."); }
                     }
                     // A changed file (S5).
                     if root.hl-state == "changed": Line { align: center; color: Theme.text; text: @tr("The file changed since the last scan."); }
-                    // A problem: the page's one red line (FFmpeg missing, a failed scan).
+                    // F1: the download the button names (its size); nothing is fetched before the click.
+                    if root.hl-offer && root.hl-model == "none": VerticalLayout {
+                        spacing: 2px;
+                        padding-top: 4px;
+                        // TRANSLATORS: {} is the size of the download in megabytes.
+                        Line { align: center; text: @tr("Needs a sound model: one download ({} MB),", ClipBridge.highlights.model-mb); }
+                        Line { align: center; text: @tr("verified after download. The video stays on this computer."); }
+                    }
+                    // F2: the download, with Cancel; the scan starts when it finishes.
+                    if root.hl-offer && root.hl-model == "downloading": DownloadCard {
+                        done: ClipBridge.highlights.dl-done;
+                        total: ClipBridge.highlights.dl-total;
+                        left: ClipBridge.highlights.dl-left;
+                    }
+                    if root.hl-offer && root.hl-model == "downloading": Line { align: center; text: @tr("The scan starts when it finishes."); }
+                    // F3–F5: how the download ended.
+                    // TRANSLATORS: {} is why the download failed (a short technical reason).
+                    if root.hl-offer && root.hl-model == "failed": Line { align: center; color: Theme.danger; text: ClipBridge.highlights.dl-reason != "" ? @tr("Download failed: {}", ClipBridge.highlights.dl-reason) : @tr("Download failed"); }
+                    if root.hl-offer && root.hl-model == "checksum": VerticalLayout {
+                        spacing: 2px;
+                        Line { align: center; color: Theme.danger; text: @tr("The download did not match its checksum"); }
+                        Line { align: center; color: Theme.danger; text: @tr("and was deleted."); }
+                    }
+                    if root.hl-offer && root.hl-model == "offline": VerticalLayout {
+                        spacing: 2px;
+                        Line { align: center; color: Theme.text; text: @tr("No internet connection."); }
+                        Line { align: center; text: @tr("The model downloads once; scans then work offline."); }
+                    }
+                    // A problem: the page's one red line (FFmpeg missing, a failed scan, the model not starting).
                     if root.hl-state == "error": Line { align: center; color: Theme.danger; text: Words.reason(ClipBridge.highlights.reason, ClipBridge.highlights.raw); }
-                    if root.hl-state == "ready" || root.hl-state == "changed" || root.hl-state == "error": HorizontalLayout {
+                    // S1 (the model is there): Find Highlights; after the model failed, Loudness Only beside it.
+                    if root.hl-offer && root.hl-model == "installed": HorizontalLayout {
+                        spacing: 4px;
                         Action {
                             horizontal-stretch: 1;
                             min-height: Theme.button-primary-height;
@@ -2503,6 +2628,20 @@ export component ClipExportTab inherits Rectangle {
                             tip-keys: [{ key: ClipBridge.keys.highlights, text: "" }];
                             clicked => { ClipBridge.find-highlights(); }
                         }
+                        if ClipBridge.highlights.reason == "modelFailed": LoudnessOnly {}
+                    }
+                    // F1: Download and Scan (the consent) and Loudness Only; F3–F5: Retry or Download Again and Loudness Only.
+                    if root.hl-offer && root.hl-model != "installed" && root.hl-model != "downloading": HorizontalLayout {
+                        spacing: 4px;
+                        Action {
+                            horizontal-stretch: 1;
+                            min-height: Theme.button-primary-height;
+                            primary: root.hl-model == "none";
+                            text: root.hl-model == "none" ? @tr("Download and Scan") : root.hl-model == "checksum" ? @tr("Download Again") : @tr("Retry");
+                            glyph: root.hl-model == "none" ? Glyphs.sound : Glyphs.retry;
+                            clicked => { ClipBridge.download-model(); }
+                        }
+                        LoudnessOnly {}
                     }
                     // The scan (S2): it goes on in the background.
                     if root.hl-state == "scanning": ScanCard {
@@ -2518,6 +2657,11 @@ export component ClipExportTab inherits Rectangle {
                         Line { align: center; color: Theme.text; text: @tr("Nothing stood out in this video."); }
                         Line { align: center; text: @tr("This listens for audience sound: films and"); }
                         Line { align: center; text: @tr("music often have none."); }
+                    }
+                    // R4: a scan with the model that found only loud moments.
+                    if root.hl-review && ClipBridge.highlights.only-loud: VerticalLayout {
+                        Line { text: @tr("Only loud moments here. Loud is not always good:"); }
+                        Line { text: @tr("check before adding."); }
                     }
                     // The review: how many are left, how many to show.
                     if root.hl-review: HorizontalLayout {
@@ -2671,6 +2815,18 @@ export component ClipExportTab inherits Rectangle {
                                 Chip { variable: "{time}"; target: root.template-target; }
                                 Chip { variable: "{n}"; target: root.template-target; }
                             }
+                        }
+                    }
+
+                    // The sound model of Highlights, while it is downloaded: its size and Remove (the page offers it again).
+                    if ClipBridge.highlights.model == "installed": Heading { text: @tr("Highlights"); }
+                    if ClipBridge.highlights.model == "installed": HorizontalLayout {
+                        spacing: 4px;
+                        // TRANSLATORS: {} is the size of the sound model's files in megabytes.
+                        Line { text: @tr("Sound model · {} MB", ClipBridge.highlights.model-mb); color: Theme.text; }
+                        Action {
+                            text: @tr("Remove");
+                            clicked => { ClipBridge.remove-model(); }
                         }
                     }
 

@@ -14,6 +14,8 @@ clen = "clen"
 # still checked.
 extend-exclude = [
   "plugins/shaderupscale/shaders/*/",
+  # Vendored third-party runtime (minified, unchanged upstream file).
+  "plugins/clipexport/vendor/*/",
   # Translated catalogs are not English (a German "oder" is no typo); messages.pot, the English source, is still checked.
   "plugins/*/locales/*.po",
 ]
