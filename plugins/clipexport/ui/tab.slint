@@ -491,6 +491,15 @@ component Action {
     in property <string> tip;
     in property <[ToolTipKey]> tip-keys;
     in property <string> tip-detail;
+    // The width it asks for with its label and key cap whole, whatever `show-key` says: a row compares it with its room
+    // to decide whether the caps fit (the decision never depends on the width it changes).
+    out property <length> full-width: (root.text != "" && root.show-text ? 2 * Theme.button-padding : 8px)
+        + (root.glyph != "" ? 14px : 0px) + (root.text != "" && root.show-text ? label-width.preferred-width : 0px)
+        + (root.key != "" ? key-width.width : 0px)
+        + max(0, (root.glyph != "" ? 1 : 0) + (root.text != "" && root.show-text ? 1 : 0) + (root.key != "" ? 1 : 0) - 1) * 5px;
+    // The label shows elided where the row gives the button less than it asks for: a button without a tooltip of its
+    // own then has its label as one (the others' tooltips already name what they do).
+    private property <bool> elided: root.text != "" && root.show-text && root.width < row.preferred-width - 0.5px;
     callback clicked();
     min-height: Theme.button-height;
     preferred-height: Theme.button-height;
@@ -503,11 +512,14 @@ component Action {
     accessible-label: root.text != "" ? root.text : root.tip;
     accessible-enabled: root.enabled;
     accessible-action-default => { if root.enabled { root.clicked(); } }
+    // Never shown: they measure the label and the cap for `full-width` (a Text and a cap outside the row's layout).
+    label-width := Text { visible: false; text: root.text; font-size: Theme.font-body; }
+    key-width := KeyHint { visible: false; text: root.key; }
     // The button fills the room its row gives it (a stretched Export Merged is one wide button, not a centred one).
     ToolTipArea {
         width: 100%;
         height: 100%;
-        text: root.tip;
+        text: root.elided && root.tip == "" ? root.text : root.tip;
         keys: root.tip-keys;
         detail: root.tip-detail;
         Rectangle {
@@ -535,6 +547,8 @@ component Action {
                     color: !root.enabled ? Theme.text-dim : root.primary ? Theme.text : Theme.text-list;
                     font-size: Theme.font-body;
                     vertical-alignment: center;
+                    // A row too narrow for every label shortens it with an ellipsis, never cuts it at the edge.
+                    overflow: elide;
                 }
                 if root.show-key && root.key != "": VerticalLayout {
                     alignment: center;
@@ -1765,6 +1779,9 @@ export component ClipExportTab inherits Rectangle {
     background: Theme.bg-panel;
     // The width classes: narrow < 317 px (key caps move to the tooltips).
     private property <bool> narrow: root.width < 317px;
+    // The room of a row in the Clip page's Range card: the tab less the page's scroll bar (12 px) and padding (10 + 4)
+    // and the card's padding (11 + 8). From the tab's own width, so that what a row shows never changes its room.
+    private property <length> range-room: root.width - 45px;
     private property <bool> fast: ClipBridge.support.fast && ClipBridge.method-index == 0;
     // Precise writes an animated image (the Quality chooser's Animated GIF or Animated WebP): no sound, its encoding is fixed.
     private property <bool> animated: !root.fast && ClipBridge.support.encode && (ClipBridge.preset-index == 3 || ClipBridge.preset-index == 4);
@@ -1841,9 +1858,10 @@ export component ClipExportTab inherits Rectangle {
         ClipBridge.unseen > 0 ? @tr("Results ({})", ClipBridge.unseen) : @tr("Results"),
         @tr("Settings"),
     ];
-    private property <string> highlights-label: root.narrow ? @tr("Highlights") : root.tab-labels[1];
+    // The count goes too where the four labels with it do not fit (German at the default width): a tab is never cut.
+    private property <string> highlights-label: root.narrow || root.width < root.tabs-width ? @tr("Highlights") : root.tab-labels[1];
     // What the four tabs ask for: 74 px each as in Tabs, a longer label its own width.
-    private property <length> tabs-width: max(74px, measure-clip.preferred-width + 12px) + max(74px, measure-highlights.preferred-width + 12px) + max(74px, measure-results.preferred-width + 12px) + max(74px, measure-settings.preferred-width + 12px);
+    private property <length> tabs-width: max(74px, measure-clip.preferred-width + 12px) + max(74px, measure-counted.preferred-width + 12px) + max(74px, measure-results.preferred-width + 12px) + max(74px, measure-settings.preferred-width + 12px);
 
     // The transition picker: where it opens, and the tile the arrow keys light (-1: none).
     private property <length> picker-y;
@@ -2001,7 +2019,9 @@ export component ClipExportTab inherits Rectangle {
             height: 31px;
             background: Theme.bg-bar;
             measure-clip := Text { visible: false; text: root.tab-labels[0]; font-size: Theme.font-tab; }
-            measure-highlights := Text { visible: false; text: root.tab-labels[1]; font-size: Theme.font-tab; }
+            // Highlights with its count (whether the four fit with it), and the label it shows (what its tab asks for).
+            measure-counted := Text { visible: false; text: root.tab-labels[1]; font-size: Theme.font-tab; }
+            measure-highlights := Text { visible: false; text: root.highlights-label; font-size: Theme.font-tab; }
             measure-results := Text { visible: false; text: root.tab-labels[2]; font-size: Theme.font-tab; }
             measure-settings := Text { visible: false; text: root.tab-labels[3]; font-size: Theme.font-tab; }
             strip-keys := FocusScope {
@@ -2338,9 +2358,11 @@ export component ClipExportTab inherits Rectangle {
                                         early: ClipBridge.note.early;
                                         end: ClipBridge.note.end;
                                     }
+                                    // Each row shows its key caps only where they fit beside the other button (German, French
+                                    // and Korean labels need the room at the default sidebar width); the keys stay in the tooltips.
                                     HorizontalLayout {
                                         spacing: 4px;
-                                        Action {
+                                        use-ab := Action {
                                             text: @tr("Use A-B range");
                                             glyph: Glyphs.ab;
                                             enabled: ClipBridge.ab.shown;
@@ -2355,7 +2377,7 @@ export component ClipExportTab inherits Rectangle {
                                             text: @tr("Last {} s", ClipBridge.last-seconds);
                                             glyph: Glyphs.back;
                                             key: ClipBridge.keys.last;
-                                            show-key: !root.narrow;
+                                            show-key: !root.narrow && use-ab.full-width + 4px + self.full-width <= root.range-room;
                                             enabled: ClipBridge.can-last && !ClipBridge.queue-full;
                                             // TRANSLATORS: {} is 10, 30, 60 or 120.
                                             tip: @tr("Export Last {} Seconds", ClipBridge.last-seconds);
@@ -2373,7 +2395,7 @@ export component ClipExportTab inherits Rectangle {
                                             text: @tr("Export Clip");
                                             glyph: Glyphs.film;
                                             key: ClipBridge.keys.clip;
-                                            show-key: !root.narrow;
+                                            show-key: !root.narrow && self.full-width + 4px + export-as.full-width <= root.range-room;
                                             enabled: !ClipBridge.clip-busy && !ClipBridge.queue-full && ClipBridge.field-error == "";
                                             // TRANSLATORS: {} is the clip's file name.
                                             tip: ClipBridge.queue-full ? Words.reason("queueFull", "")
@@ -2383,7 +2405,7 @@ export component ClipExportTab inherits Rectangle {
                                             tip-detail: root.estimate-text;
                                             clicked => { root.clip-export(); }
                                         }
-                                        Action {
+                                        export-as := Action {
                                             text: @tr("Export As…");
                                             enabled: !ClipBridge.clip-busy && !ClipBridge.queue-full && ClipBridge.field-error == "";
                                             tip: @tr("Export the range into a file you choose");

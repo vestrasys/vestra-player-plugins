@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { mkdir, open, readdir, readFile, rename, rm, stat } from "node:fs/promises";
+import { mkdir, open, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { setGlobalProxyFromEnv } from "node:http";
 import { join } from "node:path";
 
@@ -50,6 +50,14 @@ export const allowedHost = (url: string) => {
     return false;
   }
 };
+/**
+ * Left in the model's folder when a file failed its check on a load (and was deleted): the page shows F4 (the
+ * checksum, Download Again) for it, also after the plugin stopped and started again, until a download starts or
+ * Remove deletes the folder.
+ */
+export const CHECK_FAILED = ".check-failed";
+/** Whether a load found a file that failed its check since the last download (`CHECK_FAILED`). */
+export const checkFailed = async (folder: string | null) => !!folder && !!(await stat(join(folder, CHECK_FAILED)).catch(() => null));
 /** No answer or no bytes for this long ends a download. */
 const STALL = 30_000;
 
@@ -126,8 +134,9 @@ export class SoundModel {
    * The files' bytes for a scan. Everything is decided from the bytes read,
    * never from an earlier look at the file: their length and their SHA-256
    * must be the pinned ones, on every load (about 25 MB, tens of ms per
-   * scan). A file that is not the pinned one is deleted and the result is
-   * `null` (the page asks for the download again); a missing one is `null`.
+   * scan). A file that is not the pinned one is deleted, `CHECK_FAILED` is
+   * left in its place and the result is `null` (the page shows F4 and offers
+   * the download again); a missing one is `null`.
    */
   async load(): Promise<{ model: Uint8Array; wasm: Uint8Array } | null> {
     if (!this.folder) return null;
@@ -138,6 +147,7 @@ export class SoundModel {
       if (!bytes) return null;
       if (bytes.length !== file.size || createHash("sha256").update(bytes).digest("hex") !== file.sha256) {
         await rm(path, { force: true }).catch(() => {});
+        await writeFile(join(this.folder, CHECK_FAILED), "").catch(() => {});
         return null;
       }
       out.push(bytes);
@@ -147,13 +157,22 @@ export class SoundModel {
 
   /** Remove (Settings): the files go; the page offers the download again. */
   async remove() {
-    this.cancel();
+    await this.cancel();
     if (this.folder) await rm(this.folder, { recursive: true, force: true }).catch(() => {});
   }
 
-  /** Cancel the download (the card's ×): the partial files go. */
-  cancel() {
-    this.#download?.controller.abort();
+  /**
+   * Cancel the download (the card's ×, the plugin stopping): the partial files go. The promise settles once the
+   * download has ended and its partial file is deleted.
+   */
+  cancel(): Promise<void> {
+    const download = this.#download;
+    if (!download) return Promise.resolve();
+    download.controller.abort();
+    return download.promise.then(
+      () => {},
+      () => {},
+    );
   }
 
   /** Download the files that are missing (one download at a time; a second call shares it). */
@@ -175,8 +194,8 @@ export class SoundModel {
     } catch (error) {
       throw new DownloadError("failed", (error as Error).message);
     }
-    // Leftovers of a download a crash cut short.
-    for (const name of await readdir(folder).catch(() => [] as string[])) if (name.startsWith(".download-")) await rm(join(folder, name), { force: true }).catch(() => {});
+    // Leftovers of a download a crash cut short; a new download ends what a failed check said (F4).
+    for (const name of await readdir(folder).catch(() => [] as string[])) if (name.startsWith(".download-") || name === CHECK_FAILED) await rm(join(folder, name), { force: true }).catch(() => {});
     const total = this.files.reduce((sum, file) => sum + file.size, 0);
     let done = 0;
     progress({ received: 0, total });
