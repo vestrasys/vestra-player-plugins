@@ -792,3 +792,117 @@ test("the plugin stopping during the model's download aborts it and deletes the 
     await setup.cleanup();
   }
 });
+
+test("Scan Again above a scanned file without the model shows the offer in every state (removed, never downloaded, a download that failed or found no connection), never a loudness-only rescan; Loudness Only, chosen, still rescans by loudness", async () => {
+  const setup = await withMedia();
+  const other = join(dirname(setup.media), "other.mp4");
+  await writeFile(other, "other bytes");
+  const host = new TestHost();
+  fakeFfmpeg(host);
+  setup.play(host);
+  const model = new FakeModel(true);
+  const { stop } = await start(host, setup.data, model);
+  /** The file again, from another one: its kept result shows (done). */
+  const reopen = async () => {
+    setup.play(host, other);
+    await eventually(() => page(host).name, "other.mp4");
+    setup.play(host);
+    await eventually(() => [page(host).name, page(host).state], ["standup.mp4", "done"]);
+  };
+  try {
+    await eventually(() => page(host).model, "installed");
+    host.mounted().emit("find-highlights");
+    await eventually(() => page(host).state, "done");
+    const runs = loudRuns(host);
+    // Settings ▸ Remove, then Scan Again: F1 (Download and Scan, Loudness Only), no scan.
+    host.mounted().emit("remove-model");
+    await eventually(() => page(host).model, "none");
+    host.mounted().emit("find-highlights");
+    await eventually(() => page(host).state, "ready", "F1 above the file");
+    assert.equal(loudRuns(host), runs);
+    // A download that finds no connection (F5), then one that fails (F3): Scan Again above the scanned file shows them.
+    for (const [error, shown] of [[new DownloadError("offline", "ENOTFOUND"), "offline"], [new DownloadError("failed", "HTTP 503"), "failed"]] as const) {
+      model.outcome = error;
+      host.mounted().emit("download-model");
+      await eventually(() => page(host).model, shown);
+      await reopen();
+      host.mounted().emit("find-highlights");
+      await eventually(() => page(host).state, "ready", `${shown}: the offer`);
+      assert.equal(page(host).model, shown);
+      assert.equal(loudRuns(host), runs, "no loudness-only rescan");
+    }
+    // The command does not scan either (it never did without the model or the choice).
+    await host.command("clip.highlights").run();
+    await host.settle();
+    assert.equal(loudRuns(host), runs);
+    // Loudness Only, chosen: a scan by loudness, and Scan Again then rescans that way (the saved choice).
+    host.mounted().emit("loudness-only");
+    await eventually(() => page(host).state, "done");
+    assert.equal(page(host).loudness, true);
+    const chosen = loudRuns(host);
+    host.mounted().emit("find-highlights");
+    await until(() => loudRuns(host) > chosen, "Scan Again by loudness, as chosen");
+    await eventually(() => page(host).state, "done");
+    assert.equal(model.downloads, 2, "Scan Again never downloads");
+  } finally {
+    await stop();
+    await setup.cleanup();
+  }
+});
+
+test("the failed check's mark: a load that passes ends it; a Download Again that fails or is cancelled keeps it (F4 again after Cancel and after a restart); one that completes ends it", async () => {
+  const setup = await withMedia();
+  const folder = join(setup.data, "sound-model");
+  const a = new Uint8Array(1000).fill(7);
+  const files = [fileOf("m.onnx", a)];
+  try {
+    // A load that passes (the file put back) ends the mark.
+    await new SoundModel({ folder, files, fetch: fetchOf({ [files[0]!.url]: a }).fetch }).download(() => {});
+    await writeFile(join(folder, CHECK_FAILED), "");
+    assert.ok(await new SoundModel({ folder, files }).load());
+    assert.equal(await checkFailed(folder), false);
+    // A failed check; then Download Again that is cancelled, and one without a connection.
+    await writeFile(join(folder, "m.onnx"), new Uint8Array(1000).fill(8));
+    assert.equal(await new SoundModel({ folder, files }).load(), null);
+    assert.equal(await checkFailed(folder), true);
+    const hanging = hangingFetch(files[0]!, a);
+    let offline = false;
+    const fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      if (offline) throw Object.assign(new TypeError("fetch failed"), { cause: { code: "ENOTFOUND" } });
+      return hanging.fetch(url, init);
+    }) as typeof globalThis.fetch;
+    const host = new TestHost();
+    fakeFfmpeg(host);
+    setup.play(host);
+    const first = await startWith(host, setup.data, new SoundModel({ folder, files, fetch }));
+    try {
+      await eventually(() => page(host).model, "checksum");
+      host.mounted().emit("download-model");
+      await eventually(() => page(host).model, "downloading");
+      await until(() => partial(folder), "the partial file");
+      host.mounted().emit("cancel-download");
+      await eventually(() => page(host).model, "checksum", "Cancel goes back to F4, the check still unresolved");
+      assert.equal(await partial(folder), false);
+      offline = true;
+      host.mounted().emit("download-model");
+      await eventually(() => page(host).model, "offline");
+      assert.equal(await checkFailed(folder), true, "a failed retry keeps the mark");
+    } finally {
+      await first.stop();
+    }
+    const again = new TestHost();
+    fakeFfmpeg(again);
+    setup.play(again);
+    const second = await startWith(again, setup.data, new SoundModel({ folder, files, fetch: fetchOf({ [files[0]!.url]: a }).fetch }));
+    try {
+      await eventually(() => page(again).model, "checksum", "F4 after a restart");
+      again.mounted().emit("download-model");
+      await eventually(() => page(again).model, "installed");
+      assert.equal(await checkFailed(folder), false, "a completed download ends it");
+    } finally {
+      await second.stop();
+    }
+  } finally {
+    await setup.cleanup();
+  }
+});

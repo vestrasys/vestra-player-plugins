@@ -1174,8 +1174,10 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       // Stopped meanwhile: the download was cancelled and its partial files went; nothing to show.
       if (modelStopped) return;
       const kind = error instanceof DownloadError ? error.kind : "failed";
-      // Cancel goes back to F1; the partial file is gone.
-      Object.assign(model, { state: kind === "cancelled" ? "none" : kind, reason: kind === "failed" ? message(error).slice(0, 120) : "" });
+      // Cancel goes back to F1 (to F4 while a failed check is still unresolved: its mark stays); the partial file is gone.
+      const back = kind === "cancelled" ? ((await checkFailed(soundModel.folder)) ? "checksum" : "none") : kind;
+      if (modelStopped) return;
+      Object.assign(model, { state: back, reason: kind === "failed" ? message(error).slice(0, 120) : "" });
       if (kind !== "cancelled") console.error(`[clipexport] sound model download: ${message(error)}`);
       plugin.update();
       return;
@@ -1333,9 +1335,13 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     const view = highlightsFor(seen);
     if (!view || !seen.duration) return;
     if (scan?.key === view.key) return;
-    // The model failed its check (F4): a scan asked for shows the offer again (Download Again, Loudness Only)
-    // rather than measuring loudness alone, unless Loudness Only is the user's saved choice.
-    if (how === "auto" && model.state === "checksum" && !settings.highlightLoudness) {
+    // Without the model, a scan asked for never measures loudness alone unless Loudness Only is the user's choice
+    // (the button, or that choice saved): it shows the offer instead (F1 Download and Scan, F2 the download running,
+    // F3 Retry, F4 Download Again, F5 Retry; each with Loudness Only). That is Scan Again above a scanned file, in
+    // every one of these states (never downloaded, removed in Settings, a download that failed or found no
+    // connection), and any request after a failed check. Above a file not scanned the page already shows the offer
+    // and no Find Highlights button.
+    if (how === "auto" && model.state !== "installed" && !settings.highlightLoudness && (model.state === "checksum" || view.status === "done")) {
       offerModel(view.key);
       return void plugin.update();
     }

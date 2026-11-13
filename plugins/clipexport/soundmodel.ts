@@ -52,8 +52,8 @@ export const allowedHost = (url: string) => {
 };
 /**
  * Left in the model's folder when a file failed its check on a load (and was deleted): the page shows F4 (the
- * checksum, Download Again) for it, also after the plugin stopped and started again, until a download starts or
- * Remove deletes the folder.
+ * checksum, Download Again) for it, also after the plugin stopped and started again, until a download completes,
+ * a load passes, or Remove deletes the folder. A download that fails or is cancelled leaves it.
  */
 export const CHECK_FAILED = ".check-failed";
 /** Whether a load found a file that failed its check since the last download (`CHECK_FAILED`). */
@@ -152,6 +152,8 @@ export class SoundModel {
       }
       out.push(bytes);
     }
+    // Every file passed its check (put back by hand, say): no failed check is outstanding.
+    await rm(join(this.folder, CHECK_FAILED), { force: true }).catch(() => {});
     return { model: out[0]!, wasm: out[1]! };
   }
 
@@ -194,8 +196,8 @@ export class SoundModel {
     } catch (error) {
       throw new DownloadError("failed", (error as Error).message);
     }
-    // Leftovers of a download a crash cut short; a new download ends what a failed check said (F4).
-    for (const name of await readdir(folder).catch(() => [] as string[])) if (name.startsWith(".download-") || name === CHECK_FAILED) await rm(join(folder, name), { force: true }).catch(() => {});
+    // Leftovers of a download a crash cut short.
+    for (const name of await readdir(folder).catch(() => [] as string[])) if (name.startsWith(".download-")) await rm(join(folder, name), { force: true }).catch(() => {});
     const total = this.files.reduce((sum, file) => sum + file.size, 0);
     let done = 0;
     progress({ received: 0, total });
@@ -209,6 +211,9 @@ export class SoundModel {
       await this.#fetchOne(file, folder, signal, (received) => progress({ received: done + received, total }));
       done += file.size;
     }
+    // Every file is there and passed its check: what a failed check said (F4) is over. A download that failed or was
+    // cancelled leaves the mark, so F4 still shows after a restart.
+    await rm(join(folder, CHECK_FAILED), { force: true }).catch(() => {});
   }
 
   async #fetchOne(file: ModelFile, folder: string, signal: AbortSignal, progress: (received: number) => void) {
