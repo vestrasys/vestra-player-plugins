@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -204,7 +204,7 @@ test("the model's files: the pinned two (model 10.4 MB from Hugging Face at a co
   );
 });
 
-test("download: both files with progress, kept only when they match their SHA-256; then loaded (checked); a damaged file is deleted on load; Remove deletes them", async () => {
+test("download: both files with progress, kept only when they match their SHA-256; then loaded, its bytes checked on every load (a file swapped with the same size and time, or cut short, is deleted); Remove deletes them", async () => {
   const folder = join(await mkdtemp(join(tmpdir(), "clipexport-model-")), "sound-model");
   try {
     const a = new Uint8Array(1000).fill(7);
@@ -225,13 +225,24 @@ test("download: both files with progress, kept only when they match their SHA-25
     assert.deepEqual((await readdir(folder)).sort(), ["m.onnx", "r.wasm"], "no temporary file left");
     const loaded = await model.load();
     assert.deepEqual([loaded?.model.length, loaded?.wasm.length], [1000, 3000]);
-    // A file changed on disk (same size): not loaded, deleted, so the page asks for the download again.
+    // A file swapped on disk with the same size and the same modification time: its bytes decide, on every load.
+    // Not loaded, deleted, so the page asks for the download again.
+    const before = await stat(join(folder, "m.onnx"));
     await writeFile(join(folder, "m.onnx"), new Uint8Array(1000).fill(8));
+    await utimes(join(folder, "m.onnx"), before.atime, before.mtime);
     assert.equal(await model.load(), null);
     assert.equal(existsSync(join(folder, "m.onnx")), false);
     // A second download fetches only what is missing.
     await model.download(() => {});
     assert.equal(calls.length, 3);
+    assert.ok(await model.load());
+    // A file of another length (cut short): deleted too.
+    await writeFile(join(folder, "r.wasm"), b.subarray(0, 2000));
+    assert.equal(await model.load(), null);
+    assert.equal(existsSync(join(folder, "r.wasm")), false);
+    assert.equal(await model.installed(), false);
+    await model.download(() => {});
+    assert.equal(calls.length, 4);
     await model.remove();
     assert.equal(existsSync(folder), false);
     assert.equal(await model.installed(), false);

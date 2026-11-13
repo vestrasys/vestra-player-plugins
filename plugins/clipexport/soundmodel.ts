@@ -7,7 +7,7 @@ import { join } from "node:path";
  * The sound model's files (design clipexport-highlights §4.1, step 3): two
  * files, downloaded together after the user's click on Download and Scan
  * (that click is the consent), each checked against the SHA-256 pinned here
- * before it is kept, and again (by its stamp, else its bytes) before it is
+ * before it is kept, and again (its bytes, on every load) before it is
  * used. They live in `<data>/sound-model/`; Remove (Settings) deletes them.
  *
  * - The model: CED-mini (Apache-2.0, by mispeech: github.com/RicherMans/CED),
@@ -99,8 +99,6 @@ export class SoundModel {
   readonly files: readonly ModelFile[];
   readonly #fetch: typeof fetch;
   readonly #stall: number;
-  /** The stamps (size, time) of the files last checked whole; a changed stamp checks the bytes again. */
-  #checked = new Map<string, string>();
   #download: { controller: AbortController; promise: Promise<void> } | null = null;
 
   constructor(options: ModelOptions) {
@@ -125,27 +123,22 @@ export class SoundModel {
   }
 
   /**
-   * The files' bytes for a scan, each checked against its pinned SHA-256
-   * (once per stamp); a file that fails is deleted and the result is `null`
-   * (the page asks for the download again).
+   * The files' bytes for a scan. Everything is decided from the bytes read,
+   * never from an earlier look at the file: their length and their SHA-256
+   * must be the pinned ones, on every load (about 25 MB, tens of ms per
+   * scan). A file that is not the pinned one is deleted and the result is
+   * `null` (the page asks for the download again); a missing one is `null`.
    */
   async load(): Promise<{ model: Uint8Array; wasm: Uint8Array } | null> {
     if (!this.folder) return null;
     const out: Uint8Array[] = [];
     for (const file of this.files) {
       const path = join(this.folder, file.name);
-      const info = await stat(path).catch(() => null);
-      if (!info?.isFile() || info.size !== file.size) return null;
       const bytes = await readFile(path).catch(() => null);
       if (!bytes) return null;
-      const stamp = `${info.size}:${info.mtimeMs}`;
-      if (this.#checked.get(file.name) !== stamp) {
-        if (createHash("sha256").update(bytes).digest("hex") !== file.sha256) {
-          await rm(path, { force: true }).catch(() => {});
-          this.#checked.delete(file.name);
-          return null;
-        }
-        this.#checked.set(file.name, stamp);
+      if (bytes.length !== file.size || createHash("sha256").update(bytes).digest("hex") !== file.sha256) {
+        await rm(path, { force: true }).catch(() => {});
+        return null;
       }
       out.push(bytes);
     }
@@ -155,7 +148,6 @@ export class SoundModel {
   /** Remove (Settings): the files go; the page offers the download again. */
   async remove() {
     this.cancel();
-    this.#checked.clear();
     if (this.folder) await rm(this.folder, { recursive: true, force: true }).catch(() => {});
   }
 

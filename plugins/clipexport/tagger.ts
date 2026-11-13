@@ -73,7 +73,7 @@ export function startTagger(wasm: Uint8Array, model: Uint8Array, signal: AbortSi
     });
     worker.on("error", (error: Error) => end(new ModelError(error.message)));
     worker.on("exit", (code) => end(new ModelError(`the sound model stopped (exit ${code})`)));
-    // Copies: the caller keeps its buffers (they are checked again on the next scan only by their stamp).
+    // Copies handed over whole: the caller keeps its buffers.
     const wasmCopy = wasm.slice().buffer;
     const modelCopy = model.slice().buffer;
     worker.postMessage({ type: "init", wasm: wasmCopy, model: modelCopy }, [wasmCopy, modelCopy]);
