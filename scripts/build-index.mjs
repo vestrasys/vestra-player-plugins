@@ -22,6 +22,11 @@
  *              directory, no releases unless --releases is given; --out
  *              defaults to a new temporary directory. Prints the index.
  *
+ * Every version added to the index gets its capability scan (`scan`:
+ * scripts/lib/scan.mjs) from the installed SDK's `vestra-plugin scan`. An
+ * SDK older than 1.8.0 has none: the field is then left out, unless
+ * package.json asks for an SDK that has it.
+ *
  * Layout and rules: scripts/lib/build.mjs and scripts/lib/publishing.mjs.
  */
 import { mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
@@ -36,6 +41,7 @@ import {
   serializeIndex,
   settings,
 } from "./lib/publishing.mjs";
+import { sdkScanner } from "./lib/scan.mjs";
 import { readTrustedKeys } from "./lib/signing.mjs";
 
 const root = resolve(import.meta.dirname, "..");
@@ -93,6 +99,12 @@ try {
       : "previous index: none (first publish)",
   );
 
+  const scanner = await sdkScanner(root);
+  console.log(
+    scanner.scan
+      ? `capability scan: @vestra-player/sdk ${scanner.sdk}`
+      : `capability scan: none (@vestra-player/sdk ${scanner.sdk} has no vestra-plugin scan; it needs 1.8.0)`,
+  );
   const { index, packed } = await buildIndex({
     root,
     out,
@@ -100,6 +112,7 @@ try {
     pagesUrl,
     previous,
     releases: provider,
+    scan: scanner.scan,
   });
   await writeFile(join(out, "site/index.json"), serializeIndex(index));
   console.log(
