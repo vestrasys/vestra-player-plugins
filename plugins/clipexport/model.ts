@@ -72,6 +72,7 @@ export const REASON = {
   animatedTooLong: "Animated GIF and WebP are at most 60 seconds long. Choose a shorter range.",
   animatedFailed: "Could not write the animated image.",
   noScanFfmpeg: "Finding highlights needs FFmpeg.",
+  modelFailed: "The sound model could not start on this computer.",
 } as const;
 export type Reason = keyof typeof REASON;
 

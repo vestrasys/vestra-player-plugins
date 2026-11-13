@@ -1,0 +1,49 @@
+Third-party files of Clip Export
+================================
+
+The plugin's own code is Apache-2.0. vendor/ holds one third-party file,
+unchanged, byte for byte as its upstream published it, with its licence:
+
+onnxruntime-web/ort.wasm.bundle.min.mjs
+  ONNX Runtime Web 1.31.1, Copyright (c) Microsoft Corporation
+  https://github.com/microsoft/onnxruntime (tag v1.31.1, commit
+    6af1a932e2286d5c58166085d24c68783033edee)
+  Taken from the npm package onnxruntime-web@1.31.1
+    (https://registry.npmjs.org/onnxruntime-web/-/onnxruntime-web-1.31.1.tgz,
+    integrity sha512-5GeH+bWQ+HxM10z7erGlsWqryrwMbSvm/1tkIsKTT48g0fI19VXVVC435t4t7VsPdSQeS7NmuZPXrQ73k82URw==),
+    file package/dist/ort.wasm.bundle.min.mjs
+  SHA256: 51bd7168175767324ab0acfcfc4ca94a096a3826e3ebac9ccc4f195eb865f8dd
+  Licence: MIT (onnxruntime-web/LICENSE, the repository's LICENSE at that tag,
+    SHA256 2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c)
+  Why a copy and not an npm dependency: the package depends on protobufjs,
+  whose install script the repository's rules refuse; this one file needs
+  none of its dependencies (it bundles what it uses). It runs only on the
+  sound model's worker thread (tagger-worker.ts), with the WebAssembly bytes
+  handed to it (env.wasm.wasmBinary), so it fetches and reads nothing itself.
+
+onnxruntime-web/ort.wasm.bundle.min.d.mts is not upstream: the plugin's own
+declaration of the part of the API it uses (for the type check).
+
+Downloaded on first use, not in this repository or the package
+--------------------------------------------------------------
+
+After the user's click on Download and Scan (Highlights page), into the
+plugin's data folder (sound-model/), each kept only when its SHA-256 matches
+the one pinned in soundmodel.ts, and checked again before it is used:
+
+ced-mini.int8.onnx (10,451,715 bytes)
+  CED-mini audio tagger (Apache-2.0, by mispeech: https://github.com/RicherMans/CED,
+  https://huggingface.co/mispeech/ced-mini), converted to ONNX and quantised
+  to int8 by k2-fsa for sherpa-onnx
+  From: https://huggingface.co/k2-fsa/sherpa-onnx-ced-mini-audio-tagging-2024-04-19/resolve/4da6df50dc47b25f91074b5ef7df4c1cc0dd7d4d/model.int8.onnx
+  SHA256: ff29f39f9fbe637f72535160e9d006d61d872fdab0fce838672265b9b38cf946
+  The plugin keeps only the numbers of the AudioSet classes it uses
+  (sounds.ts), not the label file.
+
+ort-wasm-simd-threaded.wasm (14,848,852 bytes)
+  ONNX Runtime Web 1.31.1's WebAssembly build (MIT, Microsoft), the same
+  version as the JavaScript above
+  From: https://cdn.jsdelivr.net/npm/onnxruntime-web@1.31.1/dist/ort-wasm-simd-threaded.wasm
+    (jsDelivr's copy of the npm package's file; the same bytes as in
+    onnxruntime-web-1.31.1.tgz)
+  SHA256: 4b884c203b0fa48d057be3332c65513ff85aa3c5bddd6946acc0fab7ecda001d

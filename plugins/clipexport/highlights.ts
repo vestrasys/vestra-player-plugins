@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, rename, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { baselines, rankOf, risesOf, samplesArgs, samplesOf, SOUNDS, TAG_SECONDS } from "./sounds.ts";
+import type { Sound, Tag } from "./sounds.ts";
 
 /**
  * Highlights, step 1 (design clipexport-highlights §9): the loudness of the
@@ -127,6 +129,8 @@ export interface Candidate {
   start: number;
   end: number;
   peak: number;
+  /** With the sound model: the sounds that stand out in it, each with how far it rose (0–1); none: a loud moment alone. */
+  sounds?: Partial<Record<Sound, number>>;
 }
 
 export interface Analysis {
@@ -137,6 +141,11 @@ export interface Analysis {
   /** Every candidate (at most 100), the strongest first. */
   candidates: Candidate[];
 }
+
+/** A piece tagged by the model overlaps a range this much (s) for its sounds to be the range's. */
+const TAG_OVERLAP = 3;
+/** Around a tagged moment, its core is where the short-term loudness is within this many LU of its loudest. */
+const CORE_LU = 3;
 
 const tenth = (seconds: number) => Math.round(seconds * 10) / 10;
 
@@ -158,8 +167,14 @@ export function curveOf(short: Float32Array) {
  * before it (at least 4 s, at most 60 s before) and ends at the first pause
  * after it (at most 20 s after); without a pause there, at the quietest
  * moment. Ranges are 6–90 s; overlapping ones merge.
+ *
+ * With the sound model's `tags` (one per 10 s), a run of pieces where a
+ * sound stands out (laughter, applause, cheering, a crowd: `risesOf`) is a
+ * moment too, around its loudest part; each range gets the sounds of the
+ * pieces it overlaps by 3 s or more, and the sounds order the ranges before
+ * loudness does (`rankOf`).
  */
-export function analyse(values: Float32Array, duration: number): Analysis {
+export function analyse(values: Float32Array, duration: number, tags?: readonly Tag[]): Analysis {
   const short = shortTerm(values);
   const curve = curveOf(short);
   const average = averageOf(values);
@@ -177,6 +192,23 @@ export function analyse(values: Float32Array, duration: number): Analysis {
     if (last && i - last.b <= JOIN_GAP * RATE) Object.assign(last, { b: j, top: Math.max(last.top, top) });
     else moments.push({ a: i, b: j, top });
     i = j;
+  }
+  // The sound model's moments: runs of pieces where a sound stands out, each around its loudest part.
+  const base = tags?.length ? baselines(tags) : null;
+  const standing = base ? tags!.map((tag) => ({ tag, rises: risesOf(tag, base) })).filter(({ rises }) => Object.keys(rises).length > 0) : [];
+  for (let k = 0; k < standing.length; k++) {
+    let last = k;
+    while (last + 1 < standing.length && standing[last + 1]!.tag.t - standing[last]!.tag.t <= TAG_SECONDS + 0.5) last++;
+    const from = Math.max(0, Math.min(n - 1, Math.round(standing[k]!.tag.t * RATE)));
+    const to = Math.max(from, Math.min(n - 1, Math.round((standing[last]!.tag.t + TAG_SECONDS) * RATE) - 1));
+    let top = from;
+    for (let i = from; i <= to; i++) if (short[i]! > short[top]!) top = i;
+    let a = top;
+    let b = top;
+    while (a > from && short[a - 1]! >= short[top]! - CORE_LU) a--;
+    while (b < to && short[b + 1]! >= short[top]! - CORE_LU) b++;
+    moments.push({ a, b, top: short[top]! });
+    k = last;
   }
   const quietLevel = Math.max(SILENT + 1, average - PAUSE_BELOW);
   const quiet = (i: number) => values[i]! < quietLevel;
@@ -261,9 +293,19 @@ export function analyse(values: Float32Array, duration: number): Analysis {
       merged.push({ ...range });
     } else if (range.end - last.end >= MIN_LENGTH) merged.push({ ...range, start: last.end });
   }
-  const candidates = merged
-    .map((range) => ({ id: String(Math.round(range.start * 10)), ...range }))
-    .sort((x, y) => y.peak - x.peak || x.start - y.start)
+  const candidates: Candidate[] = merged
+    .map((range) => {
+      const candidate: Candidate = { id: String(Math.round(range.start * 10)), ...range };
+      // The sounds of the pieces it overlaps enough; none: a loud moment alone.
+      const sounds: Partial<Record<Sound, number>> = {};
+      for (const { tag, rises } of standing) {
+        if (Math.min(range.end, tag.t + TAG_SECONDS) - Math.max(range.start, tag.t) < TAG_OVERLAP) continue;
+        for (const sound of SOUNDS) if (rises[sound] !== undefined) sounds[sound] = Math.max(sounds[sound] ?? 0, rises[sound]!);
+      }
+      if (Object.keys(sounds).length) candidate.sounds = sounds;
+      return candidate;
+    })
+    .sort((x, y) => rankOf(y) - rankOf(x) || y.peak - x.peak || x.start - y.start)
     .slice(0, KEEP);
   return { average: tenth(average), curve, candidates };
 }
@@ -278,7 +320,7 @@ export type Handled = "added" | "dismissed";
  * dismissed among them (Restore N dismissed brings them back).
  */
 export function pick(candidates: readonly Candidate[], count: number, handled: Readonly<Record<string, Handled>>) {
-  const strongest = [...candidates].sort((x, y) => y.peak - x.peak || x.start - y.start).slice(0, count);
+  const strongest = [...candidates].sort((x, y) => rankOf(y) - rankOf(x) || y.peak - x.peak || x.start - y.start).slice(0, count);
   const left = strongest.filter((candidate) => !handled[candidate.id]).sort((x, y) => x.start - y.start);
   const dismissed = strongest.filter((candidate) => handled[candidate.id] === "dismissed").map((candidate) => candidate.id);
   return { left, total: strongest.length, dismissed };
@@ -406,6 +448,48 @@ export async function scanLoudness(run: Run, source: string, stream: number, dur
   return values;
 }
 
+/**
+ * The scan with the sound model: per window, ffmpeg's loudness (as
+ * `scanLoudness`) and the sound as samples, which `tag` (the model's
+ * thread) tags while ffmpeg reads the next window: at most one ffmpeg and
+ * the model's one thread run at once. `between` as in `scanLoudness`.
+ */
+export async function scanSounds(
+  run: Run,
+  tag: (samples: Float32Array, t: number) => Promise<Tag[]>,
+  source: string,
+  stream: number,
+  duration: number,
+  options: { signal: AbortSignal; between?: (done: number, values: Float32Array) => void | Promise<void>; window?: number },
+) {
+  const values = emptyValues(duration);
+  const tags: Tag[] = [];
+  const window = options.window ?? WINDOW;
+  let tagging: Promise<void> = Promise.resolve();
+  for (let from = 0; from < duration; from += window) {
+    options.signal.throwIfAborted();
+    const length = Math.min(window, duration - from);
+    const at = Math.max(0, from - LEAD);
+    const { stdout: text } = await run(loudnessArgs(source, from, length, stream), { timeoutMs: 180_000, maxOutput: 8 << 20, signal: options.signal });
+    parseMomentary(new TextDecoder().decode(text), at, from, values);
+    // 32 kB a second of 16-bit samples: 9.6 MB per 300 s window.
+    const { stdout: pcm } = await run(samplesArgs(source, from, length, stream), { timeoutMs: 180_000, maxOutput: 24 << 20, signal: options.signal });
+    // The model tags the window before while ffmpeg reads this one.
+    await tagging;
+    options.signal.throwIfAborted();
+    const samples = samplesOf(pcm);
+    const done = Math.min(duration, from + length);
+    tagging = tag(samples, from).then(async (found) => {
+      tags.push(...found);
+      await options.between?.(done, values);
+    });
+    // A failure surfaces at the next await of `tagging`; never unhandled meanwhile.
+    tagging.catch(() => {});
+  }
+  await tagging;
+  return { values, tags };
+}
+
 /** ffprobe's arguments for the file's audio streams: one line per stream. */
 export const audioStreamArgs = (source: string) => ["-v", "error", "-select_streams", "a", "-show_entries", "stream=index", "-of", "csv=p=0", source];
 /** How many audio streams ffprobe listed. */
@@ -423,8 +507,8 @@ export interface HighlightScan {
   stream: number;
   /** When it was scanned (ms since 1970). */
   scanned: number;
-  /** Step 1 measures loudness only. */
-  mode: "loudness";
+  /** Loudness only (Loudness Only, or before 0.6.4), or with the sound model (its sounds are in the candidates). */
+  mode: "loudness" | "sounds";
   duration: number;
   average: number | null;
   curve: number[];
@@ -448,16 +532,24 @@ const isRange = (value: unknown): value is { start: number; end: number } => isO
 
 /** A kept file as data, or `null` when it is not one (damaged, another version). */
 export function savedOf(value: unknown): HighlightScan | null {
-  if (!isObject(value) || value.version !== 1 || value.mode !== "loudness") return null;
+  if (!isObject(value) || value.version !== 1 || (value.mode !== "loudness" && value.mode !== "sounds")) return null;
   const { path, size, mtimeMs, stream, scanned, duration, average, curve, candidates, handled, edits } = value;
   if (typeof path !== "string" || !isNumber(size) || !isNumber(mtimeMs) || !Number.isInteger(stream) || !isNumber(scanned) || !isNumber(duration)) return null;
   if (!(average === null || isNumber(average)) || !Array.isArray(curve) || !curve.every(isNumber) || !Array.isArray(candidates)) return null;
-  const list = candidates.filter((c): c is Candidate => isRange(c) && typeof (c as Candidate).id === "string" && isNumber((c as Candidate).peak));
+  const list = candidates
+    .filter((c): c is Candidate => isRange(c) && typeof (c as Candidate).id === "string" && isNumber((c as Candidate).peak))
+    .map(({ id, start, end, peak, sounds }) => {
+      const candidate: Candidate = { id, start, end, peak };
+      const kept: Partial<Record<Sound, number>> = {};
+      for (const sound of SOUNDS) if (isObject(sounds) && isNumber(sounds[sound]) && sounds[sound] > 0) kept[sound] = Math.min(1, sounds[sound]);
+      if (Object.keys(kept).length) candidate.sounds = kept;
+      return candidate;
+    });
   const states: Record<string, Handled> = {};
   for (const [id, state] of Object.entries(isObject(handled) ? handled : {})) if (state === "added" || state === "dismissed") states[id] = state;
   const moved: Record<string, { start: number; end: number }> = {};
   for (const [id, range] of Object.entries(isObject(edits) ? edits : {})) if (isRange(range)) moved[id] = { start: range.start, end: range.end };
-  return { version: 1, path, size, mtimeMs, stream: stream as number, scanned, mode: "loudness", duration, average: average as number | null, curve: curve as number[], candidates: list, handled: states, edits: moved };
+  return { version: 1, path, size, mtimeMs, stream: stream as number, scanned, mode: value.mode, duration, average: average as number | null, curve: curve as number[], candidates: list, handled: states, edits: moved };
 }
 
 /** A kept scan's file name: a hash of the video's path and its track. */

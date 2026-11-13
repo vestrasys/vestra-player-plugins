@@ -35,6 +35,11 @@ export interface Settings {
   preciseSpeed: number | null;
   /** How many suggestions the Highlights page lists (5, 10 or 20). */
   highlightCount: number;
+  /**
+   * The user chose Loudness Only without the sound model: Find Highlights (the command) then scans that way; the
+   * page still offers the download above a file not scanned. Set back when the model is downloaded.
+   */
+  highlightLoudness: boolean;
 }
 
 /** The pages of the tab, as its sub-tab strip orders them (0.4.0: the Collection is a section of the Clip page; 0.6.0: Highlights). */
@@ -85,6 +90,7 @@ export function settingsOf(stored: unknown, folder = defaultFolder()): Settings 
     page: pageOf(s.page),
     preciseSpeed: s.preciseSpeed === null || s.preciseSpeed === undefined ? null : inRange(s.preciseSpeed, 0.01, 1000, 0) || null,
     highlightCount: (COUNTS as readonly unknown[]).includes(s.highlightCount) ? (s.highlightCount as number) : DEFAULT_COUNT,
+    highlightLoudness: flag(s.highlightLoudness, false),
   };
 }
 

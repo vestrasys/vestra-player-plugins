@@ -11,11 +11,16 @@ import { blockingNote, Collection, copyNote, exportParts, lengthClock, listKey, 
 import type { Part } from "./collection.ts";
 import { finisher, inflightStore, sweepWork } from "./finish.ts";
 import {
-  analyse, audioStreamArgs, audioStreamCount, averageOf, bandAt, bandsPath, COUNTS, curveOf, curvePath, HighlightStore, nextAfter, pick, RATE, scanLoudness, short, shortTerm, stepFrom, thumbName,
+  analyse, audioStreamArgs, audioStreamCount, averageOf, bandAt, bandsPath, COUNTS, curveOf, curvePath, HighlightStore, nextAfter, pick, RATE, scanLoudness, scanSounds, short, shortTerm, stepFrom, thumbName,
   total as lengthText,
 } from "./highlights.ts";
 import type { Candidate, HighlightScan } from "./highlights.ts";
 import { capturer } from "./form.ts";
+import { DownloadError, MODEL_MB, SoundModel } from "./soundmodel.ts";
+import { loudStrength, ranked, strengthOf } from "./sounds.ts";
+import type { Tag } from "./sounds.ts";
+import { ModelError, startTagger } from "./tagger.ts";
+import type { Tagger } from "./tagger.ts";
 import { anyTransition, capOf, CUT, DIRECTIONS, FIRST_DURATION, junctionTicks, KINDS, mergeEncode, PRESET_DURATIONS, sourceBitrate, timing, typedDuration } from "./transitions.ts";
 import type { Direction, Kind, Plan, Transition } from "./transitions.ts";
 import { audioChoices, clippable, clock, Failure, isLocal, message, notClippable, parseRange, parseTime, problemOf, REASON, tabMode, withExtension } from "./model.ts";
@@ -114,6 +119,10 @@ export interface Options {
   support: Partial<HostSupport>;
   /** The free space beside a file, in bytes (tests; the system's otherwise). */
   freeSpace: (folder: string) => Promise<number>;
+  /** The sound model's files (tests: another folder, a fake download). */
+  soundModel: SoundModel;
+  /** Start the sound model (tests: a fake one; the model's thread otherwise). */
+  tagger: (wasm: Uint8Array, model: Uint8Array, signal: AbortSignal) => Promise<Tagger>;
 }
 
 /** The frame rate a clip's intermediate MP4 is planned with (the animated presets' ceiling); the image has its own (animated.ts). */
@@ -1126,6 +1135,63 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     // no data directory: a scan is kept while its file stays open
   }
   const kept = new HighlightStore(highlightFolder);
+  // The sound model (design step 3): its two files, downloaded on Download and Scan (the click is the consent), checked
+  // against their pinned SHA-256; a scan runs it on a thread of its own. Without it, Loudness Only scans as step 1 did.
+  const soundModel = options.soundModel ?? new SoundModel({ folder: highlightFolder ? join(dirname(highlightFolder), "sound-model") : null });
+  const startModel = options.tagger ?? startTagger;
+  /** "installed", "none" (F1), the download (F2) and how it ended (F3 failed, F4 checksum, F5 offline). */
+  type ModelState = "none" | "installed" | "downloading" | "failed" | "checksum" | "offline";
+  const model = { state: "none" as ModelState, reason: "", received: 0, total: 0, started: 0 };
+  void soundModel.installed().then((yes) => {
+    if (!yes || model.state !== "none") return;
+    model.state = "installed";
+    // Past the file reads: the page changed outside SDK-invoked code.
+    plugin.update();
+  });
+  /**
+   * Download and Scan (F1), Retry (F3, F5), Download Again (F4): the model's files, with progress and Cancel; the scan
+   * of the page's file starts when it finishes (unless the file has a result or a scan is running).
+   */
+  async function downloadModel() {
+    if (model.state === "installed" || model.state === "downloading") return;
+    Object.assign(model, { state: "downloading", reason: "", received: 0, total: MODEL_MB * 1e6, started: Date.now() });
+    plugin.update();
+    let shownAt = 0;
+    try {
+      await soundModel.download((progress) => {
+        Object.assign(model, { received: progress.received, total: progress.total });
+        if (Date.now() - shownAt < 250) return;
+        shownAt = Date.now();
+        plugin.update();
+      });
+    } catch (error) {
+      const kind = error instanceof DownloadError ? error.kind : "failed";
+      // Cancel goes back to F1; the partial file is gone.
+      Object.assign(model, { state: kind === "cancelled" ? "none" : kind, reason: kind === "failed" ? message(error).slice(0, 120) : "" });
+      if (kind !== "cancelled") console.error(`[clipexport] sound model download: ${message(error)}`);
+      plugin.update();
+      return;
+    }
+    model.state = "installed";
+    if (settings.highlightLoudness) {
+      settings.highlightLoudness = false;
+      store();
+    }
+    plugin.update();
+    if (hl.key && ["ready", "changed", "error"].includes(hl.status) && !scan) await findHighlights();
+  }
+  /** Settings ▸ Remove: the model's files go; the Highlights page offers the download again. */
+  async function removeModel() {
+    await soundModel.remove();
+    Object.assign(model, { state: "none", reason: "" });
+    plugin.update();
+  }
+  /** The page's model fields: its state, the download's size and progress (MB) and time left (s; -1 unknown). */
+  function modelView() {
+    const spent = (Date.now() - model.started) / 1000;
+    const left = model.state === "downloading" && model.received > 0 && spent >= 1 ? Math.max(1, Math.round(((model.total - model.received) * spent) / model.received)) : -1;
+    return { model: model.state, "model-mb": MODEL_MB, "dl-done": Math.floor(model.received / 1e6), "dl-total": Math.round(model.total / 1e6) || MODEL_MB, "dl-left": left, "dl-reason": model.reason };
+  }
   type HighlightStatus = "loading" | "ready" | "noSound" | "changed" | "done" | "error";
   /**
    * The page's file: `key` is the source and its sound track (another track is another scan), `status` what
@@ -1227,8 +1293,11 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     }
   }
 
-  /** Find Highlights (the button, Scan Again, the command): scan the sound of the file playing. */
-  async function findHighlights() {
+  /**
+   * Find Highlights (the button, Scan Again, the command): scan the sound of the file playing, with the sound model
+   * when it is there; `loudness` (Loudness Only, or no model) measures loudness alone.
+   */
+  async function findHighlights(how: "auto" | "loudness" = "auto") {
     const seen = await player.refresh();
     const view = highlightsFor(seen);
     if (!view || !seen.duration) return;
@@ -1252,6 +1321,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     scan = job;
     hl.selected = "";
     plugin.update();
+    let tagger: Tagger | null = null;
     try {
       // The stream asked for must be in the file: ffmpeg's own refusal (exit 127, "Invalid argument") says nothing useful.
       const streams = await audioStreams(job.path, job.abort.signal);
@@ -1260,19 +1330,37 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
         if (hl.key === key) hl.status = "noSound";
         return;
       }
-      const values = await scanLoudness((args, options) => plugin.tools.run("ffmpeg", args, options), job.path, view.stream, job.duration, {
-        signal: job.abort.signal,
-        between: async (done, values) => {
-          // The strip fills in from the left: the curve of what was measured so far.
-          const upTo = Math.ceil(done * RATE);
-          Object.assign(job, { done, curve: curveOf(shortTerm(values, upTo)), average: averageOf(values, upTo) });
-          plugin.update();
-          // Another file opened while the tab was hidden: the scan stops (D12).
-          if ((await player.refresh()).sourceId !== job.sourceId) job.abort.abort();
-        },
-      });
-      const result = analyse(values, job.duration);
-      const saved: HighlightScan = { version: 1, ...stamp, scanned: Date.now(), mode: "loudness", duration: job.duration, average: result.average, curve: result.curve, candidates: result.candidates, handled: {}, edits: {} };
+      const run = (args: string[], options: { timeoutMs: number; maxOutput?: number; signal?: AbortSignal }) => plugin.tools.run("ffmpeg", args, options);
+      const between = async (done: number, values: Float32Array) => {
+        // The strip fills in from the left: the curve of what was measured so far.
+        const upTo = Math.ceil(done * RATE);
+        Object.assign(job, { done, curve: curveOf(shortTerm(values, upTo)), average: averageOf(values, upTo) });
+        plugin.update();
+        // Another file opened while the tab was hidden: the scan stops (D12).
+        if ((await player.refresh()).sourceId !== job.sourceId) job.abort.abort();
+      };
+      let values: Float32Array;
+      let tags: Tag[] | undefined;
+      if (how === "auto" && model.state === "installed") {
+        // The files are checked against their pinned SHA-256 before the model reads them; a file that fails is
+        // deleted and the page offers the download again (F1).
+        const files = await soundModel.load();
+        job.abort.signal.throwIfAborted();
+        if (!files) {
+          model.state = "none";
+          if (hl.key === key) hl.status = job.before;
+          return;
+        }
+        tagger = await startModel(files.wasm, files.model, job.abort.signal);
+        const running = tagger;
+        const found = await scanSounds(run, (samples, t) => running.tag(samples, t), job.path, view.stream, job.duration, { signal: job.abort.signal, between });
+        values = found.values;
+        tags = found.tags;
+      } else values = await scanLoudness(run, job.path, view.stream, job.duration, { signal: job.abort.signal, between });
+      const result = analyse(values, job.duration, tags);
+      const saved: HighlightScan = {
+        version: 1, ...stamp, scanned: Date.now(), mode: tags ? "sounds" : "loudness", duration: job.duration, average: result.average, curve: result.curve, candidates: result.candidates, handled: {}, edits: {},
+      };
       await kept.save(saved);
       // Scanned again: the pictures of suggestions found again stay, the others go.
       const thumbs = await keptThumbs(saved);
@@ -1289,11 +1377,16 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
         if (hl.key === key) hl.status = "noSound";
       } else if ((error as { code?: string }).code === "unavailable") {
         fail({ reason: "noScanFfmpeg", raw: "" });
+      } else if (error instanceof ModelError) {
+        // The model would not start (or stopped): the page says so and offers Loudness Only.
+        console.error(`[clipexport] sound model: ${message(error)}`);
+        fail({ reason: "modelFailed", raw: "" });
       } else {
         console.error(`[clipexport] highlights scan: ${message(error)}`);
         fail(problemOf(error));
       }
     } finally {
+      void tagger?.close();
       if (scan === job) scan = null;
       plugin.update();
     }
@@ -1525,10 +1618,23 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   let heatSent = { curve: "", bands: "", picked: "", seconds: 0 };
   const heatOf = (next: typeof heatSent) => (Object.entries(next).every(([key, value]) => heatSent[key as keyof typeof heatSent] === value) ? heatSent : (heatSent = next));
 
+  /**
+   * A row's kind (its strongest sound, "loud" for a loud moment alone) and second sound ("Laughter + applause"), the
+   * meter's bars (1–3) and each named sound's strength (the tooltip's words).
+   */
+  function kindsOf(row: Candidate) {
+    const [first, second] = ranked(row.sounds);
+    if (!first) return { kind: "loud", kind2: "", level: loudStrength(row.peak), level1: 0, level2: 0 };
+    const level1 = strengthOf(row.sounds![first]!);
+    return { kind: first, kind2: second ?? "", level: level1, level1, level2: second ? strengthOf(row.sounds![second]!) : 0 };
+  }
   /** The Highlights page: its state, the strip, the rows; the sub-tab's count. */
   function highlightView(state: PlayerState) {
     const view = highlightsFor(state);
-    const empty = { state: "none", name: "", duration: "", percent: 0, left: -1, scanned: 0, loudness: true, first: false, reason: "", raw: "", count: COUNTS.indexOf(settings.highlightCount as never), remaining: 0, total: 0, length: "", picked: -1 };
+    const empty = {
+      state: "none", name: "", duration: "", percent: 0, left: -1, scanned: 0, loudness: true, first: false, reason: "", raw: "", count: COUNTS.indexOf(settings.highlightCount as never), remaining: 0, total: 0, length: "", picked: -1,
+      "only-loud": false, ...modelView(),
+    };
     if (!view || !state.duration) return { highlights: empty, heat: heatOf({ curve: "", bands: "", picked: "", seconds: 0 }), head: -1, highlightRows: [], regions: [] as Candidate[] };
     const duration = state.duration;
     const head = state.position !== null ? Math.max(0, Math.min(1, state.position / duration)) : -1;
@@ -1557,7 +1663,9 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
         percent: running ? Math.min(100, Math.floor((running.done / running.duration) * 100)) : 0,
         left,
         scanned: saved ? minutesSince(saved.scanned) : 0,
-        loudness: true,
+        loudness: saved?.mode !== "sounds",
+        // R4: the model found no sound that stands out, only loud moments.
+        "only-loud": saved?.mode === "sounds" && rows.length > 0 && !saved.candidates.some((candidate) => candidate.sounds),
         first: view.first,
         reason: view.problem.reason,
         raw: view.problem.raw.slice(0, 200),
@@ -1576,7 +1684,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
           range: `${short(row.start)} – ${short(row.end)}`,
           brief: narrowTimes(row),
           badge: (row.end - row.start).toFixed(1),
-          kind: "loud",
+          ...kindsOf(row),
           lu: String(Math.round(row.peak)),
           selected: row === selected,
           // Asked for only while the page shows and the row is in view (one ffmpeg run at a time); the icon meanwhile.
@@ -1584,7 +1692,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
           restore: 0,
         })),
         // Restore N dismissed: the list's last row (a row of the same ListView), while any is dismissed.
-        ...(dismissed.length ? [{ id: "restore", range: "", brief: "", badge: "", kind: "", lu: "", selected: false, thumb: null, restore: dismissed.length }] : []),
+        ...(dismissed.length ? [{ id: "restore", range: "", brief: "", badge: "", kind: "", kind2: "", level: 0, level1: 0, level2: 0, lu: "", selected: false, thumb: null, restore: dismissed.length }] : []),
       ],
       regions: running ? [] : others,
     };
@@ -1969,6 +2077,17 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   });
   // Highlights
   on("findHighlights", () => findHighlights());
+  // Loudness Only (F1, F3–F5, the model failing): a scan without the model; Find Highlights (the command) then does the same.
+  on("loudnessOnly", () => {
+    if (!settings.highlightLoudness) {
+      settings.highlightLoudness = true;
+      store();
+    }
+    return findHighlights("loudness");
+  });
+  on("downloadModel", () => downloadModel());
+  on("cancelDownload", () => soundModel.cancel());
+  on("removeModel", () => removeModel());
   on("cancelScan", () => cancelScan());
   on("setHighlightCount", (index: number) => {
     const count = COUNTS[Number(index)];
@@ -2106,6 +2225,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     if (!view || scan?.key === view.key) return;
     // The read of its kept scan that showing the page started.
     await view.loading;
+    // Without the model (and no Loudness Only chosen) the page shows the download (F1): the command never downloads.
+    if (model.state !== "installed" && !settings.highlightLoudness) return;
     if (hl.key === view.key && ["ready", "changed", "error"].includes(hl.status)) await findHighlights();
   }, inTab);
   /**

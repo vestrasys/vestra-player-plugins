@@ -68,6 +68,7 @@ export global Words {
         if (code == "animatedTooLong") { return @tr("Animated GIF and WebP are at most 60 seconds long. Choose a shorter range."); }
         if (code == "animatedFailed") { return @tr("Could not write the animated image."); }
         if (code == "noScanFfmpeg") { return @tr("Finding highlights needs FFmpeg."); }
+        if (code == "modelFailed") { return @tr("The sound model could not start on this computer."); }
         return raw;
     }
 
@@ -125,6 +126,37 @@ export global Words {
         if (kind == "fadeBlack" || kind == "fadeWhite") { return @tr("Sound fades out, then in"); }
         if (kind == "cut") { return @tr("Sound: cut"); }
         return @tr("Sound crossfades with the picture");
+    }
+
+    // A Highlights suggestion's kind: the sound the model heard, or a loud moment alone.
+    public pure function sound-name(kind: string) -> string {
+        if (kind == "laughter") { return @tr("Laughter"); }
+        if (kind == "applause") { return @tr("Applause"); }
+        if (kind == "cheering") { return @tr("Cheering"); }
+        if (kind == "crowd") { return @tr("Crowd"); }
+        return @tr("Loud");
+    }
+
+    // The second sound of "Laughter + applause", where a language writes it in lower case.
+    public pure function sound-name-lower(kind: string) -> string {
+        // TRANSLATORS: the second of two sounds ("Laughter + applause"); lower case where the language has it.
+        if (kind == "laughter") { return @tr("laughter"); }
+        // TRANSLATORS: the second of two sounds ("Laughter + applause"); lower case where the language has it.
+        if (kind == "applause") { return @tr("applause"); }
+        // TRANSLATORS: the second of two sounds ("Laughter + applause"); lower case where the language has it.
+        if (kind == "cheering") { return @tr("cheering"); }
+        // TRANSLATORS: the second of two sounds ("Laughter + applause"); lower case where the language has it.
+        return @tr("crowd");
+    }
+
+    // A sound and its strength in words (a suggestion's tooltip): "Laughter · strong".
+    public pure function sound-strength(kind: string, level: int) -> string {
+        // TRANSLATORS: {} is a sound ("Laughter"); the strength the sound model gives it.
+        if (level >= 3) { return @tr("{} · strong", Words.sound-name(kind)); }
+        // TRANSLATORS: {} is a sound ("Laughter"); the strength the sound model gives it.
+        if (level == 2) { return @tr("{} · medium", Words.sound-name(kind)); }
+        // TRANSLATORS: {} is a sound ("Laughter"); the strength the sound model gives it.
+        return @tr("{} · weak", Words.sound-name(kind));
     }
 
     // The state of a Collection row's file.
