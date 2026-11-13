@@ -494,10 +494,10 @@ test("the manifest's display texts are English with a Simplified Chinese transla
   const manifest = JSON.parse(await readFile(new URL("manifest.json", directory), "utf8"));
   assert.equal(manifest.id, "zysilm.vestratube", "the id matches the plugin name");
   assert.equal(manifest.name, "VestraTube");
-  assert.equal(manifest.version, "0.5.3");
+  assert.equal(manifest.version, "0.5.4");
   assert.equal(manifest.icon, "assets/icon.png", "store icon");
-  assert.equal(manifest.minPlayerVersion, "0.5.4", "images in rows (0.5.1); rows kept in place when the length changes (0.5.4)");
-  assert.ok(manifest.capabilities.includes("ui.mount"));
+  assert.equal(manifest.minPlayerVersion, "0.9.0", "images in rows (0.5.1); rows kept in place when the length changes (0.5.4); no declarations (0.9.0)");
+  assert.equal(manifest.capabilities, undefined, "no declarations (SDK 1.9.0): the sidebar mounts without ui.mount");
   for (const value of [manifest.name, manifest.punchline, manifest.description, ...manifest.tags])
     assert.doesNotMatch(value, /[　-鿿＀-￯]/, "English source text");
   assert.doesNotMatch(manifest.description, /yt-dlp/);

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.3
+
+- Needs Vestra Player 0.9.0 or later (SDK 1.9.0): the manifest no longer lists `capabilities`; `activate` starts with `await plugin.player.read()`, which the declaration used to imply. Nothing else changes.
+
 ## 0.4.2
 
 - A ROM is checked on the file it opened, not by its path beforehand, so a file swapped in between (a FIFO, a folder, a larger file) is still turned away. No visible change.

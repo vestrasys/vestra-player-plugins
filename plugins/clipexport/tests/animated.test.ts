@@ -507,7 +507,14 @@ test("the player's check of the destination folder (the fake above): a job whose
   checkDestinations(host);
   host.openElsewhere("/media/one.mp4");
   host.setSource({ position: 2, duration: 120 });
-  const { plugin, stop } = await startPlugin(async () => {}, { directory, host, locale: "en" });
+  // What the manifest's events and playback.read did before SDK 1.9.0.
+  const { plugin, stop } = await startPlugin(
+    async (plugin) => {
+      plugin.player.subscribe();
+      await plugin.player.read();
+    },
+    { directory, host, locale: "en" },
+  );
   try {
     const missing = join(tmpdir(), `clipexport-missing-${process.pid}-${Date.now()}`, "work", "merge.mp4");
     const snapshot = await plugin.media.capture();

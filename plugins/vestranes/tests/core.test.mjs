@@ -7,7 +7,7 @@ import { BUTTONS, isButton, keyButton, NesCore as Core, rgbaFrame as rgba, timin
 import { controllerRom, homebrew } from './homebrew.mjs';
 
 // The failures are `plugin.i18n.error`s: English messages, shown translated by the player.
-const { host, plugin, stop } = await startPlugin(() => {}, { directory: new URL('..', import.meta.url), capabilities: [], locale: 'zh-Hans' });
+const { host, plugin, stop } = await startPlugin(() => {}, { directory: new URL('..', import.meta.url), locale: 'zh-Hans' });
 after(stop);
 const NesCore = class extends Core { constructor(rom) { super(rom, plugin.i18n.error); } };
 const rgbaFrame = pixels => rgba(pixels, plugin.i18n.error);

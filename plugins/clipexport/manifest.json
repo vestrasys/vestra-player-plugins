@@ -1,21 +1,8 @@
 {
   "id": "zysilm.clipexport",
-  "version": "0.6.5",
+  "version": "0.6.6",
   "apiVersion": "vestra/1",
   "entry": "main.ts",
-  "capabilities": [
-    "commands",
-    "events",
-    "ui.mount",
-    "ui.dialog",
-    "media.read",
-    "media.control",
-    "media.sources",
-    "playback.read",
-    "playback.control",
-    "timeline.marks",
-    "ui.osd"
-  ],
   "name": "Clip Export",
   "author": "zysilm",
   "punchline": "Cut part of a video into a new file: a lossless stream copy, a re-encoded MP4, or an animated GIF or WebP",
@@ -24,5 +11,5 @@
   "sourceUrl": "https://github.com/vestrasys/vestra-player-plugins/tree/main/plugins/clipexport",
   "license": "Apache-2.0",
   "icon": "assets/icon.png",
-  "minPlayerVersion": "0.7.6"
+  "minPlayerVersion": "0.9.0"
 }

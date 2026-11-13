@@ -1,9 +1,8 @@
 {
   "id": "zysilm.amdmotion",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "apiVersion": "vestra/1",
   "entry": "main.ts",
-  "capabilities": ["commands", "ui.osd", "ui.window", "video.motion"],
   "name": "AMD Motion Smoothing",
   "author": "zysilm",
   "punchline": "Smoother motion with real in-between frames from your AMD Radeon GPU",
@@ -11,5 +10,5 @@
   "tags": ["video", "motion", "smoothing", "frame rate", "amd"],
   "sourceUrl": "https://github.com/vestrasys/vestra-player-plugins/tree/main/plugins/amdmotion",
   "license": "Apache-2.0",
-  "minPlayerVersion": "0.8.1"
+  "minPlayerVersion": "0.9.0"
 }

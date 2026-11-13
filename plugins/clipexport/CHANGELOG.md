@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.6
+
+- Needs Vestra Player 0.9.0 or later (SDK 1.9.0): the manifest no longer lists `capabilities`; `activate` starts with `plugin.player.subscribe()` and `await plugin.player.read()`, which the declarations used to imply. Nothing else changes.
+
 ## 0.6.5
 
 **Who must change: nobody.** No new permission and the same player (0.7.6 or later). Kept Highlights results, the sound model, settings, the Collection and Results carry over.

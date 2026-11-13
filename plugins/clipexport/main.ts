@@ -144,6 +144,8 @@ const elapsed = (from: number | undefined) => {
  * data and says it in its Slint files.
  */
 export default async function activate(plugin: Plugin, options: Partial<Options> = {}) {
+  plugin.player.subscribe(); // the player's events from now on
+  await plugin.player.read(); // the player's state and timeline, read once
   const { player, osd } = plugin;
   const { text } = plugin.i18n;
   const support = hostSupport(plugin, options.support);

@@ -39,6 +39,8 @@ export default async function activate(
   plugin: Plugin,
   youtube = new YouTube(plugin.i18n, { lang: youtubeLanguage(plugin.i18n.locale) }),
 ) {
+  plugin.player.subscribe(); // the player's events from now on
+  await plugin.player.read(); // the player's state and timeline, read once
   const { text, error: fail } = plugin.i18n;
 
   // ------------------------------------------------------------ resolver: any open of a YouTube video link
