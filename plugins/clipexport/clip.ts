@@ -13,6 +13,18 @@ export type Method = "fast" | "precise";
 export const METHODS: readonly Method[] = ["fast", "precise"];
 /** The method a clip uses: the user's choice, or Precise while the player cannot copy streams. */
 export const effectiveMethod = (chosen: Method, fastCut: boolean): Method => (fastCut ? chosen : "precise");
+/**
+ * The Output the user picks (0.7.0): Fast, Precise, or an animated image.
+ * GIF and WebP are written the Precise way (re-encoded from the exact frame,
+ * with the video effects, subtitles and transitions), then turned into the
+ * image (animated.ts); 0.5.0–0.6.x offered them as Precise's Quality.
+ */
+export type Output = Method | Animated;
+export const OUTPUTS: readonly Output[] = ["fast", "precise", "gif", "webp"];
+/** How an Output is cut: Fast copies, the others re-encode. */
+export const methodOf = (output: Output): Method => (output === "fast" ? "fast" : "precise");
+/** The animated image an Output writes; `null` for Fast and Precise. */
+export const animatedOutput = (output: Output): Animated | null => (output === "gif" || output === "webp" ? output : null);
 
 // ---------------------------------------------------------------- ranges
 /** The lengths "Last N s" offers (proposal open question 4: adjustable, 30 s by default). */
@@ -184,15 +196,16 @@ export interface Encode {
   fps: 0 | 60 | 30;
   audio: 128 | 192 | 256;
 }
-export type Preset = "source" | "high" | "small" | "gif" | "webp" | "custom";
-/** The Quality chooser's order; Custom, when it shows, comes after them. */
-export const PRESETS: readonly Exclude<Preset, "custom">[] = ["source", "high", "small", "gif", "webp"];
+export type Preset = "source" | "high" | "small" | "custom";
+/** The Quality chooser's order (Precise's MP4); Custom, when it shows, comes after them. */
+export const PRESETS: readonly Exclude<Preset, "custom">[] = ["source", "high", "small"];
 /**
  * The three presets (design §3.5). `high` is the encoding clips always had
  * (CRF 18, x264 veryfast, AAC 192 kb/s, the source's size and rate), so the
  * default output does not change. `source` aims at the source video's
  * average bitrate (`videoBitrate: "source"`); `small` is CRF 26 at most 1080p.
- * `gif` and `webp` (0.5.0): the H.264 fields are those of the intermediate
+ * `gif` and `webp` (0.5.0; the GIF and WebP Outputs since 0.7.0, no longer
+ * in the Quality chooser): the H.264 fields are those of the intermediate
  * MP4 the player writes for the plugin's ffmpeg step: the best quality (CRF
  * 14, fast), at most 720p (the image is at most 640 px on its longer side, so
  * 720 lines always hold it) and 30 fps (the image has 15 or 20). A clip is
@@ -201,7 +214,7 @@ export const PRESETS: readonly Exclude<Preset, "custom">[] = ["source", "high", 
  * leaves it out.
  */
 const INTERMEDIATE = { rate: "crf", crf: 14, speed: "faster", height: 720, fps: 30, audio: 128 } as const;
-export const PRESET_ENCODE: Readonly<Record<Exclude<Preset, "custom">, Encode>> = {
+export const PRESET_ENCODE: Readonly<Record<Exclude<Preset, "custom"> | Animated, Encode>> = {
   source: { format: "mp4", rate: "source", crf: 18, speed: "balanced", height: 0, fps: 0, audio: 256 },
   high: { format: "mp4", rate: "crf", crf: 18, speed: "faster", height: 0, fps: 0, audio: 192 },
   small: { format: "mp4", rate: "crf", crf: 26, speed: "balanced", height: 1080, fps: 0, audio: 128 },
@@ -217,15 +230,17 @@ export const crfOf = (value: unknown) => {
   return Number.isFinite(n) ? Math.min(30, Math.max(14, n)) : 18;
 };
 /**
- * Any valid encode options from stored data, field by field; High quality's
- * for the rest. An animated format gets its preset's fixed fields; 0.4.x
- * settings (no format) are an MP4.
+ * Precise's MP4 options from stored data, field by field; High quality's for
+ * the rest. 0.4.x settings (no format) are an MP4. A stored Animated GIF or
+ * WebP (0.5.0–0.6.x kept them as the quality) is the GIF or WebP Output now
+ * (settings.ts); the MP4 quality chosen before it was not kept, so Precise
+ * gets High quality, the default (what 0.6.x used for an MP4 meanwhile).
  */
 export function encodeOf(value: unknown): Encode {
   const v = (typeof value === "object" && value !== null ? value : {}) as Partial<Record<keyof Encode, unknown>>;
   const high = PRESET_ENCODE.high;
   const pick = <T>(list: readonly T[], item: unknown, fallback: T) => (list.includes(item as T) ? (item as T) : fallback);
-  if (v.format === "gif" || v.format === "webp") return { ...PRESET_ENCODE[v.format] };
+  if (v.format === "gif" || v.format === "webp") return { ...high };
   return {
     format: "mp4",
     rate: v.rate === "source" ? "source" : "crf",

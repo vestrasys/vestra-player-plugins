@@ -2,8 +2,8 @@ import { existsSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { Scope } from "@vestra-player/sdk";
-import { encodeOf, lastSeconds, METHODS } from "./clip.ts";
-import type { Encode, Method } from "./clip.ts";
+import { encodeOf, lastSeconds, OUTPUTS } from "./clip.ts";
+import type { Encode, Output } from "./clip.ts";
 import { COUNTS, DEFAULT_COUNT } from "./highlights.ts";
 import { COLLECTION_TEMPLATE, normalTemplate } from "./names.ts";
 import { transitionOf } from "./transitions.ts";
@@ -15,9 +15,12 @@ export interface Settings {
   folder: string;
   /** Save into the media's folder when possible. */
   besideMedia: boolean;
-  /** The clip method the user picked; Fast by default. */
-  method: Method;
-  /** A Precise cut's options (R6), High quality by default. */
+  /**
+   * The Output the user picked (Fast, Precise, GIF or WebP); Fast by default.
+   * Kept under its old name: 0.1.0–0.6.x stored Fast or Precise here.
+   */
+  method: Output;
+  /** A Precise cut's MP4 options (R6), High quality by default; GIF and WebP have fixed ones. */
   encode: Encode;
   /** The file-name template. */
   template: string;
@@ -54,6 +57,18 @@ const NUMBERED: readonly Page[] = ["clip", "results", "settings"];
 const pageOf = (value: unknown): Page =>
   value === "collection" ? "clip" : PAGES.includes(value as Page) ? (value as Page) : Number.isInteger(value) ? (NUMBERED[value as number] ?? "clip") : "clip";
 
+/**
+ * A stored Output. 0.5.0–0.6.x offered Animated GIF and Animated WebP as
+ * Precise's Quality (`encode.format`): with Precise chosen that is the GIF
+ * or WebP Output now, so the next export writes what the last one did. With
+ * Fast chosen the quality was not used (Fast copied): Fast stays.
+ */
+export function outputOf(method: unknown, encode: unknown): Output {
+  const format = isObject(encode) ? encode.format : undefined;
+  if (method === "precise" && (format === "gif" || format === "webp")) return format;
+  return OUTPUTS.includes(method as Output) ? (method as Output) : "fast";
+}
+
 /** The user's Videos folder, else the home folder. */
 export const defaultFolder = () => {
   const videos = join(homedir(), "Videos");
@@ -80,7 +95,7 @@ export function settingsOf(stored: unknown, folder = defaultFolder()): Settings 
   return {
     folder: isFolder(s.folder) ? (s.folder as string) : folder,
     besideMedia: flag(s.besideMedia, false),
-    method: METHODS.includes(s.method as Method) ? (s.method as Method) : "fast",
+    method: outputOf(s.method, s.encode),
     encode: encodeOf(s.encode),
     template: normalTemplate(s.template),
     lastSeconds: lastSeconds(s.lastSeconds),

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.0
+
+**Who must change: nobody.** No new permission and the same player (0.9.0 or later). Settings, the Collection, Results and kept Highlights carry over; a remembered Animated GIF or Animated WebP becomes the GIF or WebP Output (below).
+
+- **GIF and WebP are Outputs**: the Output switch at the top of the Clip page is now **Fast | Precise | GIF | WebP**, for the clip and for the merged Collection. They were the Quality choices Animated GIF and Animated WebP, under Precise ▸ Advanced (closed by default) ▸ Quality, and are no longer there: the Quality chooser holds Same as source, High quality and Small file (and Custom).
+  - What they write is unchanged: GIF at most 480 px on its longer side at 15 fps, WebP at most 640 px at 20 fps, looping, without sound, at most 60 seconds (a longer range is refused before anything starts), with the video effects, burned-in subtitles and the Collection's transitions as in Precise. Export As… gives the file the format's extension; the ⓘ beside the switch says what they write; an FFmpeg without WebP says so ("Choose another output"), and GIF still works.
+  - While one of them is chosen, a small line right under the switch says what it writes (`GIF · 480 px long edge · 15 fps · up to 60 s`), whether Advanced is open or not. Advanced then holds only Include video effects and Burn in subtitles: the Audio and Quality rows are for an MP4 (an image has no sound and a fixed picture), and its closed header sums up nothing.
+  - Precise keeps its own Quality while GIF or WebP is chosen, so switching back writes the MP4 you had set. A merge you asked as Fast that Fast cannot join is re-encoded with that Quality too (it was always High quality while an animated quality was chosen).
+  - The Collection's footer and the running export's card say GIF or WebP.
+  - **Your setting**: Precise with Animated GIF (or WebP) from 0.5.0–0.6.x opens as the GIF (or WebP) Output, so the next export writes what the last one did; Precise's Quality is then High quality, the default (the one set before the animated quality was not kept). Fast with an animated quality stays Fast.
+- English, Simplified Chinese, German, Spanish, French, Japanese and Korean.
+
 ## 0.6.6
 
 - Needs Vestra Player 0.9.0 or later (SDK 1.9.0): the manifest no longer lists `capabilities`; `activate` starts with `plugin.player.subscribe()` and `await plugin.player.read()`, which the declarations used to imply. Nothing else changes.

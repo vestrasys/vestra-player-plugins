@@ -2,10 +2,10 @@ import { access, constants, mkdir, readdir, rm, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import type { CommandOptions, ExportCheck, ExportPart, ImageRef, Panel, PanelState, Plugin, PlayerState, Text } from "@vestra-player/sdk";
 import {
-  abRange, animatedOf, AUDIO_RATES, codecArgs, crfOf, defaultRange, effectiveMethod, estimate, exportEncoding, fastContainer, HEIGHTS, keyframeArgs, LAST_SECONDS, lastRange, lastSeconds,
-  METHODS, NO_TIMELINE, parseCodec, parseKeyframes, PRESET_ENCODE, presetOf, PRESETS, RATES, snapStart, SPEEDS, timeline, timelineWindow,
+  abRange, animatedOf, animatedOutput, AUDIO_RATES, codecArgs, crfOf, defaultRange, effectiveMethod, estimate, exportEncoding, fastContainer, HEIGHTS, keyframeArgs, LAST_SECONDS, lastRange, lastSeconds,
+  METHODS, methodOf, NO_TIMELINE, OUTPUTS, parseCodec, parseKeyframes, PRESET_ENCODE, presetOf, PRESETS, RATES, snapStart, SPEEDS, timeline, timelineWindow,
 } from "./clip.ts";
-import type { Animated, Encode, Method } from "./clip.ts";
+import type { Animated, Encode, Method, Output } from "./clip.ts";
 import { ANIMATED, encoderProbe, extensionOf, MAX_ANIMATED_SECONDS } from "./animated.ts";
 import { blockingNote, Collection, copyNote, exportParts, lengthClock, listKey, partStates, partTicks, retryDelay, targetNote, totalLength, UNDO_MS } from "./collection.ts";
 import type { Part } from "./collection.ts";
@@ -334,8 +334,9 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       shown: true,
       id: task.id,
       name: basename(task.destination),
-      method: spec.method,
-      preset: spec.method === "fast" ? "" : spec.encode ? presetOf(spec.encode) : "high",
+      // GIF and WebP name their Output; Precise adds its quality.
+      method: animatedOf(spec.encode) ?? spec.method,
+      preset: spec.method === "fast" || animatedOf(spec.encode) ? "" : spec.encode ? presetOf(spec.encode) : "high",
       percent: share === null ? -1 : Math.round(share * 100),
       left: timeLeft(task),
       elapsed: elapsed(task.started),
@@ -384,7 +385,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     clearTimeout(probe.timer);
     probe.abort?.abort();
   });
-  const method = (): Method => effectiveMethod(settings.method, support.fastCut);
+  const method = (): Method => effectiveMethod(methodOf(settings.method), support.fastCut);
   /** The range typed in the tab, or the reason it is none. */
   function typedRange(): { start: number; end: number } | { error: "time" | "endBeforeStart"; field: "start" | "end" } {
     const start = parseTime(form.start);
@@ -450,9 +451,9 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     const container = chosen === "fast" ? fastContainer(sameSource ? probe.video : null, audioCodec(state)) : "mp4";
     const length = range.end - start;
     const fileBytes = isLocal(state.source) ? fileSize(state.source) : null;
-    const guess = estimate({ method: chosen, length, fileBytes, duration: state.duration, encode: settings.encode, secondsPerSecond: settings.preciseSpeed, height: null });
+    const guess = estimate({ method: chosen, length, fileBytes, duration: state.duration, encode: outputEncode(), secondsPerSecond: settings.preciseSpeed, height: null });
     const sizeText = guess.sizehigh <= 0 ? "" : guess.sizelow === guess.sizehigh ? `${guess.sizelow}` : `${Math.round(guess.sizelow)}–${Math.round(guess.sizehigh)}`;
-    const extension = container === "mkv" ? ".mkv" : extensionOf(animatedNow(chosen));
+    const extension = container === "mkv" ? ".mkv" : extensionOf(animatedNow());
     return {
       error: "",
       field: "",
@@ -486,7 +487,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     if (!clippable(seen)) throw new Failure(notClippable(seen));
     const chosen = method();
     const precise = chosen === "precise";
-    const animated = animatedNow(chosen);
+    const animated = animatedNow();
     // An animated image: checked before the save dialog (its length, the encoder), written by the plugin's step.
     const plan = animated ? await animatedPlan(animated, [range.end - range.start], [CUT], ANIMATED_FPS, range.end - range.start) : undefined;
     const spec: Spec = {
@@ -496,7 +497,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       track: animated ? "none" : (audioChoices(seen, text).values[form.audioIndex] ?? "none"),
       method: chosen,
       // R6: the tab's encoder settings.
-      encode: precise && support.encodeOptions ? { ...settings.encode } : undefined,
+      encode: precise && support.encodeOptions ? { ...outputEncode() } : undefined,
     };
     const snapped = chosen === "fast" && probe.source === seen.source ? snapStart(probe.keyframes, range.start) : null;
     const container = chosen === "fast" ? fastContainer(probe.source === seen.source ? probe.video : null, audioCodec(seen)) : "mp4";
@@ -581,25 +582,33 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     if (stale) rememberForm();
     return stale;
   }
-  const setMethod = (next: Method) => {
-    if (!METHODS.includes(next) || settings.method === next) return;
+  const setOutput = (next: Output) => {
+    if (!OUTPUTS.includes(next) || settings.method === next) return;
+    const before = JSON.stringify(outputEncode());
     settings.method = next;
     store();
     probeSoon();
-    // With an animated quality, the check's re-encode is the image's intermediate in Precise and High quality's in Fast.
-    if (live && animatedOf(settings.encode)) void recheck();
+    // The check's re-encode follows the Output: the image's intermediate for GIF and WebP, the Quality's MP4 otherwise.
+    if (live && JSON.stringify(outputEncode()) !== before) void recheck();
   };
-  /** The animated image a Precise export writes now (the Quality chooser's GIF or WebP); null for an MP4 or a Fast cut. */
-  const animatedNow = (chosen: Method): Animated | null => (chosen === "precise" && support.encodeOptions ? animatedOf(settings.encode) : null);
+  /** The animated image the Output writes now (GIF or WebP); null for Fast and Precise, and without the player's encoder settings. */
+  const animatedNow = (): Animated | null => (support.encodeOptions ? animatedOutput(settings.method) : null);
   /**
-   * The MP4 encoding of a Precise re-encode that is no image: the tab's
-   * settings, or High quality while an animated quality is chosen (a merge
-   * the user asked as Fast that cannot be copied falls back to Precise: an
-   * MP4, never a silent GIF).
+   * What a re-encode writes (the clip, the check and a merged export): the
+   * image's fixed intermediate for GIF and WebP, else the Quality's MP4 (also
+   * when Fast falls back to Precise for parts it cannot copy: an MP4, never a
+   * silent GIF).
    */
-  const mp4Encode = (): Encode => (animatedOf(settings.encode) ? { ...PRESET_ENCODE.high } : settings.encode);
-  /** The encoding the check and a merged export use: the image's intermediate when Precise writes one, else the MP4's. */
-  const mergeEncoding = (): Encode => (animatedNow(method()) ? settings.encode : mp4Encode());
+  const outputEncode = (): Encode => {
+    const animated = animatedNow();
+    return animated ? { ...PRESET_ENCODE[animated] } : settings.encode;
+  };
+  /**
+   * The Output the tab shows: Precise for Fast while the player cannot copy
+   * streams, and for GIF and WebP without its encoder settings (what an
+   * export then writes).
+   */
+  const outputNow = (): Output => (methodOf(settings.method) !== method() || (animatedOutput(settings.method) && !animatedNow()) ? "precise" : settings.method);
   /**
    * What the plugin's step needs for an animated image, checked before
    * anything starts: the written length (at most a minute, animated.ts), the
@@ -652,7 +661,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     sourceQueue = next.catch(() => {});
     return next;
   }
-  const encodingOption = () => (support.encodeOptions ? { encoding: exportEncoding(mergeEncoding()) } : undefined);
+  const encodingOption = () => (support.encodeOptions ? { encoding: exportEncoding(outputEncode()) } : undefined);
   /** The check, when it answered for the list as it is now. */
   const freshCheck = () => (check && checkKey === listKey(exportParts(collection.parts)) ? check : null);
   /**
@@ -942,9 +951,9 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       // The red line under the buttons says it (from the same check); a key says it on screen.
       if (first) return void (say && shown(osd.show(BLOCKING[first.problem], [first.part + 1])));
       const chosen: Method = method() === "fast" && answer.copy.ok ? "fast" : "precise";
-      // The image only when the user chose Precise: Fast falling back to Precise writes an MP4 (High quality's, for an animated choice).
-      const animated = animatedNow(method());
-      const encode = mergeEncoding();
+      // The image only when the user chose GIF or WebP: Fast falling back to Precise writes an MP4 (the Quality's).
+      const animated = animatedNow();
+      const encode = outputEncode();
       const transitions = parts.map((part) => part.transition);
       const lengths = parts.map((part) => part.end - part.start);
       // An animated image: its written length (the overlaps taken off) and the encoder are checked before the save dialog.
@@ -1076,7 +1085,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
    */
   function preciseForTransitions() {
     if (collectionMethod() !== "fast") return;
-    setMethod("precise");
+    setOutput("precise");
     ui.switched = true;
   }
   /** Apply to All: this junction's transition on every junction and as the default for new parts; Undo on the message. */
@@ -1773,9 +1782,10 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
         highlights: keyOf("clip.highlights"),
       },
       ...collectionView(),
-      collectionPreview: `${renderName(settings.collectionTemplate, { source: shownSource(), start: 242.3, end: 259, now: new Date(), n: sequence + 1 }, COLLECTION_TEMPLATE)}${extensionOf(animatedNow(method()))}`,
+      collectionPreview: `${renderName(settings.collectionTemplate, { source: shownSource(), start: 242.3, end: 259, now: new Date(), n: sequence + 1 }, COLLECTION_TEMPLATE)}${extensionOf(animatedNow())}`,
       support: { fast: support.fastCut, encode: support.encodeOptions, progress: support.progress },
-      methodIndex: METHODS.indexOf(method()),
+      // The Output: 0 Fast, 1 Precise, 2 GIF, 3 WebP.
+      methodIndex: OUTPUTS.indexOf(outputNow()),
       audioIndex: form.audioIndex,
       processed: form.processed,
       burn: form.burn,
@@ -1784,7 +1794,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
         // Custom comes after the presets in the Quality chooser.
         return preset === "custom" ? PRESETS.length : PRESETS.indexOf(preset);
       })(),
-      // The line under Quality while Animated GIF or WebP is chosen: the encoder's own numbers.
+      // The line under the Output while GIF or WebP is chosen: the encoder's own numbers.
       gifSpec: { ...ANIMATED.gif, seconds: MAX_ANIMATED_SECONDS },
       webpSpec: { ...ANIMATED.webp, seconds: MAX_ANIMATED_SECONDS },
       encCrf: settings.encode.crf,
@@ -1804,7 +1814,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       resultsStatus: ui.resultsStatus,
       folder: settings.folder,
       besideMedia: settings.besideMedia,
-      preview: `${renderName(settings.template, { source: shownSource(), start: 242.3, end: 259, now: new Date(), n: sequence + 1 })}${extensionOf(animatedNow(method()))}`,
+      preview: `${renderName(settings.template, { source: shownSource(), start: 242.3, end: 259, now: new Date(), n: sequence + 1 })}${extensionOf(animatedNow())}`,
       page: PAGES.indexOf(settings.page),
       listFocus: ui.listFocus,
       unseen,
@@ -1940,7 +1950,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   on("setMethod", (index: number) => {
     // The user's own pick: the note that a transition switched the method goes.
     ui.switched = false;
-    setMethod(METHODS[Number(index)]!);
+    setOutput(OUTPUTS[Number(index)]!);
   });
   on("clipEdited", (start: string, end: string) => {
     // Typed while the tab shows the source playing: the marks are its.
@@ -1976,8 +1986,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     if (preset) setEncode({ ...PRESET_ENCODE[preset] });
   });
   on("setEncode", (field: string, value: number) => {
-    // The animated presets' encoding is fixed (the tab hides these rows for them).
-    if (animatedOf(settings.encode)) return;
+    // GIF and WebP have a fixed encoding: the tab hides these rows for them, so an event now is a stale one.
+    if (animatedNow()) return;
     const next = { ...settings.encode };
     const n = Math.round(Number(value));
     // Moving the quality number leaves "Same as source" for a quality level.
