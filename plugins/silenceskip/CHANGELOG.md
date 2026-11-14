@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0
+
+- Needs Vestra Player 0.10.0. The plugin no longer follows playback ten times a second: it scans a file when the player says it is ready, and hands the silences to the player, which draws them on the seek bar and starts the plugin 2 s (in media time) before each one. Between silences that are far apart the plugin is stopped and uses no memory.
+- A skip waits for the silence's start with one timer and then jumps to its end; a speed change during those 2 s lets that one silence play (the user's action wins), a pause there does not (the resume arms it again). A silence is skipped each time playback enters it, also after the user moved the playhead into it.
+- The seek bar shows up to 1000 silences (was 100), the same ones that are skipped; a file with more skips its 1000 longest.
+- What a scan found, the time saved and the "ffmpeg not found" note are kept while the player runs, so a restart of the plugin does not read the file again.
+
 ## 0.1.0
 
 - First release: **Playback ▸ Skip Silence** skips the silent stretches of a local video or audio file while it plays (off by default, remembered).

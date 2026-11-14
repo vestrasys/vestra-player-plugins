@@ -126,15 +126,6 @@ export function longest(spans: Span[], limit: number): Span[] {
     .sort((a, b) => a.start - b.start);
 }
 
-/** The stretch to skip at `position`: inside it, with enough left to be worth the seek. */
-export function stretchAt(spans: Span[], position: number): Span | null {
-  for (const s of spans) {
-    if (s.start > position) return null;
-    if (position >= s.start && position < s.end - MIN_JUMP / 2) return s;
-  }
-  return null;
-}
-
 /** How many windows cover `duration` seconds. */
 export const windowCount = (duration: number) => Math.max(1, Math.ceil(duration / WINDOW));
 

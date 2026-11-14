@@ -10,7 +10,6 @@ import {
   parseSilences,
   silenceArgs,
   skippable,
-  stretchAt,
   windowCount,
 } from "../silence.ts";
 
@@ -62,18 +61,6 @@ test("only silences of the minimum length are skipped, less a margin, never into
   assert.deepEqual(skippable(silences, 1, 100), [{ start: 20 + PAD, end: 23 - PAD }]);
   assert.equal(skippable(silences, 0.5, 100).length, 2);
   assert.equal(skippable(silences, 0.5, null).length, 3);
-});
-
-test("the stretch at the playhead, with something left to skip", () => {
-  const spans = [
-    { start: 5, end: 8 },
-    { start: 20, end: 30 },
-  ];
-  assert.equal(stretchAt(spans, 4.9), null);
-  assert.deepEqual(stretchAt(spans, 5), spans[0]);
-  assert.equal(stretchAt(spans, 7.95), null);
-  assert.deepEqual(stretchAt(spans, 25), spans[1]);
-  assert.equal(stretchAt(spans, 31), null);
 });
 
 test("the scan starts at the playhead's window and wraps to the start", () => {
