@@ -1,0 +1,112 @@
+# Machine translation by the plugin's author (a language model), 2026-11-14; not reviewed.
+msgid ""
+msgstr ""
+"Language: de\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: main.ts:153
+#, x-machine
+msgid "Silence"
+msgstr "Stille"
+
+#: main.ts:183
+#, x-machine
+msgid "Silence Skipper needs ffmpeg, which was not found"
+msgstr "Silence Skipper braucht ffmpeg, das nicht gefunden wurde"
+
+#: main.ts:190
+#, x-machine
+msgid "Silence Skipper cannot read the sound of this file"
+msgstr "Silence Skipper kann den Ton dieser Datei nicht lesen"
+
+#: main.ts:245
+#, x-machine
+msgid "Silence skipped · {} saved"
+msgstr "Stille übersprungen · {} gespart"
+
+#: main.ts:327
+#, x-machine
+msgid "Skip Silence"
+msgstr "Stille überspringen"
+
+#: main.ts:333
+#, x-machine
+msgid "Skip Silence: On"
+msgstr "Stille überspringen: Ein"
+
+#: main.ts:333
+#, x-machine
+msgid "Skip Silence: Off"
+msgstr "Stille überspringen: Aus"
+
+#: main.ts:341 manifest.json
+#, x-machine
+msgid "Silence Skipper"
+msgstr "Silence Skipper"
+
+#: manifest.json
+#, x-machine
+msgid "Skips the silent stretches of lectures and recordings while they play"
+msgstr "Überspringt beim Abspielen die stillen Stellen von Vorlesungen und Aufnahmen"
+
+#: manifest.json
+#, x-machine
+msgid "Silence Skipper jumps over the pauses in a video or audio file on this computer, like Trim Silence in podcast players: lectures, talks, screen recordings and interviews play without the dead air. Playback ▸ Skip Silence turns it on and off. While it is on, the player's FFmpeg reads the sound of the playing file two minutes at a time, starting where you are, and each silence that is long enough is skipped with a jump; the seek bar shows the silences it found, and a short note on the video says how much time skipping has saved. Options ▸ Playback ▸ Silence Skipper sets how quiet counts as silence and the shortest pause that is skipped. Speech is never sped up, and a pause at the very end of the file is kept."
+msgstr "Silence Skipper springt über die Pausen in einer Video- oder Audiodatei auf diesem Computer, wie „Stille kürzen“ in Podcast-Apps: Vorlesungen, Vorträge, Bildschirmaufnahmen und Interviews laufen ohne Leerlauf. Wiedergabe ▸ Stille überspringen schaltet es ein und aus. Solange es an ist, liest das FFmpeg des Players den Ton der laufenden Datei in Abschnitten von zwei Minuten, beginnend an der aktuellen Stelle, und jede ausreichend lange Stille wird mit einem Sprung übersprungen; die Zeitleiste zeigt die gefundenen Stillen, und ein kurzer Hinweis im Video sagt, wie viel Zeit das Überspringen gespart hat. Optionen ▸ Wiedergabe ▸ Silence Skipper legt fest, wie leise als Stille gilt und wie kurz eine übersprungene Pause mindestens ist. Sprache wird nie beschleunigt, und eine Pause ganz am Ende der Datei bleibt erhalten."
+
+#: manifest.json
+#, x-machine
+msgid "playback"
+msgstr "Wiedergabe"
+
+#: manifest.json
+#, x-machine
+msgid "audio"
+msgstr "Audio"
+
+#: manifest.json
+#, x-machine
+msgid "silence"
+msgstr "Stille"
+
+#: manifest.json
+#, x-machine
+msgid "lecture"
+msgstr "Vorlesung"
+
+#: ui/settings.slint:48
+#, x-machine
+msgid "Skip silence while playing"
+msgstr "Beim Abspielen Stille überspringen"
+
+#: ui/settings.slint:55
+#, x-machine
+msgid "Silence below"
+msgstr "Stille unter"
+
+#: ui/settings.slint:56
+#, x-machine
+msgid "{} dB"
+msgstr "{} dB"
+
+#: ui/settings.slint:70 ui/settings.slint:92
+#, x-machine
+msgid "Default"
+msgstr "Standard"
+
+#: ui/settings.slint:77
+#, x-machine
+msgid "Shortest silence"
+msgstr "Kürzeste Stille"
+
+#: ui/settings.slint:78
+#, x-machine
+msgid "{} s"
+msgstr "{} s"
+
+#: ui/settings.slint:99
+#, x-machine
+msgid "Raise the level when room noise or music keeps pauses from being found; lower it when quiet speech is skipped."
+msgstr "Höher stellen, wenn Raumgeräusche oder Musik verhindern, dass Pausen gefunden werden; niedriger, wenn leise Sprache übersprungen wird."
