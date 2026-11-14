@@ -1,0 +1,112 @@
+# Machine translation by the plugin's author (a language model), 2026-11-14; not reviewed.
+msgid ""
+msgstr ""
+"Language: fr\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: main.ts:153
+#, x-machine
+msgid "Silence"
+msgstr "Silence"
+
+#: main.ts:183
+#, x-machine
+msgid "Silence Skipper needs ffmpeg, which was not found"
+msgstr "Silence Skipper a besoin de ffmpeg, qui est introuvable"
+
+#: main.ts:190
+#, x-machine
+msgid "Silence Skipper cannot read the sound of this file"
+msgstr "Silence Skipper ne peut pas lire le son de ce fichier"
+
+#: main.ts:245
+#, x-machine
+msgid "Silence skipped · {} saved"
+msgstr "Silence sauté · {} gagnées"
+
+#: main.ts:327
+#, x-machine
+msgid "Skip Silence"
+msgstr "Sauter les silences"
+
+#: main.ts:333
+#, x-machine
+msgid "Skip Silence: On"
+msgstr "Sauter les silences : activé"
+
+#: main.ts:333
+#, x-machine
+msgid "Skip Silence: Off"
+msgstr "Sauter les silences : désactivé"
+
+#: main.ts:341 manifest.json
+#, x-machine
+msgid "Silence Skipper"
+msgstr "Silence Skipper"
+
+#: manifest.json
+#, x-machine
+msgid "Skips the silent stretches of lectures and recordings while they play"
+msgstr "Saute les passages silencieux des cours et des enregistrements pendant la lecture"
+
+#: manifest.json
+#, x-machine
+msgid "Silence Skipper jumps over the pauses in a video or audio file on this computer, like Trim Silence in podcast players: lectures, talks, screen recordings and interviews play without the dead air. Playback ▸ Skip Silence turns it on and off. While it is on, the player's FFmpeg reads the sound of the playing file two minutes at a time, starting where you are, and each silence that is long enough is skipped with a jump; the seek bar shows the silences it found, and a short note on the video says how much time skipping has saved. Options ▸ Playback ▸ Silence Skipper sets how quiet counts as silence and the shortest pause that is skipped. Speech is never sped up, and a pause at the very end of the file is kept."
+msgstr "Silence Skipper saute les pauses d’un fichier vidéo ou audio de cet ordinateur, comme la suppression des silences des applications de podcast : cours, conférences, enregistrements d’écran et interviews se lisent sans temps mort. Lecture ▸ Sauter les silences l’active et le désactive. Quand il est actif, le FFmpeg du lecteur lit le son du fichier en cours deux minutes à la fois, à partir de la position actuelle, et chaque silence assez long est sauté d’un bond ; la barre de progression montre les silences trouvés, et une courte note sur la vidéo indique le temps gagné. Options ▸ Lecture ▸ Silence Skipper règle le niveau en dessous duquel le son compte comme silence et la pause la plus courte sautée. La parole n’est jamais accélérée, et une pause tout à la fin du fichier est conservée."
+
+#: manifest.json
+#, x-machine
+msgid "playback"
+msgstr "lecture"
+
+#: manifest.json
+#, x-machine
+msgid "audio"
+msgstr "audio"
+
+#: manifest.json
+#, x-machine
+msgid "silence"
+msgstr "silence"
+
+#: manifest.json
+#, x-machine
+msgid "lecture"
+msgstr "cours"
+
+#: ui/settings.slint:48
+#, x-machine
+msgid "Skip silence while playing"
+msgstr "Sauter les silences pendant la lecture"
+
+#: ui/settings.slint:55
+#, x-machine
+msgid "Silence below"
+msgstr "Silence sous"
+
+#: ui/settings.slint:56
+#, x-machine
+msgid "{} dB"
+msgstr "{} dB"
+
+#: ui/settings.slint:70 ui/settings.slint:92
+#, x-machine
+msgid "Default"
+msgstr "Par défaut"
+
+#: ui/settings.slint:77
+#, x-machine
+msgid "Shortest silence"
+msgstr "Silence minimal"
+
+#: ui/settings.slint:78
+#, x-machine
+msgid "{} s"
+msgstr "{} s"
+
+#: ui/settings.slint:99
+#, x-machine
+msgid "Raise the level when room noise or music keeps pauses from being found; lower it when quiet speech is skipped."
+msgstr "Montez le niveau si le bruit de la pièce ou la musique empêche de trouver les pauses ; baissez-le si une voix faible est sautée."

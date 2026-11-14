@@ -1,0 +1,112 @@
+# Machine translation by the plugin's author (a language model), 2026-11-14; not reviewed.
+msgid ""
+msgstr ""
+"Language: ko\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#: main.ts:153
+#, x-machine
+msgid "Silence"
+msgstr "무음"
+
+#: main.ts:183
+#, x-machine
+msgid "Silence Skipper needs ffmpeg, which was not found"
+msgstr "무음 건너뛰기에는 ffmpeg가 필요하지만 찾을 수 없습니다"
+
+#: main.ts:190
+#, x-machine
+msgid "Silence Skipper cannot read the sound of this file"
+msgstr "무음 건너뛰기가 이 파일의 소리를 읽을 수 없습니다"
+
+#: main.ts:245
+#, x-machine
+msgid "Silence skipped · {} saved"
+msgstr "무음 건너뜀 · 총 {} 절약"
+
+#: main.ts:327
+#, x-machine
+msgid "Skip Silence"
+msgstr "무음 건너뛰기"
+
+#: main.ts:333
+#, x-machine
+msgid "Skip Silence: On"
+msgstr "무음 건너뛰기: 켬"
+
+#: main.ts:333
+#, x-machine
+msgid "Skip Silence: Off"
+msgstr "무음 건너뛰기: 끔"
+
+#: main.ts:341 manifest.json
+#, x-machine
+msgid "Silence Skipper"
+msgstr "무음 건너뛰기"
+
+#: manifest.json
+#, x-machine
+msgid "Skips the silent stretches of lectures and recordings while they play"
+msgstr "강의와 녹음을 재생하는 동안 소리 없는 구간을 건너뜁니다"
+
+#: manifest.json
+#, x-machine
+msgid "Silence Skipper jumps over the pauses in a video or audio file on this computer, like Trim Silence in podcast players: lectures, talks, screen recordings and interviews play without the dead air. Playback ▸ Skip Silence turns it on and off. While it is on, the player's FFmpeg reads the sound of the playing file two minutes at a time, starting where you are, and each silence that is long enough is skipped with a jump; the seek bar shows the silences it found, and a short note on the video says how much time skipping has saved. Options ▸ Playback ▸ Silence Skipper sets how quiet counts as silence and the shortest pause that is skipped. Speech is never sped up, and a pause at the very end of the file is kept."
+msgstr "무음 건너뛰기는 이 컴퓨터에 있는 동영상이나 오디오 파일의 쉬는 구간을 건너뜁니다. 팟캐스트 앱의 무음 제거처럼 강의, 발표, 화면 녹화, 인터뷰를 늘어지는 공백 없이 재생합니다. 재생 ▸ 무음 건너뛰기로 켜고 끕니다. 켜져 있으면 플레이어의 FFmpeg가 재생 중인 파일의 소리를 현재 위치부터 2분씩 읽고, 충분히 긴 무음은 한 번에 건너뜁니다. 찾은 무음은 탐색 막대에 표시되고, 영상 위의 짧은 알림이 건너뛰기로 절약한 시간을 알려 줍니다. 옵션 ▸ 재생 ▸ 무음 건너뛰기에서 무음으로 볼 소리 크기와 건너뛸 가장 짧은 공백을 정합니다. 말소리는 빨라지지 않으며 파일 맨 끝의 공백은 유지됩니다."
+
+#: manifest.json
+#, x-machine
+msgid "playback"
+msgstr "재생"
+
+#: manifest.json
+#, x-machine
+msgid "audio"
+msgstr "오디오"
+
+#: manifest.json
+#, x-machine
+msgid "silence"
+msgstr "무음"
+
+#: manifest.json
+#, x-machine
+msgid "lecture"
+msgstr "강의"
+
+#: ui/settings.slint:48
+#, x-machine
+msgid "Skip silence while playing"
+msgstr "재생 중 무음 건너뛰기"
+
+#: ui/settings.slint:55
+#, x-machine
+msgid "Silence below"
+msgstr "무음 기준"
+
+#: ui/settings.slint:56
+#, x-machine
+msgid "{} dB"
+msgstr "{} dB"
+
+#: ui/settings.slint:70 ui/settings.slint:92
+#, x-machine
+msgid "Default"
+msgstr "기본값"
+
+#: ui/settings.slint:77
+#, x-machine
+msgid "Shortest silence"
+msgstr "가장 짧은 무음"
+
+#: ui/settings.slint:78
+#, x-machine
+msgid "{} s"
+msgstr "{}초"
+
+#: ui/settings.slint:99
+#, x-machine
+msgid "Raise the level when room noise or music keeps pauses from being found; lower it when quiet speech is skipped."
+msgstr "방 소음이나 배경 음악 때문에 공백을 찾지 못하면 수준을 높이고, 작은 말소리가 건너뛰어지면 낮추세요."
