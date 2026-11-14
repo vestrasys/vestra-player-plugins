@@ -114,6 +114,7 @@ test("one menu item, Video ▸ Export Clip…; the rest is in the command palett
       ["clip.collectionClear", "", "clip.collection"],
       ["clip.collectionUndo", "", "clip.collection"],
       ["clip.collectionUndoApply", "", "clip.collection"],
+      ["clip.collectionAddAgain", "", "clip.collection"],
       ["clip.collectionRemove", "Delete", "clip.collection"],
       ["clip.highlights", "", "clip.panel"],
       ["clip.highlightAdd", "Enter", "clip.highlights"],
@@ -139,7 +140,7 @@ test("every command has the Export category in the command palette, and every ho
     ready(host);
     const { stop } = await start(host, locale);
     try {
-      assert.equal(host.commands.size, 22);
+      assert.equal(host.commands.size, 23);
       for (const [id, command] of host.commands) {
         assert.equal(command.declaration.category, "Export", id);
         assert.ok(command.display.category?.trim(), `${id}: shows a category in ${locale}`);
@@ -208,10 +209,12 @@ test("the tab's Slint: a ListView for Results, library widgets, key caps, Theme 
   assert.match(slint, /min-width: min\(measure-highlights\.preferred-width \+ 12px, 44px\);/, "Highlights gives way first");
   // No wrapped text: a wrapped line is laid out one line tall and overlapped the rows below it.
   assert.doesNotMatch(slint, /wrap:\s*word-wrap/);
-  // One scroll set by the tab: Show Collection brings the list into view (and only when asked).
+  // Two scrolls of the page set by the tab, each only when asked: Show Collection brings the list into view, and so
+  // does an add or a click on Added (design clipexport-collection A) where the list is not wholly in view.
   assert.doesNotMatch(slint, /jump-/);
-  assert.equal(slint.split("viewport-y =").length - 1, 1);
+  assert.equal(slint.split("viewport-y =").length - 1, 2);
   assert.match(slint, /changed list-request => \{\s*clip-page\.viewport-y = /);
+  assert.match(slint, /changed reveal-request => \{[\s\S]*?if list-focus\.y \+ list-focus\.height > -clip-page\.viewport-y \+ clip-page\.height \{\s*clip-page\.viewport-y = /);
   assert.doesNotMatch(slint, /ComboBox|CheckBox|StandardListView/);
   assert.match(slint, /import \{ Button, Check, Choice, KeyHint, RadioGroup, Slider, Tab, ToolTipArea, ToolTipKey \} from "@vestra\/widgets\.slint";/);
   assert.match(slint, /KeyHint \{ text: root\.key; \}/);

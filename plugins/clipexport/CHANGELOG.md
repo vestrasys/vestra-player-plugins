@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.7.1
+
+**Who must change: nobody.** No new permission and the same player (0.9.0 or later). Settings, the Collection, Results and kept Highlights carry over.
+
+- **Collection: is this range in it already?** (design clipexport-collection, option A) After **+ Add** the Range's Start and End stayed as they were, and nothing said whether that range was in the Collection, so it was easy to add it twice.
+  - While the Range is a part, the Collection's **+ Add** reads **✓ Added**; its tooltip says "Part N is this range. Click to show it." A click adds nothing: it selects that part, scrolls it into view and says "Already in the Collection as part N" with **Add Again**, which adds a deliberate second copy as the last part (offered for 10 seconds; also in the command palette as Add Range Again while offered). Where the label does not fit (a narrow tab), Added shows its check alone.
+  - The state follows at once: change Start or End by a millisecond, open another file, remove the part, Clear (and Undo), reorder or restart, and the button says what is so. A file is recognised by the player's reference to it once the plugin has one (after an add or a double-click on a part), by its name until then: a file of the same name in another folder may read Added until the click, which then adds it.
+  - When the Collection is full (100 parts), Added still shows its part; a new range is refused as before.
+  - A range that overlaps a part of the same file is still added as usual; the tooltip says "as part 5 · overlaps part 2".
+  - An add from the tab selects the new part and scrolls it into view (the page too, where the list is out of view); Start and End stay as they were. ✕ on the row, or Delete in the list, takes it out again.
+  - **Add Range to Collection** (a key, the palette): a range that is a part already adds nothing and says so with Add Again; a new one is added, selected and said as before.
+  - **Highlights**: **+** or **Enter** on a suggestion whose range is in the Collection already adds nothing; it leaves the list as added, with Add Again on the message. **Add All** adds the others and says how many were in already.
+- English, Simplified Chinese, German, Spanish, French, Japanese and Korean (the new texts are machine translations, marked as such in the catalogs).
+
 ## 0.7.0
 
 **Who must change: nobody.** No new permission and the same player (0.9.0 or later). Settings, the Collection, Results and kept Highlights carry over; a remembered Animated GIF or Animated WebP becomes the GIF or WebP Output (below).

@@ -35,6 +35,8 @@ export const PART_LIMIT = 100;
 export const retryDelay = (tries: number) => (tries < 5 ? 300 * 2 ** tries : null);
 /** How long Clear Collection can be undone. */
 export const UNDO_MS = 30_000;
+/** How long Add Again is offered after a range already in the Collection was not added again (design clipexport-collection A). */
+export const AGAIN_MS = 10_000;
 
 const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 const isPart = (value: unknown): value is Part => {
@@ -66,6 +68,38 @@ export function partsOf(stored: unknown): Part[] {
     if (parts.length >= PART_LIMIT) break;
   }
   return normalize(parts);
+}
+
+/**
+ * The file a range is of, as the page knows it: its token once the plugin has one for the file playing (exact), or
+ * only the name the player gives it (two files of one name in different folders look alike until the token is known).
+ */
+export interface FileKey {
+  token: string | null;
+  name: string;
+}
+/** Times compared to the millisecond, the precision the Start and End fields show. */
+const ms = (seconds: number) => Math.round(seconds * 1000);
+/** The part is of this file: the same token when it is known, else the same name. */
+const ofFile = (part: Part, file: FileKey) => (file.token ? part.token === file.token : !!file.name && part.name === file.name);
+/** The end a new part gets: clamped to the file's duration, as an add clamps it. */
+const endIn = (end: number, duration?: number | null) => (duration && duration > 0 ? Math.min(end, duration) : end);
+/** The part is this range of this file: the same start and end to the millisecond, the end clamped as an add would. */
+export const sameRange = (part: Part, file: FileKey, start: number, end: number, duration?: number | null) =>
+  ofFile(part, file) && ms(part.start) === ms(start) && ms(part.end) === ms(endIn(end, duration));
+/** The part shares more than 1 ms of this file with the range, and is not the same range (a part inside it counts). */
+export function overlapping(part: Part, file: FileKey, start: number, end: number, duration?: number | null) {
+  if (!ofFile(part, file) || sameRange(part, file, start, end, duration)) return false;
+  return Math.min(ms(part.end), ms(endIn(end, duration))) - Math.max(ms(part.start), ms(start)) > 1;
+}
+/**
+ * Where the range is in the Collection, as part numbers (from 1; 0 none): `added`, the first part that is this range;
+ * `overlaps`, the first other part of the file that overlaps it (0 when the range is a part: then that is what counts).
+ */
+export function rangeIn(parts: readonly Part[], file: FileKey, start: number, end: number, duration?: number | null) {
+  const added = parts.findIndex((part) => sameRange(part, file, start, end, duration)) + 1;
+  const overlaps = added ? 0 : parts.findIndex((part) => overlapping(part, file, start, end, duration)) + 1;
+  return { added, overlaps };
 }
 
 /** The parts as the export and its check take them. */
