@@ -1,0 +1,94 @@
+msgid ""
+msgstr ""
+"Language: es\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: main.ts:125
+msgid "The meter could not start: {}"
+msgstr "No se pudo iniciar el medidor: {}"
+
+#: main.ts:127 main.ts:130
+msgid "Waiting for sound…"
+msgstr "Esperando sonido…"
+
+#: main.ts:128
+msgid "Nothing is playing"
+msgstr "No se está reproduciendo nada"
+
+#: main.ts:129
+msgid "This media has no sound"
+msgstr "Este medio no tiene sonido"
+
+#: main.ts:131
+msgid "Paused: the values hold"
+msgstr "En pausa: los valores se mantienen"
+
+#: main.ts:132
+msgid "Measuring"
+msgstr "Midiendo"
+
+#: main.ts:150
+msgid "Loudness Meter…"
+msgstr "Medidor de sonoridad…"
+
+#: manifest.json
+msgid "Loudness"
+msgstr "Sonoridad"
+
+#: manifest.json
+msgid "A live EBU R128 loudness meter: momentary, short-term and integrated LUFS, loudness range and true peak"
+msgstr "Un medidor de sonoridad EBU R128 en directo: LUFS momentánea, a corto plazo e integrada, rango de sonoridad y pico real"
+
+#: manifest.json
+msgid "Measures how loud what you play is, the way broadcasters do (EBU R128, ITU-R BS.1770). Tools ▸ Loudness Meter… opens a small window with momentary and short-term loudness as bars, integrated loudness and loudness range of what has played, and the highest true peak, updated ten times a second. It only measures: the sound you hear is not changed. The meter runs while its window is open and is taken out of the sound path when you close it. To make quiet dialogue and loud scenes more even, use the player's own Normalize (Shift+N)."
+msgstr "Mide lo alto que suena lo que reproduce, como lo hacen las emisoras (EBU R128, UIT-R BS.1770). Herramientas ▸ Medidor de sonoridad… abre una pequeña ventana con la sonoridad momentánea y a corto plazo en barras, la sonoridad integrada y el rango de sonoridad de lo reproducido, y el pico real más alto, actualizados diez veces por segundo. Solo mide: el sonido que oye no cambia. El medidor funciona mientras su ventana está abierta y sale del camino del sonido al cerrarla. Para igualar diálogos bajos y escenas fuertes, use la normalización del reproductor (Mayús+N)."
+
+#: manifest.json
+msgid "audio"
+msgstr "audio"
+
+#: manifest.json
+msgid "loudness"
+msgstr "sonoridad"
+
+#: manifest.json
+msgid "meter"
+msgstr "medidor"
+
+#: manifest.json
+msgid "lufs"
+msgstr "lufs"
+
+#: manifest.json
+msgid "ebu r128"
+msgstr "ebu r128"
+
+#: meter.slint:65
+msgid "Loudness Meter"
+msgstr "Medidor de sonoridad"
+
+#: meter.slint:93
+msgid "Momentary"
+msgstr "Momentánea"
+
+#: meter.slint:94
+msgid "Short-term"
+msgstr "Corto plazo"
+
+#: meter.slint:95
+msgid "Integrated"
+msgstr "Integrada"
+
+#: meter.slint:96
+msgid "Range"
+msgstr "Rango"
+
+#: meter.slint:97
+msgid "True peak"
+msgstr "Pico real"
+
+#: meter.slint:120
+msgid "Restart"
+msgstr "Reiniciar"
