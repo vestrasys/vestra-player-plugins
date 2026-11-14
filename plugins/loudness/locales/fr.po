@@ -1,0 +1,94 @@
+msgid ""
+msgstr ""
+"Language: fr\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: main.ts:125
+msgid "The meter could not start: {}"
+msgstr "La mesure n’a pas pu démarrer : {}"
+
+#: main.ts:127 main.ts:130
+msgid "Waiting for sound…"
+msgstr "En attente du son…"
+
+#: main.ts:128
+msgid "Nothing is playing"
+msgstr "Aucune lecture en cours"
+
+#: main.ts:129
+msgid "This media has no sound"
+msgstr "Ce média n’a pas de son"
+
+#: main.ts:131
+msgid "Paused: the values hold"
+msgstr "En pause : les valeurs sont figées"
+
+#: main.ts:132
+msgid "Measuring"
+msgstr "Mesure en cours"
+
+#: main.ts:150
+msgid "Loudness Meter…"
+msgstr "Mesure de sonie…"
+
+#: manifest.json
+msgid "Loudness"
+msgstr "Sonie"
+
+#: manifest.json
+msgid "A live EBU R128 loudness meter: momentary, short-term and integrated LUFS, loudness range and true peak"
+msgstr "Une mesure de sonie EBU R128 en direct : LUFS momentanée, court terme et intégrée, plage de sonie et crête vraie"
+
+#: manifest.json
+msgid "Measures how loud what you play is, the way broadcasters do (EBU R128, ITU-R BS.1770). Tools ▸ Loudness Meter… opens a small window with momentary and short-term loudness as bars, integrated loudness and loudness range of what has played, and the highest true peak, updated ten times a second. It only measures: the sound you hear is not changed. The meter runs while its window is open and is taken out of the sound path when you close it. To make quiet dialogue and loud scenes more even, use the player's own Normalize (Shift+N)."
+msgstr "Mesure le volume perçu de ce que vous lisez, comme le font les diffuseurs (EBU R128, UIT-R BS.1770). Outils ▸ Mesure de sonie… ouvre une petite fenêtre avec la sonie momentanée et à court terme en barres, la sonie intégrée et la plage de sonie de ce qui a été lu, et la crête vraie la plus haute, mises à jour dix fois par seconde. Elle ne fait que mesurer : le son entendu n’est pas modifié. La mesure tourne tant que sa fenêtre est ouverte et quitte le chemin du son à sa fermeture. Pour équilibrer dialogues faibles et scènes fortes, utilisez la normalisation du lecteur (Maj+N)."
+
+#: manifest.json
+msgid "audio"
+msgstr "audio"
+
+#: manifest.json
+msgid "loudness"
+msgstr "sonie"
+
+#: manifest.json
+msgid "meter"
+msgstr "mesure"
+
+#: manifest.json
+msgid "lufs"
+msgstr "lufs"
+
+#: manifest.json
+msgid "ebu r128"
+msgstr "ebu r128"
+
+#: meter.slint:65
+msgid "Loudness Meter"
+msgstr "Mesure de sonie"
+
+#: meter.slint:93
+msgid "Momentary"
+msgstr "Momentanée"
+
+#: meter.slint:94
+msgid "Short-term"
+msgstr "Court terme"
+
+#: meter.slint:95
+msgid "Integrated"
+msgstr "Intégrée"
+
+#: meter.slint:96
+msgid "Range"
+msgstr "Plage"
+
+#: meter.slint:97
+msgid "True peak"
+msgstr "Crête vraie"
+
+#: meter.slint:120
+msgid "Restart"
+msgstr "Recommencer"

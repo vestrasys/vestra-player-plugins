@@ -1,0 +1,94 @@
+msgid ""
+msgstr ""
+"Language: ko\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#: main.ts:125
+msgid "The meter could not start: {}"
+msgstr "미터를 시작할 수 없습니다: {}"
+
+#: main.ts:127 main.ts:130
+msgid "Waiting for sound…"
+msgstr "소리를 기다리는 중…"
+
+#: main.ts:128
+msgid "Nothing is playing"
+msgstr "재생 중인 항목이 없습니다"
+
+#: main.ts:129
+msgid "This media has no sound"
+msgstr "이 미디어에는 소리가 없습니다"
+
+#: main.ts:131
+msgid "Paused: the values hold"
+msgstr "일시 정지됨: 값이 유지됩니다"
+
+#: main.ts:132
+msgid "Measuring"
+msgstr "측정 중"
+
+#: main.ts:150
+msgid "Loudness Meter…"
+msgstr "라우드니스 미터…"
+
+#: manifest.json
+msgid "Loudness"
+msgstr "라우드니스"
+
+#: manifest.json
+msgid "A live EBU R128 loudness meter: momentary, short-term and integrated LUFS, loudness range and true peak"
+msgstr "실시간 EBU R128 라우드니스 미터: 순간·단기·통합 LUFS, 라우드니스 범위, 트루 피크"
+
+#: manifest.json
+msgid "Measures how loud what you play is, the way broadcasters do (EBU R128, ITU-R BS.1770). Tools ▸ Loudness Meter… opens a small window with momentary and short-term loudness as bars, integrated loudness and loudness range of what has played, and the highest true peak, updated ten times a second. It only measures: the sound you hear is not changed. The meter runs while its window is open and is taken out of the sound path when you close it. To make quiet dialogue and loud scenes more even, use the player's own Normalize (Shift+N)."
+msgstr "재생 중인 소리의 크기를 방송사와 같은 방식(EBU R128, ITU-R BS.1770)으로 측정합니다. 도구 ▸ 라우드니스 미터…를 선택하면 작은 창이 열리고, 순간 및 단기 라우드니스를 막대로, 재생된 부분의 통합 라우드니스와 라우드니스 범위, 최고 트루 피크를 초당 10번 갱신해 보여 줍니다. 측정만 하며 들리는 소리는 바뀌지 않습니다. 미터는 창이 열려 있는 동안만 동작하고, 창을 닫으면 소리 경로에서 빠집니다. 작은 대사와 큰 장면의 차이를 줄이려면 플레이어 내장 '노멀라이즈'(Shift+N)를 사용하세요."
+
+#: manifest.json
+msgid "audio"
+msgstr "오디오"
+
+#: manifest.json
+msgid "loudness"
+msgstr "라우드니스"
+
+#: manifest.json
+msgid "meter"
+msgstr "미터"
+
+#: manifest.json
+msgid "lufs"
+msgstr "lufs"
+
+#: manifest.json
+msgid "ebu r128"
+msgstr "ebu r128"
+
+#: meter.slint:65
+msgid "Loudness Meter"
+msgstr "라우드니스 미터"
+
+#: meter.slint:93
+msgid "Momentary"
+msgstr "순간"
+
+#: meter.slint:94
+msgid "Short-term"
+msgstr "단기"
+
+#: meter.slint:95
+msgid "Integrated"
+msgstr "통합"
+
+#: meter.slint:96
+msgid "Range"
+msgstr "범위"
+
+#: meter.slint:97
+msgid "True peak"
+msgstr "트루 피크"
+
+#: meter.slint:120
+msgid "Restart"
+msgstr "다시 시작"
