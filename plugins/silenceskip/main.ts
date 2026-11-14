@@ -1,11 +1,13 @@
+import { createHash } from "node:crypto";
 import { realpath, stat } from "node:fs/promises";
 import { isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Plugin, PlayerState, PluginError, Scope } from "@vestra-player/sdk";
+import type { Plugin, PlayerState, PluginError, Scope, TriggerEvent } from "@vestra-player/sdk";
 import {
   audioStream,
   clock,
   longest,
+  MIN_JUMP,
   MIN_LENGTH,
   mergeSpans,
   nextWindow,
@@ -13,7 +15,6 @@ import {
   silenceArgs,
   skippable,
   type Span,
-  stretchAt,
   THRESHOLD,
   WINDOW,
   windowCount,
@@ -46,12 +47,19 @@ const clamp = (value: number, range: { min: number; max: number }) => Math.min(r
 
 /** How long one ffmpeg window may take. */
 const WINDOW_TIMEOUT = 60_000;
-/** The seek bar shows at most this many ranges (`TIMELINE_LIMITS.ranges`): the longest silences. */
-export const SHOWN_RANGES = 100;
-/** Files whose scan is kept in memory, the most recent. */
+/**
+ * The stretches skipped and shown on the seek bar: at most this many, the
+ * longest (`TIMELINE_LIMITS.ranges`, also the limit of a trigger's position list).
+ */
+export const SHOWN_RANGES = 1000;
+/**
+ * Media seconds before a silence at which the player wakes the plugin: the
+ * wake of a plugin in standby takes a fraction of a second, so it is told
+ * early and waits the rest with one timer of its own.
+ */
+export const LEAD = 2;
+/** Files whose scan is kept in the player's session storage, the most recent. */
 const KEPT_FILES = 20;
-/** A backward jump larger than this (the user seeking back) lets silences already skipped be skipped again. */
-const BACK_JUMP = 1;
 
 /** A local path from the player's source, or `null` (a URL, a stream, nothing). */
 export function localPath(source: string | null): string | null {
@@ -67,27 +75,20 @@ export function localPath(source: string | null): string | null {
   return isAbsolute(source) ? source : null;
 }
 
-/** What a scan found in one file at one threshold. */
+/** What a scan found in one file at one threshold (in session storage: it outlives the plugin's process). */
 interface Scan {
   silences: Span[];
-  done: Set<number>;
+  done: number[];
   count: number;
 }
 
-/** The file playing now. */
-interface Current {
+/** The time saved in one playthrough (session storage `saved`). */
+interface Saved {
   sourceId: number;
-  path: string;
-  duration: number;
-  stream: number;
-  scan: Scan;
-  /** The stretches skipped for the user's minimum length. */
-  spans: Span[];
-  /** Starts of the stretches already skipped (until the user seeks back before them). */
-  skipped: Set<number>;
-  /** Seconds saved in this file. */
-  saved: number;
+  seconds: number;
 }
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /**
  * Silence Skipper (`zysilm.silenceskip`): while a local file plays, skip the
@@ -95,231 +96,219 @@ interface Current {
  *
  * Detection runs ffmpeg's `silencedetect` on the file with the player's
  * FFmpeg (`plugin.tools`), {@link WINDOW} seconds at a time, starting at the
- * playhead, so skipping starts after the first window. Skipping is a seek
- * past the silence: one action per stretch that leaves the user's speed
- * alone. The silences show on the seek bar as ranges, and each skip says on
- * the video how much time was saved.
+ * playhead, when the file is ready (`source.ready`). The silences go to the
+ * player twice: drawn on the seek bar (the timeline layer) and as the
+ * condition of one trigger, which the player evaluates by itself. Between
+ * silences the plugin holds nothing and may be stopped; the player starts it
+ * again {@link LEAD} seconds before the next one. Skipping is a seek past the
+ * silence: one action per stretch that leaves the user's speed alone, and
+ * each skip says on the video how much time was saved.
  */
-export default async function activate(plugin: Plugin) {
-  plugin.player.subscribe(); // the player's events from now on
-  await plugin.player.read(); // the player's state and timeline, read once
+export default function activate(plugin: Plugin) {
+  const { player, when } = plugin;
   const { text } = plugin.i18n;
   const settings = plugin.storage.json<Settings>("settings", { defaults: DEFAULT_SETTINGS, validate: isSettings });
+  const session = plugin.storage.session;
   const layer = plugin.timeline.layer();
-  const scans = new Map<string, Scan>();
   const log = (...args: unknown[]) => console.error("silenceskip:", ...args);
 
-  /** ffmpeg was missing: said once per run. */
-  let toldMissing = false;
-  /** While on: the listener, the scan and their cleanup. */
+  // The player calls this when playback is about to reach a silence: LEAD
+  // seconds before it, or at once when a seek lands inside it.
+  const silence = plugin.trigger().enter(({ range, state }) => skip(range, state));
+
+  /** While on: the event listener and the scan. */
   let active: Scope | null = null;
+  /** The scan running now. */
+  let job: AbortController | null = null;
+  /** The source whose scan was started by this process. */
+  let handled: number | null = null;
 
   function save(change: Partial<Settings>) {
     settings.save({ ...settings.value, ...change });
     plugin.update();
   }
 
-  /** Follow playback while on; hold nothing while off, so the player may stop the plugin. */
-  function follow(on: boolean) {
-    if (on && !active) {
-      active = plugin.scope();
-      start(active);
-    } else if (!on && active) {
-      void active.dispose();
-      active = null;
-      layer.setRanges([]);
+  // ------------------------------------------------------------------ skipping
+  async function skip(range: TriggerEvent["range"], seen: PlayerState) {
+    if (!range || range.end === null || !settings.value.enabled) return;
+    // The notification's state is from when the player saw the flip; the
+    // process may just have started, so read the position now.
+    const now = await player.refresh();
+    if (now.sourceId !== seen.sourceId || now.phase !== "ready" || now.paused || now.position === null) return;
+    // Already past it: the seek landed (a replaced list, or the same range
+    // entered again after a pause during the seek), or too little is left.
+    if (now.position >= range.end - MIN_JUMP / 2) return;
+    const from = Math.max(range.start, now.position);
+    const wait = ((range.start - now.position) / now.rate) * 1000;
+    if (wait > 0) await sleep(wait);
+    if (!settings.value.enabled) return;
+    try {
+      // `stale`: the user paused, moved the playhead, changed the speed or
+      // opened something meanwhile; their action wins.
+      await player.seek(range.end, { ifCurrent: now });
+    } catch (error) {
+      if ((error as PluginError).code !== "stale") log("seek", error);
+      return;
+    }
+    const last = await session.get<Saved>("saved");
+    const seconds = (last?.sourceId === now.sourceId ? last.seconds : 0) + (range.end - from);
+    await session.set("saved", { sourceId: now.sourceId, seconds } satisfies Saved);
+    await plugin.osd.show("Silence skipped · {} saved", [clock(seconds)]);
+  }
+
+  // ------------------------------------------------------------------ scanning
+  /** Where a file's scan is kept: a key of 1 KiB at most whatever the path. */
+  async function scanKey(path: string) {
+    const real = await realpath(path);
+    const info = await stat(real);
+    const id = `${real}|${info.size}|${Math.trunc(info.mtimeMs)}|${settings.value.thresholdDb}`;
+    return `scan:${createHash("sha256").update(id).digest("hex")}`;
+  }
+
+  /** Keep `scan` under `key`, the most recent of at most {@link KEPT_FILES}. */
+  async function keep(key: string, scan: Scan) {
+    const order = ((await session.get<string[]>("scans")) ?? []).filter((k) => k !== key);
+    order.push(key);
+    while (order.length > KEPT_FILES) await session.delete(order.shift()!);
+    for (;;) {
+      try {
+        await session.set(key, scan);
+        await session.set("scans", order);
+        return;
+      } catch (error) {
+        // Full: drop the oldest file's scan; a scan that does not fit at all is not kept.
+        if ((error as PluginError).code !== "limit" || order.length <= 1) return;
+        await session.delete(order.shift()!);
+      }
     }
   }
 
-  function start(scope: Scope) {
-    let current: Current | null = null;
-    let seenSource: number | null = null;
-    let job: AbortController | null = null;
-    let lastPosition: number | null = null;
-    let seeking = false;
-    /** The first position after this plugin's seek is where it landed, not a jump of the user's. */
-    let landing = false;
-    /** The source whose scan was started. */
-    let handled: number | null = null;
-    /** Bumped by another source or a new threshold: a `begin` started before it does nothing. */
-    let generation = 0;
-    scope.onDispose(() => job?.abort());
+  /** Draw the stretches and hand them to the trigger, for the source of `state`. */
+  function publish(state: PlayerState, silences: Span[], duration: number) {
+    if (!player.isCurrent(state)) return;
+    const spans = longest(skippable(silences, settings.value.minLength, duration), SHOWN_RANGES);
+    layer.setRanges(
+      spans.map((s) => ({ start: s.start, end: s.end, style: "region" as const, title: text("Silence") })),
+      { ifCurrent: state },
+    );
+    // The player binds the list to the source that is current when it gets it.
+    if (spans.length) silence.firesOn(when.playing.and(when.can("seek"), when.position.in(spans, { lead: LEAD })));
+    else silence.off();
+  }
 
-    const live = (c: Current) => current === c && plugin.player.state.sourceId === c.sourceId;
-
-    function publish(c: Current) {
-      if (!live(c)) return;
-      layer.setRanges(
-        longest(c.spans, SHOWN_RANGES).map((s) => ({ start: s.start, end: s.end, style: "region" as const, title: text("Silence") })),
-        { ifCurrent: plugin.player.state },
-      );
-    }
-
-    function recompute(c: Current) {
-      c.spans = skippable(c.scan.silences, settings.value.minLength, c.duration);
-      publish(c);
-    }
-
-    async function scanFile(c: Current, signal: AbortSignal) {
+  /** Scan the file of `state` (its cached part is not read again), drawing and arming as windows finish. */
+  async function begin(state: PlayerState) {
+    const path = state.kind === "media" ? localPath(state.source) : null;
+    const duration = state.duration;
+    // A duration is needed to plan the windows; a live stream has none.
+    const scope = active;
+    if (!scope || state.phase !== "ready" || !path || duration === null || duration <= 0) return;
+    handled = state.sourceId;
+    job?.abort();
+    const controller = new AbortController();
+    job = controller;
+    const { signal } = controller;
+    try {
+      let key: string;
+      try {
+        key = await scanKey(path);
+      } catch (error) {
+        log("cannot read", path, error);
+        return;
+      }
+      if (signal.aborted || !player.isCurrent(state)) return;
+      const scan = (await session.get<Scan>(key)) ?? { silences: [], done: [], count: windowCount(duration) };
+      publish(state, scan.silences, duration);
       const threshold = settings.value.thresholdDb;
-      while (!signal.aborted && live(c)) {
-        const index = nextWindow(c.scan.done, c.scan.count, plugin.player.state.position ?? 0);
-        if (index === null) return;
+      const stream = audioStream(state.audioTracks);
+      for (;;) {
+        // The playhead now: the next window is the one it plays, or the first not read after it.
+        const now = await player.refresh();
+        if (signal.aborted || now.sourceId !== state.sourceId) return;
+        const index = nextWindow(new Set(scan.done), scan.count, now.position ?? 0);
+        if (index === null) break;
         const from = index * WINDOW;
-        const to = Math.min(c.duration, from + WINDOW);
+        const to = Math.min(duration, from + WINDOW);
         try {
-          const { stdout } = await scope.tools.run("ffmpeg", silenceArgs(c.path, from, to - from, c.stream, threshold), {
+          const { stdout } = await scope.tools.run("ffmpeg", silenceArgs(path, from, to - from, stream, threshold), {
             timeoutMs: WINDOW_TIMEOUT,
             maxOutput: 4 << 20,
             signal,
           });
           if (signal.aborted) return;
           const found = parseSilences(new TextDecoder().decode(stdout), from, to);
-          c.scan.silences = mergeSpans([...c.scan.silences, ...found]);
+          scan.silences = mergeSpans([...scan.silences, ...found]);
         } catch (error) {
           const code = (error as PluginError).code;
           if (code === "aborted" || signal.aborted) return;
           if (code === "unavailable") {
-            if (!toldMissing) await plugin.osd.show("Silence Skipper needs ffmpeg, which was not found");
-            toldMissing = true;
-            return;
+            if (!(await session.get<boolean>("toldMissing"))) {
+              await session.set("toldMissing", true);
+              await plugin.osd.show("Silence Skipper needs ffmpeg, which was not found");
+            }
+            break;
           }
           if (code !== "timeout") {
             // No sound track, or a file ffmpeg cannot read: nothing to skip.
-            log("cannot read", c.path, error);
+            log("cannot read", path, error);
             await plugin.osd.show("Silence Skipper cannot read the sound of this file");
-            return;
+            break;
           }
           log("window", index, "timed out");
         }
-        c.scan.done.add(index);
-        recompute(c);
+        scan.done.push(index);
+        await keep(key, scan);
+        publish(state, scan.silences, duration);
       }
+      // A process started later for this source (a wake) does not scan it again.
+      if (!signal.aborted && player.isCurrent(state)) await session.set("handled", state.sourceId);
+    } finally {
+      if (job === controller) job = null;
     }
-
-    async function begin(state: PlayerState, path: string, duration: number) {
-      const gen = generation;
-      let key: string;
-      try {
-        const real = await realpath(path);
-        const info = await stat(real);
-        key = `${real}|${info.size}|${Math.trunc(info.mtimeMs)}|${settings.value.thresholdDb}`;
-      } catch (error) {
-        log("cannot read", path, error);
-        return;
-      }
-      if (gen !== generation || plugin.player.state.sourceId !== state.sourceId) return;
-      let scan = scans.get(key);
-      if (scan) scans.delete(key);
-      else scan = { silences: [], done: new Set(), count: windowCount(duration) };
-      scans.set(key, scan); // most recent last
-      while (scans.size > KEPT_FILES) scans.delete(scans.keys().next().value!);
-      const c: Current = {
-        sourceId: state.sourceId,
-        path,
-        duration,
-        stream: audioStream(state.audioTracks),
-        scan,
-        spans: [],
-        skipped: new Set(),
-        saved: 0,
-      };
-      current = c;
-      recompute(c);
-      const controller = new AbortController();
-      job = controller;
-      try {
-        await scanFile(c, controller.signal);
-      } finally {
-        if (job === controller) job = null;
-      }
-    }
-
-    async function skip(c: Current, state: PlayerState, stretch: Span, position: number) {
-      seeking = true;
-      c.skipped.add(stretch.start);
-      try {
-        await plugin.player.seek(stretch.end, { ifCurrent: state });
-        c.saved += stretch.end - position;
-        landing = true;
-        await plugin.osd.show("Silence skipped · {} saved", [clock(c.saved)]);
-      } catch (error) {
-        // `stale`: the user paused, moved the playhead or opened something meanwhile; their action wins.
-        if ((error as PluginError).code !== "stale") log("seek", error);
-      } finally {
-        seeking = false;
-      }
-    }
-
-    function onPlayer(state: PlayerState) {
-      if (state.sourceId !== seenSource) {
-        seenSource = state.sourceId;
-        generation++;
-        handled = null;
-        job?.abort();
-        job = null;
-        current = null;
-        lastPosition = null;
-        landing = false;
-      }
-      if (state.phase === "ended" && current) {
-        // The time saved counts one playthrough: a replay starts again from 0:00.
-        current.saved = 0;
-        current.skipped.clear();
-        lastPosition = null;
-        landing = false;
-      }
-      if (state.phase !== "ready") return;
-      if (handled !== state.sourceId) {
-        const path = state.kind === "media" ? localPath(state.source) : null;
-        // A duration is needed to plan the windows; a live stream has none.
-        if (!path || state.duration === null || state.duration <= 0) return;
-        handled = state.sourceId;
-        void begin(state, path, state.duration).catch((error) => log(error));
-        return;
-      }
-      const c = current;
-      const position = state.position;
-      if (!c || position === null) return;
-      if (landing) {
-        // Where the seek landed: a seek that lands early (on a keyframe) must not count as the user going back.
-        landing = false;
-      } else if (lastPosition !== null && position < lastPosition - BACK_JUMP && !seeking) {
-        // The user went back: the silences after the new position are skipped again.
-        for (const start of c.skipped) if (start > position) c.skipped.delete(start);
-      }
-      lastPosition = position;
-      if (seeking || state.paused || !state.can.seek) return;
-      const stretch = stretchAt(c.spans, position);
-      if (stretch && !c.skipped.has(stretch.start)) void skip(c, state, stretch, position);
-    }
-
-    // Settings that change while on.
-    restartScan = () => {
-      generation++;
-      handled = null;
-      job?.abort();
-      job = null;
-      current = null;
-      layer.setRanges([]);
-      onPlayer(plugin.player.state);
-    };
-    refilter = () => {
-      if (current) recompute(current);
-    };
-    scope.onDispose(() => {
-      restartScan = () => {};
-      refilter = () => {};
-    });
-
-    scope.player.onChange(onPlayer);
-    onPlayer(plugin.player.state);
   }
 
-  /** Scan the playing file again (a new threshold); a no-op while off. */
-  let restartScan = () => {};
-  /** Apply a new minimum length to what was found; a no-op while off. */
-  let refilter = () => {};
+  /**
+   * Scan the file playing now again; a no-op while off. Another threshold
+   * reads it again (what was found is cleared first); another minimum
+   * length filters the kept scan without reading the file.
+   */
+  async function restart(clear: boolean) {
+    if (!active) return;
+    job?.abort();
+    if (clear) {
+      layer.setRanges([]);
+      silence.off();
+    }
+    await begin(await player.refresh());
+  }
+
+  // ------------------------------------------------------------------ on and off
+  /** Listen for files while on; hold nothing while off. */
+  function follow(on: boolean) {
+    if (on && !active) {
+      const scope = plugin.scope();
+      active = scope;
+      scope.onDispose(() => job?.abort());
+      scope.player.on("source.ready", ({ state }) => {
+        if (handled !== state.sourceId) void begin(state).catch((error) => log(error));
+      });
+      // The time saved counts one playthrough: a replay starts again from 0:00.
+      scope.player.on("source.ended", () => void session.delete("saved").catch(() => {}));
+    } else if (!on && active) {
+      void active.dispose();
+      active = null;
+      handled = null;
+      layer.setRanges([]);
+      silence.off();
+    }
+  }
+
+  /** The file playing now, when this process has not seen it ready (turned on, or a `source.ready` missed). */
+  async function catchUp() {
+    const state = await player.refresh();
+    if (state.phase !== "ready" || (await session.get<number>("handled")) === state.sourceId) return;
+    if (active && handled !== state.sourceId) await begin(state);
+  }
 
   // ------------------------------------------------------------------ the menu
   plugin.commands.add({
@@ -330,6 +319,7 @@ export default async function activate(plugin: Plugin) {
       const enabled = !settings.value.enabled;
       save({ enabled });
       follow(enabled);
+      if (enabled) void catchUp().catch((error) => log(error));
       await plugin.osd.show(enabled ? "Skip Silence: On" : "Skip Silence: Off");
     },
   });
@@ -349,17 +339,18 @@ export default async function activate(plugin: Plugin) {
     const thresholdDb = Math.round(clamp(value, THRESHOLD));
     if (thresholdDb === settings.value.thresholdDb) return;
     save({ thresholdDb });
-    restartScan();
+    void restart(true).catch((error) => log(error));
   };
   const setMinLength = (value: number) => {
     const minLength = Math.round(clamp(value, MIN_LENGTH) * 10) / 10;
     if (minLength === settings.value.minLength) return;
     save({ minLength });
-    refilter();
+    void restart(false).catch((error) => log(error));
   };
   page.on("enabledToggled", (on: boolean) => {
     save({ enabled: on });
     follow(on);
+    if (on) void catchUp().catch((error) => log(error));
   });
   page.on("thresholdChanged", (value: number) => setThreshold(value));
   page.on("minLengthChanged", (value: number) => setMinLength(value));
@@ -368,4 +359,5 @@ export default async function activate(plugin: Plugin) {
   page.ready.catch((error: PluginError) => log("settings page", error.message));
 
   follow(settings.value.enabled);
+  if (settings.value.enabled) void catchUp().catch((error) => log(error));
 }
