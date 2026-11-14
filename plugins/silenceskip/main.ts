@@ -244,7 +244,7 @@ export default async function activate(plugin: Plugin) {
         landing = true;
         await plugin.osd.show("Silence skipped · {} saved", [clock(c.saved)]);
       } catch (error) {
-        // `stale`: the user paused, seeked or opened something meanwhile; their action wins.
+        // `stale`: the user paused, moved the playhead or opened something meanwhile; their action wins.
         if ((error as PluginError).code !== "stale") log("seek", error);
       } finally {
         seeking = false;
