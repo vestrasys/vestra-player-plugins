@@ -58,6 +58,13 @@ export const SHOWN_RANGES = 1000;
  * early and waits the rest with one timer of its own.
  */
 export const LEAD = 2;
+/**
+ * Skipping from further back than this before where the last skip landed
+ * is a new playthrough (a replay, or the user went back); from there or
+ * later (the next silence, or the rest of one that a scan window cut and a
+ * later window extended) it is the same one. Seconds.
+ */
+const BACK = 0.5;
 /** Files whose scan is kept in the player's session storage, the most recent. */
 const KEPT_FILES = 20;
 
@@ -86,7 +93,7 @@ interface Scan {
 interface Saved {
   sourceId: number;
   seconds: number;
-  /** The start of the last silence skipped. */
+  /** Where the last skip jumped to. */
   last: number;
 }
 
@@ -150,12 +157,12 @@ export default function activate(plugin: Plugin) {
       if ((error as PluginError).code !== "stale") log("seek", error);
       return;
     }
-    // The count is one playthrough: another file, or a silence at or before
-    // the last one skipped (a replay, or the user went back), starts it again.
+    // The count is one playthrough: another file, or a skip from before where
+    // the last one landed (a replay, or the user went back), starts it again.
     const saved = await session.get<Saved>("saved");
-    const same = saved?.sourceId === now.sourceId && range.start > saved.last;
+    const same = saved?.sourceId === now.sourceId && from >= saved.last - BACK;
     const seconds = (same ? saved.seconds : 0) + (range.end - from);
-    await session.set("saved", { sourceId: now.sourceId, seconds, last: range.start } satisfies Saved);
+    await session.set("saved", { sourceId: now.sourceId, seconds, last: range.end } satisfies Saved);
     await plugin.osd.show("Silence skipped · {} saved", [clock(seconds)]);
   }
 
@@ -284,6 +291,8 @@ export default function activate(plugin: Plugin) {
    */
   async function rescan(clear = false) {
     if (!active) return;
+    // The scan running now must not draw or arm its list while this one starts.
+    job?.abort();
     if (clear) {
       layer.setRanges([]);
       silence.off();

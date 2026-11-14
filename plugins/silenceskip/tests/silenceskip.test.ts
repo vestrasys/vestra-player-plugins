@@ -422,6 +422,73 @@ test("a skip (or any seek or pause) during the scan does not stop it from drawin
   });
 });
 
+test("a new threshold stops the scan running at once: the old list is not armed again", async () => {
+  await withFile(async (path) => {
+    const host = new TestHost();
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const old = fakeFfmpeg(SILENCES);
+    host.tools.handle("ffmpeg", async (args) => {
+      if (args.join(" ").includes("noise=-50dB")) return fakeFfmpeg([{ start: 50, end: 53 }])(args);
+      if (args[args.indexOf("-ss") + 1] !== "0.000") await gate;
+      return old(args);
+    });
+    open(host, path);
+    const { stop } = await startPlugin(activate, { directory, host });
+    await host.command("toggle").run();
+    await until(host, () => host.tools.calls.length === 2);
+    // The old scan finishes window 1 and reads the state before arming it;
+    // the threshold changes while that read is on its way.
+    let answer: () => void = () => {};
+    const held = new Promise<void>((resolve) => (answer = resolve));
+    let waiting = 0;
+    host.handle("source.state", async () => {
+      waiting++;
+      await held;
+      return host.source;
+    });
+    release();
+    for (let i = 0; i < 200 && waiting < 1; i++) await new Promise((r) => setTimeout(r, 10));
+    assert.equal(waiting, 1);
+    const before = host.sent("triggers.set").length;
+    host.settingsPage("silenceskip").emit("thresholdChanged", -50);
+    await new Promise((r) => setTimeout(r, 50));
+    host.reset("source.state");
+    answer();
+    await until(host, () => armed(host)?.length === 1);
+    const old10 = host.sent("triggers.set").slice(before).filter((p) => JSON.stringify(p).includes(String(FIRST.start)));
+    assert.deepEqual(old10, []);
+    assert.deepEqual(armed(host), [[50 + PAD, 53 - PAD]]);
+    await stop();
+  });
+});
+
+test("the rest of a silence that a scan window cut is skipped on, and the time saved adds up", async () => {
+  await withFile(async (path) => {
+    const host = new TestHost();
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const answer = fakeFfmpeg(SILENCES);
+    host.tools.handle("ffmpeg", async (args) => {
+      if (args[args.indexOf("-ss") + 1] !== "0.000") await gate;
+      return answer(args);
+    });
+    open(host, path, { position: 118.3 });
+    const { stop } = await startPlugin(activate, { directory, host });
+    await host.command("toggle").run();
+    // Window 0 ends at 120 s, inside the silence: the jump goes to its edge.
+    await until(host, () => host.seeks.length === 1);
+    assert.equal(host.seeks[0]!.seconds, 120 - PAD);
+    await until(host, () => host.osd.at(-1) === "Silence skipped · 0:02 saved");
+    // Window 1 extends it to 125 s: the same silence (same start) is entered again, from where the jump landed.
+    release();
+    await until(host, () => host.seeks.length === 2);
+    assert.equal(host.seeks[1]!.seconds, SECOND.end);
+    await until(host, () => host.osd.at(-1) === "Silence skipped · 0:07 saved");
+    await stop();
+  });
+});
+
 test("the seek bar and the trigger take at most the limit of ranges, the longest", async () => {
   await withFile(async (path) => {
     // 1100 pauses of 1.2–1.5 s in 55 minutes.
