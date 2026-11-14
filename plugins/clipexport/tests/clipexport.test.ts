@@ -214,7 +214,7 @@ test("the tab's Slint: a ListView for Results, library widgets, key caps, Theme 
   assert.doesNotMatch(slint, /jump-/);
   assert.equal(slint.split("viewport-y =").length - 1, 2);
   assert.match(slint, /changed list-request => \{\s*clip-page\.viewport-y = /);
-  assert.match(slint, /changed reveal-request => \{[\s\S]*?if list-focus\.y \+ list-focus\.height > -clip-page\.viewport-y \+ clip-page\.height \{\s*clip-page\.viewport-y = /);
+  assert.match(slint, /function reveal-part\(\) \{[\s\S]*?if list-focus\.y \+ list-focus\.height > -clip-page\.viewport-y \+ clip-page\.height \{\s*clip-page\.viewport-y = /);
   assert.doesNotMatch(slint, /ComboBox|CheckBox|StandardListView/);
   assert.match(slint, /import \{ Button, Check, Choice, KeyHint, RadioGroup, Slider, Tab, ToolTipArea, ToolTipKey \} from "@vestra\/widgets\.slint";/);
   assert.match(slint, /KeyHint \{ text: root\.key; \}/);

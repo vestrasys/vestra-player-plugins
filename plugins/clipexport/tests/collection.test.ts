@@ -1028,3 +1028,16 @@ test("a full Collection: the same range still reads Added and a click shows it; 
     await stop();
   }
 });
+
+test("the reveal scrolls after the list has the new part: the request only marks it, a timer on the next turn of the event loop scrolls (the scroll range otherwise ended one row short)", async () => {
+  const slint = await readFile(new URL("../ui/tab.slint", import.meta.url), "utf8");
+  // The request arrives with the new row: it does not scroll there and then.
+  assert.match(slint, /changed reveal-request => \{ root\.reveal-pending = true; \}/);
+  const timer = /reveal-timer := Timer \{([\s\S]*?)\n    \}/.exec(slint)?.[1] ?? "";
+  assert.match(timer, /running: root\.reveal-pending;/);
+  assert.match(timer, /triggered => \{\s*root\.reveal-pending = false;\s*root\.reveal-part\(\);\s*\}/);
+  // The scroll to the row: its bottom (row × 63 px + 46 px) at the bottom of the view.
+  const reveal = /function reveal-part\(\) \{([\s\S]*?)\n    \}/.exec(slint)?.[1] ?? "";
+  assert.match(reveal, /parts-list\.content-y = min\(0px, parts-list\.visible-height - ClipBridge\.reveal\.row \* 63px - 46px\);/);
+  assert.equal(slint.split("parts-list.content-y =").length - 1, 2, "nowhere else");
+});

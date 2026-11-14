@@ -1942,10 +1942,22 @@ export component ClipExportTab inherits Rectangle {
         if ClipBridge.collection-info.count > 0 { list-focus.focus(); }
     }
     // An add or a click on Added: where the list is not wholly in view, the page scrolls as for Show Collection (the
-    // list itself scrolls to the row; the focus stays where it is).
-    // The list's rows are 63 px (the part, 46 px, and the junction under it), the last one 46 px.
+    // list itself scrolls to the row; the focus stays where it is). The scroll waits for the next turn of the event loop
+    // (`reveal-timer`): a part just added arrives with this request, and until the list has laid it out its scroll
+    // range ends one row short (the new last row stayed below the view).
     private property <int> reveal-request: ClipBridge.reveal.serial;
-    changed reveal-request => {
+    private property <bool> reveal-pending;
+    changed reveal-request => { root.reveal-pending = true; }
+    reveal-timer := Timer {
+        interval: 30ms;
+        running: root.reveal-pending;
+        triggered => {
+            root.reveal-pending = false;
+            root.reveal-part();
+        }
+    }
+    // The list's rows are 63 px (the part, 46 px, and the junction under it), the last one 46 px.
+    function reveal-part() {
         if ClipBridge.reveal.row >= 0 {
             if ClipBridge.reveal.row * 63px < -parts-list.content-y {
                 parts-list.content-y = -ClipBridge.reveal.row * 63px;

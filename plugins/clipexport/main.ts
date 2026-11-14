@@ -1573,12 +1573,13 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     }
   }
   /** + and Add All: the suggestions as the last parts of the Collection (as many as fit); they leave the list. */
-  async function addHighlights(ids: string[]) {
+  /** `all`: Add All, a batch even with one suggestion left (no Add Again for a batch). */
+  async function addHighlights(ids: string[], all = false) {
     const saved = hl.saved;
     if (!saved) return;
     const rows = suggestions(saved).rows.filter((row) => ids.includes(row.id));
     // Those in the Collection already leave the list as added too: they are in it.
-    const handled = await addRanges(rows, rows.length === 1);
+    const handled = await addRanges(rows, rows.length === 1, !all);
     if (hl.saved !== saved || !handled.length) return;
     for (const row of handled) saved.handled[row.id] = "added";
     if (handled.some((row) => row.id === hl.selected)) hl.selected = "";
@@ -1708,10 +1709,11 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   /**
    * Ranges of the file playing as the last parts of the Collection, in order, as many as fit (the rest is said
    * with the Collection's limit); one file reference for all. `say`: "Added as part N". A range that is a part
-   * already is not added again: one alone is said with Add Again, several are counted (design clipexport-collection).
+   * already is not added again: one alone (`single`: + or Enter) is said with Add Again; Add All says them without it,
+   * one by its number, several counted (design clipexport-collection).
    * The ranges handled come back: those added and those in the Collection already.
    */
-  async function addRanges<T extends { start: number; end: number }>(ranges: T[], say: boolean): Promise<T[]> {
+  async function addRanges<T extends { start: number; end: number }>(ranges: T[], say: boolean, single: boolean): Promise<T[]> {
     if (ui.adding || !ranges.length) return [];
     ui.adding = true; // exclusion before the first await
     try {
@@ -1737,9 +1739,9 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
         return { token: file.token, added: made, already: there };
       });
       if (say && added.length) shown(osd.show("Added as part {}", [collection.parts.length]));
-      if (ranges.length === 1 && already.length === 1) offerAgain(seen.sourceId, already[0]!.range, already[0]!.number);
+      if (single && ranges.length === 1 && already.length === 1) offerAgain(seen.sourceId, already[0]!.range, already[0]!.number);
       else if (already.length) {
-        // Add All: no Add Again for a batch; one of them is said as one.
+        // Add All (a batch, also of one): no Add Again; one of them is said as one.
         if (already.length === 1) shown(osd.show("Already in the Collection as part {}", [already[0]!.number]));
         else {
           // TRANSLATORS: {} is how many suggestions (2 or more) Add All did not add because they were parts already.
@@ -2266,7 +2268,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   on("playHighlight", (id: string) => selectHighlight(String(id), true));
   on("addHighlight", (id: string) => addHighlights([String(id)]));
   on("dismissHighlight", (id: string) => dismissHighlight(String(id)));
-  on("addAllHighlights", () => addHighlights(hl.saved ? suggestions(hl.saved).rows.map((row) => row.id) : []));
+  on("addAllHighlights", () => addHighlights(hl.saved ? suggestions(hl.saved).rows.map((row) => row.id) : [], true));
   on("restoreHighlights", () => restoreHighlights());
   // Delete while the list has the focus.
   on("dismissSelected", () => handleSelected("dismiss"));

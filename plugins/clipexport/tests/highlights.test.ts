@@ -1068,14 +1068,30 @@ test("a suggestion already in the Collection (its range added from the Clip page
     await eventually(() => rows(host).map((row) => row.id), ids.slice(2));
     await eventually(selected, ids[2]);
     assert.equal(parts().length, 3);
-    // Add All with two of the three left in the Collection already: the third is added, the two are counted.
+    // Add All with one suggestion left, in the Collection already: a batch all the same, said without Add Again.
+    host.mounted().emit("dismiss-highlight", ids[2]);
+    host.mounted().emit("dismiss-highlight", ids[4]);
+    await eventually(() => rows(host).map((row) => row.id), [ids[3]]);
     await addFromClipPage(ids[3]!);
-    await addFromClipPage(ids[4]!);
     host.mounted().emit("add-all-highlights");
-    await until(() => host.osd.includes("2 were already in the Collection"), "counted");
+    await until(() => host.osd.includes("Already in the Collection as part 4"), "said for Add All");
+    assert.deepEqual(host.osdActions.at(-1), [], "no Add Again for a batch, also of one");
+    await eventually(() => rows(host).length, 0, "it leaves the list");
+    assert.equal(parts().length, 4);
+    // Add All with two of three in the Collection already: the third is added, the two are counted.
+    host.mounted().emit("restore-highlights");
+    await eventually(() => rows(host).map((row) => row.id), [ids[2], ids[4]]);
+    await addFromClipPage(ids[2]!);
+    await addFromClipPage(ids[4]!);
+    host.mounted().emit("set-highlight-count", 1);
+    await eventually(() => rows(host).length, 7, "ten picked, three handled");
+    const fresh = rows(host).map((row) => row.id).filter((id) => !ids.includes(id));
+    await addFromClipPage(fresh[0]!);
+    host.mounted().emit("add-all-highlights");
+    await until(() => host.osd.includes("3 were already in the Collection"), "counted");
     assert.deepEqual(host.osdActions.at(-1), [], "no Add Again for a batch");
-    await eventually(() => parts().length, 6, "the one not in yet");
-    await eventually(() => rows(host).length, 0, "all three leave the list");
+    await eventually(() => parts().length, 7 + 4, "the four not in yet");
+    await eventually(() => rows(host).length, 0, "all seven leave the list");
     assert.equal(new Set([...host.sourceReferences.values()].map((ref) => ref.path)).size, 1, "one file reference");
   } finally {
     await stop();
