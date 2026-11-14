@@ -1081,8 +1081,10 @@ component PartItem inherits Rectangle {
     callback chip-clicked(length, length);
     private property <bool> bad: root.entry.state != "ok";
     private property <bool> locatable: root.entry.state == "missing" || root.entry.state == "changed";
-    // The part (46 px) and, unless it is the last, the junction row under it (17 px).
-    height: root.entry.join ? 63px : 46px;
+    // The part (46 px) and the junction row under it (17 px; empty under the last part). Every row is 63 px: Slint's
+    // ListView places rows it has not built by one row height (the average of those in view), so only rows of one
+    // height make `content-y` a real position, which the reveal of a part needs (`reveal-part`).
+    height: 63px;
     opacity: root.dragging ? 0.6 : 1;
     Rectangle {
         height: 46px;
@@ -1185,7 +1187,7 @@ component PartItem inherits Rectangle {
     }
     // Always there, shown while it applies (no element is created or removed during a drag).
     Rectangle { y: 0px; height: 2px; background: Theme.accent; visible: root.line-above; }
-    Rectangle { y: parent.height - 2px; height: 2px; background: Theme.accent; visible: root.line-below; }
+    Rectangle { y: (root.entry.join ? 63px : 46px) - 2px; height: 2px; background: Theme.accent; visible: root.line-below; }
     Rectangle { y: root.entry.join ? 62px : 45px; height: 1px; background: Theme.line; visible: !root.entry.join; }
     // The junction: a line from this thumbnail down to the next, a chip on it (kind and length); a click opens the picker.
     if root.entry.join: Rectangle {
@@ -1942,27 +1944,20 @@ export component ClipExportTab inherits Rectangle {
         if ClipBridge.collection-info.count > 0 { list-focus.focus(); }
     }
     // An add or a click on Added: where the list is not wholly in view, the page scrolls as for Show Collection (the
-    // list itself scrolls to the row; the focus stays where it is). The scroll waits for the next turn of the event loop
-    // (`reveal-timer`): a part just added arrives with this request, and until the list has laid it out its scroll
-    // range ends one row short (the new last row stayed below the view).
+    // list itself scrolls to the row; the focus stays where it is).
     private property <int> reveal-request: ClipBridge.reveal.serial;
-    private property <bool> reveal-pending;
-    changed reveal-request => { root.reveal-pending = true; }
-    reveal-timer := Timer {
-        interval: 30ms;
-        running: root.reveal-pending;
-        triggered => {
-            root.reveal-pending = false;
-            root.reveal-part();
-        }
-    }
-    // The list's rows are 63 px (the part, 46 px, and the junction under it), the last one 46 px.
+    changed reveal-request => { root.reveal-part(); }
+    // The list scrolls only to the top of a row (`content-y` a multiple of the 63 px row). Slint's ListView, asked for
+    // a position more than a screen away, rebuilds its rows from the row that position falls in, at the top of the
+    // view, and drops the pixels into that row: a position between rows landed up to a row short, so a part revealed
+    // at the bottom edge stayed below the view. A row's top is exact on every path. A part above the view goes to the
+    // top; one below it becomes the last row whose part (46 px) fits whole.
     function reveal-part() {
         if ClipBridge.reveal.row >= 0 {
             if ClipBridge.reveal.row * 63px < -parts-list.content-y {
                 parts-list.content-y = -ClipBridge.reveal.row * 63px;
             } else if ClipBridge.reveal.row * 63px + 46px > -parts-list.content-y + parts-list.visible-height {
-                parts-list.content-y = min(0px, parts-list.visible-height - ClipBridge.reveal.row * 63px - 46px);
+                parts-list.content-y = -max(0, ClipBridge.reveal.row - floor(max(0px, parts-list.visible-height - 46px) / 63px)) * 63px;
             }
         }
         if list-focus.y + list-focus.height > -clip-page.viewport-y + clip-page.height {

@@ -1029,15 +1029,114 @@ test("a full Collection: the same range still reads Added and a click shows it; 
   }
 });
 
-test("the reveal scrolls after the list has the new part: the request only marks it, a timer on the next turn of the event loop scrolls (the scroll range otherwise ended one row short)", async () => {
+/**
+ * Slint 1.18.1's ListView layout (i-slint-core, model/repeater.rs `update_visible_instances`), as far as a scroll
+ * position matters: rows not built are placed by one row height (the average of those built last), and a position
+ * more than a screen away rebuilds the rows from the row it falls in, at the top of the view (the pixels into that
+ * row are dropped). The test host lays nothing out; this stands in for the list when a part is revealed.
+ */
+function listView(count: number, view: number, heightOf: (row: number) => number) {
+  const state = { offset: 0, built: 0, anchor: 0, cached: 0, previous: 0 };
+  let contentY = 0;
+  let top = 0; // where the first built row is drawn
+  function layout() {
+    const y0 = Math.min(contentY, 0);
+    let each = state.cached;
+    if (!(each > 0)) {
+      if (!state.built) state.built = 1;
+      each = Array.from({ length: state.built }, (_, i) => heightOf(state.offset + i)).reduce((a, b) => a + b, 0) / state.built;
+    }
+    let first: number, at: number;
+    if (state.anchor > -y0 + view * 1.5 || state.anchor + each * state.built + each < -y0) {
+      state.built = 0;
+      first = state.offset = Math.min(Math.floor(-y0 / each), count - 1);
+      at = 0;
+    } else if (y0 < state.previous) {
+      at = state.anchor + y0;
+      first = state.offset;
+      for (let i = 0; i < state.built; i++) {
+        const h = heightOf(first);
+        if (at + h > 0 || first + 1 >= count) break;
+        at += h;
+        first++;
+      }
+    } else {
+      first = state.offset;
+      at = state.anchor + y0;
+    }
+    while (first > 0 && at > 0) at -= heightOf(--first);
+    let y = at, next = first;
+    while (next < count && y < view) y += heightOf(next++);
+    state.offset = first;
+    state.built = next - first;
+    state.cached = (y - at) / state.built;
+    state.anchor = state.cached * first;
+    state.previous = contentY = -state.anchor + at;
+    top = at;
+  }
+  layout();
+  return {
+    get contentY() {
+      return contentY;
+    },
+    /** A write of `content-y` (the tab's, or the user's scroll), then the next layout. */
+    scroll(y: number) {
+      contentY = y;
+      layout();
+    },
+    /** Where row `row` is drawn (its top in the view), null when it is not built. */
+    topOf(row: number) {
+      if (row < state.offset || row >= state.offset + state.built) return null;
+      let y = top;
+      for (let i = state.offset; i < row; i++) y += heightOf(i);
+      return y;
+    },
+  };
+}
+
+test("revealing a part: the list scrolls to the top of a row (rows of one height), so the part is whole in view from anywhere; the first version's position between rows left the last part below the view", async () => {
   const slint = await readFile(new URL("../ui/tab.slint", import.meta.url), "utf8");
-  // The request arrives with the new row: it does not scroll there and then.
-  assert.match(slint, /changed reveal-request => \{ root\.reveal-pending = true; \}/);
-  const timer = /reveal-timer := Timer \{([\s\S]*?)\n    \}/.exec(slint)?.[1] ?? "";
-  assert.match(timer, /running: root\.reveal-pending;/);
-  assert.match(timer, /triggered => \{\s*root\.reveal-pending = false;\s*root\.reveal-part\(\);\s*\}/);
-  // The scroll to the row: its bottom (row × 63 px + 46 px) at the bottom of the view.
+  // What the tab does (ui/tab.slint `reveal-part`), mirrored below: a part above the view goes to the top, one below it becomes the last row whose part fits.
   const reveal = /function reveal-part\(\) \{([\s\S]*?)\n    \}/.exec(slint)?.[1] ?? "";
-  assert.match(reveal, /parts-list\.content-y = min\(0px, parts-list\.visible-height - ClipBridge\.reveal\.row \* 63px - 46px\);/);
+  assert.match(reveal, /if ClipBridge\.reveal\.row \* 63px < -parts-list\.content-y \{\s*parts-list\.content-y = -ClipBridge\.reveal\.row \* 63px;/);
+  assert.match(reveal, /\} else if ClipBridge\.reveal\.row \* 63px \+ 46px > -parts-list\.content-y \+ parts-list\.visible-height \{\s*parts-list\.content-y = -max\(0, ClipBridge\.reveal\.row - floor\(max\(0px, parts-list\.visible-height - 46px\) \/ 63px\)\) \* 63px;/);
   assert.equal(slint.split("parts-list.content-y =").length - 1, 2, "nowhere else");
+  assert.match(slint, /changed reveal-request => \{ root\.reveal-part\(\); \}/, "at once: no timer");
+  assert.doesNotMatch(slint.slice(slint.indexOf("export component ClipExportTab")), /Timer \{/);
+  // Every row of the list is 63 px, the last one too: only then is `content-y` a real position.
+  const item = slint.slice(slint.indexOf("component PartItem inherits Rectangle")).split("\ncomponent ")[0]!;
+  assert.match(item, /\n    height: 63px;/);
+  assert.doesNotMatch(item, /\n    height: root\.entry\.join/);
+  const ROW = 63, PART = 46;
+  const target = (row: number, y: number, view: number) =>
+    row * ROW < -y ? -row * ROW : row * ROW + PART > -y + view ? -Math.max(0, row - Math.floor(Math.max(0, view - PART) / ROW)) * ROW : y;
+  const whole = (list: ReturnType<typeof listView>, row: number, view: number) => {
+    const y = list.topOf(row);
+    return y !== null && y >= -1e-6 && y + PART <= view + 1e-6;
+  };
+  // The defect seen on screen (0.7.1 as first built): 14 parts, the last row 46 px, the list at the top, a view of
+  // 245 px; the write `visible-height − row × 63 − 46` shows parts 10–13 and leaves part 14 below the view.
+  const old = listView(14, 245, (row) => (row < 13 ? ROW : PART));
+  old.scroll(Math.min(0, 245 - 13 * ROW - PART));
+  assert.deepEqual([old.topOf(9), old.topOf(13)], [0, null], "the model shows the defect: part 10 at the top, part 14 not in view");
+  // Now: the same case, and every list length, view height, starting position and part.
+  const now = listView(14, 245, () => ROW);
+  now.scroll(target(13, now.contentY, 245));
+  assert.deepEqual([now.topOf(10), now.topOf(13)], [0, 189], "parts 11–14, part 14 whole");
+  for (const view of [191, 245, 300, 437, 800]) {
+    for (const count of [1, 2, 3, 4, 5, 14, 15, 37, 100]) {
+      const end = Math.max(0, count * ROW - view);
+      for (const start of [0, 17, ROW, end / 2, end - 30, end]) {
+        for (let row = 0; row < count; row++) {
+          const list = listView(count, view, () => ROW);
+          list.scroll(-Math.max(0, start));
+          const before = list.contentY;
+          const shown = whole(list, row, view);
+          list.scroll(target(row, list.contentY, view));
+          assert.ok(whole(list, row, view), `part ${row + 1} of ${count} whole in a ${view} px list scrolled to ${start}`);
+          if (shown) assert.equal(list.contentY, before, `part ${row + 1} of ${count} was in view: the list does not move`);
+        }
+      }
+    }
+  }
 });
