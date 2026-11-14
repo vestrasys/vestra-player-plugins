@@ -86,6 +86,8 @@ interface Scan {
 interface Saved {
   sourceId: number;
   seconds: number;
+  /** The start of the last silence skipped. */
+  last: number;
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -120,8 +122,6 @@ export default function activate(plugin: Plugin) {
   let active: Scope | null = null;
   /** The scan running now. */
   let job: AbortController | null = null;
-  /** The source whose scan was started by this process. */
-  let handled: number | null = null;
 
   function save(change: Partial<Settings>) {
     settings.save({ ...settings.value, ...change });
@@ -150,9 +150,12 @@ export default function activate(plugin: Plugin) {
       if ((error as PluginError).code !== "stale") log("seek", error);
       return;
     }
-    const last = await session.get<Saved>("saved");
-    const seconds = (last?.sourceId === now.sourceId ? last.seconds : 0) + (range.end - from);
-    await session.set("saved", { sourceId: now.sourceId, seconds } satisfies Saved);
+    // The count is one playthrough: another file, or a silence at or before
+    // the last one skipped (a replay, or the user went back), starts it again.
+    const saved = await session.get<Saved>("saved");
+    const same = saved?.sourceId === now.sourceId && range.start > saved.last;
+    const seconds = (same ? saved.seconds : 0) + (range.end - from);
+    await session.set("saved", { sourceId: now.sourceId, seconds, last: range.start } satisfies Saved);
     await plugin.osd.show("Silence skipped · {} saved", [clock(seconds)]);
   }
 
@@ -196,14 +199,17 @@ export default function activate(plugin: Plugin) {
     else silence.off();
   }
 
-  /** Scan the file of `state` (its cached part is not read again), drawing and arming as windows finish. */
+  /**
+   * Scan the file of `state`, drawing and arming as windows finish. What
+   * session storage has of it is not read again, so for a file scanned
+   * already this only draws and arms (the same list again changes nothing).
+   */
   async function begin(state: PlayerState) {
     const path = state.kind === "media" ? localPath(state.source) : null;
     const duration = state.duration;
     // A duration is needed to plan the windows; a live stream has none.
     const scope = active;
     if (!scope || state.phase !== "ready" || !path || duration === null || duration <= 0) return;
-    handled = state.sourceId;
     job?.abort();
     const controller = new AbortController();
     job = controller;
@@ -260,21 +266,19 @@ export default function activate(plugin: Plugin) {
         await keep(key, scan);
         publish(state, scan.silences, duration);
       }
-      // A process started later for this source (a wake) does not scan it again.
-      if (!signal.aborted && player.isCurrent(state)) await session.set("handled", state.sourceId);
     } finally {
       if (job === controller) job = null;
     }
   }
 
   /**
-   * Scan the file playing now again; a no-op while off. Another threshold
-   * reads it again (what was found is cleared first); another minimum
-   * length filters the kept scan without reading the file.
+   * The file playing now, while on: at every start of the process (a
+   * `source.ready` before it listened, a scan cut short), when turned on
+   * mid-file, and after a settings change. `clear`: another threshold, what
+   * was found no longer holds.
    */
-  async function restart(clear: boolean) {
+  async function rescan(clear = false) {
     if (!active) return;
-    job?.abort();
     if (clear) {
       layer.setRanges([]);
       silence.off();
@@ -289,25 +293,13 @@ export default function activate(plugin: Plugin) {
       const scope = plugin.scope();
       active = scope;
       scope.onDispose(() => job?.abort());
-      scope.player.on("source.ready", ({ state }) => {
-        if (handled !== state.sourceId) void begin(state).catch((error) => log(error));
-      });
-      // The time saved counts one playthrough: a replay starts again from 0:00.
-      scope.player.on("source.ended", () => void session.delete("saved").catch(() => {}));
+      scope.player.on("source.ready", ({ state }) => void begin(state).catch((error) => log(error)));
     } else if (!on && active) {
       void active.dispose();
       active = null;
-      handled = null;
       layer.setRanges([]);
       silence.off();
     }
-  }
-
-  /** The file playing now, when this process has not seen it ready (turned on, or a `source.ready` missed). */
-  async function catchUp() {
-    const state = await player.refresh();
-    if (state.phase !== "ready" || (await session.get<number>("handled")) === state.sourceId) return;
-    if (active && handled !== state.sourceId) await begin(state);
   }
 
   // ------------------------------------------------------------------ the menu
@@ -319,7 +311,7 @@ export default function activate(plugin: Plugin) {
       const enabled = !settings.value.enabled;
       save({ enabled });
       follow(enabled);
-      if (enabled) void catchUp().catch((error) => log(error));
+      if (enabled) void rescan().catch((error) => log(error));
       await plugin.osd.show(enabled ? "Skip Silence: On" : "Skip Silence: Off");
     },
   });
@@ -339,18 +331,18 @@ export default function activate(plugin: Plugin) {
     const thresholdDb = Math.round(clamp(value, THRESHOLD));
     if (thresholdDb === settings.value.thresholdDb) return;
     save({ thresholdDb });
-    void restart(true).catch((error) => log(error));
+    void rescan(true).catch((error) => log(error));
   };
   const setMinLength = (value: number) => {
     const minLength = Math.round(clamp(value, MIN_LENGTH) * 10) / 10;
     if (minLength === settings.value.minLength) return;
     save({ minLength });
-    void restart(false).catch((error) => log(error));
+    void rescan().catch((error) => log(error));
   };
   page.on("enabledToggled", (on: boolean) => {
     save({ enabled: on });
     follow(on);
-    if (on) void catchUp().catch((error) => log(error));
+    if (on) void rescan().catch((error) => log(error));
   });
   page.on("thresholdChanged", (value: number) => setThreshold(value));
   page.on("minLengthChanged", (value: number) => setMinLength(value));
@@ -359,5 +351,5 @@ export default function activate(plugin: Plugin) {
   page.ready.catch((error: PluginError) => log("settings page", error.message));
 
   follow(settings.value.enabled);
-  if (settings.value.enabled) void catchUp().catch((error) => log(error));
+  if (settings.value.enabled) void rescan().catch((error) => log(error));
 }

@@ -10,8 +10,8 @@ interviews play without the dead air.
   it on, and the player remembers your choice.
 - While it is on, each pause that is long enough is skipped with a jump.
   A short note on the video says how much time skipping has saved since
-  the file started playing ("Silence skipped · 1:15 saved"); a replay counts
-  from 0:00 again.
+  the file started playing ("Silence skipped · 1:15 saved"); a replay, or
+  going back before a silence already skipped, counts from 0:00 again.
 - The seek bar shows the silences it found as shaded ranges: the ones
   that are skipped (the 1000 longest, when a file has more).
 - **Options ▸ Playback ▸ Silence Skipper**:
