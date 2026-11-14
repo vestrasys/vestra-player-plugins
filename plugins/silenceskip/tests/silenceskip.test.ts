@@ -128,6 +128,8 @@ test("turning it on scans from the playhead, draws the silences and arms one tri
     ]);
     // Nothing keeps it running: the player may stop it between silences.
     assert.deepEqual(host.keepsRunning, []);
+    // Only a new file wakes it; the end of one does not.
+    assert.deepEqual([...host.subscriptions].filter((e) => e.startsWith("source.")), ["source.ready"]);
     await stop();
   });
 });
@@ -209,11 +211,13 @@ test("a seek into a silence jumps at once; one that lands inside it is not repea
     host.setSource({ position: FIRST.end - 0.01 });
     await host.settle(50);
     assert.equal(host.seeks.length, 1);
-    // The user goes back before it: it is skipped again.
+    // The user goes back before it: it is skipped again, and the count starts again.
     host.setSource({ position: 2 });
     await host.settle();
     host.setSource({ position: 10.4 });
     await until(host, () => host.seeks.length === 2);
+    await until(host, () => host.osd.length === 3);
+    assert.equal(host.osd.at(-1), "Silence skipped · 0:02 saved");
     await stop();
   });
 });
