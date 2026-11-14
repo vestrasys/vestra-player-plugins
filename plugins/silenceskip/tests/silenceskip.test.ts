@@ -400,6 +400,28 @@ test("another file mid-scan: the old scan's results never reach it", async () =>
   });
 });
 
+test("a skip (or any seek or pause) during the scan does not stop it from drawing and arming the rest", async () => {
+  await withFile(async (path) => {
+    const host = new TestHost();
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const answer = fakeFfmpeg(SILENCES);
+    host.tools.handle("ffmpeg", async (args) => {
+      if (args[args.indexOf("-ss") + 1] !== "0.000") await gate;
+      return answer(args);
+    });
+    open(host, path, { position: 10.3 });
+    const { stop } = await startPlugin(activate, { directory, host });
+    await host.command("toggle").run();
+    // Window 0 is read: its silence is armed and skipped while window 1 is still being read.
+    await until(host, () => host.seeks.length === 1);
+    release();
+    // The silence across the seam of windows 0 and 1 ends where window 1 says.
+    await until(host, () => host.tools.calls.length === 3 && ranges(host)[1]?.end === SECOND.end && armed(host)?.[1]?.[1] === SECOND.end);
+    await stop();
+  });
+});
+
 test("the seek bar and the trigger take at most the limit of ranges, the longest", async () => {
   await withFile(async (path) => {
     // 1100 pauses of 1.2–1.5 s in 55 minutes.

@@ -186,9 +186,14 @@ export default function activate(plugin: Plugin) {
     }
   }
 
-  /** Draw the stretches and hand them to the trigger, for the source of `state`. */
-  function publish(state: PlayerState, silences: Span[], duration: number) {
-    if (!player.isCurrent(state)) return;
+  /**
+   * Draw the stretches and hand them to the trigger, while the source of
+   * `state` is still the one playing. Only the source is compared, read
+   * just before: a pause or a seek (also this plugin's own skip) during the
+   * scan must not stop it from drawing and arming.
+   */
+  async function publish(state: PlayerState, silences: Span[], duration: number, signal: AbortSignal) {
+    if ((await player.refresh()).sourceId !== state.sourceId || signal.aborted) return;
     const spans = longest(skippable(silences, settings.value.minLength, duration), SHOWN_RANGES);
     layer.setRanges(
       spans.map((s) => ({ start: s.start, end: s.end, style: "region" as const, title: text("Silence") })),
@@ -222,9 +227,9 @@ export default function activate(plugin: Plugin) {
         log("cannot read", path, error);
         return;
       }
-      if (signal.aborted || !player.isCurrent(state)) return;
+      if (signal.aborted) return;
       const scan = (await session.get<Scan>(key)) ?? { silences: [], done: [], count: windowCount(duration) };
-      publish(state, scan.silences, duration);
+      await publish(state, scan.silences, duration, signal);
       const threshold = settings.value.thresholdDb;
       const stream = audioStream(state.audioTracks);
       for (;;) {
@@ -264,7 +269,7 @@ export default function activate(plugin: Plugin) {
         }
         scan.done.push(index);
         await keep(key, scan);
-        publish(state, scan.silences, duration);
+        await publish(state, scan.silences, duration, signal);
       }
     } finally {
       if (job === controller) job = null;
