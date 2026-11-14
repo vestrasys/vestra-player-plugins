@@ -1,0 +1,112 @@
+# Machine translation by the plugin's author (a language model), 2026-11-14; not reviewed.
+msgid ""
+msgstr ""
+"Language: ja\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#: main.ts:153
+#, x-machine
+msgid "Silence"
+msgstr "無音"
+
+#: main.ts:183
+#, x-machine
+msgid "Silence Skipper needs ffmpeg, which was not found"
+msgstr "サイレンススキッパーには ffmpeg が必要ですが、見つかりませんでした"
+
+#: main.ts:190
+#, x-machine
+msgid "Silence Skipper cannot read the sound of this file"
+msgstr "サイレンススキッパーはこのファイルの音声を読み取れません"
+
+#: main.ts:245
+#, x-machine
+msgid "Silence skipped · {} saved"
+msgstr "無音をスキップ · 合計 {} 短縮"
+
+#: main.ts:327
+#, x-machine
+msgid "Skip Silence"
+msgstr "無音をスキップ"
+
+#: main.ts:333
+#, x-machine
+msgid "Skip Silence: On"
+msgstr "無音をスキップ：オン"
+
+#: main.ts:333
+#, x-machine
+msgid "Skip Silence: Off"
+msgstr "無音をスキップ：オフ"
+
+#: main.ts:341 manifest.json
+#, x-machine
+msgid "Silence Skipper"
+msgstr "サイレンススキッパー"
+
+#: manifest.json
+#, x-machine
+msgid "Skips the silent stretches of lectures and recordings while they play"
+msgstr "講義や録音の無音部分を再生中に自動でスキップ"
+
+#: manifest.json
+#, x-machine
+msgid "Silence Skipper jumps over the pauses in a video or audio file on this computer, like Trim Silence in podcast players: lectures, talks, screen recordings and interviews play without the dead air. Playback ▸ Skip Silence turns it on and off. While it is on, the player's FFmpeg reads the sound of the playing file two minutes at a time, starting where you are, and each silence that is long enough is skipped with a jump; the seek bar shows the silences it found, and a short note on the video says how much time skipping has saved. Options ▸ Playback ▸ Silence Skipper sets how quiet counts as silence and the shortest pause that is skipped. Speech is never sped up, and a pause at the very end of the file is kept."
+msgstr "サイレンススキッパーは、このコンピューター上の動画や音声ファイルの間をスキップします。ポッドキャストアプリの「無音をカット」と同じように、講義、講演、画面録画、インタビューを無駄な間なしで再生できます。再生 ▸ 無音をスキップ でオンとオフを切り替えます。オンの間は、プレーヤーの FFmpeg が再生中のファイルの音声を現在位置から 2 分ずつ読み取り、十分に長い無音をジャンプで飛ばします。見つかった無音はシークバーに表示され、映像上の短い表示で短縮できた時間を知らせます。オプション ▸ 再生 ▸ サイレンススキッパー で、無音とみなす音量とスキップする最短の間を設定できます。話し声が早送りされることはなく、ファイル末尾の間は残ります。"
+
+#: manifest.json
+#, x-machine
+msgid "playback"
+msgstr "再生"
+
+#: manifest.json
+#, x-machine
+msgid "audio"
+msgstr "音声"
+
+#: manifest.json
+#, x-machine
+msgid "silence"
+msgstr "無音"
+
+#: manifest.json
+#, x-machine
+msgid "lecture"
+msgstr "講義"
+
+#: ui/settings.slint:48
+#, x-machine
+msgid "Skip silence while playing"
+msgstr "再生中に無音をスキップ"
+
+#: ui/settings.slint:55
+#, x-machine
+msgid "Silence below"
+msgstr "無音のしきい値"
+
+#: ui/settings.slint:56
+#, x-machine
+msgid "{} dB"
+msgstr "{} dB"
+
+#: ui/settings.slint:70 ui/settings.slint:92
+#, x-machine
+msgid "Default"
+msgstr "既定"
+
+#: ui/settings.slint:77
+#, x-machine
+msgid "Shortest silence"
+msgstr "最短の無音"
+
+#: ui/settings.slint:78
+#, x-machine
+msgid "{} s"
+msgstr "{} 秒"
+
+#: ui/settings.slint:99
+#, x-machine
+msgid "Raise the level when room noise or music keeps pauses from being found; lower it when quiet speech is skipped."
+msgstr "室内の雑音や BGM で間が見つからないときはレベルを上げ、小さな声がスキップされるときは下げてください。"

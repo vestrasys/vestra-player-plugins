@@ -1,0 +1,89 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: zysilm.silenceskip 0.1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: main.ts:153
+msgid "Silence"
+msgstr ""
+
+#: main.ts:183
+msgid "Silence Skipper needs ffmpeg, which was not found"
+msgstr ""
+
+#: main.ts:190
+msgid "Silence Skipper cannot read the sound of this file"
+msgstr ""
+
+#: main.ts:245
+msgid "Silence skipped · {} saved"
+msgstr ""
+
+#: main.ts:327
+msgid "Skip Silence"
+msgstr ""
+
+#: main.ts:333
+msgid "Skip Silence: On"
+msgstr ""
+
+#: main.ts:333
+msgid "Skip Silence: Off"
+msgstr ""
+
+#: main.ts:341 manifest.json
+msgid "Silence Skipper"
+msgstr ""
+
+#: manifest.json
+msgid "Skips the silent stretches of lectures and recordings while they play"
+msgstr ""
+
+#: manifest.json
+msgid "Silence Skipper jumps over the pauses in a video or audio file on this computer, like Trim Silence in podcast players: lectures, talks, screen recordings and interviews play without the dead air. Playback ▸ Skip Silence turns it on and off. While it is on, the player's FFmpeg reads the sound of the playing file two minutes at a time, starting where you are, and each silence that is long enough is skipped with a jump; the seek bar shows the silences it found, and a short note on the video says how much time skipping has saved. Options ▸ Playback ▸ Silence Skipper sets how quiet counts as silence and the shortest pause that is skipped. Speech is never sped up, and a pause at the very end of the file is kept."
+msgstr ""
+
+#: manifest.json
+msgid "playback"
+msgstr ""
+
+#: manifest.json
+msgid "audio"
+msgstr ""
+
+#: manifest.json
+msgid "silence"
+msgstr ""
+
+#: manifest.json
+msgid "lecture"
+msgstr ""
+
+#: ui/settings.slint:48
+msgid "Skip silence while playing"
+msgstr ""
+
+#: ui/settings.slint:55
+msgid "Silence below"
+msgstr ""
+
+#: ui/settings.slint:56
+msgid "{} dB"
+msgstr ""
+
+#: ui/settings.slint:70 ui/settings.slint:92
+msgid "Default"
+msgstr ""
+
+#: ui/settings.slint:77
+msgid "Shortest silence"
+msgstr ""
+
+#: ui/settings.slint:78
+msgid "{} s"
+msgstr ""
+
+#: ui/settings.slint:99
+msgid "Raise the level when room noise or music keeps pauses from being found; lower it when quiet speech is skipped."
+msgstr ""

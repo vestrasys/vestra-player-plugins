@@ -1,0 +1,105 @@
+// Options ▸ Playback ▸ Silence Skipper: the on/off switch, the loudness
+// under which sound counts as silence, and the shortest silence skipped.
+import { CheckBox } from "std-widgets.slint";
+import { Theme } from "@vestra/theme.slint";
+import { Button, Slider } from "@vestra/widgets.slint";
+
+export global SilenceSkipSettings {
+    in-out property <bool> enabled;
+    in-out property <float> threshold: -35;
+    in-out property <float> min-length: 1;
+    callback enabled-toggled(bool);
+    // Sent on release: a new threshold scans the file again.
+    callback threshold-changed(float);
+    callback min-length-changed(float);
+    callback threshold-default();
+    callback min-length-default();
+}
+
+component Row inherits HorizontalLayout {
+    in property <string> label;
+    in property <string> value-text;
+    spacing: 8px;
+    height: 24px;
+    Text {
+        text: root.label;
+        width: 110px;
+        horizontal-alignment: right;
+        vertical-alignment: center;
+        font-size: Theme.font-body;
+        color: Theme.text;
+    }
+    @children
+    Text {
+        text: root.value-text;
+        min-width: 48px;
+        vertical-alignment: center;
+        font-size: Theme.font-body;
+        color: Theme.text;
+    }
+}
+
+export component SilenceSkipSettingsPage inherits Rectangle {
+    VerticalLayout {
+        padding: Theme.dialog-padding;
+        spacing: 6px;
+        alignment: start;
+        CheckBox {
+            text: @tr("Skip silence while playing");
+            checked <=> SilenceSkipSettings.enabled;
+            toggled => {
+                SilenceSkipSettings.enabled-toggled(self.checked);
+            }
+        }
+        Row {
+            label: @tr("Silence below");
+            value-text: @tr("{} dB", Math.round(SilenceSkipSettings.threshold));
+            Slider {
+                panel: true;
+                width: 154px;
+                minimum: -60;
+                maximum: -20;
+                step: 1;
+                value <=> SilenceSkipSettings.threshold;
+                released(v) => {
+                    SilenceSkipSettings.threshold-changed(v);
+                }
+            }
+            Button {
+                small: true;
+                text: @tr("Default");
+                clicked => {
+                    SilenceSkipSettings.threshold-default();
+                }
+            }
+        }
+        Row {
+            label: @tr("Shortest silence");
+            value-text: @tr("{} s", Math.round(SilenceSkipSettings.min-length * 10) / 10);
+            Slider {
+                panel: true;
+                width: 154px;
+                minimum: 0.5;
+                maximum: 5;
+                step: 0.1;
+                value <=> SilenceSkipSettings.min-length;
+                changed(v) => {
+                    SilenceSkipSettings.min-length-changed(v);
+                }
+            }
+            Button {
+                small: true;
+                text: @tr("Default");
+                clicked => {
+                    SilenceSkipSettings.min-length-default();
+                }
+            }
+        }
+        Text {
+            text: @tr("Raise the level when room noise or music keeps pauses from being found; lower it when quiet speech is skipped.");
+            wrap: word-wrap;
+            font-size: Theme.font-xs;
+            color: Theme.text-dim;
+        }
+    }
+}
