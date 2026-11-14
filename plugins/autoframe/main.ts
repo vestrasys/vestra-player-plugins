@@ -213,6 +213,8 @@ interface Current {
  * chain, which keeps zero-copy hardware decoding.
  */
 export default async function activate(plugin: Plugin) {
+  plugin.player.subscribe(); // the player's events from now on
+  await plugin.player.read(); // the player's state and timeline, read once
   const { text } = plugin.i18n;
   const settings = plugin.storage.json<Settings>("settings", { defaults: DEFAULT_SETTINGS, validate: isSettings });
   const cache = plugin.storage.json<Cache>("cache", { defaults: { files: {} }, validate: isCache });

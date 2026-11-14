@@ -68,7 +68,7 @@ export const REASON = {
   transitionFailed: "Could not write the transitions.",
   undoFull: "There is no room to bring the cleared parts back: the Collection holds at most 100. Remove parts, then Undo again.",
   noAnimatedFfmpeg: "Animated GIF and WebP need FFmpeg, which the player could not find.",
-  noAnimatedEncoder: "The player's FFmpeg cannot write this format. Choose another quality.",
+  noAnimatedEncoder: "The player's FFmpeg cannot write this format. Choose another output.",
   animatedTooLong: "Animated GIF and WebP are at most 60 seconds long. Choose a shorter range.",
   animatedFailed: "Could not write the animated image.",
   noScanFfmpeg: "Finding highlights needs FFmpeg.",

@@ -57,6 +57,8 @@ export const shaderPath = (file: string) => join(PACKAGE, "shaders", ...file.spl
  * Turn Off saves off, and an explicit Turn On tries once.
  */
 export default async function activate(plugin: Plugin) {
+  plugin.player.subscribe(); // the player's events from now on
+  await plugin.player.read(); // the player's state and timeline, read once
   const { text, list } = plugin.i18n;
   const store = plugin.storage.json<Settings>("upscaling", {
     defaults: DEFAULT_SETTINGS,

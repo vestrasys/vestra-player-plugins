@@ -27,7 +27,7 @@ The plugin follows the player's interface language (English and Simplified Chine
 
 ## Requirements
 
-- Vestra Player 0.5.8 or later.
+- Vestra Player 0.9.0 or later.
 - Your own game ROMs. None are included.
 
 ## Limits

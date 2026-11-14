@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1
+
+- Needs Vestra Player 0.9.0 or later (SDK 1.9.0): the manifest no longer lists `capabilities`; `activate` starts with `plugin.player.subscribe()` and `await plugin.player.read()`, which the declarations used to imply. Nothing else changes.
+
 ## 0.3.0
 
 - Two upscalers for live action next to AMD FSR 1: **Live action · Light: RAVU** (RAVU-lite-AR r3, bjin's mpv-prescalers) and **Live action · High: FSRCNNX** (igv's FSRCNNX x2), whose new **Network** row chooses x2 16 (the default, marked demanding) or the lighter x2 8. Like FSR they enlarge the brightness plane 2×, so only one of the three runs; the chroma add-on stays CfL Lite and predicts the colour from their result.

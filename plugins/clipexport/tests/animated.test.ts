@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { mkdir, mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -9,15 +9,17 @@ import { HostError, startPlugin, TestHost } from "@vestra-player/sdk/testing";
 import activate from "../main.ts";
 import { ANIMATED, animatedArgs, animatedChain, encoderFor, encodersOf, extensionOf, frameTimes, graphValue, lastFrameTime, MAX_ANIMATED_SECONDS, scaleFilter } from "../animated.ts";
 import type { AnimatedPass } from "../animated.ts";
-import { animatedOf, encodeOf, estimate, exportEncoding, PRESET_ENCODE, presetOf, PRESETS } from "../clip.ts";
+import { animatedOf, animatedOutput, encodeOf, estimate, exportEncoding, methodOf, OUTPUTS, PRESET_ENCODE, presetOf, PRESETS } from "../clip.ts";
+import { outputOf, settingsOf } from "../settings.ts";
 import { REASON, withExtension } from "../model.ts";
 import { CUT } from "../transitions.ts";
 import type { Transition } from "../transitions.ts";
 import { checkDestinations, eventually } from "./fakes.ts";
 
 /**
- * Animated GIF and WebP (0.5.0): the Quality chooser's two presets, Precise
- * only. The player writes the clip (or the merge) into the work folder; the
+ * Animated GIF and WebP (0.5.0; two Output segments beside Fast and Precise
+ * since 0.7.0, written the Precise way). The player writes the clip (or the
+ * merge) into the work folder; the
  * plugin's ffmpeg writes the image beside the destination, as for the
  * transitions.
  */
@@ -73,25 +75,25 @@ const leftovers = (data: string, folder: string) => [
   ...readdirSync(folder).filter((name) => name.endsWith(".partial")),
 ];
 const statusOf = (host: TestHost) => tab(host)["clip-status"] as { kind: string; reason: string; name: string };
-/** Precise with the Quality chooser's `index` (3 Animated GIF, 4 Animated WebP). */
+/** The Output segment `index` (2 GIF, 3 WebP); the Quality chooser keeps Precise's MP4 setting (High quality). */
 async function choose(host: TestHost, index: number) {
-  const panel = host.mounted();
-  panel.emit("set-method", 1);
-  panel.emit("set-preset", index);
+  host.mounted().emit("set-method", index);
   await host.settle();
-  await eventually(() => [tab(host)["method-index"], tab(host)["preset-index"]], [1, index]);
+  await eventually(() => [tab(host)["method-index"], tab(host)["preset-index"]], [index, 1]);
 }
 
 // ---------------------------------------------------------------- the presets and the arguments
 
-test("the presets: Animated GIF and WebP after the three MP4 ones, Custom after them; their intermediate MP4 is fixed; 0.4.x settings stay MP4", () => {
-  assert.deepEqual(PRESETS, ["source", "high", "small", "gif", "webp"]);
-  assert.equal(presetOf(PRESET_ENCODE.gif), "gif");
-  assert.equal(presetOf(PRESET_ENCODE.webp), "webp");
+test("the Outputs: Fast, Precise, GIF, WebP; the Quality chooser holds the three MP4 presets only; the image's intermediate MP4 is fixed; stored settings are an MP4", () => {
+  assert.deepEqual(OUTPUTS, ["fast", "precise", "gif", "webp"]);
+  assert.deepEqual(OUTPUTS.map(methodOf), ["fast", "precise", "precise", "precise"], "GIF and WebP are written the Precise way");
+  assert.deepEqual(OUTPUTS.map(animatedOutput), [null, null, "gif", "webp"]);
+  assert.deepEqual(PRESETS, ["source", "high", "small"]);
+  assert.equal(presetOf(PRESET_ENCODE.gif), "custom", "not a Quality any more");
   assert.equal(presetOf({ ...PRESET_ENCODE.high, format: "mp4" }), "high");
-  // A stored animated preset with other fields gets the preset's own; anything without a format is an MP4.
-  assert.deepEqual(encodeOf({ format: "gif", crf: 30, height: 0 }), PRESET_ENCODE.gif);
-  assert.deepEqual(encodeOf({ format: "webp" }), PRESET_ENCODE.webp);
+  // A stored Animated GIF or WebP quality (0.5.0–0.6.x) is the GIF or WebP Output now; the MP4 quality is High quality's.
+  assert.deepEqual(encodeOf({ format: "gif", crf: 30, height: 0 }), PRESET_ENCODE.high);
+  assert.deepEqual(encodeOf({ format: "webp" }), PRESET_ENCODE.high);
   assert.equal(encodeOf({ format: "apng", crf: 20 }).format, "mp4");
   assert.equal(encodeOf({ rate: "crf", crf: 20, speed: "faster", height: 0, fps: 0, audio: 192 }).format, "mp4", "0.4.x settings");
   assert.deepEqual([animatedOf(PRESET_ENCODE.gif), animatedOf(PRESET_ENCODE.webp), animatedOf(PRESET_ENCODE.high), animatedOf(undefined)], ["gif", "webp", null, null]);
@@ -190,7 +192,7 @@ test("Animated GIF of a clip: the player writes the clip without sound into the 
   const { folder, cleanup } = await withFolder(host);
   try {
     const runs = fakeFfmpeg(host);
-    await choose(host, 3);
+    await choose(host, 2);
     const panel = host.mounted();
     panel.emit("set-processed", true);
     panel.emit("clip-edited", "0:01", "0:05");
@@ -252,7 +254,7 @@ test("Animated GIF: the palette run shows its progress (the frame times it print
       writeFileSync(times, "frame:29   pts:29      pts_time:1.933333\nclipexport=1\nframe:30   pts:30      pts_time:2\nclipexport=1\n");
       return new Promise((done) => (release = () => done({ stdout: new Uint8Array() }))) as never;
     });
-    await choose(host, 3);
+    await choose(host, 2);
     host.mounted().emit("export-clip", "0:01", "0:05");
     await until(() => palette !== null, "the palette run");
     // The player's 4 s, then the palette run's 2 s of 4 (half of the step's first run): (4 + 1) / 8.
@@ -277,7 +279,7 @@ test("Animated WebP: Export As… renames a typed .mp4 to .webp; libwebp_anim is
   const { folder, cleanup } = await withFolder(host);
   try {
     const runs = fakeFfmpeg(host);
-    await choose(host, 4);
+    await choose(host, 3);
     host.dialogAnswers.push([join(folder, "mine.mp4")]);
     host.mounted().emit("export-as", "0:01", "0:03");
     await until(() => host.osd.some((line) => line.startsWith("Clip exported as")), "the export");
@@ -300,7 +302,7 @@ test("longer than a minute: refused before anything starts (no save dialog, no s
   const { cleanup } = await withFolder(host);
   try {
     fakeFfmpeg(host);
-    await choose(host, 3);
+    await choose(host, 2);
     const dialogs = host.sent("dialogs.open").length;
     host.mounted().emit("export-as", "0:00", "1:00.5");
     await eventually(() => [statusOf(host).kind, statusOf(host).reason], ["error", "animatedTooLong"]);
@@ -324,20 +326,20 @@ test("an ffmpeg without libwebp: WebP is refused with its reason, GIF still work
   const { cleanup } = await withFolder(host);
   try {
     // No ffmpeg at all.
-    await choose(host, 3);
+    await choose(host, 2);
     host.mounted().emit("export-clip", "0:01", "0:03");
     await eventually(() => [statusOf(host).kind, statusOf(host).reason], ["error", "noAnimatedFfmpeg"]);
     assert.equal(host.sent("snapshot.capture").length, 0);
     // An ffmpeg without libwebp.
     fakeFfmpeg(host, NO_WEBP);
-    await choose(host, 4);
+    await choose(host, 3);
     host.mounted().emit("export-clip", "0:01", "0:03");
     await eventually(() => [statusOf(host).kind, statusOf(host).reason], ["error", "noAnimatedEncoder"]);
     assert.equal(host.sent("snapshot.capture").length, 0);
-    await choose(host, 3);
+    await choose(host, 2);
     host.mounted().emit("export-clip", "0:01", "0:03");
     await until(() => host.sent("jobs.start").length === 1, "the GIF export");
-    // Fast ignores the chooser: a stream copy into an MP4 or MKV.
+    // Fast after GIF: a stream copy into an MP4 or MKV.
     host.mounted().emit("set-method", 0);
     await host.settle();
     await eventually(() => tab(host)["method-index"], 0);
@@ -366,7 +368,7 @@ test("the image fails: the reason is said, retry runs it again, nothing is left"
       writeFileSync(args.at(-1)!, "half");
       throw new HostError("failed", "Conversion failed!");
     });
-    await choose(host, 3);
+    await choose(host, 2);
     host.mounted().emit("export-clip", "0:01", "0:03");
     await until(() => host.osd.includes(`Export failed: ${REASON.animatedFailed}`), "the failure");
     await until(() => leftovers(data, folder).length === 0, "no work files left");
@@ -402,7 +404,7 @@ test("the merged Collection as a GIF: with a crossfade the parts blend first, th
   };
   try {
     const runs = fakeFfmpeg(host);
-    await choose(host, 3);
+    await choose(host, 2);
     await add("/media/one.mp4", "0", "4");
     await add("/media/two.mp4", "0", "4");
     await eventually(() => tab(host)["collection-preview"], `${tab(host)["collection-preview"]}`.replace(/\.\w+$/, ".gif"));
@@ -475,7 +477,7 @@ test("a fresh install (an empty data directory): the work folder is made before 
     host.mounted().emit("add-part", "0", "4");
     await until(() => parts(host).length === count + 1, `part ${count + 1}`);
   };
-  for (const [what, index] of [["GIF", 3], ["WebP", 4]] as const) {
+  for (const [what, index] of [["GIF", 2], ["WebP", 3]] as const) {
     await fresh(`${what} of a clip`, async (host) => {
       fakeFfmpeg(host);
       await choose(host, index);
@@ -484,7 +486,7 @@ test("a fresh install (an empty data directory): the work folder is made before 
   }
   await fresh("the merged Collection as a GIF", async (host) => {
     fakeFfmpeg(host);
-    await choose(host, 3);
+    await choose(host, 2);
     await add(host, "/media/one.mp4");
     await add(host, "/media/two.mp4");
     host.mounted().emit("export-merged");
@@ -507,7 +509,14 @@ test("the player's check of the destination folder (the fake above): a job whose
   checkDestinations(host);
   host.openElsewhere("/media/one.mp4");
   host.setSource({ position: 2, duration: 120 });
-  const { plugin, stop } = await startPlugin(async () => {}, { directory, host, locale: "en" });
+  // What the manifest's events and playback.read did before SDK 1.9.0.
+  const { plugin, stop } = await startPlugin(
+    async (plugin) => {
+      plugin.player.subscribe();
+      await plugin.player.read();
+    },
+    { directory, host, locale: "en" },
+  );
   try {
     const missing = join(tmpdir(), `clipexport-missing-${process.pid}-${Date.now()}`, "work", "merge.mp4");
     const snapshot = await plugin.media.capture();
@@ -520,7 +529,7 @@ test("the player's check of the destination folder (the fake above): a job whose
   }
 });
 
-test("Fast with a saved Animated GIF and parts Fast cannot join: the fallback is a High quality MP4 (no image, no minute limit); Precise writes the GIF again", async () => {
+test("Fast after GIF and parts Fast cannot join: the fallback is an MP4 at the Quality chooser's setting (no image, no minute limit)", async () => {
   const data = await mkdtemp(join(tmpdir(), "clipexport-data-"));
   const host = new TestHost();
   const { stop } = await start(host, data);
@@ -535,10 +544,17 @@ test("Fast with a saved Animated GIF and parts Fast cannot join: the fallback is
   };
   try {
     const runs = fakeFfmpeg(host);
-    await choose(host, 3);
+    // Precise's Quality: Small file, kept while GIF is the Output.
+    host.mounted().emit("set-method", 1);
+    host.mounted().emit("set-preset", 2);
+    await host.settle();
+    await eventually(() => tab(host)["preset-index"], 2);
+    host.mounted().emit("set-method", 2);
+    await host.settle();
+    await eventually(() => [tab(host)["method-index"], tab(host)["preset-index"]], [2, 2], "GIF chosen, Small file kept for Precise");
     host.mounted().emit("set-method", 0);
     await host.settle();
-    await eventually(() => tab(host)["method-index"], 0, "Fast chosen, Animated GIF kept");
+    await eventually(() => tab(host)["method-index"], 0, "Fast chosen: one Output at a time");
     // Two files of different sizes, together over a minute.
     host.mediaFiles.set("/media/wide.mp4", { duration: 120, video: { codec: "h264", width: 1920, height: 818, fps: 30, pixelFormat: "yuv420p" } });
     await add("/media/one.mp4", "0", "40");
@@ -549,7 +565,7 @@ test("Fast with a saved Animated GIF and parts Fast cannot join: the fallback is
     const merge = host.exports.filter((e) => Array.isArray(e.parts))[0]!;
     assert.equal(merge.kind, "rawMp4", "Precise: Fast cannot join these parts");
     assert.ok(String(merge.destination).startsWith(folder) && String(merge.destination).endsWith(".mp4"), "an MP4 straight into the folder");
-    assert.deepEqual(merge.encoding, { crf: 18, speed: "faster", audioBitrate: 192, threads: "auto" }, "High quality, not the image's intermediate");
+    assert.deepEqual(merge.encoding, { crf: 26, speed: "balanced", maxHeight: 1080, audioBitrate: 128, threads: "auto" }, "Small file, not the image's intermediate");
     assert.equal(runs.length, 0, "no image run");
     assert.ok(!host.osd.some((line) => line.includes(REASON.animatedTooLong)));
     // The check of the parts asked with the same encoding.
@@ -561,41 +577,185 @@ test("Fast with a saved Animated GIF and parts Fast cannot join: the fallback is
   }
 });
 
-test("the tab: Animated GIF and WebP in the Quality chooser, Custom after them; the H.264 rows hide and the audio choice greys for them; the ⓘ says what they write", async () => {
+test("the tab: Output is Fast | Precise | GIF | WebP in one switch; the Quality chooser holds the MP4 presets and Custom; for GIF and WebP Advanced hides Audio, Quality and the H.264 rows and keeps the effects and subtitles", async () => {
   const slint = await readFile(new URL("../ui/tab.slint", import.meta.url), "utf8");
-  assert.match(slint, /model: ClipBridge\.preset-index == 5\s*\? \[@tr\("Same as source"\), @tr\("High quality"\), @tr\("Small file"\), @tr\("Animated GIF"\), @tr\("Animated WebP"\), @tr\("Custom"\)\]/);
-  assert.match(slint, /private property <bool> animated: !root\.fast && ClipBridge\.support\.encode && \(ClipBridge\.preset-index == 3 \|\| ClipBridge\.preset-index == 4\);/);
+  const parts = await readFile(new URL("../ui/parts.slint", import.meta.url), "utf8");
+  // The four segments, in this order, each picking its index; GIF and WebP are the formats' own names.
+  const halves = [...slint.matchAll(/MethodHalf \{ (?:glyph: Glyphs\.\w+; )?title: (@tr\("\w+"\)|"\w+"); selected: root\.index == (\d);[^\n]*picked\((\d)\)/g)].map((m) => [m[1], m[2], m[3]]);
+  assert.deepEqual(halves, [['@tr("Fast")', "0", "0"], ['@tr("Precise")', "1", "1"], ['"GIF"', "2", "2"], ['"WebP"', "3", "3"]]);
+  // One switch for the clip and the merged Collection: always shown (Fast greys without the player's stream copy, GIF and WebP without its encoder settings).
+  assert.match(slint, /MethodSwitch \{\s*horizontal-stretch: 1;\s*index: ClipBridge\.method-index;\s*fast-enabled: ClipBridge\.support\.fast;\s*image-enabled: ClipBridge\.support\.encode;/);
+  // The Quality chooser: MP4 only.
+  assert.match(slint, /model: ClipBridge\.preset-index == 3\s*\? \[@tr\("Same as source"\), @tr\("High quality"\), @tr\("Small file"\), @tr\("Custom"\)\]\s*: \[@tr\("Same as source"\), @tr\("High quality"\), @tr\("Small file"\)\];/);
+  for (const text of [slint, parts]) assert.doesNotMatch(text, /@tr\("Animated (GIF|WebP)"\)/, "no Animated GIF or WebP quality left");
+  assert.match(slint, /private property <bool> animated: ClipBridge\.support\.encode && \(ClipBridge\.method-index == 2 \|\| ClipBridge\.method-index == 3\);/);
+  // Advanced for GIF and WebP: no Audio row, no Quality row, no H.264 rows; the effects and subtitles stay (enabled as in Precise).
+  assert.match(slint, /if !root\.animated: HorizontalLayout \{\s*spacing: 4px;\s*Label \{ width: 64px; text: @tr\("Audio"\); \}/);
+  assert.match(slint, /if !root\.animated: HorizontalLayout \{\s*spacing: 4px;\s*Label \{ width: 64px; text: @tr\("Quality"\); \}/);
   assert.match(slint, /if !root\.fast && ClipBridge\.support\.encode && !root\.animated: VerticalLayout/);
-  assert.match(slint, /enabled: !root\.animated;\s*current-index <=> ClipBridge\.audio-index;/);
+  assert.match(slint, /text: @tr\("Include video effects"\);\s*checked <=> ClipBridge\.processed;\s*enabled: !root\.fast;/);
+  // The closed Advanced sums up nothing for them (no sound, a fixed picture: the line under the Output says what it is).
+  assert.match(slint, /summary: root\.animated \? ""/);
+  // The footer of the Collection names GIF or WebP, Words.method knows them.
+  assert.match(slint, /text: Words\.method\(ClipBridge\.method-index == 2 && ClipBridge\.support\.encode \? "gif" : ClipBridge\.method-index == 3 && ClipBridge\.support\.encode \? "webp" : ClipBridge\.collection-method-index == 0 \? "fast" : "precise"\)/);
+  assert.match(parts, /if \(m == "gif"\) \{ return "GIF"; \}\s*if \(m == "webp"\) \{ return "WebP"; \}/);
   const host = new TestHost();
   host.openElsewhere("/media/one.mp4");
   host.setSource({ position: 2, duration: 120 });
   const { stop } = await start(host);
   try {
-    await choose(host, 4);
-    // A stale H.264 field event changes nothing while an animated preset is chosen.
+    await choose(host, 3);
+    // A stale H.264 field event changes nothing while GIF or WebP is chosen.
     host.mounted().emit("set-encode", "crf", 25);
     await host.settle();
-    await eventually(() => tab(host)["preset-index"], 4);
-    // A custom MP4 shows Custom at index 5.
-    host.mounted().emit("set-preset", 1);
+    await eventually(() => [tab(host)["method-index"], tab(host)["preset-index"], tab(host)["enc-crf"]], [3, 1, 18]);
+    // A custom MP4 shows Custom at index 3.
+    host.mounted().emit("set-method", 1);
     host.mounted().emit("set-encode", "crf", 25);
-    await eventually(() => tab(host)["preset-index"], 5, "Custom");
+    await eventually(() => tab(host)["preset-index"], 3, "Custom");
   } finally {
     await stop();
   }
 });
 
-test("the tab: a muted line under Quality says what GIF or WebP writes, from the encoder's constants, in every language", async () => {
+test("the Output segments: GIF and WebP name the file .gif and .webp (clip and Collection), Precise and Fast go back to MP4 with the Quality kept; the progress card names GIF", async () => {
+  const data = await mkdtemp(join(tmpdir(), "clipexport-data-"));
+  const host = new TestHost();
+  host.openElsewhere("/media/one.mp4");
+  host.setSource({ position: 2, duration: 120 });
+  const { stop } = await start(host, data);
+  const { cleanup } = await withFolder(host);
+  try {
+    const panel = host.mounted();
+    panel.emit("set-method", 1);
+    panel.emit("set-preset", 0);
+    panel.emit("clip-edited", "0:01", "0:05");
+    await host.settle();
+    const ending = (key: string) => String(tab(host)[key]).replace(/^.*(\.\w+)$/, "$1");
+    for (const [index, extension] of [[2, ".gif"], [3, ".webp"], [1, ".mp4"], [0, ".mp4"], [2, ".gif"]] as const) {
+      panel.emit("set-method", index);
+      await host.settle();
+      await eventually(() => [tab(host)["method-index"], ending("clip-name"), ending("preview"), ending("collection-preview"), tab(host)["preset-index"]], [index, extension, extension, extension, 0], `segment ${index}`);
+      await eventually(() => (tab(host).note as { method: string }).method, index === 0 ? "fast" : "precise", "GIF and WebP cut the Precise way");
+    }
+    // Kept in settings.json under its old name.
+    await until(async () => JSON.parse(await readFile(join(data, "settings.json"), "utf8").catch(() => "{}")).method === "gif", "the Output stored");
+    // The running export's card says GIF, not Precise with a quality.
+    let release: (() => void) | undefined;
+    host.tools.handle("ffmpeg", (args) => {
+      if (args.includes("-encoders")) return { stdout: ENCODERS };
+      if (!args.includes("-/filter_complex")) return { stdout: new Uint8Array() };
+      writeFileSync(args[args.indexOf("-progress") + 1]!, "out_time_us=1000000\nprogress=continue\n");
+      writeFileSync(args.at(-1)!, "GIF89a");
+      // The first run (the palette) waits while the card is read.
+      if (release) return { stdout: new Uint8Array() };
+      return new Promise((done) => (release = () => done({ stdout: new Uint8Array() }))) as never;
+    });
+    panel.emit("export-clip", "0:01", "0:05");
+    await eventually(() => {
+      const card = tab(host).card as { shown: boolean; method: string; preset: string };
+      return [card.shown, card.method, card.preset];
+    }, [true, "gif", ""]);
+    await until(() => !!release, "the image run");
+    release!();
+    await until(() => host.osd.some((line) => line.startsWith("Clip exported as")), "the export");
+  } finally {
+    await stop();
+    await cleanup();
+    await rm(data, { recursive: true, force: true });
+  }
+});
+
+test("settings of 0.5.0–0.6.x: Precise with the Animated GIF or WebP quality is the GIF or WebP Output (Quality: High quality); Fast stays Fast; others as stored", async () => {
+  const gif = { format: "gif", rate: "crf", crf: 14, speed: "faster", height: 720, fps: 30, audio: 128 };
+  const webp = { ...gif, format: "webp" };
+  const small = { format: "mp4", rate: "crf", crf: 26, speed: "balanced", height: 1080, fps: 0, audio: 128 };
+  assert.deepEqual(
+    [
+      outputOf("precise", gif), outputOf("precise", webp), outputOf("fast", gif), outputOf("fast", webp),
+      outputOf("precise", small), outputOf("fast", small), outputOf("gif", small), outputOf("webp", undefined), outputOf(undefined, gif), outputOf("turbo", null),
+    ],
+    ["gif", "webp", "fast", "fast", "precise", "fast", "gif", "webp", "fast", "fast"],
+  );
+  const migrated = settingsOf({ method: "precise", encode: gif }, "/videos");
+  assert.deepEqual([migrated.method, migrated.encode], ["gif", PRESET_ENCODE.high]);
+  assert.deepEqual(settingsOf({ method: "fast", encode: webp }, "/videos").encode, PRESET_ENCODE.high, "the MP4 quality before the image was not kept");
+  assert.deepEqual(settingsOf({ method: "precise", encode: small }, "/videos").encode, PRESET_ENCODE.small);
+  // The tab after an update: a settings.json of 0.6.x with Precise and Animated WebP opens on WebP, the Quality on High quality.
+  const data = await mkdtemp(join(tmpdir(), "clipexport-data-"));
+  try {
+    await writeFile(join(data, "settings.json"), JSON.stringify({ method: "precise", encode: webp, advancedOpen: true }));
+    const host = new TestHost();
+    host.openElsewhere("/media/one.mp4");
+    host.setSource({ position: 2, duration: 120 });
+    const { stop } = await start(host, data);
+    try {
+      host.mounted().emit("clip-edited", "0:01", "0:05");
+      await host.settle();
+      await eventually(() => [tab(host)["method-index"], tab(host)["preset-index"], String(tab(host)["clip-name"]).endsWith(".webp"), tab(host)["advanced-open"]], [3, 1, true, true]);
+      // Precise from there: High quality, an MP4.
+      host.mounted().emit("set-method", 1);
+      await host.settle();
+      await eventually(() => [tab(host)["method-index"], tab(host)["preset-index"], String(tab(host)["clip-name"]).endsWith(".mp4")], [1, 1, true]);
+    } finally {
+      await stop();
+    }
+  } finally {
+    await rm(data, { recursive: true, force: true });
+  }
+});
+
+test("the merged Collection as WebP from the Output: the merge is Precise, named .webp, the image run is libwebp's; Fast-joinable parts do not make it a copy", async () => {
+  const data = await mkdtemp(join(tmpdir(), "clipexport-data-"));
+  const host = new TestHost();
+  const { stop } = await start(host, data);
+  const { folder, cleanup } = await withFolder(host);
+  const rows = () => (tab(host).parts ?? []) as { id: string }[];
+  const add = async (path: string) => {
+    host.openElsewhere(path);
+    host.setSource({ position: 2, duration: 120 });
+    const count = rows().length;
+    host.mounted().emit("add-part", "0", "4");
+    await until(() => rows().length === count + 1, `part ${count + 1}`);
+  };
+  try {
+    const runs = fakeFfmpeg(host);
+    await add("/media/one.mp4");
+    await add("/media/two.mp4");
+    await eventually(() => tab(host)["collection-method-index"], 0, "Fast can join these parts");
+    await choose(host, 3);
+    await eventually(() => [tab(host)["collection-method-index"], String(tab(host)["collection-preview"]).endsWith(".webp")], [1, true], "WebP merges the Precise way");
+    // The check asks with the image's intermediate encoding.
+    await until(() => JSON.stringify(host.sent("jobs.check").at(-1)?.encoding) === JSON.stringify(exportEncoding(PRESET_ENCODE.webp)), "the check with the intermediate");
+    host.mounted().emit("export-merged");
+    await until(() => host.osd.some((line) => line.startsWith("Clip exported as")), "the export");
+    const merge = host.exports.filter((e) => Array.isArray(e.parts))[0]!;
+    assert.equal(merge.kind, "rawMp4", "re-encoded, not copied");
+    assert.ok(String(merge.destination).startsWith(join(data, "work")), "into the work folder first");
+    assert.deepEqual(merge.encoding, exportEncoding(PRESET_ENCODE.webp));
+    assert.equal(runs.length, 1, "one image run");
+    assert.equal(runs[0]!.args[runs[0]!.args.indexOf("-c:v") + 1], "libwebp_anim");
+    assert.equal((await readdir(folder)).filter((name) => name.endsWith(".webp")).length, 1);
+    await until(() => leftovers(data, folder).length === 0, "no work files left");
+  } finally {
+    await stop();
+    await cleanup();
+    await rm(data, { recursive: true, force: true });
+  }
+});
+
+test("the tab: a muted line under the Output says what GIF or WebP writes, from the encoder's constants, in every language", async () => {
   const slint = await readFile(new URL("../ui/tab.slint", import.meta.url), "utf8");
-  // Shown only while an animated quality is chosen, right after the Quality row, aligned with its chooser, small and dim.
-  const line = /\n(\s*)\/\/ An animated quality's fixed picture[^\n]*\n\s*if root\.animated: HorizontalLayout \{\s*padding-left: 68px;\s*Text \{([\s\S]*?)\n\1\}/.exec(slint);
-  assert.ok(line, "the line's row");
+  // Shown only while GIF or WebP is chosen, right after the Output row and before Advanced, small and dim.
+  const line = /\n(\s*)\/\/ What GIF or WebP writes, right under the Output[^\n]*\n[^\n]*\n\s*if root\.animated: Text \{([\s\S]*?)\n\1\}/.exec(slint);
+  assert.ok(line, "the line");
   const body = line[2]!;
   assert.match(body, /color: Theme\.text-dim;/);
   assert.match(body, /font-size: Theme\.font-xs;/);
-  assert.ok(slint.indexOf("An animated quality's fixed picture") > slint.indexOf('Label { width: 64px; text: @tr("Quality"); }'), "below the Quality row");
-  assert.ok(slint.indexOf("An animated quality's fixed picture") < slint.indexOf("if !root.fast && ClipBridge.support.encode && !root.animated: VerticalLayout"), "where the H.264 rows would be");
+  assert.match(body, /overflow: elide;/);
+  const at = slint.indexOf("What GIF or WebP writes, right under the Output");
+  assert.ok(at > slint.indexOf("image-enabled: ClipBridge.support.encode;"), "below the Output switch");
+  assert.ok(at < slint.indexOf('title: @tr("Advanced");'), "above Advanced, shown whether it is open or not");
   // One template, its numbers from the bridge (no literal number in the line).
   const template = "{0} · {1} px long edge · {2} fps · up to {3} s";
   for (const format of ["gif", "webp"]) {

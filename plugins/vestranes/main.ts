@@ -14,6 +14,7 @@ const MAX_ROM = 16 * 1024 * 1024;
  * main window's and are not touched.
  */
 export default async function activate(plugin: Plugin) {
+  await plugin.player.read(); // the player's state and timeline, read once
   const window = plugin.windows.create("nes.slint");
   let stream: Stream | undefined;
   /** The emulator of the running stream: the keys go to it. */

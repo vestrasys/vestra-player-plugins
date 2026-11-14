@@ -297,6 +297,7 @@ export global ClipBridge {
     in property <int> list-focus;
     // Clips finished since the Results page was last shown (its badge).
     in property <int> unseen;
+    // The Output: 0 Fast, 1 Precise, 2 GIF, 3 WebP (GIF and WebP are written the Precise way).
     in-out property <int> method-index;
     in-out property <string> clip-start;
     in-out property <string> clip-end;
@@ -308,9 +309,9 @@ export global ClipBridge {
     in-out property <int> audio-index: 1;
     in-out property <bool> processed;
     in-out property <bool> burn;
-    // 0 Same as source, 1 High quality, 2 Small file, 3 Animated GIF, 4 Animated WebP, 5 Custom.
+    // Precise's Quality: 0 Same as source, 1 High quality, 2 Small file, 3 Custom.
     in-out property <int> preset-index: 1;
-    // What Animated GIF and Animated WebP write (the plugin's constants, animated.ts), for the line under Quality.
+    // What GIF and WebP write (the plugin's constants, animated.ts), for the line under the Output.
     in property <AnimatedSpec> gif-spec;
     in property <AnimatedSpec> webp-spec;
     in-out property <float> enc-crf: 18;
@@ -349,7 +350,7 @@ export global ClipBridge {
     in property <Blocking> blocking;
     in property <CopyNote> copy;
     in property <Target> target;
-    // The method a merged export uses now (Precise when Fast cannot write the parts).
+    // The method a merged export uses now, 0 Fast or 1 Precise (Precise when Fast cannot write the parts, and for GIF and WebP).
     in property <int> collection-method-index;
     in property <bool> collection-busy;
     in-out property <string> collection-template;
@@ -638,35 +639,55 @@ component Fold {
     TouchArea { clicked => { root.toggled(!root.open); } }
 }
 
-// One half of the method switch: glyph and name.
+// One segment of the Output switch: glyph and name, or the name alone (GIF and WebP: a format's name is its mark).
 component MethodHalf inherits Rectangle {
     in property <string> glyph;
     in property <string> title;
     in property <bool> selected;
+    // Not offered by this player (greyed, no click).
+    in property <bool> enabled: true;
     callback clicked();
     horizontal-stretch: 1;
     border-radius: 3px;
     border-width: root.selected ? 1px : 0px;
     border-color: Theme.line;
-    background: root.selected ? Theme.selected-bg : touch.has-hover ? Theme.hover-bg : transparent;
+    background: root.selected ? Theme.selected-bg : touch.has-hover && root.enabled ? Theme.hover-bg : transparent;
     accessible-role: button;
     accessible-label: root.title;
     accessible-checkable: true;
     accessible-checked: root.selected;
-    accessible-action-default => { root.clicked(); }
+    accessible-enabled: root.enabled;
+    accessible-action-default => { if (root.enabled) { root.clicked(); } }
     HorizontalLayout {
         alignment: center;
         spacing: 5px;
-        VerticalLayout { alignment: center; Glyph { glyph: root.glyph; color: root.selected ? Theme.text : Theme.text-dim; } }
-        Text { text: root.title; color: root.selected ? Theme.text : Theme.text-list; font-size: Theme.font-body; vertical-alignment: center; }
+        if root.glyph != "": VerticalLayout {
+            alignment: center;
+            Glyph { glyph: root.glyph; color: !root.enabled ? Theme.icon-disabled : root.selected ? Theme.text : Theme.text-dim; }
+        }
+        Text {
+            text: root.title;
+            color: !root.enabled ? Theme.icon-disabled : root.selected ? Theme.text : Theme.text-list;
+            font-size: Theme.font-body;
+            vertical-alignment: center;
+        }
     }
-    touch := TouchArea { clicked => { root.clicked(); } }
+    touch := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
+    }
 }
 
-// The method: Fast | Precise in one 26 px row (a segmented control); what they mean is in the ⓘ tip beside it.
+// The Output: Fast | Precise | GIF | WebP in one 26 px row (a segmented control), for the clip and for the merged
+// Collection; what they mean is in the ⓘ tip beside it. Each segment is as wide as its name plus an equal share of the
+// rest (as Fast and Precise were): in a 280 px tab the four fit in every language (Korean, the widest, needs about
+// 160 of the 222 px; English 136).
 component MethodSwitch inherits Rectangle {
-    // 0 Fast, 1 Precise.
+    // 0 Fast, 1 Precise, 2 GIF, 3 WebP.
     in property <int> index;
+    // Fast needs the player's stream copy; GIF and WebP its encoder settings.
+    in property <bool> fast-enabled: true;
+    in property <bool> image-enabled: true;
     callback picked(int);
     height: 26px;
     border-radius: Theme.radius-control;
@@ -676,8 +697,11 @@ component MethodSwitch inherits Rectangle {
     HorizontalLayout {
         padding: 2px;
         spacing: 2px;
-        MethodHalf { glyph: Glyphs.fast; title: @tr("Fast"); selected: root.index == 0; clicked => { root.picked(0); } }
+        MethodHalf { glyph: Glyphs.fast; title: @tr("Fast"); selected: root.index == 0; enabled: root.fast-enabled; clicked => { root.picked(0); } }
         MethodHalf { glyph: Glyphs.precise; title: @tr("Precise"); selected: root.index == 1; clicked => { root.picked(1); } }
+        // i18n-ignore: GIF and WebP are the formats' own names in every language.
+        MethodHalf { title: "GIF"; selected: root.index == 2; enabled: root.image-enabled; clicked => { root.picked(2); } }
+        MethodHalf { title: "WebP"; selected: root.index == 3; enabled: root.image-enabled; clicked => { root.picked(3); } } // i18n-ignore
     }
 }
 
@@ -1332,7 +1356,8 @@ component MergeFooter inherits Rectangle {
             }
             Text {
                 horizontal-stretch: 1;
-                text: Words.method(ClipBridge.collection-method-index == 0 ? "fast" : "precise")
+                // The Output the merge writes: GIF or WebP as chosen, else the method it uses (Precise when Fast cannot).
+                text: Words.method(ClipBridge.method-index == 2 && ClipBridge.support.encode ? "gif" : ClipBridge.method-index == 3 && ClipBridge.support.encode ? "webp" : ClipBridge.collection-method-index == 0 ? "fast" : "precise")
                     + (ClipBridge.collection-info.transitions == 0 ? ""
                         : " · " + (ClipBridge.collection-info.off ? @tr("transitions off in Fast")
                             // TRANSLATORS: {} is the seconds the transition takes off the length ("1.0").
@@ -1783,8 +1808,8 @@ export component ClipExportTab inherits Rectangle {
     // and the card's padding (11 + 8). From the tab's own width, so that what a row shows never changes its room.
     private property <length> range-room: root.width - 45px;
     private property <bool> fast: ClipBridge.support.fast && ClipBridge.method-index == 0;
-    // Precise writes an animated image (the Quality chooser's Animated GIF or Animated WebP): no sound, its encoding is fixed.
-    private property <bool> animated: !root.fast && ClipBridge.support.encode && (ClipBridge.preset-index == 3 || ClipBridge.preset-index == 4);
+    // The Output is an animated image (GIF or WebP): no sound, its encoding is fixed.
+    private property <bool> animated: ClipBridge.support.encode && (ClipBridge.method-index == 2 || ClipBridge.method-index == 3);
     // What the ⓘ beside Fast / Precise explains: the method, and where this clip will start.
     private property <string> method-tip: root.fast
         ? @tr("Fast cut copies the streams: lossless and done in seconds, but a clip can only start on a keyframe.")
@@ -1801,8 +1826,8 @@ export component ClipExportTab inherits Rectangle {
             // TRANSLATORS: {0} and {1} are times.
             : @tr("Precise re-encodes from the exact frame {0} to {1}, and can include video effects and subtitles.", ClipBridge.note.start, ClipBridge.note.end))
             + (!root.animated ? ""
-                // TRANSLATORS: what the Animated GIF and Animated WebP qualities write.
-                : " " + (ClipBridge.preset-index == 3 ? @tr("Animated GIF: at most 480 px and 15 fps, no sound, loops, up to 60 s.")
+                // TRANSLATORS: what the GIF and WebP outputs write.
+                : " " + (ClipBridge.method-index == 2 ? @tr("Animated GIF: at most 480 px and 15 fps, no sound, loops, up to 60 s.")
                     : @tr("Animated WebP: at most 640 px and 20 fps, no sound, loops, up to 60 s.")));
     // The estimate in the Export button's tip (length, size and time, each approximate).
     private property <string> estimate-text: ClipBridge.estimate.length == "" ? ""
@@ -2119,15 +2144,16 @@ export component ClipExportTab inherits Rectangle {
                             spacing: 6px;
                             // The running export (Results has its row too).
                             if ClipBridge.card.shown: ProgressCard { card: ClipBridge.card; }
-                            // ---- Output: Fast | Precise (what they mean in the ⓘ tip), Advanced folded.
+                            // ---- Output: Fast | Precise | GIF | WebP (what they mean in the ⓘ tip), Advanced folded.
                             HorizontalLayout {
                                 spacing: 4px;
-                                if ClipBridge.support.fast: MethodSwitch {
+                                MethodSwitch {
                                     horizontal-stretch: 1;
                                     index: ClipBridge.method-index;
+                                    fast-enabled: ClipBridge.support.fast;
+                                    image-enabled: ClipBridge.support.encode;
                                     picked(index) => { ClipBridge.method-index = index; ClipBridge.set-method(index); }
                                 }
-                                if !ClipBridge.support.fast: Rectangle { horizontal-stretch: 1; }
                                 VerticalLayout {
                                     alignment: center;
                                     ToolTipArea {
@@ -2139,12 +2165,23 @@ export component ClipExportTab inherits Rectangle {
                                     }
                                 }
                             }
+                            // What GIF or WebP writes, right under the Output while one of them is chosen (from the plugin's
+                            // constants, animated.ts): its picture is fixed, so Advanced has no quality for it.
+                            if root.animated: Text {
+                                text: ClipBridge.method-index == 2
+                                    // TRANSLATORS: {0} is the format (GIF or WebP), {1} pixels on the longer side of the picture, {2} frames per second, {3} the longest image in seconds.
+                                    ? @tr("{0} · {1} px long edge · {2} fps · up to {3} s", "GIF", ClipBridge.gif-spec.box, ClipBridge.gif-spec.fps, ClipBridge.gif-spec.seconds)
+                                    : @tr("{0} · {1} px long edge · {2} fps · up to {3} s", "WebP", ClipBridge.webp-spec.box, ClipBridge.webp-spec.fps, ClipBridge.webp-spec.seconds);
+                                color: Theme.text-dim;
+                                font-size: Theme.font-xs;
+                                overflow: elide;
+                            }
                             Fold {
                                 title: @tr("Advanced");
                                 open: ClipBridge.advanced-open;
                                 // TRANSLATORS: what the closed Advanced rows hold now: an audio choice and a quality.
-                                // An animated image has no sound: its quality alone.
-                                summary: root.animated ? Words.preset(ClipBridge.preset-index == 3 ? "gif" : "webp")
+                                // GIF and WebP: no sound and a fixed picture (the line above), so nothing to sum up.
+                                summary: root.animated ? ""
                                     : @tr("{0} · {1}", ClipBridge.audio-labels[ClipBridge.audio-index],
                                     root.fast ? @tr("Same as source (stream copy)") : ClipBridge.support.encode ? Words.preset(ClipBridge.preset-index == 0 ? "source" : ClipBridge.preset-index == 1 ? "high" : ClipBridge.preset-index == 2 ? "small" : "custom") : @tr("High quality"));
                                 toggled(open) => {
@@ -2155,45 +2192,32 @@ export component ClipExportTab inherits Rectangle {
                             if ClipBridge.advanced-open: VerticalLayout {
                                 padding-left: 12px;
                                 spacing: 5px;
-                                HorizontalLayout {
+                                // Audio and Quality are the MP4's: GIF and WebP have no sound and a fixed picture (the line
+                                // under the Output says what it is), so Advanced holds only the effects and subtitles for them.
+                                if !root.animated: HorizontalLayout {
                                     spacing: 4px;
                                     Label { width: 64px; text: @tr("Audio"); }
                                     Choice {
                                         model: ClipBridge.audio-labels;
-                                        // An animated image has no sound (the ⓘ beside Fast / Precise says so).
-                                        enabled: !root.animated;
                                         current-index <=> ClipBridge.audio-index;
                                         selected(index) => { ClipBridge.set-audio(index); }
                                     }
                                 }
-                                HorizontalLayout {
+                                if !root.animated: HorizontalLayout {
                                     spacing: 4px;
                                     Label { width: 64px; text: @tr("Quality"); }
                                     if root.fast: Line { text: @tr("Same as source (stream copy)"); }
                                     if !root.fast && ClipBridge.support.encode: Choice {
-                                        // Custom (index 5) shows only while the settings are none of the presets.
-                                        model: ClipBridge.preset-index == 5
-                                            ? [@tr("Same as source"), @tr("High quality"), @tr("Small file"), @tr("Animated GIF"), @tr("Animated WebP"), @tr("Custom")]
-                                            : [@tr("Same as source"), @tr("High quality"), @tr("Small file"), @tr("Animated GIF"), @tr("Animated WebP")];
+                                        // Custom (index 3) shows only while the settings are none of the presets.
+                                        model: ClipBridge.preset-index == 3
+                                            ? [@tr("Same as source"), @tr("High quality"), @tr("Small file"), @tr("Custom")]
+                                            : [@tr("Same as source"), @tr("High quality"), @tr("Small file")];
                                         current-index <=> ClipBridge.preset-index;
                                         selected(index) => { ClipBridge.set-preset(index); }
                                     }
                                     if !root.fast && !ClipBridge.support.encode: Line { text: @tr("High quality (H.264 + AAC in MP4)"); }
                                 }
-                                // An animated quality's fixed picture, under the chooser in place of the H.264 rows (aligned with it).
-                                if root.animated: HorizontalLayout {
-                                    padding-left: 68px;
-                                    Text {
-                                        text: ClipBridge.preset-index == 3
-                                            // TRANSLATORS: {0} is the format (GIF or WebP), {1} pixels on the longer side of the picture, {2} frames per second, {3} the longest image in seconds.
-                                            ? @tr("{0} · {1} px long edge · {2} fps · up to {3} s", "GIF", ClipBridge.gif-spec.box, ClipBridge.gif-spec.fps, ClipBridge.gif-spec.seconds)
-                                            : @tr("{0} · {1} px long edge · {2} fps · up to {3} s", "WebP", ClipBridge.webp-spec.box, ClipBridge.webp-spec.fps, ClipBridge.webp-spec.seconds);
-                                        color: Theme.text-dim;
-                                        font-size: Theme.font-xs;
-                                        overflow: elide;
-                                    }
-                                }
-                                // The H.264 rows; an animated image's encoding is fixed (the line above says what it is).
+                                // The H.264 rows; GIF's and WebP's encoding is fixed (the line under the Output says what it is).
                                 if !root.fast && ClipBridge.support.encode && !root.animated: VerticalLayout {
                                     spacing: 5px;
                                     HorizontalLayout {

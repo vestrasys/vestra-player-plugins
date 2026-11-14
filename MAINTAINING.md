@@ -134,10 +134,13 @@ behind it:
 - `vestra.` is reserved for the player's built-in plugins: neither an id
   nor an owner here may use it. `npm run registry` and the publish build
   enforce these rules.
-- Neither may a manifest declare a capability that only built-in plugins
-  may declare (`commands.run`, `palette.lead`; the SDK's `CAPABILITY_INFO`
-  marks them `builtinOnly`). `vestra-plugin check`, `npm run registry` and
-  the publish build refuse such a plugin, naming the capability.
+- A manifest declares no `capabilities` (SDK 1.9.0 removed them;
+  `vestra-plugin check` and the pack refuse the field, and the package
+  check refuses a packed manifest that has it). A plugin turns on the
+  player's events with `plugin.player.subscribe()` and its start-up state
+  with `await plugin.player.read()`. Listing and running commands and
+  leading the palette stay with built-in plugins: the player refuses them
+  to any other plugin at run time.
 - A changed id is a new plugin to the store: the old id's history is not
   carried over. Bump the version (minor) and say so in the changelog.
 - **Every change that should reach users bumps `version`** in
@@ -523,7 +526,7 @@ On the pull request (`Add someone.cool-visualizer`, or
 
 - **Registry owners** ([`registry.yml`](.github/workflows/registry.yml)) checks that the author is in `owners` of a new registration, or already an owner of one they change. It runs from the base branch and never runs the pull request's code.
 - **CI** ([`ci.yml`](.github/workflows/ci.yml)) validates the file (`npm run registry`) and dry-runs the publish flow. Today that dry run fails on any registration (third-party builds are not implemented), which is what keeps registrations from being merged; once they are, it builds and tests the plugin from the registered commit.
-- **Review**: a maintainer reads the source at the commit (for an update, the diff since the previous one): that it does what its README says, that the capabilities match, and how it uses files, the network and child processes.
+- **Review**: a maintainer reads the source at the commit (for an update, the diff since the previous one): that it does what its README says, that the categories `vestra-plugin scan` reports match what it does, and how it uses files, the network and child processes.
 
 After the merge, [`publish.yml`](.github/workflows/publish.yml) builds the package at the commit without secrets, releases it as `<id>-v<version>` with a build provenance attestation, signs the index in a separate job that never runs plugin code, and deploys it.
 
@@ -621,7 +624,8 @@ plugins ──▶ static ──┬──▶ plugin × N ──┬──▶ build
    checks the build artifact as untrusted data (each package's and store
    asset's sha256 and size against the index; the version history, `revoked`
    (append-only) and `generated` (previous + 1) against the previously signed
-   index; `revoked` against `revoked.json`; nothing on the site but
+   index; no `capabilities` in a new version; `revoked` against
+   `revoked.json`; nothing on the site but
    `index.json` and the assets it references), creates the Releases with
    `gh release create`, and signs `index.json`.
 3. **attest** (`id-token: write`, `attestations: write`, this job only; runs
@@ -668,7 +672,7 @@ and Pages of a private repository need authentication or a paid plan):
       },
       "versions": [
         { "version": "0.3.0", "apiVersion": "vestra/1", "minPlayerVersion": "0.2.0",
-          "capabilities": ["…"], "downloadUrl": "https://…/zysilm.vestratube-0.3.0.vxp",
+          "downloadUrl": "https://…/zysilm.vestratube-0.3.0.vxp",
           "sha256": "…", "size": 9370, "published": "2026-10-21T…Z",
           "scan": { "uses": ["clipboard"], "method": "types", "sdk": "1.8.0" } }
       ]
@@ -742,9 +746,15 @@ and Pages of a private repository need authentication or a paid plan):
   before installing and compares it between two versions; it is a report
   and gates nothing (files, the network and other programs are outside it:
   see [Security review](#security-review)). The signature covers it, and
-  `indexProblems` checks its shape (`scripts/lib/scan.mjs`).
+  `indexProblems` checks its shape (`scripts/lib/scan.mjs`). Since SDK 1.9.0
+  the scan is the only disclosure: manifests declare nothing.
+- `capabilities` (legacy, in a version entry) is the list a manifest
+  declared before SDK 1.9.0. Versions published before then keep it as
+  signed; the build never writes it, and the signing job refuses a new
+  version that has it. When present, `indexProblems` checks that it is an
+  array of strings. Clients must not rely on it.
 - Compatibility: `generated`, the asset fields, `translations` and `scan`
-  were added within `schema` 1. Clients ignore unknown keys (the store does), so older
+  were added within `schema` 1, and `capabilities` became optional in it. Clients ignore unknown keys (the store does), so older
   clients read the new index unchanged; this repository's own scripts still
   read an index from before them as the previous index.
 

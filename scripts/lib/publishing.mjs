@@ -109,6 +109,7 @@ const VERSION_KEYS = [
   "version",
   "apiVersion",
   "minPlayerVersion",
+  // Legacy: versions published before SDK 1.9.0 only (see indexProblems).
   "capabilities",
   "downloadUrl",
   "sha256",
@@ -284,11 +285,16 @@ export function indexProblems(index, { legacy = false } = {}) {
         problems.push(
           `${where}: minPlayerVersion must be MAJOR.MINOR.PATCH or null`,
         );
+      // Only versions published before SDK 1.9.0 have it, kept as signed
+      // (scripts/lib/release.mjs refuses it on a new version).
       if (
-        !Array.isArray(entry.capabilities) ||
-        entry.capabilities.some((c) => typeof c !== "string")
+        entry.capabilities !== undefined &&
+        (!Array.isArray(entry.capabilities) ||
+          entry.capabilities.some((c) => typeof c !== "string"))
       )
-        problems.push(`${where}: capabilities must be an array of strings`);
+        problems.push(
+          `${where}: capabilities, when present, must be an array of strings`,
+        );
       if (!https(entry.downloadUrl))
         problems.push(`${where}: downloadUrl must be an https: URL`);
       if (

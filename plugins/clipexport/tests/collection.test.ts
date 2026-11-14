@@ -335,12 +335,20 @@ test("double-click previews a part: its file opens at the part's start and Start
   }
 });
 
-test("capability errors: without media.sources nothing is remembered; without playback.control no preview", async () => {
-  const all = JSON.parse(await readFile(new URL("../manifest.json", import.meta.url), "utf8")).capabilities as string[];
-  for (const [missing, action] of [["media.sources", "add"], ["playback.control", "preview"]] as const) {
+test("capability errors: when the player refuses media.sources nothing is remembered; when it refuses the open no preview", async () => {
+  // The player's `capability` refusal (SDK 1.9.0: no declarations; an older player refused these without one).
+  const refused = {
+    add: ["media.sources.remember", "media.sources.get", "media.sources.locate", "media.sources.forget", "media.sources.list"],
+    preview: ["media.sources.open"],
+  };
+  for (const action of ["add", "preview"] as const) {
     const host = new TestHost();
+    for (const method of refused[action])
+      host.handle(method, () => {
+        throw new HostError("capability", `${method} is not available`);
+      });
     play(host, "/media/one.mp4");
-    const { stop } = await startPlugin(activate, { directory, host, id: ID, capabilities: all.filter((c) => c !== missing), locale: "en" });
+    const { stop } = await startPlugin(activate, { directory, host, id: ID, locale: "en" });
     try {
       if (action === "add") {
         host.mounted().emit("add-part", "1", "2");

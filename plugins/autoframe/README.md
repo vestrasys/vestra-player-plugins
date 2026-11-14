@@ -47,4 +47,4 @@ Detect Again says on the video why it did not crop.
 
 ## Requirements
 
-- Vestra Player 0.4.3 or later, with its FFmpeg (or `ffmpeg` and `ffprobe` on the `PATH`).
+- Vestra Player 0.9.0 or later, with its FFmpeg (or `ffmpeg` and `ffprobe` on the `PATH`).

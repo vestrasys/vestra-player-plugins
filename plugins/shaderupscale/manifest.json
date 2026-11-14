@@ -1,9 +1,8 @@
 {
   "id": "zysilm.shaderupscale",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "apiVersion": "vestra/1",
   "entry": "main.ts",
-  "capabilities": ["commands", "events", "playback.read", "processing.video", "ui.osd", "ui.window"],
   "name": "Shader Upscale for Vestra Player",
   "author": "zysilm",
   "punchline": "Real-time GPU upscaling with mpv GLSL shaders: Anime4K for anime; AMD FSR 1, RAVU and FSRCNNX for live action",
@@ -12,5 +11,5 @@
   "sourceUrl": "https://github.com/vestrasys/vestra-player-plugins/tree/main/plugins/shaderupscale",
   "license": "Apache-2.0",
   "icon": "assets/icon.png",
-  "minPlayerVersion": "0.6.3"
+  "minPlayerVersion": "0.9.0"
 }

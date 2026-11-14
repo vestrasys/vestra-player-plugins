@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1
+
+- Needs Vestra Player 0.9.0 or later (SDK 1.9.0): the manifest no longer lists `capabilities`; `activate` starts with `plugin.player.subscribe()` and `await plugin.player.read()`, which the declarations used to imply. Nothing else changes.
+
 ## 0.1.0
 
 - First release: when a local video's picture sits in a solid-colour border (any colour), Auto Frame finds the picture in eight sampled keyframes and crops the video to it with the player's crop, exactly to the pixel. The answer is cached per file (path, size and modification time).

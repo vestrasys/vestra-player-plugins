@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.4
+
+- Needs Vestra Player 0.9.0 or later (SDK 1.9.0): the manifest no longer lists `capabilities`; `activate` starts with `plugin.player.subscribe()` and `await plugin.player.read()`, which the declarations used to imply. Nothing else changes.
+
 ## 0.5.3
 
 - Corrected: needs Vestra Player 0.5.4 or later, not 0.5.2. The player keeps the rows on screen in place when the list grows or shrinks only from 0.5.4 (the change came after 0.5.3 was numbered, so some 0.5.3 builds have it and some do not). On an older player each new page rebuilt every row, losing a double-click in progress and the hover. Nothing else changes.

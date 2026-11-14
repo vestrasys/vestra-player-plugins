@@ -30,7 +30,7 @@ test('menu entries and window are registered; no file resolver, no drop provider
   assert.equal(host.resolvers.size, 0, 'only VestraNES loads .nes: Open File, a drop and the playlist do not');
   assert.equal(host.dropProviders.length, 0);
   const manifest = JSON.parse(await fs.readFile(new URL('../manifest.json', import.meta.url), 'utf8'));
-  assert.deepEqual(manifest.capabilities.sort(), ['commands', 'playback.control', 'playback.read', 'producer.av', 'ui.dialog', 'ui.window']);
+  assert.equal(manifest.capabilities, undefined, 'no declarations (SDK 1.9.0): activate reads the state once instead of playback.read');
   assert.equal(manifest.id, 'zysilm.vestranes');
   assert.equal(window().file, 'nes.slint');
   assert.deepEqual(window().props, { state: 'idle', rom: '', detail: '', running: false });

@@ -1311,7 +1311,7 @@ test("store listing: the id of the directory, the name, a 256×256 icon, the pla
   const manifest = JSON.parse(await readFile(new URL("manifest.json", directory), "utf8"));
   assert.equal(manifest.id, "zysilm.shaderupscale"); // <owner>.<directory>, as the repository requires
   assert.equal(manifest.name, "Shader Upscale for Vestra Player");
-  assert.equal(manifest.minPlayerVersion, "0.6.3"); // the shader channel (0.5.20), the Choice drop-down (0.6.0), the crash guard (0.6.3)
+  assert.equal(manifest.minPlayerVersion, "0.9.0"); // the shader channel (0.5.20), the Choice drop-down (0.6.0), the crash guard (0.6.3), no declarations (0.9.0)
   assert.equal(manifest.icon, "assets/icon.png");
   const png = await readFile(new URL(manifest.icon, directory));
   assert.equal(png.toString("latin1", 1, 4), "PNG");

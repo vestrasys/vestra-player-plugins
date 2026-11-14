@@ -50,7 +50,7 @@ Anime4K's six modes, exactly as its own mpv templates define them. Each runs up 
 
 ## Requirements
 
-- Vestra Player 0.6.3 or later (its crash guard for shaders, below).
+- Vestra Player 0.9.0 or later (its crash guard for shaders, below).
 - **GPU rendering only.** Shaders run only where the player draws the picture on the GPU: on macOS always, on Windows after **Video ▸ GPU Rendering (Experimental)** and a restart. The player's CPU (software) rendering cannot run shaders at all: with it (the Windows default, and Linux) the window greys the button out and says what to do.
 - A capable GPU for the presets marked **demanding** (Anime4K HQ and Ultra, modes A+A, B+B and C+A, and FSRCNNX x2 16): they cost several times what the others do. If playback stutters, choose a preset that is not marked demanding, FSR or RAVU.
 
