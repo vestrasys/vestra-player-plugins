@@ -191,6 +191,14 @@ One plugin at a time:
 npm run plugin -- check <name>   # also: test, build, pack
 ```
 
+CI also compiles your `.slint` files with Slint's compiler at the player's
+version, so a Slint error (an unknown property, a missing import) fails the
+pull request instead of the install in the player. `check` does the same
+locally once the compiler is installed (`npm i -D slint-ui@1.18.1` in your
+own project, or `npm i --no-save slint-ui@1.18.1` in this repository, after
+`npm ci`); without it, `check` prints one line and passes. It is optional
+for you, and never a dependency of a plugin.
+
 ## Open the pull request
 
 Title it `Add <id>` and fill in the checklist of the pull request template.

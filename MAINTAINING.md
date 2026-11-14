@@ -296,7 +296,19 @@ reusable workflow:
   `scripts/check-package.mjs` reads the `.vxp` and checks its manifest,
   files, size, and the license files of its dependencies. Ubuntu, Windows and macOS, each with
   Node 26 (the Node the player ships; the SDK's `engines` is `>=26`). Every
-  other job runs Node 26 too.
+  other job runs Node 26 too. Before the check, the job installs
+  [`slint-ui`](https://www.npmjs.com/package/slint-ui) at the player's
+  Slint version (`PLAYER_SLINT` in the SDK, read from the installed SDK;
+  1.18.1 now), so `vestra-plugin check` compiles every `.slint` file as the
+  player does at install and a Slint error (an unknown property, a missing
+  import) fails the pull request. The native compiler comes from a
+  per-platform package: Linux x64, Windows x64 and macOS on Apple silicon
+  (`macos-latest`); there is no Intel-Mac build. `slint-ui` is licensed
+  GPL-3.0, Slint's royalty-free licence or commercially; it is a CI-only
+  tool, installed `--no-save` in the job: it is in no `package.json` or
+  lockfile, never a dependency of a plugin, and never in a package, so the
+  license allowlist and dependency review never see it. Do not add it to
+  the root `devDependencies` (dependency review would refuse its license).
 - [`_index-dryrun.yml`](.github/workflows/_index-dryrun.yml): the publish
   flow end to end with a key generated in the job: `build-index.mjs` packs
   every plugin, `publish-releases.mjs --dry-run` checks the artifact as the
