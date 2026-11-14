@@ -1,0 +1,112 @@
+# Machine translation by the plugin's author (a language model), 2026-11-14; not reviewed.
+msgid ""
+msgstr ""
+"Language: zh-Hans\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#: main.ts:153
+#, x-machine
+msgid "Silence"
+msgstr "静音"
+
+#: main.ts:183
+#, x-machine
+msgid "Silence Skipper needs ffmpeg, which was not found"
+msgstr "静音跳过需要 ffmpeg，但未找到"
+
+#: main.ts:190
+#, x-machine
+msgid "Silence Skipper cannot read the sound of this file"
+msgstr "静音跳过无法读取此文件的声音"
+
+#: main.ts:245
+#, x-machine
+msgid "Silence skipped · {} saved"
+msgstr "已跳过静音 · 共节省 {}"
+
+#: main.ts:327
+#, x-machine
+msgid "Skip Silence"
+msgstr "跳过静音"
+
+#: main.ts:333
+#, x-machine
+msgid "Skip Silence: On"
+msgstr "跳过静音：开"
+
+#: main.ts:333
+#, x-machine
+msgid "Skip Silence: Off"
+msgstr "跳过静音：关"
+
+#: main.ts:341 manifest.json
+#, x-machine
+msgid "Silence Skipper"
+msgstr "静音跳过"
+
+#: manifest.json
+#, x-machine
+msgid "Skips the silent stretches of lectures and recordings while they play"
+msgstr "播放讲座和录音时自动跳过无声片段"
+
+#: manifest.json
+#, x-machine
+msgid "Silence Skipper jumps over the pauses in a video or audio file on this computer, like Trim Silence in podcast players: lectures, talks, screen recordings and interviews play without the dead air. Playback ▸ Skip Silence turns it on and off. While it is on, the player's FFmpeg reads the sound of the playing file two minutes at a time, starting where you are, and each silence that is long enough is skipped with a jump; the seek bar shows the silences it found, and a short note on the video says how much time skipping has saved. Options ▸ Playback ▸ Silence Skipper sets how quiet counts as silence and the shortest pause that is skipped. Speech is never sped up, and a pause at the very end of the file is kept."
+msgstr "静音跳过会跳过本机视频或音频文件中的停顿，就像播客应用里的“修剪静音”：讲座、演讲、录屏和访谈播放时不再有冷场。播放 ▸ 跳过静音 可开启或关闭。开启后，播放器的 FFmpeg 从当前位置起每次读取正在播放文件的两分钟声音，足够长的静音会被直接跳过；进度条上会标出找到的静音，视频上的简短提示会说明跳过已节省了多少时间。选项 ▸ 播放 ▸ 静音跳过 可设置多安静算作静音，以及跳过的最短停顿。语音从不加速，文件末尾的停顿会保留。"
+
+#: manifest.json
+#, x-machine
+msgid "playback"
+msgstr "播放"
+
+#: manifest.json
+#, x-machine
+msgid "audio"
+msgstr "音频"
+
+#: manifest.json
+#, x-machine
+msgid "silence"
+msgstr "静音"
+
+#: manifest.json
+#, x-machine
+msgid "lecture"
+msgstr "讲座"
+
+#: ui/settings.slint:48
+#, x-machine
+msgid "Skip silence while playing"
+msgstr "播放时跳过静音"
+
+#: ui/settings.slint:55
+#, x-machine
+msgid "Silence below"
+msgstr "静音低于"
+
+#: ui/settings.slint:56
+#, x-machine
+msgid "{} dB"
+msgstr "{} dB"
+
+#: ui/settings.slint:70 ui/settings.slint:92
+#, x-machine
+msgid "Default"
+msgstr "默认"
+
+#: ui/settings.slint:77
+#, x-machine
+msgid "Shortest silence"
+msgstr "最短静音"
+
+#: ui/settings.slint:78
+#, x-machine
+msgid "{} s"
+msgstr "{} 秒"
+
+#: ui/settings.slint:99
+#, x-machine
+msgid "Raise the level when room noise or music keeps pauses from being found; lower it when quiet speech is skipped."
+msgstr "房间噪音或背景音乐导致找不到停顿时，请调高电平；轻声说话被跳过时，请调低。"
