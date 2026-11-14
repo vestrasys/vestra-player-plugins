@@ -5,7 +5,9 @@ import { basename, join } from "node:path";
 import test from "node:test";
 import type { Locale } from "@vestra-player/sdk";
 import { HostError, startPlugin, TestHost } from "@vestra-player/sdk/testing";
-import { exportParts, lengthClock, listKey, moved, partsOf, partStates, partTicks, retryDelay } from "../collection.ts";
+import { AGAIN_MS, exportParts, lengthClock, listKey, moved, overlapping, partsOf, partStates, partTicks, rangeIn, retryDelay, sameRange } from "../collection.ts";
+import type { Part } from "../collection.ts";
+import { CUT } from "../transitions.ts";
 import activate from "../main.ts";
 import { clock, parseTime, REASON } from "../model.ts";
 import { dateOf } from "../names.ts";
@@ -138,7 +140,7 @@ test("add: only a local file with a valid range; the 101st part is refused", asy
     await said(host, REASON.addLocal);
     await host.command("clip.collection").run();
     await host.settle();
-    await eventually(() => tab(host)["add-from"], { can: false, name: "", duration: "01:00.000", length: "", next: 1, full: false }, "no title for a stream in the public API: no name, only why");
+    await eventually(() => tab(host)["add-from"], { can: false, name: "", duration: "01:00.000", length: "", next: 1, full: false, added: 0, overlaps: 0 }, "no title for a stream in the public API: no name, only why");
     play(host, "/media/one.mp4", 30);
     host.mounted().emit("add-part", "5", "1");
     await said(host, REASON.endBeforeStart);
@@ -185,7 +187,8 @@ test("reorder, select and Delete, remove: the list is renumbered, kept on disk, 
     // Delete removes the selected part while the list has the focus (a panel key).
     assert.deepEqual(host.command("clip.collectionRemove").declaration.bindings, ["Delete"]);
     assert.equal(host.command("clip.collectionRemove").declaration.focus, "panel");
-    assert.equal(host.command("clip.collectionRemove").state.enabled, false, "nothing selected");
+    // An add selects its part (design clipexport-collection A): the one added last.
+    await eventually(() => rows(host).filter((row) => row.selected).map((row) => row.id), [c], "the part added last is selected");
     await showCollection(host);
     host.mounted().emit("select-part", a);
     await eventually(() => rows(host).find((row) => row.id === a)?.selected, true);
@@ -195,6 +198,7 @@ test("reorder, select and Delete, remove: the list is renumbered, kept on disk, 
     assert.equal(host.command("clip.collectionRemove").state.enabled, false, "not on the Clip page");
     assert.equal(rows(host).length, 3);
     host.mounted().emit("set-page", 0);
+    await eventually(() => host.command("clip.collectionRemove").state.enabled, false, "nothing selected");
     host.mounted().emit("select-part", a);
     await until(() => host.command("clip.collectionRemove").state.enabled, "Delete enabled with a selection on the page");
     await host.command("clip.collectionRemove").run();
@@ -776,5 +780,363 @@ test("Export Clip with a range and an empty Collection: enabled and the highligh
     assert.match(slint, /@tr\("\{\} parts", ClipBridge\.collection-info\.count\);[^}]*font-weight: 700;/);
   } finally {
     await stop();
+  }
+});
+
+// ---------------------------------------------------------------- is this range in the Collection? (design clipexport-collection, option A)
+
+type AddFrom = { can: boolean; name: string; length: string; next: number; full: boolean; added: number; overlaps: number };
+const addFrom = (host: TestHost) => tab(host)["add-from"] as AddFrom;
+/** + Add's state: the part the Range is (0 none) and the first part it overlaps (0 none). */
+const where = (host: TestHost) => [addFrom(host)?.added, addFrom(host)?.overlaps];
+const reveal = (host: TestHost) => tab(host).reveal as { serial: number; row: number };
+const selectedIds = (host: TestHost) => rows(host).filter((row) => row.selected).map((row) => row.id);
+/** Type a range into Start and End (the tab sends what it shows). */
+const typeRange = (host: TestHost, from: string, to: string) => host.mounted().emit("clip-edited", from, to);
+const ALREADY = (n: number) => `Already in the Collection as part ${n}`;
+/** A message shown since the OSD held `from` messages (one said before does not count). */
+const saidSince = (host: TestHost, from: number, text: string) => until(() => host.osd.slice(from).includes(text), `"${text}" on screen again`);
+
+test("match helpers: the same range is the same file (its token, else its name) and the same times to the millisecond, the end clamped as an add clamps it; an overlap is more than 1 ms of the same file", () => {
+  const part = (fields: Partial<Part> = {}): Part => ({ id: "p1", token: "t1", name: "a.mp4", start: 10, end: 20, thumb: "", transition: { ...CUT }, ...fields });
+  const byToken = { token: "t1", name: "a.mp4" };
+  assert.equal(sameRange(part(), byToken, 10, 20), true);
+  assert.equal(sameRange(part(), byToken, 10.0004, 19.9996), true, "within the millisecond the fields show");
+  assert.equal(sameRange(part(), byToken, 10.001, 20), false, "+1 ms");
+  assert.equal(sameRange(part(), byToken, 10, 19.999), false, "−1 ms");
+  assert.equal(sameRange(part(), byToken, 10, 20.0004, 20), true, "the end clamped to the file's duration");
+  assert.equal(sameRange(part({ end: 19.5 }), byToken, 10, 20, 19.5), true, "an end past the file is its duration, as the add stores it");
+  assert.equal(sameRange(part(), byToken, 10, 20, 0), true, "no duration: no clamp");
+  assert.equal(sameRange(part(), { token: "t2", name: "a.mp4" }, 10, 20), false, "same name, another token: another file");
+  assert.equal(sameRange(part(), { token: null, name: "a.mp4" }, 10, 20), true, "token unknown: by name");
+  assert.equal(sameRange(part(), { token: null, name: "b.mp4" }, 10, 20), false, "another name");
+  assert.equal(sameRange(part(), { token: null, name: "" }, 10, 20), false, "no file");
+  // Overlap: the same file, more than 1 ms in common, not the same range.
+  assert.equal(overlapping(part(), byToken, 12, 15), true, "contained in the part");
+  assert.equal(overlapping(part(), byToken, 5, 25), true, "containing the part");
+  assert.equal(overlapping(part(), byToken, 15, 25), true, "partly");
+  assert.equal(overlapping(part(), byToken, 20, 30), false, "adjacent is no overlap");
+  assert.equal(overlapping(part(), byToken, 19.999, 30), false, "1 ms is no overlap");
+  assert.equal(overlapping(part(), byToken, 19.998, 30), true, "2 ms");
+  assert.equal(overlapping(part(), byToken, 10, 20), false, "the same range is no overlap");
+  assert.equal(overlapping(part(), { token: "t2", name: "a.mp4" }, 12, 15), false, "another file");
+  assert.equal(overlapping(part(), { token: null, name: "a.mp4" }, 12, 15), true, "by name while the token is unknown");
+  // The part numbers (from 1): the first match; an overlap only when the range is no part.
+  const parts = [part(), part({ id: "p2", start: 15, end: 25 }), part({ id: "p3" }), part({ id: "p4", token: "t2", start: 0, end: 100 })];
+  assert.deepEqual(rangeIn(parts, byToken, 10, 20), { added: 1, overlaps: 0 }, "the first of two");
+  assert.deepEqual(rangeIn(parts, byToken, 12, 14), { added: 0, overlaps: 1 });
+  assert.deepEqual(rangeIn(parts, byToken, 21, 24), { added: 0, overlaps: 2 });
+  assert.deepEqual(rangeIn(parts, byToken, 30, 40), { added: 0, overlaps: 0 }, "part 4 is another file");
+  assert.deepEqual(rangeIn([], byToken, 10, 20), { added: 0, overlaps: 0 });
+  assert.equal(AGAIN_MS, 10_000, "Add Again is offered for 10 s");
+});
+
+test("Added: while the Range is a part + Add reads Added (worked out on every pass): a millisecond, another file, Remove, Clear and Undo, a reorder and a restart change it at once; an overlap is only said", async () => {
+  const data = await mkdtemp(join(tmpdir(), "clipexport-data-"));
+  const host = new TestHost();
+  play(host, "/media/one.mp4");
+  const { stop } = await start(host, "en", data);
+  try {
+    await showCollection(host);
+    typeRange(host, "1", "4");
+    await eventually(() => where(host), [0, 0], "an empty Collection");
+    await add(host, "1", "4");
+    await eventually(() => where(host), [1, 0], "the Range is part 1");
+    typeRange(host, "1.001", "4");
+    await eventually(() => where(host), [0, 1], "a millisecond later: + Add, overlapping part 1");
+    typeRange(host, "4", "6");
+    await eventually(() => where(host), [0, 0], "adjacent: no overlap");
+    await add(host, "4", "6");
+    await eventually(() => where(host), [2, 0]);
+    typeRange(host, "1", "4");
+    await eventually(() => where(host), [1, 0]);
+    // A reorder: the number follows the part.
+    host.mounted().emit("move-part", rows(host)[0]!.id, 1);
+    await eventually(() => where(host), [2, 0], "part 1 is now part 2");
+    // Another file: its own marks (none); the same times there are another file's.
+    play(host, "/media/two.mp4");
+    await eventually(() => where(host), [0, 0]);
+    typeRange(host, "1", "4");
+    await host.settle();
+    await eventually(() => where(host), [0, 0], "two.mp4 has no part");
+    // Back to one.mp4 (a new source): its marks were cleared; typed again, it is part 2 (by name until its token is known).
+    play(host, "/media/one.mp4");
+    typeRange(host, "1", "4");
+    await eventually(() => where(host), [2, 0]);
+    // Remove: + Add at once.
+    const id = rows(host)[1]!.id;
+    host.mounted().emit("remove-part", id);
+    await eventually(() => where(host), [0, 0], "removed");
+    await add(host, "1", "4");
+    await eventually(() => where(host), [2, 0]);
+    // Clear, then Undo: Added, Add, Added.
+    host.mounted().emit("clear-parts");
+    await eventually(() => where(host), [0, 0], "cleared");
+    await until(() => host.osd.at(-1) === "Collection cleared.", "the message");
+    await host.pressOsdAction(0);
+    await eventually(() => where(host), [2, 0], "Undo");
+  } finally {
+    await stop();
+  }
+  // A restart: the parts are kept, the token of the file playing is not known yet: by name.
+  const again = new TestHost();
+  play(again, "/media/one.mp4");
+  const second = await start(again, "en", data);
+  try {
+    await showCollection(again);
+    await eventually(() => rows(again).length, 2);
+    typeRange(again, "1", "4");
+    await eventually(() => where(again), [2, 0], "after a restart");
+    assert.equal(again.sent("media.sources.remember").length, 0, "nothing remembered to draw the button");
+  } finally {
+    await second.stop();
+    await rm(data, { recursive: true, force: true });
+  }
+});
+
+test("an add from the tab selects the new part and brings it into view; a click on Added adds nothing, shows that part and offers Add Again, which adds the duplicate as the last part", async () => {
+  const host = new TestHost();
+  play(host, "/media/one.mp4");
+  const { stop } = await start(host);
+  try {
+    await showCollection(host);
+    await add(host, "1", "4");
+    await eventually(() => reveal(host), { serial: 1, row: 0 });
+    await add(host, "5", "6");
+    await eventually(() => selectedIds(host), [rows(host)[1]!.id], "the new part is selected");
+    await eventually(() => reveal(host), { serial: 2, row: 1 }, "and scrolled into view");
+    assert.equal(host.osd.some((line) => line.startsWith("Added")), false, "a button press needs no message: the row is there");
+    // The Range is part 1 (Added): a click shows it.
+    typeRange(host, "1", "4");
+    await eventually(() => where(host), [1, 0]);
+    host.mounted().emit("add-part", "1", "4");
+    await said(host, ALREADY(1));
+    assert.deepEqual(host.osdActions.at(-1), [{ title: "Add Again", command: "clip.collectionAddAgain" }]);
+    assert.equal(rows(host).length, 2, "nothing added");
+    await eventually(() => selectedIds(host), [rows(host)[0]!.id], "part 1 selected");
+    await eventually(() => reveal(host), { serial: 3, row: 0 }, "and scrolled into view");
+    assert.equal(host.command("clip.collectionAddAgain").state.enabled, true, "offered");
+    assert.equal(host.sourceReferences.size, 1, "one file reference");
+    // Add Again: the duplicate as the last part.
+    await host.pressOsdAction(0);
+    await eventually(() => rows(host).map((row) => row.range), [`${clock(1)} – ${clock(4)}`, `${clock(5)} – ${clock(6)}`, `${clock(1)} – ${clock(4)}`]);
+    await until(() => host.osd.at(-1) === "Added as part 3", "said from the message");
+    await eventually(() => selectedIds(host), [rows(host)[2]!.id]);
+    assert.equal(host.command("clip.collectionAddAgain").state.enabled, false, "offered once");
+    await eventually(() => where(host), [1, 0], "the first of the two");
+    // Offered for the file it was refused on: another file playing by then adds nothing.
+    const shownBefore = host.osd.length;
+    host.mounted().emit("add-part", "1", "4");
+    await saidSince(host, shownBefore, ALREADY(1));
+    assert.equal(host.command("clip.collectionAddAgain").state.enabled, true);
+    play(host, "/media/two.mp4");
+    await host.settle();
+    await host.command("clip.collectionAddAgain").run();
+    await said(host, REASON.changed);
+    assert.equal(rows(host).length, 3);
+  } finally {
+    await stop();
+  }
+});
+
+test("Add Range to Collection (a key, the palette): a new range says Added as part N and selects it; the same range adds nothing and says so with Add Again (the palette runs it too)", async () => {
+  const host = new TestHost();
+  play(host, "/media/one.mp4");
+  const { stop } = await start(host);
+  try {
+    await showCollection(host);
+    typeRange(host, "1", "4");
+    await host.settle();
+    await host.command("clip.collectionAdd").run();
+    await said(host, "Added as part 1");
+    await eventually(() => selectedIds(host), [rows(host)[0]!.id]);
+    await eventually(() => reveal(host).row, 0);
+    const serial = reveal(host).serial;
+    await host.command("clip.collectionAdd").run();
+    await said(host, ALREADY(1));
+    assert.deepEqual(host.osdActions.at(-1), [{ title: "Add Again", command: "clip.collectionAddAgain" }]);
+    assert.equal(rows(host).length, 1, "nothing added");
+    await eventually(() => reveal(host), { serial: serial + 1, row: 0 }, "shown");
+    await host.command("clip.collectionAddAgain").run();
+    await eventually(() => rows(host).length, 2, "Add Again from the palette");
+    await said(host, "Added as part 2");
+    await assert.rejects(host.command("clip.collectionAddAgain").run(), "no longer offered");
+  } finally {
+    await stop();
+  }
+});
+
+test("a file of the same name in another folder: + Add may read Added until the token is known; the click adds (no message), and from then on the state is exact", async () => {
+  const host = new TestHost();
+  play(host, "/media/a/clip.mp4");
+  const { stop } = await start(host);
+  try {
+    await showCollection(host);
+    await add(host, "1", "4");
+    play(host, "/media/b/clip.mp4");
+    typeRange(host, "1", "4");
+    await eventually(() => where(host), [1, 0], "by name: it looks like part 1");
+    const said = host.osd.length;
+    await add(host, "1", "4");
+    assert.equal(host.osd.slice(said).some((line) => line.startsWith("Already")), false, "another file: added, no message");
+    await eventually(() => where(host), [2, 0], "exact now: this file's part is part 2");
+    assert.equal(host.sourceReferences.size, 2);
+    // A double-click on part 1 plays its file: its token is known, the Range is part 1.
+    host.mounted().emit("preview-part", rows(host)[0]!.id);
+    await until(() => host.sourceOpens.length === 1, "the open");
+    await eventually(() => where(host), [1, 0]);
+  } finally {
+    await stop();
+  }
+});
+
+test("a full Collection: the same range still reads Added and a click shows it; a new range is refused before anything is remembered; a same-name file's new reference is let go", async () => {
+  const host = new TestHost();
+  play(host, "/media/one.mp4", 300);
+  const { stop } = await start(host);
+  try {
+    await showCollection(host);
+    for (let i = 0; i < 100; i++) {
+      host.mounted().emit("add-part", String(i), String(i + 1));
+      await until(() => rows(host).length === i + 1, `part ${i + 1}`);
+    }
+    typeRange(host, "5", "6");
+    await eventually(() => [addFrom(host).full, ...where(host)], [true, 6, 0], "full, and the Range is part 6");
+    const remembered = host.sent("media.sources.remember").length;
+    host.mounted().emit("add-part", "5", "6");
+    await said(host, ALREADY(6));
+    await eventually(() => reveal(host).row, 5, "part 6 shown");
+    assert.equal(rows(host).length, 100);
+    assert.equal(host.sourceReferences.size, 1);
+    typeRange(host, "200", "201");
+    await eventually(() => where(host), [0, 0]);
+    const before = host.sent("media.sources.remember").length;
+    host.mounted().emit("add-part", "200", "201");
+    await said(host, REASON.collectionFull);
+    assert.equal(host.sent("media.sources.remember").length, before, "refused before anything is remembered");
+    assert.ok(before >= remembered);
+    // Another folder, the same name: it looks like part 6; the click finds another file, which is not kept.
+    play(host, "/media/other/one.mp4", 300);
+    typeRange(host, "5", "6");
+    await eventually(() => where(host), [6, 0]);
+    const shownBefore = host.osd.length;
+    host.mounted().emit("add-part", "5", "6");
+    await saidSince(host, shownBefore, REASON.collectionFull);
+    await until(() => host.sourceReferences.size === 1, "the other file's reference let go");
+    assert.equal(rows(host).length, 100);
+  } finally {
+    await stop();
+  }
+});
+
+/**
+ * Slint 1.18.1's ListView layout (i-slint-core, model/repeater.rs `update_visible_instances`), as far as a scroll
+ * position matters: rows not built are placed by one row height (the average of those built last), and a position
+ * more than a screen away rebuilds the rows from the row it falls in, at the top of the view (the pixels into that
+ * row are dropped). The test host lays nothing out; this stands in for the list when a part is revealed.
+ */
+function listView(count: number, view: number, heightOf: (row: number) => number) {
+  const state = { offset: 0, built: 0, anchor: 0, cached: 0, previous: 0 };
+  let contentY = 0;
+  let top = 0; // where the first built row is drawn
+  function layout() {
+    const y0 = Math.min(contentY, 0);
+    let each = state.cached;
+    if (!(each > 0)) {
+      if (!state.built) state.built = 1;
+      each = Array.from({ length: state.built }, (_, i) => heightOf(state.offset + i)).reduce((a, b) => a + b, 0) / state.built;
+    }
+    let first: number, at: number;
+    if (state.anchor > -y0 + view * 1.5 || state.anchor + each * state.built + each < -y0) {
+      state.built = 0;
+      first = state.offset = Math.min(Math.floor(-y0 / each), count - 1);
+      at = 0;
+    } else if (y0 < state.previous) {
+      at = state.anchor + y0;
+      first = state.offset;
+      for (let i = 0; i < state.built; i++) {
+        const h = heightOf(first);
+        if (at + h > 0 || first + 1 >= count) break;
+        at += h;
+        first++;
+      }
+    } else {
+      first = state.offset;
+      at = state.anchor + y0;
+    }
+    while (first > 0 && at > 0) at -= heightOf(--first);
+    let y = at, next = first;
+    while (next < count && y < view) y += heightOf(next++);
+    state.offset = first;
+    state.built = next - first;
+    state.cached = (y - at) / state.built;
+    state.anchor = state.cached * first;
+    state.previous = contentY = -state.anchor + at;
+    top = at;
+  }
+  layout();
+  return {
+    get contentY() {
+      return contentY;
+    },
+    /** A write of `content-y` (the tab's, or the user's scroll), then the next layout. */
+    scroll(y: number) {
+      contentY = y;
+      layout();
+    },
+    /** Where row `row` is drawn (its top in the view), null when it is not built. */
+    topOf(row: number) {
+      if (row < state.offset || row >= state.offset + state.built) return null;
+      let y = top;
+      for (let i = state.offset; i < row; i++) y += heightOf(i);
+      return y;
+    },
+  };
+}
+
+test("revealing a part: the list scrolls to the top of a row (rows of one height), so the part is whole in view from anywhere; the first version's position between rows left the last part below the view", async () => {
+  const slint = await readFile(new URL("../ui/tab.slint", import.meta.url), "utf8");
+  // What the tab does (ui/tab.slint `reveal-part`), mirrored below: a part above the view goes to the top, one below it becomes the last row whose part fits.
+  const reveal = /function reveal-part\(\) \{([\s\S]*?)\n    \}/.exec(slint)?.[1] ?? "";
+  assert.match(reveal, /if ClipBridge\.reveal\.row \* 63px < -parts-list\.content-y \{\s*parts-list\.content-y = -ClipBridge\.reveal\.row \* 63px;/);
+  assert.match(reveal, /\} else if ClipBridge\.reveal\.row \* 63px \+ 46px > -parts-list\.content-y \+ parts-list\.visible-height \{\s*parts-list\.content-y = -max\(0, ClipBridge\.reveal\.row - floor\(max\(0px, parts-list\.visible-height - 46px\) \/ 63px\)\) \* 63px;/);
+  assert.equal(slint.split("parts-list.content-y =").length - 1, 2, "nowhere else");
+  assert.match(slint, /changed reveal-request => \{ root\.reveal-part\(\); \}/, "at once: no timer");
+  assert.doesNotMatch(slint.slice(slint.indexOf("export component ClipExportTab")), /Timer \{/);
+  // Every row of the list is 63 px, the last one too: only then is `content-y` a real position.
+  const item = slint.slice(slint.indexOf("component PartItem inherits Rectangle")).split("\ncomponent ")[0]!;
+  assert.match(item, /\n    height: 63px;/);
+  assert.doesNotMatch(item, /\n    height: root\.entry\.join/);
+  const ROW = 63, PART = 46;
+  const target = (row: number, y: number, view: number) =>
+    row * ROW < -y ? -row * ROW : row * ROW + PART > -y + view ? -Math.max(0, row - Math.floor(Math.max(0, view - PART) / ROW)) * ROW : y;
+  const whole = (list: ReturnType<typeof listView>, row: number, view: number) => {
+    const y = list.topOf(row);
+    return y !== null && y >= -1e-6 && y + PART <= view + 1e-6;
+  };
+  // The defect seen on screen (0.7.1 as first built): 14 parts, the last row 46 px, the list at the top, a view of
+  // 245 px; the write `visible-height − row × 63 − 46` shows parts 10–13 and leaves part 14 below the view.
+  const old = listView(14, 245, (row) => (row < 13 ? ROW : PART));
+  old.scroll(Math.min(0, 245 - 13 * ROW - PART));
+  assert.deepEqual([old.topOf(9), old.topOf(13)], [0, null], "the model shows the defect: part 10 at the top, part 14 not in view");
+  // Now: the same case, and every list length, view height, starting position and part.
+  const now = listView(14, 245, () => ROW);
+  now.scroll(target(13, now.contentY, 245));
+  assert.deepEqual([now.topOf(10), now.topOf(13)], [0, 189], "parts 11–14, part 14 whole");
+  for (const view of [191, 245, 300, 437, 800]) {
+    for (const count of [1, 2, 3, 4, 5, 14, 15, 37, 100]) {
+      const end = Math.max(0, count * ROW - view);
+      for (const start of [0, 17, ROW, end / 2, end - 30, end]) {
+        for (let row = 0; row < count; row++) {
+          const list = listView(count, view, () => ROW);
+          list.scroll(-Math.max(0, start));
+          const before = list.contentY;
+          const shown = whole(list, row, view);
+          list.scroll(target(row, list.contentY, view));
+          assert.ok(whole(list, row, view), `part ${row + 1} of ${count} whole in a ${view} px list scrolled to ${start}`);
+          if (shown) assert.equal(list.contentY, before, `part ${row + 1} of ${count} was in view: the list does not move`);
+        }
+      }
+    }
   }
 });

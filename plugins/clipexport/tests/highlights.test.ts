@@ -1021,3 +1021,80 @@ test("with a real ffmpeg: a row's picture is a small JPEG of the first keyframe 
     await rm(folder, { recursive: true, force: true });
   }
 });
+
+test("a suggestion already in the Collection (its range added from the Clip page): the Clip page reads Added; + and Enter add nothing, it leaves the list as added with Add Again on the message; Add All adds the others and counts those already in", async () => {
+  const setup = await withMedia(3000);
+  const host = new TestHost();
+  fakeFfmpeg(host, many);
+  setup.play(host);
+  const { stop } = await startIn(host, setup.data);
+  const parts = () => (tab(host).parts ?? []) as { range: string }[];
+  const added = () => (tab(host)["add-from"] as { added: number }).added;
+  const selected = () => rows(host).find((row) => row.selected)?.id ?? "";
+  /** Select a suggestion (it becomes the Range), then + Add of the Clip page with the Range it shows. */
+  async function addFromClipPage(id: string) {
+    host.mounted().emit("select-highlight", id);
+    await eventually(selected, id);
+    // The jump to its start is done: the add asks about the file as it is then.
+    await host.settle();
+    const count = parts().length;
+    host.mounted().emit("add-part", String(tab(host)["clip-start"]), String(tab(host)["clip-end"]));
+    await until(() => parts().length === count + 1, `part ${count + 1}`);
+  }
+  try {
+    await showHighlights(host);
+    await eventually(() => page(host).state, "ready");
+    host.mounted().emit("set-highlight-count", 0);
+    host.mounted().emit("find-highlights");
+    await eventually(() => page(host).state, "done");
+    await eventually(() => rows(host).length, 5);
+    const ids = rows(host).map((row) => row.id);
+    await addFromClipPage(ids[0]!);
+    await eventually(added, 1, "the selected suggestion is part 1: the Clip page reads Added");
+    // + on it: nothing added; it leaves the list (it is in the Collection); the message offers Add Again.
+    host.mounted().emit("add-highlight", ids[0]);
+    await until(() => host.osd.includes("Already in the Collection as part 1"), "said");
+    assert.deepEqual(host.osdActions.at(-1), [{ title: "Add Again", command: "clip.collectionAddAgain" }]);
+    await eventually(() => rows(host).map((row) => row.id), ids.slice(1), "it left the list");
+    assert.equal(parts().length, 1, "nothing added");
+    await host.pressOsdAction(0);
+    await eventually(() => parts().length, 2, "Add Again");
+    assert.equal(parts()[1]!.range, parts()[0]!.range);
+    // Enter on a selected suggestion that is a part: nothing added, the next one is selected (as after an add).
+    await addFromClipPage(ids[1]!);
+    await eventually(selected, ids[1]);
+    await host.press("Enter", { panel: true });
+    await until(() => host.osd.includes("Already in the Collection as part 3"), "said for Enter");
+    await eventually(() => rows(host).map((row) => row.id), ids.slice(2));
+    await eventually(selected, ids[2]);
+    assert.equal(parts().length, 3);
+    // Add All with one suggestion left, in the Collection already: a batch all the same, said without Add Again.
+    host.mounted().emit("dismiss-highlight", ids[2]);
+    host.mounted().emit("dismiss-highlight", ids[4]);
+    await eventually(() => rows(host).map((row) => row.id), [ids[3]]);
+    await addFromClipPage(ids[3]!);
+    host.mounted().emit("add-all-highlights");
+    await until(() => host.osd.includes("Already in the Collection as part 4"), "said for Add All");
+    assert.deepEqual(host.osdActions.at(-1), [], "no Add Again for a batch, also of one");
+    await eventually(() => rows(host).length, 0, "it leaves the list");
+    assert.equal(parts().length, 4);
+    // Add All with two of three in the Collection already: the third is added, the two are counted.
+    host.mounted().emit("restore-highlights");
+    await eventually(() => rows(host).map((row) => row.id), [ids[2], ids[4]]);
+    await addFromClipPage(ids[2]!);
+    await addFromClipPage(ids[4]!);
+    host.mounted().emit("set-highlight-count", 1);
+    await eventually(() => rows(host).length, 7, "ten picked, three handled");
+    const fresh = rows(host).map((row) => row.id).filter((id) => !ids.includes(id));
+    await addFromClipPage(fresh[0]!);
+    host.mounted().emit("add-all-highlights");
+    await until(() => host.osd.includes("3 were already in the Collection"), "counted");
+    assert.deepEqual(host.osdActions.at(-1), [], "no Add Again for a batch");
+    await eventually(() => parts().length, 7 + 4, "the four not in yet");
+    await eventually(() => rows(host).length, 0, "all seven leave the list");
+    assert.equal(new Set([...host.sourceReferences.values()].map((ref) => ref.path)).size, 1, "one file reference");
+  } finally {
+    await stop();
+    await setup.cleanup();
+  }
+});

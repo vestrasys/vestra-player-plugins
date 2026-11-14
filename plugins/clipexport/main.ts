@@ -7,8 +7,8 @@ import {
 } from "./clip.ts";
 import type { Animated, Encode, Method, Output } from "./clip.ts";
 import { ANIMATED, encoderProbe, extensionOf, MAX_ANIMATED_SECONDS } from "./animated.ts";
-import { blockingNote, Collection, copyNote, exportParts, lengthClock, listKey, partStates, partTicks, retryDelay, targetNote, totalLength, UNDO_MS } from "./collection.ts";
-import type { Part } from "./collection.ts";
+import { AGAIN_MS, blockingNote, Collection, copyNote, exportParts, lengthClock, listKey, partStates, partTicks, rangeIn, retryDelay, targetNote, totalLength, UNDO_MS } from "./collection.ts";
+import type { FileKey, Part } from "./collection.ts";
 import { finisher, inflightStore, sweepWork } from "./finish.ts";
 import {
   analyse, audioStreamArgs, audioStreamCount, averageOf, bandAt, bandsPath, COUNTS, curveOf, curvePath, HighlightStore, nextAfter, pick, RATE, scanLoudness, scanSounds, short, shortTerm, stepFrom, thumbName,
@@ -68,6 +68,7 @@ const TITLE = {
   "clip.collectionUndo": "Undo Clear Collection",
   "clip.collectionRemove": "Remove from Collection",
   "clip.collectionUndoApply": "Undo Apply to All",
+  "clip.collectionAddAgain": "Add Range Again",
   "clip.highlights": "Find Highlights",
   "clip.highlightAdd": "Add Highlight to Collection",
   "clip.highlightDismiss": "Dismiss Highlight",
@@ -161,9 +162,13 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
    * `picker`: the part whose junction's picker is open ("" closed); `pickerSerial`: counts the opens (the tab shows the
    * popup on a new one, so the popup only ever shows a picker the plugin opened); `switched`: a transition picked in
    * Fast switched the method to Precise (the footer says so until the user picks a method); `listFocus`: counts
-   * Show Collection (the tab focuses the list and scrolls it into view).
+   * Show Collection (the tab focuses the list and scrolls it into view); `reveal`: a part to bring into view, the list's
+   * row `row` (the tab scrolls to it when `serial` changes: an add from the tab or a key, a click on Added).
    */
-  const ui = { clipBusy: false, clipStatus: status(), resultsStatus: status(), adding: false, collectionBusy: false, picker: "", pickerSerial: 0, switched: false, listFocus: 0 };
+  const ui = {
+    clipBusy: false, clipStatus: status(), resultsStatus: status(), adding: false, collectionBusy: false, picker: "", pickerSerial: 0, switched: false, listFocus: 0,
+    reveal: { serial: 0, row: -1 },
+  };
   const collection = new Collection(plugin);
   let partFolder: string | null = null;
   try {
@@ -656,6 +661,12 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
    * again inside the queue, right before it asks.
    */
   let sourceQueue: Promise<unknown> = Promise.resolve();
+  /**
+   * The token of each source played this session (`PlayerState.sourceId`), once the plugin has one: from an add
+   * (`remember`) or a double-click on a part (`open`). Never asked for just to draw the page (`remember` writes a
+   * reference into the profile): until it is known, whether a range is a part is judged by the file's name.
+   */
+  const tokenBySource = new Map<number, string>();
   function serial<T>(run: () => Promise<T>): Promise<T> {
     const next = sourceQueue.then(run, run);
     sourceQueue = next.catch(() => {});
@@ -744,6 +755,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
         serial(async () => {
           if (usedTokens().has(token)) return;
           await plugin.media.sources.forget(token).catch((error) => console.error(`[clipexport] forget: ${message(error)}`));
+          // A forgotten file gets a new token when it is remembered again.
+          for (const [source, known] of tokenBySource) if (known === token) tokenBySource.delete(source);
         }),
       ),
     );
@@ -841,23 +854,94 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       if (!clippable(seen)) throw new Failure(tabMode(seen) === "local" ? "needDuration" : "addLocal");
       const range = parseRange(form.start, form.end);
       if (range.end > seen.duration! + 0.0005) throw new Failure("outOfRange");
-      if (collection.full()) throw new Failure("collectionFull");
-      // In the token queue: no forget can come between the token and the part that uses it.
-      const part = await serial(async () => {
-        const file = await plugin.media.sources.remember({ ifCurrent: seen }).catch((error) => {
-          throw sourceError(error);
-        });
-        // The player's own name: the file as the token stands for it.
-        // The part before it joins it with the default for new parts: Cut, until Apply to All sets another (Q3 a).
-        return collection.add({ token: file.token, name: file.name, start: range.start, end: Math.min(range.end, file.duration || range.end) }, settings.newTransition);
-      });
-      if (say) shown(osd.show("Added as part {}", [collection.parts.length]));
-      plugin.update();
-      void recheck();
-      void partThumbnail(part, seen);
-      void partBitrate(part, seen.source);
+      await addRange(seen, range, say, false);
     } catch (error) {
       // The Collection has no status line (its red line is for what blocks the export): the message says it.
+      sayProblem(problemOf(error));
+    } finally {
+      ui.adding = false;
+    }
+  }
+  /** The file playing as the page knows it without asking the player: its token once known, else its name. */
+  const fileKey = (state: PlayerState): FileKey => ({ token: tokenBySource.get(state.sourceId) ?? null, name: isLocal(state.source) ? basename(state.source) : "" });
+  /**
+   * Add `range` of the file playing (`seen`) as the last part, and show it in the list. A range that is a part already
+   * (the same file, by its token) is not added again unless `again` (Add Again): that part is shown instead, and the
+   * message offers Add Again (design clipexport-collection, option A).
+   */
+  async function addRange(seen: PlayerState, range: { start: number; end: number }, say: boolean, again: boolean) {
+    // Full: only a range that looks like a part already goes on (to be shown); for the rest no reference is asked for.
+    if (collection.full() && (again || !rangeIn(collection.parts, fileKey(seen), range.start, range.end, seen.duration).added)) throw new Failure("collectionFull");
+    // In the token queue: no forget can come between the token and the part that uses it.
+    const { token, part, existing } = await serial(async () => {
+      const file = await plugin.media.sources.remember({ ifCurrent: seen }).catch((error) => {
+        throw sourceError(error);
+      });
+      tokenBySource.set(seen.sourceId, file.token);
+      // The token decides: a file of the same name in another folder is another file.
+      const { added } = again ? { added: 0 } : rangeIn(collection.parts, { token: file.token, name: file.name }, range.start, range.end, file.duration);
+      if (added) return { token: file.token, part: null, existing: collection.parts[added - 1]! };
+      if (collection.full()) return { token: file.token, part: null, existing: null };
+      // The player's own name: the file as the token stands for it.
+      // The part before it joins it with the default for new parts: Cut, until Apply to All sets another (Q3 a).
+      const made = collection.add({ token: file.token, name: file.name, start: range.start, end: Math.min(range.end, file.duration || range.end) }, settings.newTransition);
+      return { token: file.token, part: made, existing: null };
+    });
+    if (!part) {
+      // A file no part names keeps no reference.
+      void forgetUnused([token]);
+      if (!existing) throw new Failure("collectionFull");
+      revealPart(existing.id);
+      offerAgain(seen.sourceId, range, collection.indexOf(existing.id) + 1);
+      plugin.update();
+      return;
+    }
+    revealPart(part.id);
+    if (say) shown(osd.show("Added as part {}", [collection.parts.length]));
+    plugin.update();
+    void recheck();
+    void partThumbnail(part, seen);
+    void partBitrate(part, seen.source);
+  }
+  /** Select a part and bring its row into view (the list scrolls to it, the page to the list where it is out of view). */
+  function revealPart(id: string) {
+    const row = collection.indexOf(id);
+    if (row < 0) return;
+    selected = id;
+    ui.reveal = { serial: ui.reveal.serial + 1, row };
+  }
+  /** Add Again: the range a key, a click or a suggestion did not add again, while the message offers it. */
+  let offered: { sourceId: number; range: { start: number; end: number }; timer: ReturnType<typeof setTimeout> } | null = null;
+  plugin.onDispose(() => void (offered && clearTimeout(offered.timer)));
+  /** "Already in the Collection as part N" with Add Again (an OSD button runs a command, as Undo does). */
+  function offerAgain(sourceId: number, range: { start: number; end: number }, number: number) {
+    expireAgain();
+    const timer = setTimeout(expireAgain, AGAIN_MS);
+    timer.unref?.();
+    offered = { sourceId, range: { start: range.start, end: range.end }, timer };
+    // TRANSLATORS: the button of "Already in the Collection as part N": it adds the range once more, as the last part.
+    const actions = [{ title: text("Add Again"), command: "clip.collectionAddAgain" }];
+    // TRANSLATORS: {} is the number of the part in the Collection that is this range (it was not added again).
+    shown(osd.show("Already in the Collection as part {}", [number], { actions }));
+  }
+  function expireAgain() {
+    if (!offered) return;
+    clearTimeout(offered.timer);
+    offered = null;
+    plugin.update();
+  }
+  /** Add Again (the message's button, or the palette while it is offered): the duplicate as the last part. */
+  async function addAgain() {
+    const offer = offered;
+    if (!offer || ui.adding) return;
+    expireAgain();
+    ui.adding = true; // exclusion before the first await
+    try {
+      const seen = await player.refresh();
+      // The range is of the file it was offered for: another file playing now is not that file.
+      if (seen.sourceId !== offer.sourceId || !clippable(seen)) throw new Failure("changed");
+      await addRange(seen, offer.range, true, true);
+    } catch (error) {
       sayProblem(problemOf(error));
     } finally {
       ui.adding = false;
@@ -930,7 +1014,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       throw sourceError(error, "cannotRead");
     }
     // The part's file is the source now: its marks are the part (read the new source first, so they are not cleared as stale).
-    await player.refresh();
+    // Its token is the part's: whether the Range is a part is then exact for this file.
+    tokenBySource.set((await player.refresh()).sourceId, part.token);
     setRange({ start: part.start, end: part.end });
   }
   /** Export Merged (the clip folder, named by the Collection template) or Export As… (a save dialog). */
@@ -1488,14 +1573,16 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     }
   }
   /** + and Add All: the suggestions as the last parts of the Collection (as many as fit); they leave the list. */
-  async function addHighlights(ids: string[]) {
+  /** `all`: Add All, a batch even with one suggestion left (no Add Again for a batch). */
+  async function addHighlights(ids: string[], all = false) {
     const saved = hl.saved;
     if (!saved) return;
     const rows = suggestions(saved).rows.filter((row) => ids.includes(row.id));
-    const added = await addRanges(rows, rows.length === 1);
-    if (hl.saved !== saved || !added.length) return;
-    for (const row of added) saved.handled[row.id] = "added";
-    if (added.some((row) => row.id === hl.selected)) hl.selected = "";
+    // Those in the Collection already leave the list as added too: they are in it.
+    const handled = await addRanges(rows, rows.length === 1, !all);
+    if (hl.saved !== saved || !handled.length) return;
+    for (const row of handled) saved.handled[row.id] = "added";
+    if (handled.some((row) => row.id === hl.selected)) hl.selected = "";
     keepSoon(saved);
   }
   function dismissHighlight(id: string) {
@@ -1621,9 +1708,12 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   }
   /**
    * Ranges of the file playing as the last parts of the Collection, in order, as many as fit (the rest is said
-   * with the Collection's limit); one file reference for all. `say`: "Added as part N".
+   * with the Collection's limit); one file reference for all. `say`: "Added as part N". A range that is a part
+   * already is not added again: one alone (`single`: + or Enter) is said with Add Again; Add All says them without it,
+   * one by its number, several counted (design clipexport-collection).
+   * The ranges handled come back: those added and those in the Collection already.
    */
-  async function addRanges<T extends { start: number; end: number }>(ranges: T[], say: boolean): Promise<T[]> {
+  async function addRanges<T extends { start: number; end: number }>(ranges: T[], say: boolean, single: boolean): Promise<T[]> {
     if (ui.adding || !ranges.length) return [];
     ui.adding = true; // exclusion before the first await
     try {
@@ -1631,20 +1721,36 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       if (!clippable(seen)) throw new Failure(tabMode(seen) === "local" ? "needDuration" : "addLocal");
       // The suggestions are the page's file's: another file playing now is not theirs.
       if (seen.sourceId !== hl.sourceId) throw new Failure("changed");
-      if (collection.full()) throw new Failure("collectionFull");
-      const added = await serial(async () => {
+      // Full: only ranges that look like parts already go on (they are handled); for the rest no reference is asked for.
+      const known = fileKey(seen);
+      if (collection.full() && !ranges.some((range) => rangeIn(collection.parts, known, range.start, range.end, seen.duration).added)) throw new Failure("collectionFull");
+      const { token, added, already } = await serial(async () => {
         const file = await plugin.media.sources.remember({ ifCurrent: seen }).catch((error) => {
           throw sourceError(error);
         });
+        tokenBySource.set(seen.sourceId, file.token);
         const made: { range: T; part: Part }[] = [];
+        const there: { range: T; number: number }[] = [];
         for (const range of ranges) {
-          if (collection.full()) break;
-          made.push({ range, part: collection.add({ token: file.token, name: file.name, start: range.start, end: Math.min(range.end, file.duration || range.end) }, settings.newTransition) });
+          const { added: number } = rangeIn(collection.parts, { token: file.token, name: file.name }, range.start, range.end, file.duration);
+          if (number) there.push({ range, number });
+          else if (!collection.full()) made.push({ range, part: collection.add({ token: file.token, name: file.name, start: range.start, end: Math.min(range.end, file.duration || range.end) }, settings.newTransition) });
         }
-        return made;
+        return { token: file.token, added: made, already: there };
       });
       if (say && added.length) shown(osd.show("Added as part {}", [collection.parts.length]));
-      if (added.length < ranges.length) sayProblem({ reason: "collectionFull", raw: "" });
+      if (single && ranges.length === 1 && already.length === 1) offerAgain(seen.sourceId, already[0]!.range, already[0]!.number);
+      else if (already.length) {
+        // Add All (a batch, also of one): no Add Again; one of them is said as one.
+        if (already.length === 1) shown(osd.show("Already in the Collection as part {}", [already[0]!.number]));
+        else {
+          // TRANSLATORS: {} is how many suggestions (2 or more) Add All did not add because they were parts already.
+          shown(osd.show("{} were already in the Collection", [already.length]));
+        }
+      }
+      if (added.length + already.length < ranges.length) sayProblem({ reason: "collectionFull", raw: "" });
+      // A file no part names keeps no reference.
+      if (!added.length) void forgetUnused([token]);
       plugin.update();
       void recheck();
       // One frame capture at a time; the file's bit rate is read once for all its parts.
@@ -1656,7 +1762,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
           if (bitrate) for (const { part } of added.slice(1)) if (collection.find(part.id)) collection.update(part, { bitrate });
         });
       }
-      return added.map(({ range }) => range);
+      return [...added, ...already].map(({ range }) => range);
     } catch (error) {
       sayProblem(problemOf(error));
       return [];
@@ -1817,6 +1923,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       preview: `${renderName(settings.template, { source: shownSource(), start: 242.3, end: 259, now: new Date(), n: sequence + 1 })}${extensionOf(animatedNow())}`,
       page: PAGES.indexOf(settings.page),
       listFocus: ui.listFocus,
+      reveal: ui.reveal,
       unseen,
     };
   });
@@ -1853,11 +1960,18 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       addFrom: addFrom(state),
     };
   }
-  /** The Range card's file and + Add: the file playing, its duration, the marked range's length, whether it can be added. */
+  /**
+   * The Range card's file and + Add: the file playing, its duration, the marked range's length, whether it can be
+   * added; whether it is a part already (`added`, the part's number) or overlaps one (`overlaps`). Worked out from the
+   * file playing, the Range and the parts on every pass: nothing is kept, so a removal, Clear and Undo, a reorder,
+   * another file or a restart show at once.
+   */
   function addFrom(state: PlayerState) {
     const range = typedRange();
     const can = clippable(state);
+    const where = can && !("error" in range) ? rangeIn(collection.parts, fileKey(state), range.start, range.end, state.duration) : { added: 0, overlaps: 0 };
     return {
+      ...where,
       can,
       // A stream's name too (shown greyed beside why it cannot be added); a plugin's picture has none.
       // The file's name; a stream has no title in the public API (its address's last segment says nothing, "watch"), so none.
@@ -2154,7 +2268,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   on("playHighlight", (id: string) => selectHighlight(String(id), true));
   on("addHighlight", (id: string) => addHighlights([String(id)]));
   on("dismissHighlight", (id: string) => dismissHighlight(String(id)));
-  on("addAllHighlights", () => addHighlights(hl.saved ? suggestions(hl.saved).rows.map((row) => row.id) : []));
+  on("addAllHighlights", () => addHighlights(hl.saved ? suggestions(hl.saved).rows.map((row) => row.id) : [], true));
   on("restoreHighlights", () => restoreHighlights());
   // Delete while the list has the focus.
   on("dismissSelected", () => handleSelected("dismiss"));
@@ -2268,6 +2382,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   /** Delete while the list has the keyboard focus (a key of the panel's content, `focus: "panel"`). */
   /** The Undo button of the "applied to every join" message (an OSD button runs a command), while Undo is offered. */
   entry("clip.collectionUndoApply", 487, undoApply, { ...inCollection, enabled: () => !!applyUndo });
+  /** The Add Again button of "Already in the Collection as part N" (an OSD button runs a command), while it is offered. */
+  entry("clip.collectionAddAgain", 492, addAgain, { ...inCollection, enabled: () => !!offered });
   entry("clip.collectionRemove", 486, removeSelected, { ...inCollection, bindings: ["Delete"], focus: "panel", enabled: () => !!selected && collectionShown() });
   /**
    * Find Highlights: the Highlights page; a file not scanned yet (or changed since) is scanned. A scan
