@@ -1,0 +1,94 @@
+msgid ""
+msgstr ""
+"Language: de\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: main.ts:125
+msgid "The meter could not start: {}"
+msgstr "Der Messer konnte nicht starten: {}"
+
+#: main.ts:127 main.ts:130
+msgid "Waiting for sound…"
+msgstr "Warte auf Ton…"
+
+#: main.ts:128
+msgid "Nothing is playing"
+msgstr "Es wird nichts abgespielt"
+
+#: main.ts:129
+msgid "This media has no sound"
+msgstr "Dieses Medium hat keinen Ton"
+
+#: main.ts:131
+msgid "Paused: the values hold"
+msgstr "Pausiert: Die Werte bleiben stehen"
+
+#: main.ts:132
+msgid "Measuring"
+msgstr "Misst"
+
+#: main.ts:150
+msgid "Loudness Meter…"
+msgstr "Lautheitsmesser…"
+
+#: manifest.json
+msgid "Loudness"
+msgstr "Lautheit"
+
+#: manifest.json
+msgid "A live EBU R128 loudness meter: momentary, short-term and integrated LUFS, loudness range and true peak"
+msgstr "Ein Live-Lautheitsmesser nach EBU R128: momentane, Kurzzeit- und integrierte Lautheit in LUFS, Lautheitsbereich und True Peak"
+
+#: manifest.json
+msgid "Measures how loud what you play is, the way broadcasters do (EBU R128, ITU-R BS.1770). Tools ▸ Loudness Meter… opens a small window with momentary and short-term loudness as bars, integrated loudness and loudness range of what has played, and the highest true peak, updated ten times a second. It only measures: the sound you hear is not changed. The meter runs while its window is open and is taken out of the sound path when you close it. To make quiet dialogue and loud scenes more even, use the player's own Normalize (Shift+N)."
+msgstr "Misst, wie laut das Abgespielte ist, so wie es Sender tun (EBU R128, ITU-R BS.1770). Werkzeuge ▸ Lautheitsmesser… öffnet ein kleines Fenster mit momentaner und Kurzzeit-Lautheit als Balken, der integrierten Lautheit und dem Lautheitsbereich des bisher Gespielten und dem höchsten True Peak, zehnmal pro Sekunde aktualisiert. Er misst nur: Der Ton, den Sie hören, bleibt unverändert. Der Messer läuft, solange sein Fenster offen ist, und wird beim Schließen aus dem Tonweg genommen. Um leise Dialoge und laute Szenen anzugleichen, nutzen Sie die Normalisierung des Players (Umschalt+N)."
+
+#: manifest.json
+msgid "audio"
+msgstr "Audio"
+
+#: manifest.json
+msgid "loudness"
+msgstr "Lautheit"
+
+#: manifest.json
+msgid "meter"
+msgstr "Messer"
+
+#: manifest.json
+msgid "lufs"
+msgstr "lufs"
+
+#: manifest.json
+msgid "ebu r128"
+msgstr "ebu r128"
+
+#: meter.slint:65
+msgid "Loudness Meter"
+msgstr "Lautheitsmesser"
+
+#: meter.slint:93
+msgid "Momentary"
+msgstr "Momentan"
+
+#: meter.slint:94
+msgid "Short-term"
+msgstr "Kurzzeit"
+
+#: meter.slint:95
+msgid "Integrated"
+msgstr "Integriert"
+
+#: meter.slint:96
+msgid "Range"
+msgstr "Bereich"
+
+#: meter.slint:97
+msgid "True peak"
+msgstr "True Peak"
+
+#: meter.slint:120
+msgid "Restart"
+msgstr "Neu starten"

@@ -1,0 +1,93 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: zysilm.loudness 0.1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: main.ts:125
+msgid "The meter could not start: {}"
+msgstr ""
+
+#: main.ts:127 main.ts:130
+msgid "Waiting for sound…"
+msgstr ""
+
+#: main.ts:128
+msgid "Nothing is playing"
+msgstr ""
+
+#: main.ts:129
+msgid "This media has no sound"
+msgstr ""
+
+#: main.ts:131
+msgid "Paused: the values hold"
+msgstr ""
+
+#: main.ts:132
+msgid "Measuring"
+msgstr ""
+
+#: main.ts:150
+msgid "Loudness Meter…"
+msgstr ""
+
+#: manifest.json
+msgid "Loudness"
+msgstr ""
+
+#: manifest.json
+msgid "A live EBU R128 loudness meter: momentary, short-term and integrated LUFS, loudness range and true peak"
+msgstr ""
+
+#: manifest.json
+msgid "Measures how loud what you play is, the way broadcasters do (EBU R128, ITU-R BS.1770). Tools ▸ Loudness Meter… opens a small window with momentary and short-term loudness as bars, integrated loudness and loudness range of what has played, and the highest true peak, updated ten times a second. It only measures: the sound you hear is not changed. The meter runs while its window is open and is taken out of the sound path when you close it. To make quiet dialogue and loud scenes more even, use the player's own Normalize (Shift+N)."
+msgstr ""
+
+#: manifest.json
+msgid "audio"
+msgstr ""
+
+#: manifest.json
+msgid "loudness"
+msgstr ""
+
+#: manifest.json
+msgid "meter"
+msgstr ""
+
+#: manifest.json
+msgid "lufs"
+msgstr ""
+
+#: manifest.json
+msgid "ebu r128"
+msgstr ""
+
+#: meter.slint:65
+msgid "Loudness Meter"
+msgstr ""
+
+#: meter.slint:93
+msgid "Momentary"
+msgstr ""
+
+#: meter.slint:94
+msgid "Short-term"
+msgstr ""
+
+#: meter.slint:95
+msgid "Integrated"
+msgstr ""
+
+#: meter.slint:96
+msgid "Range"
+msgstr ""
+
+#: meter.slint:97
+msgid "True peak"
+msgstr ""
+
+#: meter.slint:120
+msgid "Restart"
+msgstr ""
