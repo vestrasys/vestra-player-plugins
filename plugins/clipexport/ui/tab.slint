@@ -1577,7 +1577,11 @@ component HeatStrip inherits Rectangle {
         height: 2px;
         background: Theme.accent;
     }
+    // Sized to the strip: a ToolTipArea without a size is 0 × 0 here (it is not in a layout), so the strip took no
+    // click, drag or hover at all (0.6.0–0.8.0 in the player; the plugin's tests do not draw the tab).
     ToolTipArea {
+        width: 100%;
+        height: 100%;
         text: root.heat.seconds > 0 && touch.has-hover ? Words.hms(round(touch.mouse-x / touch.width * root.heat.seconds)) : "";
         touch := TouchArea {
             mouse-cursor: root.line >= 0 ? MouseCursor.ns-resize : MouseCursor.pointer;

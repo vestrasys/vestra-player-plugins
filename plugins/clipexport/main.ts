@@ -1561,6 +1561,24 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     listOf(saved).edits[hl.selected] = { start: range.start, end: range.end };
     keepSoon(saved);
   }
+  /**
+   * A seek the user asked for on the page's file, conditional on the state just read. Refused as stale (another
+   * request came between the read and the seek: the click's own seek before a double click's, a seek of another
+   * plugin), it is sent once more on a fresh read while the same file plays, as the player's A-B loop does. Returns
+   * the state it was sent on, or null when the file changed.
+   */
+  async function seekHere(seconds: number, seen: PlayerState): Promise<PlayerState | null> {
+    try {
+      await player.seek(seconds, { ifCurrent: seen });
+      return seen;
+    } catch (error) {
+      if ((error as { code?: string }).code !== "stale") throw error;
+      const now = await player.refresh();
+      if (now.sourceId !== seen.sourceId) return null;
+      await player.seek(seconds, { ifCurrent: now });
+      return now;
+    }
+  }
   /** A click on a row (or its band on the strip): it is selected, the player jumps to its start, it becomes the Range. */
   async function selectHighlight(id: string, play = false) {
     const row = suggestionOf(id);
@@ -1571,8 +1589,13 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     setRange({ start: row.start, end: row.end });
     try {
       // Playing stays playing, paused stays paused; a double click plays.
-      await player.seek(row.start, { ifCurrent: seen });
-      if (play) await player.setPaused(false, { ifCurrent: seen });
+      const now = await seekHere(row.start, seen);
+      // On the state after that seek: conditional on the read before it, the seek itself made it stale (0.7.x: "Stale",
+      // and a double click did not play).
+      if (play && now) {
+        const after = await player.refresh();
+        if (after.sourceId === now.sourceId) await player.setPaused(false, { ifCurrent: after });
+      }
     } catch (error) {
       console.error(`[clipexport] highlights: ${message(error)}`);
     }
@@ -1712,7 +1735,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     if (!clippable(seen) || !seen.duration || !Number.isFinite(ratio)) return;
     const band = hl.saved && hl.status === "done" && !scan ? bandAt(suggestions(hl.saved).rows, ratio, seen.duration) : null;
     if (band) return selectHighlight(band.id);
-    await player.seek(timeAt(ratio, seen.duration), { ifCurrent: seen }).catch((error) => console.error(`[clipexport] highlights: ${message(error)}`));
+    await seekHere(timeAt(ratio, seen.duration), seen).catch((error) => console.error(`[clipexport] highlights: ${message(error)}`));
   }
   /**
    * A drag on the strip seeks as the pointer moves, as the player's seek bar does: a gesture (`player.scrub`) from

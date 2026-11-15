@@ -1446,3 +1446,45 @@ test("the loudness line appearing during a drag (a scan finishing with the toggl
     await setup.cleanup();
   }
 });
+
+test("a double click on a row plays from its start: the play is sent on the state after the seek (on the read before it, the seek made it stale)", async () => {
+  const setup = await withMedia();
+  const host = new TestHost();
+  fakeFfmpeg(host);
+  setup.play(host, setup.media, { paused: true });
+  const errors: string[] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => void errors.push(args.join(" "));
+  const { stop } = await startIn(host, setup.data);
+  try {
+    await showHighlights(host);
+    await eventually(() => page(host).state, "ready");
+    host.mounted().emit("find-highlights");
+    await eventually(() => page(host).state, "done");
+    await eventually(() => rows(host).length, 2);
+    const first = rows(host)[0]!;
+    // A double click: the click selects (and seeks), then the double click plays.
+    host.mounted().emit("select-highlight", first.id);
+    host.mounted().emit("play-highlight", first.id);
+    await until(() => host.source.paused === false, "playing");
+    assert.ok(host.seeks.length >= 1);
+    assert.ok(Math.abs(host.seeks.at(-1)!.seconds - host.seeks[0]!.seconds) < 1e-9, "both at the row's start");
+    assert.deepEqual(errors.filter((line) => /highlights:/.test(line)), [], "no stale refusal");
+  } finally {
+    console.error = original;
+    await stop();
+    await setup.cleanup();
+  }
+});
+
+test("the strip's pointer area is the strip's size: a ToolTipArea outside a layout without a size is 0 × 0 and takes no click, drag or hover", async () => {
+  // The test host records the tab's properties and fires its callbacks; it never lays the .slint out, so it cannot
+  // see a hit area of no size (the strip did nothing in the player from 0.6.0 to 0.8.0). Checked here in the source;
+  // the click, drag and line gestures were checked on the laid-out component offline with Slint's software window.
+  const slint = await readFile(new URL("../ui/tab.slint", import.meta.url), "utf8");
+  const start = slint.indexOf("component HeatStrip inherits Rectangle {");
+  const strip = slint.slice(start, slint.indexOf("\n}\n", start));
+  const area = strip.slice(strip.indexOf("ToolTipArea {"), strip.indexOf("touch := TouchArea {"));
+  assert.match(area, /width: 100%;/);
+  assert.match(area, /height: 100%;/);
+});
