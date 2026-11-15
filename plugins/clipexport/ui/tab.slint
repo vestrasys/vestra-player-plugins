@@ -1599,7 +1599,7 @@ component HeatStrip inherits Rectangle {
                         root.line-held = true;
                     }
                 } else if event.kind == PointerEventKind.up {
-                    // A drag that seeked always says it ended, also when the line appeared during it.
+                    // A seeking drag always says it ended, also when the line appeared during it.
                     if root.scrubbing {
                         root.scrubbing = false;
                         root.scrub-held = true;

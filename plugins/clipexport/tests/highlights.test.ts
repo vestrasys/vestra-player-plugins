@@ -1437,7 +1437,7 @@ test("the loudness line appearing during a drag (a scan finishing with the toggl
     await host.settle();
     await tick();
     assert.equal(host.seeks.length, seeks, "the drag's later moves do not seek");
-    // The release the tab now always sends for a drag that seeked does nothing more.
+    // The release the tab now always sends for a drag that has sought does nothing more.
     host.mounted().emit("heat-released");
     await host.settle();
     assert.equal(host.seeks.length, seeks);
