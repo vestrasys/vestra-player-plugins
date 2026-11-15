@@ -359,10 +359,8 @@ const fixed = (n: number) => String(Math.round(n * 10) / 10);
 export function curvePath(curve: readonly number[], average: number | null, duration: number, seconds = curve.length) {
   const known = Math.min(curve.length, Math.ceil(seconds));
   if (average === null || known <= 0 || duration <= 0) return "";
-  let top = average + 12;
-  for (let i = 0; i < known; i++) top = Math.max(top, curve[i]!);
-  const low = average - 15;
-  const height = (value: number) => 100 - Math.max(0, Math.min(1, (value - low) / (top - low))) * 92;
+  const scale = curveScale(curve, average, known);
+  const height = (value: number) => lineY(value, scale);
   const bins = Math.max(1, Math.min(BINS, Math.ceil(duration)));
   let path = "M 0 100";
   let reached = 0;
@@ -378,6 +376,58 @@ export function curvePath(curve: readonly number[], average: number | null, dura
   }
   return `${path} L ${fixed(x(reached, duration))} 100 Z`;
 }
+
+/** The curve's vertical scale (`curvePath`): the loudness (LUFS) at its bottom (15 LU under the average) and at its top (the loudest second, at least 12 LU over the average). */
+export function curveScale(curve: readonly number[], average: number, seconds = curve.length) {
+  let top = average + 12;
+  for (let i = 0; i < Math.min(curve.length, seconds); i++) top = Math.max(top, curve[i]!);
+  return { low: average - 15, top };
+}
+/** Where a loudness (LUFS) sits in the curve's 100-high view box (100 its bottom, 8 its top), held to the curve's range. */
+export const lineY = (level: number, scale: { low: number; top: number }) => 100 - Math.max(0, Math.min(1, (level - scale.low) / (scale.top - scale.low))) * 92;
+/** The loudness (LUFS) at a height of the curve's view box (`lineY` the other way), held to the curve's range. */
+export const levelAt = (y: number, scale: { low: number; top: number }) => scale.low + Math.max(0, Math.min(1, (100 - y) / 92)) * (scale.top - scale.low);
+
+/** The loudness line, in LU over the video's average: where it starts (the level detection calls standing out) and how far it goes. */
+export const DEFAULT_LINE = STAND_OUT;
+export const LINE_RANGE = { low: -15, high: 60 } as const;
+/** Parts over the line closer than this (s) are one part, as detection joins loud parts. */
+export const LINE_GAP = JOIN_GAP;
+/** Parts shorter than this (s) are dropped: shorter than the 3 s short-term loudness the curve is made of, they are one loud blip. */
+export const LINE_MIN = 3;
+
+/**
+ * The parts of the video louder than the line, as suggestions: the seconds
+ * of the curve (one value a second, the loudest short-term loudness in it)
+ * over `level` (LUFS); parts less than `gap` seconds apart are one,
+ * parts shorter than `min` seconds are dropped, an end is held to the
+ * video's length. Each range's `peak` is its loudest second over the
+ * average (LU), as detection's; ids start with "l" (a scan's never do). At
+ * most 100 ranges (as a scan keeps), the loudest, in time order.
+ */
+export function rangesAbove(curve: readonly number[], average: number, level: number, duration: number, { gap = LINE_GAP, min = LINE_MIN } = {}): Candidate[] {
+  const parts: { start: number; end: number; top: number }[] = [];
+  for (let i = 0; i < curve.length; i++) {
+    if (!(curve[i]! > level)) continue;
+    let j = i;
+    let top = curve[i]!;
+    while (j + 1 < curve.length && curve[j + 1]! > level) top = Math.max(top, curve[++j]!);
+    const end = Math.min(duration, j + 1);
+    const last = parts.at(-1);
+    if (last && i - last.end < gap) Object.assign(last, { end, top: Math.max(last.top, top) });
+    else parts.push({ start: i, end, top });
+    i = j;
+  }
+  return parts
+    .filter((part) => part.end - part.start >= min)
+    .sort((x, y) => y.top - x.top || x.start - y.start)
+    .slice(0, KEEP)
+    .map((part) => ({ id: `l${Math.round(part.start * 10)}`, start: tenth(part.start), end: tenth(part.end), peak: tenth(part.top - average) }))
+    .sort((x, y) => x.start - y.start);
+}
+
+/** The strip's time at a share of its width (0–1, held there): a click or a drag on it seeks there. */
+export const timeAt = (ratio: number, duration: number) => (Number.isFinite(ratio) && duration > 0 ? Math.max(0, Math.min(1, ratio)) * duration : 0);
 
 /** Bands for ranges in a 1000 × 10 view box, each at least `MIN_BAND` wide; "" for none. */
 export function bandsPath(ranges: readonly { start: number; end: number }[], duration: number) {
@@ -497,8 +547,21 @@ export const audioStreamCount = (text: string) => text.split("\n").filter((line)
 
 // ---------------------------------------------------------------- the kept results
 
-/** A scan as kept in the plugin's data folder: one small file per video and sound track. */
-export interface HighlightScan {
+/** A list of suggestions with what the user did to it: each list keeps its own marks. */
+export interface SuggestionList {
+  candidates: Candidate[];
+  /** Added or dismissed suggestions, by id. */
+  handled: Record<string, Handled>;
+  /** A suggestion's edges as the user moved them (Set Clip Start / End while it was selected). */
+  edits: Record<string, { start: number; end: number }>;
+}
+
+/**
+ * A scan as kept in the plugin's data folder: one small file per video and sound track. Its own suggestions are
+ * `candidates` (with `handled` and `edits`); since 0.8.0 it can also hold the parts over the loudness line
+ * (`above`, made by Suggest Parts Above the Line) and which of the two lists the page shows.
+ */
+export interface HighlightScan extends SuggestionList {
   version: 1;
   path: string;
   size: number;
@@ -512,12 +575,14 @@ export interface HighlightScan {
   duration: number;
   average: number | null;
   curve: number[];
-  candidates: Candidate[];
-  /** Added or dismissed suggestions, by id. */
-  handled: Record<string, Handled>;
-  /** A suggestion's edges as the user moved them (Set Clip Start / End while it was selected). */
-  edits: Record<string, { start: number; end: number }>;
+  /** The parts over the loudness line, at `line` LU over the average when they were made; absent: none made. */
+  above?: SuggestionList & { line: number };
+  /** The page shows the parts over the line; absent: the scan's own suggestions. */
+  shown?: "above";
 }
+
+/** The list of suggestions the page shows: the parts over the line when chosen (and made), else the scan's own. */
+export const listOf = (saved: HighlightScan): SuggestionList => (saved.shown === "above" && saved.above ? saved.above : saved);
 
 export interface Stamp {
   path: string;
@@ -536,6 +601,17 @@ export function savedOf(value: unknown): HighlightScan | null {
   const { path, size, mtimeMs, stream, scanned, duration, average, curve, candidates, handled, edits } = value;
   if (typeof path !== "string" || !isNumber(size) || !isNumber(mtimeMs) || !Number.isInteger(stream) || !isNumber(scanned) || !isNumber(duration)) return null;
   if (!(average === null || isNumber(average)) || !Array.isArray(curve) || !curve.every(isNumber) || !Array.isArray(candidates)) return null;
+  const scan: HighlightScan = { version: 1, path, size, mtimeMs, stream: stream as number, scanned, mode: value.mode, duration, average: average as number | null, curve: curve as number[], ...listFrom(candidates, handled, edits) };
+  const above = value.above;
+  if (isObject(above) && isNumber(above.line) && Array.isArray(above.candidates)) {
+    scan.above = { line: above.line, ...listFrom(above.candidates, above.handled, above.edits) };
+    if (value.shown === "above") scan.shown = "above";
+  }
+  return scan;
+}
+
+/** A kept list as data: invalid entries dropped. */
+function listFrom(candidates: unknown[], handled: unknown, edits: unknown): SuggestionList {
   const list = candidates
     .filter((c): c is Candidate => isRange(c) && typeof (c as Candidate).id === "string" && isNumber((c as Candidate).peak))
     .map(({ id, start, end, peak, sounds }) => {
@@ -549,7 +625,7 @@ export function savedOf(value: unknown): HighlightScan | null {
   for (const [id, state] of Object.entries(isObject(handled) ? handled : {})) if (state === "added" || state === "dismissed") states[id] = state;
   const moved: Record<string, { start: number; end: number }> = {};
   for (const [id, range] of Object.entries(isObject(edits) ? edits : {})) if (isRange(range)) moved[id] = { start: range.start, end: range.end };
-  return { version: 1, path, size, mtimeMs, stream: stream as number, scanned, mode: value.mode, duration, average: average as number | null, curve: curve as number[], candidates: list, handled: states, edits: moved };
+  return { candidates: list, handled: states, edits: moved };
 }
 
 /** A kept scan's file name: a hash of the video's path and its track. */

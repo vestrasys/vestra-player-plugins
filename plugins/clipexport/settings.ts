@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { Scope } from "@vestra-player/sdk";
 import { encodeOf, lastSeconds, OUTPUTS } from "./clip.ts";
 import type { Encode, Output } from "./clip.ts";
-import { COUNTS, DEFAULT_COUNT } from "./highlights.ts";
+import { COUNTS, DEFAULT_COUNT, DEFAULT_LINE, LINE_RANGE } from "./highlights.ts";
 import { COLLECTION_TEMPLATE, normalTemplate } from "./names.ts";
 import { transitionOf } from "./transitions.ts";
 import type { Transition } from "./transitions.ts";
@@ -43,6 +43,11 @@ export interface Settings {
    * page still offers the download above a file not scanned. Set back when the model is downloaded.
    */
   highlightLoudness: boolean;
+  /**
+   * The Highlights page's loudness line, in LU over the video's average loudness (0.8.0): one value for every
+   * video, since the strip's scale is the video's own (from its average), so the same line means as loud for each.
+   */
+  highlightLine: number;
 }
 
 /** The pages of the tab, as its sub-tab strip orders them (0.4.0: the Collection is a section of the Clip page; 0.6.0: Highlights). */
@@ -106,6 +111,7 @@ export function settingsOf(stored: unknown, folder = defaultFolder()): Settings 
     preciseSpeed: s.preciseSpeed === null || s.preciseSpeed === undefined ? null : inRange(s.preciseSpeed, 0.01, 1000, 0) || null,
     highlightCount: (COUNTS as readonly unknown[]).includes(s.highlightCount) ? (s.highlightCount as number) : DEFAULT_COUNT,
     highlightLoudness: flag(s.highlightLoudness, false),
+    highlightLine: inRange(s.highlightLine, LINE_RANGE.low, LINE_RANGE.high, DEFAULT_LINE),
   };
 }
 

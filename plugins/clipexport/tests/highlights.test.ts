@@ -7,8 +7,8 @@ import test from "node:test";
 import { promisify } from "node:util";
 import { HostError, startPlugin, TestHost } from "@vestra-player/sdk/testing";
 import {
-  analyse, bandAt, bandsPath, CACHE_LIMIT, curvePath, emptyValues, HighlightStore, keptName, loudnessArgs, MAX_LENGTH, MIN_BAND, MIN_LENGTH, nextAfter, parseMomentary, pick, RATE, savedOf, scanLoudness, short,
-  stepFrom, thumbName, total, WINDOW,
+  analyse, bandAt, bandsPath, CACHE_LIMIT, curvePath, curveScale, DEFAULT_LINE, emptyValues, HighlightStore, keptName, levelAt, LINE_GAP, LINE_MIN, lineY, listOf, loudnessArgs, MAX_LENGTH, MIN_BAND, MIN_LENGTH, nextAfter,
+  parseMomentary, pick, rangesAbove, RATE, savedOf, scanLoudness, short, stepFrom, thumbName, timeAt, total, WINDOW,
 } from "../highlights.ts";
 import type { HighlightScan } from "../highlights.ts";
 import activate from "../main.ts";
@@ -1097,4 +1097,394 @@ test("a suggestion already in the Collection (its range added from the Clip page
     await stop();
     await setup.cleanup();
   }
+});
+
+// ---------------------------------------------------------------- 0.8.0: seeking on the strip, the loudness line
+
+test("the loudness line: the seconds over it are ranges; parts less than 3 s apart are one, parts shorter than 3 s go; an end is held to the length; peaks over the average; at most 100, the loudest", () => {
+  const average = -30;
+  const curve = Array.from({ length: 100 }, (_, i) =>
+    i >= 10 && i <= 14 ? -20 : i >= 16 && i <= 17 ? -15 : i >= 30 && i <= 31 ? -18 : i >= 50 && i <= 59 ? -24 : i === 60 ? -25 : (i >= 70 && i <= 72) || (i >= 76 && i <= 79) ? -22 : i >= 96 ? -10 : -32,
+  );
+  const level = average + DEFAULT_LINE;
+  assert.deepEqual([DEFAULT_LINE, LINE_GAP, LINE_MIN], [5, 3, 3], "the line starts where detection calls a moment standing out");
+  const found = rangesAbove(curve, average, level, 99.5);
+  assert.deepEqual(
+    found.map(({ id, start, end, peak }) => [id, start, end, peak]),
+    [
+      ["l100", 10, 18, 15], // a gap of 1 s: one part
+      ["l500", 50, 60, 6], // a second at the line itself is not over it
+      ["l700", 70, 73, 8], // 3 s apart: two parts
+      ["l760", 76, 80, 8],
+      ["l960", 96, 99.5, 20], // the end held to the video's length
+    ],
+    "the 2 s blip at 30 s is shorter than 3 s",
+  );
+  assert.deepEqual(rangesAbove(curve, average, level, 99.5, { gap: 4 }).map((r) => [r.start, r.end]).slice(2, 3), [[70, 80]], "a longer gap joins them");
+  assert.ok(rangesAbove(curve, average, level, 99.5, { min: 1 }).some((r) => r.start === 30), "a shorter minimum keeps the blip");
+  assert.deepEqual(rangesAbove(curve, average, -5, 99.5), [], "nothing over a line above the loudest second");
+  // 150 parts: the 100 loudest stay, in time order.
+  const many = Array.from({ length: 1500 }, (_, i) => (i % 10 < 4 ? -25 + Math.floor(i / 10) * 0.05 : -40));
+  const kept = rangesAbove(many, average, level, 1500);
+  assert.equal(kept.length, 100);
+  assert.deepEqual([kept[0]!.start, kept.at(-1)!.start], [500, 1490]);
+});
+
+test("the strip's geometry: a share of its width is a time (held to the video); the line's height and its loudness are one another's inverse, held to the curve's range", () => {
+  assert.deepEqual([timeAt(0.25, 600), timeAt(0, 600), timeAt(1, 600), timeAt(-0.2, 600), timeAt(1.4, 600), timeAt(Number.NaN, 600), timeAt(0.5, 0)], [150, 0, 600, 0, 600, 0, 0]);
+  const scale = curveScale([-30, -12, -28], -30);
+  assert.deepEqual(scale, { low: -45, top: -12 }, "15 LU under the average to the loudest second");
+  assert.deepEqual(curveScale([-30], -30), { low: -45, top: -18 }, "at least 12 LU over the average");
+  assert.equal(lineY(-45, scale), 100);
+  assert.equal(lineY(-12, scale), 8);
+  assert.equal(lineY(-80, scale), 100, "held at the bottom");
+  assert.equal(lineY(0, scale), 8, "held at the top");
+  assert.ok(Math.abs(levelAt(lineY(-25, scale), scale) + 25) < 1e-9);
+  assert.equal(levelAt(0, scale), -12);
+  assert.equal(levelAt(120, scale), -45);
+  // The strip's curve path uses the same scale: the loudest column at 8.
+  assert.match(curvePath([-30, -12, -28], -30, 3), / 8 L /);
+});
+
+/** The settings file as kept. */
+const settingsIn = async (data: string) => JSON.parse(await readFile(join(data, "settings.json"), "utf8").catch(() => "{}")) as { highlightLine?: number };
+
+test("the strip: a click seeks; a drag seeks as the pointer moves, in one gesture; with the loudness line on, the strip seeks no more, the line is kept where it is let go, and Suggest Parts Above the Line lists the parts over it", async () => {
+  const setup = await withMedia();
+  const host = new TestHost();
+  fakeFfmpeg(host);
+  setup.play(host);
+  const { stop } = await startIn(host, setup.data);
+  try {
+    await showHighlights(host);
+    await eventually(() => page(host).state, "ready");
+    host.mounted().emit("find-highlights");
+    await eventually(() => page(host).state, "done");
+    await eventually(() => rows(host).length, 2);
+    assert.deepEqual([tab(host)["heat-line"], tab(host)["line-on"]], [-1, false], "the line is off at first");
+
+    // A click away from the bands seeks there; a drag seeks as it moves.
+    host.mounted().emit("heat-clicked", 0.1);
+    await until(() => host.seeks.length === 1, "the click's seek");
+    assert.equal(host.seeks[0]!.seconds, 60);
+    const why = () => (host.listeningWhy.get("source.state") ?? []).length;
+    const before = why();
+    for (const [i, ratio] of [0.5, 0.55, 0.6].entries()) host.mounted().emit("heat-scrubbed", ratio, i === 0);
+    await until(() => why() > before, "the gesture follows the player's state while it is open");
+    host.mounted().emit("heat-released");
+    await until(() => host.seeks.at(-1)?.seconds === 360, "the drag's last target lands after the release");
+    await until(() => why() === before, "the gesture ends once its last seek settled: nothing keeps following the state");
+    const dragged = host.seeks.slice(1).map((seek) => seek.seconds);
+    assert.ok(dragged.length >= 1 && dragged.length <= 3 && dragged.every((t) => [300, 330, 360].includes(t)), `the drag's targets, none sent twice: ${dragged}`);
+    assert.ok(host.seeks.every((seek) => !seek.keyframes), "exact seeks");
+
+    // The line on: the strip moves the line, it never seeks.
+    host.mounted().emit("set-line", true);
+    await until(() => (tab(host)["heat-line"] as number) >= 0, "the line drawn");
+    assert.equal(tab(host)["line-on"], true);
+    const seeks = host.seeks.length;
+    host.mounted().emit("heat-clicked", 0.2);
+    host.mounted().emit("heat-scrubbed", 0.3, true);
+    host.mounted().emit("heat-released");
+    await host.settle();
+    await tick();
+    assert.equal(host.seeks.length, seeks, "no seek while the line shows");
+
+    // Let go at 15 LU over the average: only the loud burst at 200 s is over it.
+    const [file] = (await readdir(join(setup.data, "highlights"))).filter((name) => name.endsWith(".json"));
+    const keptScan = async () => savedOf(JSON.parse(await readFile(join(setup.data, "highlights", file!), "utf8")))!;
+    const scanned = await keptScan();
+    const scale = curveScale(scanned.curve, scanned.average!);
+    const y = lineY(scanned.average! + 15, scale);
+    host.mounted().emit("line-released", y);
+    await until(async () => (await settingsIn(setup.data)).highlightLine === 15, "the line kept as LU over the average");
+    await eventually(() => Math.abs((tab(host)["heat-line"] as number) - y) < 0.1, true, "drawn where it was let go");
+    type Lists = { lines: boolean; above: boolean };
+    const lists = () => page(host) as unknown as Lists;
+    assert.deepEqual([lists().lines, lists().above], [false, false], "one list: no switch");
+    // Before: the scan's first suggestion dismissed (its marks are the scan list's).
+    const scanIds = rows(host).map((row) => row.id);
+    host.mounted().emit("dismiss-highlight", scanIds[0]!);
+    await eventually(() => rows(host).length, 1);
+    host.mounted().emit("suggest-above");
+    await eventually(() => [lists().lines, lists().above], [true, true], "the parts shown, the switch there");
+    await eventually(() => rows(host).length, 1);
+    assert.match(rows(host)[0]!.range, /^3:(19|20)\.0 – 3:4\d\.0$/, rows(host)[0]!.range);
+    assert.equal(rows(host)[0]!.kind, "loud");
+    assert.ok(rows(host)[0]!.id.startsWith("l"));
+    assert.equal(restoreRow(host), 0, "the parts' marks start empty");
+    await until(async () => {
+      const saved = await keptScan();
+      return saved.above?.line === 15 && saved.shown === "above" && saved.above.candidates.length === 1 && saved.candidates.length === 2 && saved.handled[scanIds[0]!] === "dismissed";
+    }, "kept with the file beside the scan's own, which stays with its marks");
+
+    // The switch: back to the scan's suggestions (as left: one dismissed), and to the parts again.
+    host.mounted().emit("show-list", false);
+    await eventually(() => lists().above, false);
+    await eventually(() => rows(host).map((row) => row.id), [scanIds[1]!], "the scan's list, no scan run");
+    assert.equal(restoreRow(host), 1);
+    assert.equal(scans(host), 2, "no new scan (600 s: the first scan's two windows)");
+    // A mark on the parts stays theirs.
+    host.mounted().emit("show-list", true);
+    await eventually(() => lists().above, true);
+    const part = rows(host)[0]!.id;
+    host.mounted().emit("dismiss-highlight", part);
+    await eventually(() => rows(host).length, 0);
+    host.mounted().emit("show-list", false);
+    await eventually(() => rows(host).map((row) => row.id), [scanIds[1]!], "the scan's list keeps its own marks");
+    host.mounted().emit("show-list", true);
+    await eventually(() => restoreRow(host), 1);
+    host.mounted().emit("restore-highlights");
+    await eventually(() => rows(host).map((row) => row.id), [part]);
+    await until(async () => (await keptScan()).shown === "above", "the list shown is kept");
+
+    // At the top nothing is over it: the list stays and the video says so.
+    host.mounted().emit("line-released", 8);
+    await until(async () => ((await settingsIn(setup.data)).highlightLine ?? 0) > 15, "the line at the top");
+    host.mounted().emit("suggest-above");
+    await until(() => host.osd.includes("Nothing is louder than the line."), "said");
+    assert.equal(rows(host).length, 1);
+
+    // An idle stop and wake (the same player session): the toggle stays on.
+    await until(() => host.sessionStorage.get("lineOn") === true, "kept for the session");
+    const woken = new TestHost();
+    fakeFfmpeg(woken);
+    setup.play(woken);
+    const awake = await startPlugin(activate, { directory, host: woken, locale: "en", dataDirectory: setup.data, sessionStorage: host.sessionStorage });
+    try {
+      await showHighlights(woken);
+      await eventually(() => page(woken).state, "done");
+      await eventually(() => tab(woken)["line-on"], true, "on after the wake");
+      await until(() => (tab(woken)["heat-line"] as number) >= 0, "the line drawn after the wake");
+    } finally {
+      await awake.stop();
+    }
+
+    // Off: no line, the strip seeks again.
+    host.mounted().emit("set-line", false);
+    await eventually(() => tab(host)["heat-line"], -1);
+    host.mounted().emit("heat-clicked", 0.9);
+    await until(() => host.seeks.at(-1)?.seconds === 540, "a click seeks again");
+  } finally {
+    await stop();
+  }
+
+  // The player restarted (a new session): the line's place is kept, the toggle is off.
+  const again = new TestHost();
+  fakeFfmpeg(again);
+  setup.play(again);
+  const second = await startIn(again, setup.data);
+  try {
+    await showHighlights(again);
+    await eventually(() => page(again).state, "done");
+    await eventually(() => rows(again).length, 1, "the line's suggestions were kept");
+    assert.deepEqual([tab(again)["heat-line"], tab(again)["line-on"]], [-1, false]);
+    again.mounted().emit("set-line", true);
+    await until(() => (tab(again)["heat-line"] as number) >= 0);
+    assert.ok(Math.abs((tab(again)["heat-line"] as number) - 8) < 0.5, "at the top, where it was let go");
+  } finally {
+    await second.stop();
+    await setup.cleanup();
+  }
+});
+
+test("a drag whose gesture is lost to another file ignores its later moves until the next press; hiding the tab ends a drag's gesture", async () => {
+  const setup = await withMedia();
+  const host = new TestHost();
+  fakeFfmpeg(host);
+  setup.play(host);
+  const { stop } = await startIn(host, setup.data);
+  try {
+    await showHighlights(host);
+    await eventually(() => page(host).state, "ready");
+    host.mounted().emit("find-highlights");
+    await eventually(() => page(host).state, "done");
+    host.mounted().emit("heat-scrubbed", 0.5, true);
+    await until(() => host.seeks.at(-1)?.seconds === 300, "the drag seeks");
+    // Another file opens mid-drag: the gesture is lost.
+    host.openElsewhere(setup.media);
+    host.setSource({ position: 0, duration: 600, audioTracks: TRACK });
+    await host.settle();
+    const seeks = host.seeks.length;
+    host.mounted().emit("heat-scrubbed", 0.7, false);
+    host.mounted().emit("heat-scrubbed", 0.8, false);
+    await host.settle();
+    await tick();
+    assert.equal(host.seeks.length, seeks, "the rest of the drag does nothing");
+    host.mounted().emit("heat-released");
+    // The next press starts a new gesture.
+    host.mounted().emit("heat-scrubbed", 0.25, true);
+    await until(() => host.seeks.at(-1)?.seconds === 150, "a new drag seeks");
+    // The tab hides mid-drag: the gesture ends with it.
+    host.mountOther("sidebar", "vestra.playlist", { title: "Playlist" });
+    host.selectTab("vestra.playlist");
+    await until(() => !host.listening.has("source.state"), "nothing follows the player's state once the tab is hidden");
+    const after = host.seeks.length;
+    host.mounted().emit("heat-scrubbed", 0.9, false);
+    await host.settle();
+    await tick();
+    assert.equal(host.seeks.length, after, "its later moves do nothing");
+  } finally {
+    await stop();
+    await setup.cleanup();
+  }
+});
+
+test("kept results with the parts over the line: both lists read back with their own marks; a damaged second list is dropped, the scan's own stays", () => {
+  const base = { version: 1, path: "/v.mp4", size: 1, mtimeMs: 1, stream: 0, scanned: 1, mode: "loudness", duration: 600, average: -30, curve: [-30], candidates: [{ id: "100", start: 10, end: 20, peak: 6 }], handled: { 100: "dismissed" }, edits: {} };
+  const above = { line: 7.5, candidates: [{ id: "l50", start: 5, end: 9, peak: 8 }, { id: "bad", start: 9, end: 3, peak: 1 }], handled: { l50: "added" }, edits: { l50: { start: 4, end: 9 } } };
+  const read = savedOf({ ...base, above, shown: "above" })!;
+  assert.deepEqual(read.above, { line: 7.5, candidates: [{ id: "l50", start: 5, end: 9, peak: 8 }], handled: { l50: "added" }, edits: { l50: { start: 4, end: 9 } } });
+  assert.equal(read.shown, "above");
+  assert.deepEqual(listOf(read), read.above);
+  assert.deepEqual(read.handled, { 100: "dismissed" }, "the scan's marks are its own");
+  const plain = savedOf({ ...base, shown: "above" })!;
+  assert.equal(listOf(plain), plain, "no parts made: the scan's list whatever was shown");
+  const damaged = savedOf({ ...base, above: { line: "x", candidates: [] }, shown: "above" })!;
+  assert.deepEqual([damaged.above, damaged.shown, damaged.candidates.length], [undefined, undefined, 1]);
+});
+
+/** The plugin's drag gestures, each seek held until `open()`: what ends them, and when. */
+function heldScrubs(plugin: { player: { scrub(): { active: boolean; seek(seconds: number, options?: { keyframes?: boolean }): Promise<boolean>; end(): void } } }) {
+  let open: () => void = () => {};
+  const gate = new Promise<void>((done) => (open = done));
+  const made: { active: boolean }[] = [];
+  const real = plugin.player.scrub.bind(plugin.player);
+  Object.defineProperty(plugin.player, "scrub", {
+    configurable: true,
+    value: () => {
+      const scrub = real();
+      const held = {
+        get active() {
+          return scrub.active;
+        },
+        seek: (seconds: number, options?: { keyframes?: boolean }) => gate.then(() => scrub.seek(seconds, options)),
+        end: () => scrub.end(),
+      };
+      made.push(held);
+      return held;
+    },
+  });
+  return { made, open: () => open() };
+}
+
+test("a released drag whose last seek has not landed yet is ended by the next press and by hiding the tab", async () => {
+  const setup = await withMedia();
+  const host = new TestHost();
+  fakeFfmpeg(host);
+  setup.play(host);
+  const { plugin, stop } = await startIn(host, setup.data);
+  const scrubs = heldScrubs(plugin as never);
+  try {
+    await showHighlights(host);
+    await eventually(() => page(host).state, "ready");
+    host.mounted().emit("find-highlights");
+    await eventually(() => page(host).state, "done");
+    // A drag let go while its seek is still on its way: its gesture waits for it…
+    host.mounted().emit("heat-scrubbed", 0.5, true);
+    await until(() => scrubs.made.length === 1, "the first gesture");
+    host.mounted().emit("heat-released");
+    await host.settle();
+    assert.equal(scrubs.made[0]!.active, true, "waiting for its last seek");
+    // …and a new press ends it now.
+    host.mounted().emit("heat-scrubbed", 0.6, true);
+    await until(() => scrubs.made.length === 2, "the second gesture");
+    assert.equal(scrubs.made[0]!.active, false, "the next press ended the waiting gesture");
+    host.mounted().emit("heat-released");
+    await host.settle();
+    assert.equal(scrubs.made[1]!.active, true);
+    // Hiding the tab ends the one waiting too.
+    host.mountOther("sidebar", "vestra.playlist", { title: "Playlist" });
+    host.selectTab("vestra.playlist");
+    await until(() => scrubs.made[1]!.active === false, "the hidden tab ended the waiting gesture");
+    await until(() => !host.listening.has("source.state"), "nothing follows the player's state");
+  } finally {
+    scrubs.open();
+    await stop();
+    await setup.cleanup();
+  }
+});
+
+test("the loudness line appearing during a drag (a scan finishing with the toggle on) ends the drag's gesture: its later moves do not seek", async () => {
+  const setup = await withMedia();
+  const host = new TestHost();
+  let release: () => void = () => {};
+  let held = true;
+  fakeFfmpeg(host, talk, () => (held ? new Promise((done) => (release = done)) : Promise.resolve()));
+  setup.play(host);
+  const { stop } = await startIn(host, setup.data);
+  try {
+    await showHighlights(host);
+    await eventually(() => page(host).state, "ready");
+    host.mounted().emit("set-line", true);
+    host.mounted().emit("find-highlights");
+    await eventually(() => page(host).state, "scanning");
+    assert.equal(tab(host)["heat-line"], -1, "no line while the scan runs");
+    const why = () => (host.listeningWhy.get("source.state") ?? []).length;
+    const before = why();
+    // A drag during the scan seeks.
+    host.mounted().emit("heat-scrubbed", 0.5, true);
+    await until(() => host.seeks.at(-1)?.seconds === 300, "the drag seeks");
+    await until(() => why() > before, "its gesture follows the player's state");
+    // The scan finishes: the line shows mid-drag.
+    held = false;
+    release();
+    await eventually(() => page(host).state, "done");
+    await until(() => (tab(host)["heat-line"] as number) >= 0, "the line shows");
+    const seeks = host.seeks.length;
+    host.mounted().emit("heat-scrubbed", 0.7, false);
+    await until(() => why() <= before, "the gesture ended when the line showed");
+    await host.settle();
+    await tick();
+    assert.equal(host.seeks.length, seeks, "the drag's later moves do not seek");
+    // The release the tab now always sends for a drag that has sought does nothing more.
+    host.mounted().emit("heat-released");
+    await host.settle();
+    assert.equal(host.seeks.length, seeks);
+  } finally {
+    await stop();
+    await setup.cleanup();
+  }
+});
+
+test("a double click on a row plays from its start: the play is sent on the state after the seek (on the read before it, the seek made it stale)", async () => {
+  const setup = await withMedia();
+  const host = new TestHost();
+  fakeFfmpeg(host);
+  setup.play(host, setup.media, { paused: true });
+  const errors: string[] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => void errors.push(args.join(" "));
+  const { stop } = await startIn(host, setup.data);
+  try {
+    await showHighlights(host);
+    await eventually(() => page(host).state, "ready");
+    host.mounted().emit("find-highlights");
+    await eventually(() => page(host).state, "done");
+    await eventually(() => rows(host).length, 2);
+    const first = rows(host)[0]!;
+    // A double click: the click selects (and seeks), then the double click plays.
+    host.mounted().emit("select-highlight", first.id);
+    host.mounted().emit("play-highlight", first.id);
+    await until(() => host.source.paused === false, "playing");
+    assert.ok(host.seeks.length >= 1);
+    assert.ok(Math.abs(host.seeks.at(-1)!.seconds - host.seeks[0]!.seconds) < 1e-9, "both at the row's start");
+    assert.deepEqual(errors.filter((line) => /highlights:/.test(line)), [], "no stale refusal");
+  } finally {
+    console.error = original;
+    await stop();
+    await setup.cleanup();
+  }
+});
+
+test("the strip's pointer area is the strip's size: a ToolTipArea outside a layout without a size is 0 × 0 and takes no click, drag or hover", async () => {
+  // The test host records the tab's properties and fires its callbacks; it never lays the .slint out, so it cannot
+  // see a hit area of no size (the strip did nothing in the player from 0.6.0 to 0.8.0). Checked here in the source;
+  // the click, drag and line gestures were checked on the laid-out component offline with Slint's software window.
+  const slint = await readFile(new URL("../ui/tab.slint", import.meta.url), "utf8");
+  const start = slint.indexOf("component HeatStrip inherits Rectangle {");
+  const strip = slint.slice(start, slint.indexOf("\n}\n", start));
+  const area = strip.slice(strip.indexOf("ToolTipArea {"), strip.indexOf("touch := TouchArea {"));
+  assert.match(area, /width: 100%;/);
+  assert.match(area, /height: 100%;/);
 });
