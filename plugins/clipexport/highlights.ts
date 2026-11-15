@@ -547,8 +547,21 @@ export const audioStreamCount = (text: string) => text.split("\n").filter((line)
 
 // ---------------------------------------------------------------- the kept results
 
-/** A scan as kept in the plugin's data folder: one small file per video and sound track. */
-export interface HighlightScan {
+/** A list of suggestions with what the user did to it: each list keeps its own marks. */
+export interface SuggestionList {
+  candidates: Candidate[];
+  /** Added or dismissed suggestions, by id. */
+  handled: Record<string, Handled>;
+  /** A suggestion's edges as the user moved them (Set Clip Start / End while it was selected). */
+  edits: Record<string, { start: number; end: number }>;
+}
+
+/**
+ * A scan as kept in the plugin's data folder: one small file per video and sound track. Its own suggestions are
+ * `candidates` (with `handled` and `edits`); since 0.8.0 it can also hold the parts over the loudness line
+ * (`above`, made by Suggest Parts Above the Line) and which of the two lists the page shows.
+ */
+export interface HighlightScan extends SuggestionList {
   version: 1;
   path: string;
   size: number;
@@ -562,14 +575,14 @@ export interface HighlightScan {
   duration: number;
   average: number | null;
   curve: number[];
-  candidates: Candidate[];
-  /** Added or dismissed suggestions, by id. */
-  handled: Record<string, Handled>;
-  /** A suggestion's edges as the user moved them (Set Clip Start / End while it was selected). */
-  edits: Record<string, { start: number; end: number }>;
-  /** The suggestions are the parts over the loudness line (0.8.0), at this many LU over the average; absent: the scan's own. */
-  line?: number;
+  /** The parts over the loudness line, at `line` LU over the average when they were made; absent: none made. */
+  above?: SuggestionList & { line: number };
+  /** The page shows the parts over the line; absent: the scan's own suggestions. */
+  shown?: "above";
 }
+
+/** The list of suggestions the page shows: the parts over the line when chosen (and made), else the scan's own. */
+export const listOf = (saved: HighlightScan): SuggestionList => (saved.shown === "above" && saved.above ? saved.above : saved);
 
 export interface Stamp {
   path: string;
@@ -588,6 +601,17 @@ export function savedOf(value: unknown): HighlightScan | null {
   const { path, size, mtimeMs, stream, scanned, duration, average, curve, candidates, handled, edits } = value;
   if (typeof path !== "string" || !isNumber(size) || !isNumber(mtimeMs) || !Number.isInteger(stream) || !isNumber(scanned) || !isNumber(duration)) return null;
   if (!(average === null || isNumber(average)) || !Array.isArray(curve) || !curve.every(isNumber) || !Array.isArray(candidates)) return null;
+  const scan: HighlightScan = { version: 1, path, size, mtimeMs, stream: stream as number, scanned, mode: value.mode, duration, average: average as number | null, curve: curve as number[], ...listFrom(candidates, handled, edits) };
+  const above = value.above;
+  if (isObject(above) && isNumber(above.line) && Array.isArray(above.candidates)) {
+    scan.above = { line: above.line, ...listFrom(above.candidates, above.handled, above.edits) };
+    if (value.shown === "above") scan.shown = "above";
+  }
+  return scan;
+}
+
+/** A kept list as data: invalid entries dropped. */
+function listFrom(candidates: unknown[], handled: unknown, edits: unknown): SuggestionList {
   const list = candidates
     .filter((c): c is Candidate => isRange(c) && typeof (c as Candidate).id === "string" && isNumber((c as Candidate).peak))
     .map(({ id, start, end, peak, sounds }) => {
@@ -601,9 +625,7 @@ export function savedOf(value: unknown): HighlightScan | null {
   for (const [id, state] of Object.entries(isObject(handled) ? handled : {})) if (state === "added" || state === "dismissed") states[id] = state;
   const moved: Record<string, { start: number; end: number }> = {};
   for (const [id, range] of Object.entries(isObject(edits) ? edits : {})) if (isRange(range)) moved[id] = { start: range.start, end: range.end };
-  const scan: HighlightScan = { version: 1, path, size, mtimeMs, stream: stream as number, scanned, mode: value.mode, duration, average: average as number | null, curve: curve as number[], candidates: list, handled: states, edits: moved };
-  if (isNumber(value.line)) scan.line = value.line;
-  return scan;
+  return { candidates: list, handled: states, edits: moved };
 }
 
 /** A kept scan's file name: a hash of the video's path and its track. */

@@ -253,6 +253,9 @@ export struct Highlights {
     picked: int,
     // A scan with the sound model found only loud moments (R4).
     only-loud: bool,
+    // The parts over the loudness line were made (the switch between the two lists shows); they are the list shown.
+    lines: bool,
+    above: bool,
     // The sound model: "none" (F1), "installed", "downloading" (F2), "failed" (F3), "checksum" (F4), "offline" (F5);
     // the download's size (MB), how much of it arrived (MB), the seconds left (-1 unknown), why it failed.
     model: string,
@@ -453,12 +456,16 @@ export global ClipBridge {
     callback dismiss-selected();
     // A click on the strip, at this share of its width (0–1).
     callback heat-clicked(float);
-    // A drag on the strip (past a few pixels): the pointer at this share of its width.
-    callback heat-scrubbed(float);
+    // A drag on the strip (past a few pixels): the pointer at this share of its width, and whether it is the drag's
+    // first move (a new gesture: the press); then the release (or a lost press) of a drag.
+    callback heat-scrubbed(float, bool);
+    callback heat-released();
     // The loudness line: the toggle, the line let go at this height of the view box, Suggest Parts Above the Line.
     callback set-line(bool);
     callback line-released(float);
     callback suggest-above();
+    // The switch above the list: the scan's own suggestions (false) or the parts over the line (true).
+    callback show-list(bool);
     // The list's rows on screen: the first one in view and how many fit (whole rows), for their pictures.
     callback highlights-seen(int, int);
 }
@@ -1459,7 +1466,8 @@ component HeatStrip inherits Rectangle {
     in property <float> head: -1;
     in property <float> line: -1;
     callback clicked(float);
-    callback scrubbed(float);
+    callback scrubbed(float, bool);
+    callback released();
     callback line-released(float);
     // A drag that seeks: past a few pixels from the press; where the pointer is (0–1).
     private property <length> press-x;
@@ -1474,6 +1482,18 @@ component HeatStrip inherits Rectangle {
     private property <float> line-shown: root.line-held ? root.line-draft : root.line;
     private property <length> line-y: 1px + root.line-shown / 100 * 34px;
     changed line => { root.line-held = false; }
+    // After a release the drafts above stay until the plugin's values arrive; when nothing changes (a seek refused or
+    // made stale, a line let go at the value it had), they go after this long.
+    private property <bool> settling;
+    Timer {
+        interval: 600ms;
+        running: root.settling;
+        triggered => {
+            root.settling = false;
+            root.scrub-held = false;
+            root.line-held = false;
+        }
+    }
     height: 44px;
     background: Theme.bg-list;
     border-width: 1px;
@@ -1568,21 +1588,29 @@ component HeatStrip inherits Rectangle {
                 if event.kind == PointerEventKind.down {
                     root.press-x = self.mouse-x;
                     root.scrubbing = false;
+                    root.settling = false;
+                    root.scrub-held = false;
                     if root.line >= 0 {
                         root.line-draft = max(8, min(100, (self.mouse-y - 1px) / 34px * 100));
                         root.line-held = true;
                     }
                 } else if event.kind == PointerEventKind.up {
                     if root.line-held && root.line >= 0 {
+                        root.settling = true;
                         root.line-released(root.line-draft);
                     } else if root.scrubbing {
                         root.scrubbing = false;
                         root.scrub-held = true;
+                        root.settling = true;
+                        root.released();
                     } else if root.line < 0 {
                         root.clicked(self.mouse-x / self.width);
                     }
                 } else if event.kind == PointerEventKind.cancel {
-                    root.scrubbing = false;
+                    if root.scrubbing {
+                        root.scrubbing = false;
+                        root.released();
+                    }
                     root.line-held = false;
                 }
             }
@@ -1594,9 +1622,9 @@ component HeatStrip inherits Rectangle {
                     root.line-draft = max(8, min(100, (self.mouse-y - 1px) / 34px * 100));
                     root.line-held = true;
                 } else if root.scrubbing || self.mouse-x - root.press-x > 3px || root.press-x - self.mouse-x > 3px {
-                    root.scrubbing = true;
                     root.scrub-at = max(0, min(1, self.mouse-x / self.width));
-                    root.scrubbed(root.scrub-at);
+                    root.scrubbed(root.scrub-at, !root.scrubbing);
+                    root.scrubbing = true;
                 }
             }
         }
@@ -2754,7 +2782,8 @@ export component ClipExportTab inherits Rectangle {
                         head: ClipBridge.heat-head;
                         line: ClipBridge.heat-line;
                         clicked(ratio) => { ClipBridge.heat-clicked(ratio); }
-                        scrubbed(ratio) => { ClipBridge.heat-scrubbed(ratio); }
+                        scrubbed(ratio, first) => { ClipBridge.heat-scrubbed(ratio, first); }
+                        released => { ClipBridge.heat-released(); }
                         line-released(y) => { ClipBridge.line-released(y); }
                     }
                     // After a scan: when (it measured loudness only), the loudness line's toggle, what it listens to.
@@ -2800,7 +2829,7 @@ export component ClipExportTab inherits Rectangle {
                         horizontal-stretch: 1;
                         text: @tr("Suggest Parts Above the Line");
                         glyph: Glyphs.line;
-                        tip: @tr("Replaces the suggestions with the parts louder than the line");
+                        tip: @tr("Lists the parts louder than the line; the scan's suggestions stay");
                         clicked => { ClipBridge.suggest-above(); }
                     }
                     // Before a scan (S1, F1) and after a problem: what it finds, and for what (not while the model downloads).
@@ -2879,6 +2908,12 @@ export component ClipExportTab inherits Rectangle {
                         left: ClipBridge.highlights.left;
                     }
                     if root.hl-state == "scanning": Line { align: center; text: @tr("Runs in the background: keep watching."); }
+                    // Two lists once the parts over the line were made: which one shows, and the way to the other.
+                    if root.hl-scanned && ClipBridge.highlights.lines: HorizontalLayout {
+                        spacing: 2px;
+                        Segment { text: @tr("Scan Results"); on: !ClipBridge.highlights.above; clicked => { ClipBridge.show-list(false); } }
+                        Segment { text: @tr("Above the Line"); on: ClipBridge.highlights.above; clicked => { ClipBridge.show-list(true); } }
+                    }
                     // No sound (S3), nothing found (S4).
                     if root.hl-state == "noSound": Line { align: center; color: Theme.text; text: @tr("This video has no sound to scan."); }
                     if root.hl-state == "nothing": VerticalLayout {

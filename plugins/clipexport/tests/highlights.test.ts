@@ -7,7 +7,7 @@ import test from "node:test";
 import { promisify } from "node:util";
 import { HostError, startPlugin, TestHost } from "@vestra-player/sdk/testing";
 import {
-  analyse, bandAt, bandsPath, CACHE_LIMIT, curvePath, curveScale, DEFAULT_LINE, emptyValues, HighlightStore, keptName, levelAt, LINE_GAP, LINE_MIN, lineY, loudnessArgs, MAX_LENGTH, MIN_BAND, MIN_LENGTH, nextAfter,
+  analyse, bandAt, bandsPath, CACHE_LIMIT, curvePath, curveScale, DEFAULT_LINE, emptyValues, HighlightStore, keptName, levelAt, LINE_GAP, LINE_MIN, lineY, listOf, loudnessArgs, MAX_LENGTH, MIN_BAND, MIN_LENGTH, nextAfter,
   parseMomentary, pick, rangesAbove, RATE, savedOf, scanLoudness, short, stepFrom, thumbName, timeAt, total, WINDOW,
 } from "../highlights.ts";
 import type { HighlightScan } from "../highlights.ts";
@@ -1167,8 +1167,13 @@ test("the strip: a click seeks; a drag seeks as the pointer moves, in one gestur
     host.mounted().emit("heat-clicked", 0.1);
     await until(() => host.seeks.length === 1, "the click's seek");
     assert.equal(host.seeks[0]!.seconds, 60);
-    for (const ratio of [0.5, 0.55, 0.6]) host.mounted().emit("heat-scrubbed", ratio);
-    await until(() => host.seeks.at(-1)?.seconds === 360, "the drag's last target");
+    const why = () => (host.listeningWhy.get("source.state") ?? []).length;
+    const before = why();
+    for (const [i, ratio] of [0.5, 0.55, 0.6].entries()) host.mounted().emit("heat-scrubbed", ratio, i === 0);
+    await until(() => why() > before, "the gesture follows the player's state while it is open");
+    host.mounted().emit("heat-released");
+    await until(() => host.seeks.at(-1)?.seconds === 360, "the drag's last target lands after the release");
+    await until(() => why() === before, "the gesture ends once its last seek settled: nothing keeps following the state");
     const dragged = host.seeks.slice(1).map((seek) => seek.seconds);
     assert.ok(dragged.length >= 1 && dragged.length <= 3 && dragged.every((t) => [300, 330, 360].includes(t)), `the drag's targets, none sent twice: ${dragged}`);
     assert.ok(host.seeks.every((seek) => !seek.keyframes), "exact seeks");
@@ -1179,7 +1184,8 @@ test("the strip: a click seeks; a drag seeks as the pointer moves, in one gestur
     assert.equal(tab(host)["line-on"], true);
     const seeks = host.seeks.length;
     host.mounted().emit("heat-clicked", 0.2);
-    host.mounted().emit("heat-scrubbed", 0.3);
+    host.mounted().emit("heat-scrubbed", 0.3, true);
+    host.mounted().emit("heat-released");
     await host.settle();
     await tick();
     assert.equal(host.seeks.length, seeks, "no seek while the line shows");
@@ -1193,14 +1199,44 @@ test("the strip: a click seeks; a drag seeks as the pointer moves, in one gestur
     host.mounted().emit("line-released", y);
     await until(async () => (await settingsIn(setup.data)).highlightLine === 15, "the line kept as LU over the average");
     await eventually(() => Math.abs((tab(host)["heat-line"] as number) - y) < 0.1, true, "drawn where it was let go");
+    type Lists = { lines: boolean; above: boolean };
+    const lists = () => page(host) as unknown as Lists;
+    assert.deepEqual([lists().lines, lists().above], [false, false], "one list: no switch");
+    // Before: the scan's first suggestion dismissed (its marks are the scan list's).
+    const scanIds = rows(host).map((row) => row.id);
+    host.mounted().emit("dismiss-highlight", scanIds[0]!);
+    await eventually(() => rows(host).length, 1);
     host.mounted().emit("suggest-above");
+    await eventually(() => [lists().lines, lists().above], [true, true], "the parts shown, the switch there");
     await eventually(() => rows(host).length, 1);
     assert.match(rows(host)[0]!.range, /^3:(19|20)\.0 – 3:4\d\.0$/, rows(host)[0]!.range);
     assert.equal(rows(host)[0]!.kind, "loud");
+    assert.ok(rows(host)[0]!.id.startsWith("l"));
+    assert.equal(restoreRow(host), 0, "the parts' marks start empty");
     await until(async () => {
       const saved = await keptScan();
-      return saved.line === 15 && saved.candidates.length === 1 && saved.candidates[0]!.id.startsWith("l");
-    }, "kept with the file, as a scan's suggestions");
+      return saved.above?.line === 15 && saved.shown === "above" && saved.above.candidates.length === 1 && saved.candidates.length === 2 && saved.handled[scanIds[0]!] === "dismissed";
+    }, "kept with the file beside the scan's own, which stays with its marks");
+
+    // The switch: back to the scan's suggestions (as left: one dismissed), and to the parts again.
+    host.mounted().emit("show-list", false);
+    await eventually(() => lists().above, false);
+    await eventually(() => rows(host).map((row) => row.id), [scanIds[1]!], "the scan's list, no scan run");
+    assert.equal(restoreRow(host), 1);
+    assert.equal(scans(host), 2, "no new scan (600 s: the first scan's two windows)");
+    // A mark on the parts stays theirs.
+    host.mounted().emit("show-list", true);
+    await eventually(() => lists().above, true);
+    const part = rows(host)[0]!.id;
+    host.mounted().emit("dismiss-highlight", part);
+    await eventually(() => rows(host).length, 0);
+    host.mounted().emit("show-list", false);
+    await eventually(() => rows(host).map((row) => row.id), [scanIds[1]!], "the scan's list keeps its own marks");
+    host.mounted().emit("show-list", true);
+    await eventually(() => restoreRow(host), 1);
+    host.mounted().emit("restore-highlights");
+    await eventually(() => rows(host).map((row) => row.id), [part]);
+    await until(async () => (await keptScan()).shown === "above", "the list shown is kept");
 
     // At the top nothing is over it: the list stays and the video says so.
     host.mounted().emit("line-released", 8);
@@ -1208,6 +1244,21 @@ test("the strip: a click seeks; a drag seeks as the pointer moves, in one gestur
     host.mounted().emit("suggest-above");
     await until(() => host.osd.includes("Nothing is louder than the line."), "said");
     assert.equal(rows(host).length, 1);
+
+    // An idle stop and wake (the same player session): the toggle stays on.
+    await until(() => host.sessionStorage.get("lineOn") === true, "kept for the session");
+    const woken = new TestHost();
+    fakeFfmpeg(woken);
+    setup.play(woken);
+    const awake = await startPlugin(activate, { directory, host: woken, locale: "en", dataDirectory: setup.data, sessionStorage: host.sessionStorage });
+    try {
+      await showHighlights(woken);
+      await eventually(() => page(woken).state, "done");
+      await eventually(() => tab(woken)["line-on"], true, "on after the wake");
+      await until(() => (tab(woken)["heat-line"] as number) >= 0, "the line drawn after the wake");
+    } finally {
+      await awake.stop();
+    }
 
     // Off: no line, the strip seeks again.
     host.mounted().emit("set-line", false);
@@ -1218,7 +1269,7 @@ test("the strip: a click seeks; a drag seeks as the pointer moves, in one gestur
     await stop();
   }
 
-  // Restarted: the line's place is kept, the toggle is off (on for one run only).
+  // The player restarted (a new session): the line's place is kept, the toggle is off.
   const again = new TestHost();
   fakeFfmpeg(again);
   setup.play(again);
@@ -1235,4 +1286,60 @@ test("the strip: a click seeks; a drag seeks as the pointer moves, in one gestur
     await second.stop();
     await setup.cleanup();
   }
+});
+
+test("a drag whose gesture is lost to another file ignores its later moves until the next press; hiding the tab ends a drag's gesture", async () => {
+  const setup = await withMedia();
+  const host = new TestHost();
+  fakeFfmpeg(host);
+  setup.play(host);
+  const { stop } = await startIn(host, setup.data);
+  try {
+    await showHighlights(host);
+    await eventually(() => page(host).state, "ready");
+    host.mounted().emit("find-highlights");
+    await eventually(() => page(host).state, "done");
+    host.mounted().emit("heat-scrubbed", 0.5, true);
+    await until(() => host.seeks.at(-1)?.seconds === 300, "the drag seeks");
+    // Another file opens mid-drag: the gesture is lost.
+    host.openElsewhere(setup.media);
+    host.setSource({ position: 0, duration: 600, audioTracks: TRACK });
+    await host.settle();
+    const seeks = host.seeks.length;
+    host.mounted().emit("heat-scrubbed", 0.7, false);
+    host.mounted().emit("heat-scrubbed", 0.8, false);
+    await host.settle();
+    await tick();
+    assert.equal(host.seeks.length, seeks, "the rest of the drag does nothing");
+    host.mounted().emit("heat-released");
+    // The next press starts a new gesture.
+    host.mounted().emit("heat-scrubbed", 0.25, true);
+    await until(() => host.seeks.at(-1)?.seconds === 150, "a new drag seeks");
+    // The tab hides mid-drag: the gesture ends with it.
+    host.mountOther("sidebar", "vestra.playlist", { title: "Playlist" });
+    host.selectTab("vestra.playlist");
+    await until(() => !host.listening.has("source.state"), "nothing follows the player's state once the tab is hidden");
+    const after = host.seeks.length;
+    host.mounted().emit("heat-scrubbed", 0.9, false);
+    await host.settle();
+    await tick();
+    assert.equal(host.seeks.length, after, "its later moves do nothing");
+  } finally {
+    await stop();
+    await setup.cleanup();
+  }
+});
+
+test("kept results with the parts over the line: both lists read back with their own marks; a damaged second list is dropped, the scan's own stays", () => {
+  const base = { version: 1, path: "/v.mp4", size: 1, mtimeMs: 1, stream: 0, scanned: 1, mode: "loudness", duration: 600, average: -30, curve: [-30], candidates: [{ id: "100", start: 10, end: 20, peak: 6 }], handled: { 100: "dismissed" }, edits: {} };
+  const above = { line: 7.5, candidates: [{ id: "l50", start: 5, end: 9, peak: 8 }, { id: "bad", start: 9, end: 3, peak: 1 }], handled: { l50: "added" }, edits: { l50: { start: 4, end: 9 } } };
+  const read = savedOf({ ...base, above, shown: "above" })!;
+  assert.deepEqual(read.above, { line: 7.5, candidates: [{ id: "l50", start: 5, end: 9, peak: 8 }], handled: { l50: "added" }, edits: { l50: { start: 4, end: 9 } } });
+  assert.equal(read.shown, "above");
+  assert.deepEqual(listOf(read), read.above);
+  assert.deepEqual(read.handled, { 100: "dismissed" }, "the scan's marks are its own");
+  const plain = savedOf({ ...base, shown: "above" })!;
+  assert.equal(listOf(plain), plain, "no parts made: the scan's list whatever was shown");
+  const damaged = savedOf({ ...base, above: { line: "x", candidates: [] }, shown: "above" })!;
+  assert.deepEqual([damaged.above, damaged.shown, damaged.candidates.length], [undefined, undefined, 1]);
 });

@@ -11,7 +11,7 @@ import { AGAIN_MS, blockingNote, Collection, copyNote, exportParts, lengthClock,
 import type { FileKey, Part } from "./collection.ts";
 import { finisher, inflightStore, sweepWork } from "./finish.ts";
 import {
-  analyse, audioStreamArgs, audioStreamCount, averageOf, bandAt, bandsPath, COUNTS, curveOf, curvePath, curveScale, HighlightStore, LINE_RANGE, levelAt, lineY, nextAfter, pick, rangesAbove, RATE, scanLoudness, scanSounds, short, shortTerm, stepFrom, thumbName, timeAt,
+  analyse, audioStreamArgs, audioStreamCount, averageOf, bandAt, bandsPath, COUNTS, curveOf, curvePath, curveScale, HighlightStore, LINE_RANGE, levelAt, lineY, listOf, nextAfter, pick, rangesAbove, RATE, scanLoudness, scanSounds, short, shortTerm, stepFrom, thumbName, timeAt,
   total as lengthText,
 } from "./highlights.ts";
 import type { Candidate, HighlightScan } from "./highlights.ts";
@@ -1389,9 +1389,13 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     // Past the file reads: the page changed outside SDK-invoked code.
     plugin.update();
   }
-  /** The thumbnails kept for a scan; those no suggestion shows any more (scanned again, a start moved) go. */
+  /** The thumbnails kept for a scan; those no suggestion of either list shows any more (scanned again, a start moved) go. */
   const keptThumbs = (saved: HighlightScan) =>
-    kept.thumbs(saved.path, saved.stream, new Set(saved.candidates.map((candidate) => thumbName(candidate.id, saved.edits[candidate.id]?.start ?? candidate.start))));
+    kept.thumbs(
+      saved.path,
+      saved.stream,
+      new Set([saved, ...(saved.above ? [saved.above] : [])].flatMap((list) => list.candidates.map((candidate) => thumbName(candidate.id, list.edits[candidate.id]?.start ?? candidate.start)))),
+    );
   /** Writes of the page's scan (what was added, dismissed, moved), gathered for half a second; `flushKeep` writes them now. */
   let pendingKeep: { saved: HighlightScan; timer: ReturnType<typeof setTimeout> } | null = null;
   function keepSoon(saved: HighlightScan) {
@@ -1541,8 +1545,9 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
 
   /** The suggestions listed: the chosen number of the strongest, those added or dismissed left out, with the user's edges, in time order. */
   function suggestions(saved: HighlightScan) {
-    const { left, total: picked, dismissed } = pick(saved.candidates, settings.highlightCount, saved.handled);
-    const rows = left.map((candidate) => ({ ...candidate, ...saved.edits[candidate.id] })).sort((a, b) => a.start - b.start);
+    const list = listOf(saved);
+    const { left, total: picked, dismissed } = pick(list.candidates, settings.highlightCount, list.handled);
+    const rows = left.map((candidate) => ({ ...candidate, ...list.edits[candidate.id] })).sort((a, b) => a.start - b.start);
     return { rows, picked, dismissed };
   }
   const suggestionOf = (id: string) => (hl.saved ? suggestions(hl.saved).rows.find((row) => row.id === id) : undefined);
@@ -1553,7 +1558,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     const range = typedRange();
     const row = suggestionOf(hl.selected);
     if ("error" in range || !row || (row.start === range.start && row.end === range.end)) return;
-    saved.edits[hl.selected] = { start: range.start, end: range.end };
+    listOf(saved).edits[hl.selected] = { start: range.start, end: range.end };
     keepSoon(saved);
   }
   /** A click on a row (or its band on the strip): it is selected, the player jumps to its start, it becomes the Range. */
@@ -1581,14 +1586,15 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     // Those in the Collection already leave the list as added too: they are in it.
     const handled = await addRanges(rows, rows.length === 1, !all);
     if (hl.saved !== saved || !handled.length) return;
-    for (const row of handled) saved.handled[row.id] = "added";
+    const list = listOf(saved);
+    for (const row of handled) list.handled[row.id] = "added";
     if (handled.some((row) => row.id === hl.selected)) hl.selected = "";
     keepSoon(saved);
   }
   function dismissHighlight(id: string) {
     const saved = hl.saved;
     if (!saved || !suggestionOf(id)) return;
-    saved.handled[id] = "dismissed";
+    listOf(saved).handled[id] = "dismissed";
     if (hl.selected === id) hl.selected = "";
     keepSoon(saved);
   }
@@ -1598,7 +1604,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     if (!saved) return;
     const { dismissed } = suggestions(saved);
     if (!dismissed.length) return;
-    for (const id of dismissed) delete saved.handled[id];
+    const list = listOf(saved);
+    for (const id of dismissed) delete list.handled[id];
     keepSoon(saved);
   }
   /** The Highlights page is the one on screen. */
@@ -1622,7 +1629,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     const next = nextAfter(suggestions(saved).rows.map((row) => row.id), id);
     if (how === "add") await addHighlights([id]);
     else dismissHighlight(id);
-    if (hl.saved === saved && saved.handled[id] && next && !hl.selected) await selectHighlight(next);
+    if (hl.saved === saved && listOf(saved).handled[id] && next && !hl.selected) await selectHighlight(next);
   }
   /**
    * "N highlights found" on the video, with Show (Show Highlights, which opens the page and never scans: another file
@@ -1708,30 +1715,73 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     await player.seek(timeAt(ratio, seen.duration), { ifCurrent: seen }).catch((error) => console.error(`[clipexport] highlights: ${message(error)}`));
   }
   /**
-   * A drag on the strip seeks as the pointer moves, as the player's seek bar does: a gesture (`player.scrub`), each
-   * seek conditional on the one before, only the newest target sent while one runs (a fast drag never queues seeks),
-   * exact seeks. The release does not end it, so the newest target still lands; the next drag goes on with it while
-   * nothing else changed playback (else a new one starts). The tab sends moves only while the button is down:
-   * nothing runs between drags.
+   * A drag on the strip seeks as the pointer moves, as the player's seek bar does: a gesture (`player.scrub`) from
+   * the drag's first move, each seek conditional on the one before, only the newest target sent while one runs (a fast
+   * drag never queues seeks), exact seeks (the player's keyframe-only switch is not available to plugins). A gesture
+   * lost to an outside change (another file, a pause elsewhere) ignores the drag's later moves until the next press,
+   * as the seek bar does. An open gesture follows the player's state, so it ends as soon as it is no longer needed:
+   * after the release once its last seek settled (a bare `end()` would drop that target), when the tab hides and
+   * when the plugin stops. Nothing runs between drags.
    */
-  let scrubbing: Scrub | null = null;
-  plugin.onDispose(() => scrubbing?.end());
-  function heatScrubbed(ratio: number) {
-    const state = player.state;
-    if (lineShown() || !clippable(state) || !state.duration || !Number.isFinite(ratio)) return;
-    if (!scrubbing?.active) scrubbing = player.scrub();
-    scrubbing.seek(timeAt(ratio, state.duration)).catch((error) => console.error(`[clipexport] highlights: ${message(error)}`));
+  let scrubbing: { scrub: Scrub; last: Promise<unknown> } | null = null;
+  function heatScrubbed(ratio: number, first: boolean) {
+    if (first) {
+      scrubbing?.scrub.end();
+      scrubbing = null;
+      const state = player.state;
+      if (lineShown() || !clippable(state) || !state.duration) return;
+      scrubbing = { scrub: player.scrub(), last: Promise.resolve() };
+    }
+    const gesture = scrubbing;
+    const duration = player.state.duration;
+    if (!gesture || !Number.isFinite(ratio) || !duration) return;
+    // Lost (or ended): the drag's later moves do nothing; the next press starts again.
+    if (!gesture.scrub.active) return void (scrubbing = null);
+    gesture.last = gesture.scrub.seek(timeAt(ratio, duration)).catch((error) => console.error(`[clipexport] highlights: ${message(error)}`));
   }
+  /** The drag let go (or its press lost): the gesture ends once its newest seek has landed or was refused. */
+  function heatReleased() {
+    const gesture = scrubbing;
+    scrubbing = null;
+    if (gesture) void gesture.last.then(() => gesture.scrub.end());
+  }
+  /** The tab hid or the plugin stops: the gesture ends now. */
+  function endScrub() {
+    scrubbing?.scrub.end();
+    scrubbing = null;
+  }
+  plugin.onDispose(endScrub);
 
   /**
-   * The loudness line (the toggle beside "Scanned …"): on for this run of the plugin only, so the strip seeks again
-   * after a restart; where it sits is a setting (`highlightLine`, LU over the average), the same for every video.
+   * The loudness line (the toggle beside "Scanned …"): on for this session (`plugin.storage.session`, as the typed
+   * fields: an idle stop and wake keeps it; a restart of the player turns it off, so the strip seeks by default);
+   * where it sits is a setting (`highlightLine`, LU over the average), the same for every video.
    */
   let lineOn = false;
+  /** The toggle was used in this run: the session's value, read later, does not override it. */
+  let lineSet = false;
+  function setLine(on: boolean) {
+    lineSet = true;
+    if (on === lineOn) return;
+    lineOn = on;
+    if (on) endScrub();
+    void plugin.storage.session.set("lineOn", on).catch(() => {});
+  }
+  void plugin.storage.session.get<boolean>("lineOn").then(
+    (kept) => {
+      if (kept !== true || lineSet) return;
+      lineOn = true;
+      plugin.update();
+    },
+    () => {},
+  );
   /** The scan the line is drawn on: the page's kept result with sound, not while a scan runs. */
   const lineScan = () => (lineOn && hl.saved && hl.status === "done" && scan?.key !== hl.key && hl.saved.average !== null ? hl.saved : null);
   const lineShown = () => !!lineScan();
-  /** The line let go at this height of the curve's view box (0 top – 100 bottom): kept as LU over the average, in tenths. */
+  /**
+   * The line let go at this height of the curve's view box (0 top – 100 bottom; the tab holds it to the curve's
+   * range, so a press above or below the curve keeps the curve's top or bottom): kept as LU over the average, in tenths.
+   */
   function lineReleased(y: number) {
     const saved = lineScan();
     if (!saved || !Number.isFinite(y)) return;
@@ -1741,21 +1791,29 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     settings.highlightLine = next;
     store();
   }
-  /**
-   * Suggest Parts Above the Line: the parts louder than the line become the page's suggestions, as a scan's do (kept
-   * with the file; added and dismissed marks start over; the pictures of suggestions no longer listed go). None over
-   * the line: the list stays as it is and the video says so.
-   */
+  /** The parts of the page's scan louder than the line as drawn (held to the curve's range: a line kept from a louder video sits at this one's top). */
+  function lineParts(saved: HighlightScan) {
+    const average = saved.average!;
+    const scale = curveScale(saved.curve, average);
+    return rangesAbove(saved.curve, average, Math.max(scale.low, Math.min(scale.top, average + settings.highlightLine)), saved.duration);
+  }
+  /** Suggest Parts Above the Line. None over the line: the list stays as it is and the video says so. */
   async function suggestAbove() {
     const saved = lineScan();
     if (!saved) return;
-    const average = saved.average!;
-    // The line as drawn: held to the curve's range (a line kept from a louder video sits at this one's top).
-    const scale = curveScale(saved.curve, average);
-    const candidates = rangesAbove(saved.curve, average, Math.max(scale.low, Math.min(scale.top, average + settings.highlightLine)), saved.duration);
-    if (!candidates.length) return void shown(osd.show("Nothing is louder than the line."));
-    const next: HighlightScan = { ...saved, candidates, handled: {}, edits: {}, line: settings.highlightLine };
-    // What the old list still had to write is replaced by the new list.
+    const parts = lineParts(saved);
+    if (!parts.length) return void shown(osd.show("Nothing is louder than the line."));
+    await partsAsSuggestions(saved, parts);
+  }
+  /**
+   * The parts become the page's list of parts over the line, shown, beside the scan's own suggestions, which stay
+   * (with their added, dismissed and moved marks) for the switch above the list. Made again, the parts replace the
+   * last ones and their marks start over; the pictures of parts no longer listed go. Each part is added to the
+   * Collection one by one (+, Enter) or with Add All, as a scan's suggestions are.
+   */
+  async function partsAsSuggestions(saved: HighlightScan, candidates: Candidate[]) {
+    const next: HighlightScan = { ...saved, above: { line: settings.highlightLine, candidates, handled: {}, edits: {} }, shown: "above" };
+    // What the old object still had to write is in the new one (the scan's marks are carried over).
     if (pendingKeep?.saved === saved) {
       clearTimeout(pendingKeep.timer);
       pendingKeep = null;
@@ -1766,6 +1824,15 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     if (hl.saved === next) hl.thumbs = thumbs;
     // Past the file writes: the page changed outside SDK-invoked code.
     plugin.update();
+  }
+  /** The switch above the list: the scan's own suggestions (false) or the parts over the line (true), each with its marks. */
+  function showList(above: boolean) {
+    const saved = hl.saved;
+    if (!saved?.above || (saved.shown === "above") === above) return;
+    if (above) saved.shown = "above";
+    else delete saved.shown;
+    hl.selected = "";
+    keepSoon(saved);
   }
   /**
    * Ranges of the file playing as the last parts of the Collection, in order, as many as fit (the rest is said
@@ -1854,7 +1921,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     const view = highlightsFor(state);
     const empty = {
       state: "none", name: "", duration: "", percent: 0, left: -1, scanned: 0, loudness: true, first: false, reason: "", raw: "", count: COUNTS.indexOf(settings.highlightCount as never), remaining: 0, total: 0, length: "", picked: -1,
-      "only-loud": false, ...modelView(),
+      "only-loud": false, lines: false, above: false, ...modelView(),
     };
     if (!view || !state.duration) return { highlights: empty, heat: heatOf({ curve: "", bands: "", picked: "", seconds: 0 }), head: -1, line: -1, highlightRows: [], regions: [] as Candidate[] };
     const duration = state.duration;
@@ -1877,7 +1944,10 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     return {
       highlights: {
         ...empty,
-        state: running ? "scanning" : saved && !saved.candidates.length ? "nothing" : view.status,
+        state: running ? "scanning" : saved && !listOf(saved).candidates.length ? "nothing" : view.status,
+        // The parts over the line were made (the switch shows), and they are the list shown.
+        lines: !running && !!saved?.above,
+        above: !running && !!saved && listOf(saved) === saved.above,
         name: basename(view.path),
         // As the Range card shows it.
         duration: clock(duration),
@@ -1886,7 +1956,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
         scanned: saved ? minutesSince(saved.scanned) : 0,
         loudness: saved?.mode !== "sounds",
         // R4: the model found no sound that stands out, only loud moments.
-        "only-loud": saved?.mode === "sounds" && saved.line === undefined && rows.length > 0 && !saved.candidates.some((candidate) => candidate.sounds),
+        "only-loud": saved?.mode === "sounds" && listOf(saved) === saved && rows.length > 0 && !saved.candidates.some((candidate) => candidate.sounds),
         first: view.first,
         reason: view.problem.reason,
         raw: view.problem.raw.slice(0, 200),
@@ -2068,6 +2138,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     } else {
       marker.set(null);
       ui.picker = "";
+      // A drag cannot go on in a hidden tab; its gesture would keep the player's state followed.
+      endScrub();
       // What the user typed, written back for the next build of the tab (the player may rebuild it from the last values).
       panel.set({ clipStart: form.start, clipEnd: form.end });
     }
@@ -2343,13 +2415,13 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   // Up and Down while the list has the focus (the tab's own keys: -1 or 1).
   on("stepHighlight", (step: number) => stepHighlight(Number(step)));
   on("heatClicked", (ratio: number) => heatClicked(Number(ratio)));
-  on("heatScrubbed", (ratio: number) => heatScrubbed(Number(ratio)));
+  on("heatScrubbed", (ratio: number, first: boolean) => heatScrubbed(Number(ratio), first === true));
+  on("heatReleased", () => heatReleased());
   // The loudness line: the toggle, the line let go, Suggest Parts Above the Line.
-  on("setLine", (on: boolean) => {
-    lineOn = on === true;
-  });
+  on("setLine", (on: boolean) => setLine(on === true));
   on("lineReleased", (y: number) => lineReleased(Number(y)));
   on("suggestAbove", () => suggestAbove());
+  on("showList", (above: boolean) => showList(above === true));
   // The list's rows on screen changed (a scroll past a row, another height): the rows come in view ask for pictures.
   on("highlightsSeen", (first: number, count: number) => {
     const next = { first: Math.max(0, Math.floor(Number(first)) || 0), count: Math.max(1, Math.min(40, Math.ceil(Number(count)) || 1)) };
