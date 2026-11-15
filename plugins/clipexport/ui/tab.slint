@@ -375,6 +375,9 @@ export global ClipBridge {
     in property <HeatView> heat;
     // The playhead on the strip (0–1, -1 none).
     in property <float> heat-head: -1;
+    // The loudness line: its height in the curve's view box (0 top – 100 bottom), -1 while it is not drawn; the toggle.
+    in property <float> heat-line: -1;
+    in property <bool> line-on;
     in property <[HighlightRow]> highlight-rows;
 
     callback set-page(int);
@@ -450,6 +453,12 @@ export global ClipBridge {
     callback dismiss-selected();
     // A click on the strip, at this share of its width (0–1).
     callback heat-clicked(float);
+    // A drag on the strip (past a few pixels): the pointer at this share of its width.
+    callback heat-scrubbed(float);
+    // The loudness line: the toggle, the line let go at this height of the view box, Suggest Parts Above the Line.
+    callback set-line(bool);
+    callback line-released(float);
+    callback suggest-above();
     // The list's rows on screen: the first one in view and how many fit (whole rows), for their pictures.
     callback highlights-seen(int, int);
 }
@@ -475,6 +484,8 @@ global Glyphs {
     out property <string> warn: "M 7 1.5 L 12.5 10.5 H 1.5 Z M 7 5 V 7.3 M 7 9 L 7 9.05";
     // Three bars of a sound level (Find Highlights).
     out property <string> sound: "M 3.5 5 V 7 M 7 2.5 V 9.5 M 10.5 4 V 8";
+    // The loudness line: a level line across three bars (the line's toggle).
+    out property <string> line: "M 1 4 H 13 M 3.5 7 V 10.5 M 7 2 V 10.5 M 10.5 6 V 10.5";
 }
 
 component Glyph inherits Path {
@@ -584,6 +595,8 @@ component IconAction {
     in property <string> tip;
     in property <[ToolTipKey]> tip-keys;
     in property <bool> enabled: true;
+    // A toggle's "on" state: the glyph in the accent (the library Button's `checked`).
+    in property <bool> checked;
     callback clicked();
     width: 22px;
     height: 22px;
@@ -598,6 +611,7 @@ component IconAction {
             icon: root.glyph;
             stroked: true;
             enabled: root.enabled;
+            checked: root.checked;
             accessible-label: root.tip;
             clicked => { root.clicked(); }
         }
@@ -1436,11 +1450,30 @@ component RangeCard inherits Rectangle {
 
 // The Highlights page's heat strip: the whole video in a well, the loudness as one area (one Path, never an element
 // per sample), a band per suggestion under it (one Path), the selected one in the accent with a column above it,
-// the playhead. A click seeks, or selects the suggestion whose band it hits (the plugin decides); hovering shows the time.
+// the playhead. A click seeks, or selects the suggestion whose band it hits (the plugin decides); a drag seeks as the
+// pointer moves, as the player's seek bar does (the playhead follows the pointer at once); hovering shows the time.
+// With the loudness line (`line` >= 0): the line across the strip in the accent, the curve over it drawn stronger, and a
+// press or a drag anywhere on the strip moves the line instead of seeking (its new height is sent when let go).
 component HeatStrip inherits Rectangle {
     in property <HeatView> heat;
     in property <float> head: -1;
+    in property <float> line: -1;
     callback clicked(float);
+    callback scrubbed(float);
+    callback line-released(float);
+    // A drag that seeks: past a few pixels from the press; where the pointer is (0–1).
+    private property <length> press-x;
+    private property <bool> scrubbing;
+    private property <float> scrub-at;
+    // After the release the playhead stays where the drag left it until the player's next position arrives.
+    private property <bool> scrub-held;
+    changed head => { root.scrub-held = false; }
+    // The line under the pointer, and after the release until the plugin's value arrives (`changed line`).
+    private property <bool> line-held;
+    private property <float> line-draft;
+    private property <float> line-shown: root.line-held ? root.line-draft : root.line;
+    private property <length> line-y: 1px + root.line-shown / 100 * 34px;
+    changed line => { root.line-held = false; }
     height: 44px;
     background: Theme.bg-list;
     border-width: 1px;
@@ -1469,6 +1502,25 @@ component HeatStrip inherits Rectangle {
         fill: Theme.text-dim;
         opacity: 0.55;
     }
+    // Louder than the line: the same curve, stronger, cut at the line.
+    if root.line >= 0 && root.heat.curve != "": Rectangle {
+        x: 1px;
+        y: 1px;
+        width: root.width - 2px;
+        height: max(0px, root.line-y - 1px);
+        clip: true;
+        Path {
+            x: 0px;
+            y: 0px;
+            width: parent.width;
+            height: 34px;
+            viewbox-width: 1000;
+            viewbox-height: 100;
+            commands: root.heat.curve;
+            fill: Theme.text;
+            opacity: 0.9;
+        }
+    }
     if root.heat.bands != "": Path {
         x: 1px;
         y: 37px;
@@ -1489,19 +1541,64 @@ component HeatStrip inherits Rectangle {
         commands: root.heat.picked;
         fill: Theme.accent;
     }
-    if root.head >= 0: Rectangle {
-        x: 1px + root.head * (root.width - 2px) - 1px;
+    if root.head >= 0 || root.scrubbing || root.scrub-held: Rectangle {
+        x: 1px + (root.scrubbing || root.scrub-held ? root.scrub-at : root.head) * (root.width - 2px) - 1px;
         y: 2px;
         width: 2px;
         height: root.height - 4px;
         border-radius: 1px;
         background: Theme.text;
     }
+    // The loudness line, across the whole strip.
+    if root.line >= 0: Rectangle {
+        x: 0px;
+        y: root.line-y - 1px;
+        width: root.width;
+        height: 2px;
+        background: Theme.accent;
+    }
     ToolTipArea {
         text: root.heat.seconds > 0 && touch.has-hover ? Words.hms(round(touch.mouse-x / touch.width * root.heat.seconds)) : "";
         touch := TouchArea {
-            mouse-cursor: pointer;
-            clicked => { root.clicked(self.mouse-x / self.width); }
+            mouse-cursor: root.line >= 0 ? MouseCursor.ns-resize : MouseCursor.pointer;
+            pointer-event(event) => {
+                if event.button != PointerEventButton.left {
+                    return;
+                }
+                if event.kind == PointerEventKind.down {
+                    root.press-x = self.mouse-x;
+                    root.scrubbing = false;
+                    if root.line >= 0 {
+                        root.line-draft = max(8, min(100, (self.mouse-y - 1px) / 34px * 100));
+                        root.line-held = true;
+                    }
+                } else if event.kind == PointerEventKind.up {
+                    if root.line-held && root.line >= 0 {
+                        root.line-released(root.line-draft);
+                    } else if root.scrubbing {
+                        root.scrubbing = false;
+                        root.scrub-held = true;
+                    } else if root.line < 0 {
+                        root.clicked(self.mouse-x / self.width);
+                    }
+                } else if event.kind == PointerEventKind.cancel {
+                    root.scrubbing = false;
+                    root.line-held = false;
+                }
+            }
+            moved => {
+                if !self.pressed {
+                    return;
+                }
+                if root.line >= 0 {
+                    root.line-draft = max(8, min(100, (self.mouse-y - 1px) / 34px * 100));
+                    root.line-held = true;
+                } else if root.scrubbing || self.mouse-x - root.press-x > 3px || root.press-x - self.mouse-x > 3px {
+                    root.scrubbing = true;
+                    root.scrub-at = max(0, min(1, self.mouse-x / self.width));
+                    root.scrubbed(root.scrub-at);
+                }
+            }
         }
     }
 }
@@ -2655,9 +2752,12 @@ export component ClipExportTab inherits Rectangle {
                     HeatStrip {
                         heat: ClipBridge.heat;
                         head: ClipBridge.heat-head;
+                        line: ClipBridge.heat-line;
                         clicked(ratio) => { ClipBridge.heat-clicked(ratio); }
+                        scrubbed(ratio) => { ClipBridge.heat-scrubbed(ratio); }
+                        line-released(y) => { ClipBridge.line-released(y); }
                     }
-                    // After a scan: when (it measured loudness only), Scan Again, what it listens to.
+                    // After a scan: when (it measured loudness only), the loudness line's toggle, what it listens to.
                     if root.hl-scanned: HorizontalLayout {
                         spacing: 4px;
                         Line {
@@ -2668,9 +2768,10 @@ export component ClipExportTab inherits Rectangle {
                                 + (ClipBridge.highlights.first ? " · " + @tr("the file's first audio track") : "");
                         }
                         IconAction {
-                            glyph: Glyphs.retry;
-                            tip: @tr("Scan Again");
-                            clicked => { ClipBridge.find-highlights(); }
+                            glyph: Glyphs.line;
+                            checked: ClipBridge.line-on;
+                            tip: @tr("Loudness line: drag it up or down on the strip to choose what counts as loud");
+                            clicked => { ClipBridge.set-line(!ClipBridge.line-on); }
                         }
                         VerticalLayout {
                             alignment: center;
@@ -2681,6 +2782,26 @@ export component ClipExportTab inherits Rectangle {
                                 Glyph { x: 2px; y: 3px; glyph: Glyphs.info; }
                             }
                         }
+                    }
+                    // Scan Again: the Find Highlights button of a file not scanned, its label changed.
+                    if root.hl-scanned: Action {
+                        horizontal-stretch: 1;
+                        min-height: Theme.button-primary-height;
+                        primary: true;
+                        text: @tr("Scan Again");
+                        glyph: Glyphs.sound;
+                        show-key: false;
+                        tip: ClipBridge.keys.highlights != "" ? @tr("Find Highlights") : "";
+                        tip-keys: [{ key: ClipBridge.keys.highlights, text: "" }];
+                        clicked => { ClipBridge.find-highlights(); }
+                    }
+                    // The loudness line is on: its parts become the suggestions.
+                    if root.hl-scanned && ClipBridge.heat-line >= 0: Action {
+                        horizontal-stretch: 1;
+                        text: @tr("Suggest Parts Above the Line");
+                        glyph: Glyphs.line;
+                        tip: @tr("Replaces the suggestions with the parts louder than the line");
+                        clicked => { ClipBridge.suggest-above(); }
                     }
                     // Before a scan (S1, F1) and after a problem: what it finds, and for what (not while the model downloads).
                     if (root.hl-state == "ready" || root.hl-state == "error") && root.hl-model != "downloading": VerticalLayout {

@@ -1,6 +1,6 @@
 import { access, constants, mkdir, readdir, rm, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-import type { CommandOptions, ExportCheck, ExportPart, ImageRef, Panel, PanelState, Plugin, PlayerState, Text } from "@vestra-player/sdk";
+import type { CommandOptions, ExportCheck, ExportPart, ImageRef, Panel, PanelState, Plugin, PlayerState, Scrub, Text } from "@vestra-player/sdk";
 import {
   abRange, animatedOf, animatedOutput, AUDIO_RATES, codecArgs, crfOf, defaultRange, effectiveMethod, estimate, exportEncoding, fastContainer, HEIGHTS, keyframeArgs, LAST_SECONDS, lastRange, lastSeconds,
   METHODS, methodOf, NO_TIMELINE, OUTPUTS, parseCodec, parseKeyframes, PRESET_ENCODE, presetOf, PRESETS, RATES, snapStart, SPEEDS, timeline, timelineWindow,
@@ -11,7 +11,7 @@ import { AGAIN_MS, blockingNote, Collection, copyNote, exportParts, lengthClock,
 import type { FileKey, Part } from "./collection.ts";
 import { finisher, inflightStore, sweepWork } from "./finish.ts";
 import {
-  analyse, audioStreamArgs, audioStreamCount, averageOf, bandAt, bandsPath, COUNTS, curveOf, curvePath, HighlightStore, nextAfter, pick, RATE, scanLoudness, scanSounds, short, shortTerm, stepFrom, thumbName,
+  analyse, audioStreamArgs, audioStreamCount, averageOf, bandAt, bandsPath, COUNTS, curveOf, curvePath, curveScale, HighlightStore, LINE_RANGE, levelAt, lineY, nextAfter, pick, rangesAbove, RATE, scanLoudness, scanSounds, short, shortTerm, stepFrom, thumbName, timeAt,
   total as lengthText,
 } from "./highlights.ts";
 import type { Candidate, HighlightScan } from "./highlights.ts";
@@ -1698,13 +1698,74 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     // Past ffmpeg's await: the row's picture changed outside SDK-invoked code.
     plugin.update();
   }
-  /** The strip: a click on a band selects its suggestion; elsewhere it seeks. */
+  /** The strip: a click on a band selects its suggestion; elsewhere it seeks. While the loudness line shows, a press moves the line instead. */
   async function heatClicked(ratio: number) {
+    if (lineShown()) return;
     const seen = await player.refresh();
     if (!clippable(seen) || !seen.duration || !Number.isFinite(ratio)) return;
     const band = hl.saved && hl.status === "done" && !scan ? bandAt(suggestions(hl.saved).rows, ratio, seen.duration) : null;
     if (band) return selectHighlight(band.id);
-    await player.seek(Math.max(0, Math.min(1, ratio)) * seen.duration, { ifCurrent: seen }).catch((error) => console.error(`[clipexport] highlights: ${message(error)}`));
+    await player.seek(timeAt(ratio, seen.duration), { ifCurrent: seen }).catch((error) => console.error(`[clipexport] highlights: ${message(error)}`));
+  }
+  /**
+   * A drag on the strip seeks as the pointer moves, as the player's seek bar does: a gesture (`player.scrub`), each
+   * seek conditional on the one before, only the newest target sent while one runs (a fast drag never queues seeks),
+   * exact seeks. The release does not end it, so the newest target still lands; the next drag goes on with it while
+   * nothing else changed playback (else a new one starts). The tab sends moves only while the button is down:
+   * nothing runs between drags.
+   */
+  let scrubbing: Scrub | null = null;
+  plugin.onDispose(() => scrubbing?.end());
+  function heatScrubbed(ratio: number) {
+    const state = player.state;
+    if (lineShown() || !clippable(state) || !state.duration || !Number.isFinite(ratio)) return;
+    if (!scrubbing?.active) scrubbing = player.scrub();
+    scrubbing.seek(timeAt(ratio, state.duration)).catch((error) => console.error(`[clipexport] highlights: ${message(error)}`));
+  }
+
+  /**
+   * The loudness line (the toggle beside "Scanned …"): on for this run of the plugin only, so the strip seeks again
+   * after a restart; where it sits is a setting (`highlightLine`, LU over the average), the same for every video.
+   */
+  let lineOn = false;
+  /** The scan the line is drawn on: the page's kept result with sound, not while a scan runs. */
+  const lineScan = () => (lineOn && hl.saved && hl.status === "done" && scan?.key !== hl.key && hl.saved.average !== null ? hl.saved : null);
+  const lineShown = () => !!lineScan();
+  /** The line let go at this height of the curve's view box (0 top – 100 bottom): kept as LU over the average, in tenths. */
+  function lineReleased(y: number) {
+    const saved = lineScan();
+    if (!saved || !Number.isFinite(y)) return;
+    const lu = Math.round((levelAt(y, curveScale(saved.curve, saved.average!)) - saved.average!) * 10) / 10;
+    const next = Math.max(LINE_RANGE.low, Math.min(LINE_RANGE.high, lu));
+    if (next === settings.highlightLine) return;
+    settings.highlightLine = next;
+    store();
+  }
+  /**
+   * Suggest Parts Above the Line: the parts louder than the line become the page's suggestions, as a scan's do (kept
+   * with the file; added and dismissed marks start over; the pictures of suggestions no longer listed go). None over
+   * the line: the list stays as it is and the video says so.
+   */
+  async function suggestAbove() {
+    const saved = lineScan();
+    if (!saved) return;
+    const average = saved.average!;
+    // The line as drawn: held to the curve's range (a line kept from a louder video sits at this one's top).
+    const scale = curveScale(saved.curve, average);
+    const candidates = rangesAbove(saved.curve, average, Math.max(scale.low, Math.min(scale.top, average + settings.highlightLine)), saved.duration);
+    if (!candidates.length) return void shown(osd.show("Nothing is louder than the line."));
+    const next: HighlightScan = { ...saved, candidates, handled: {}, edits: {}, line: settings.highlightLine };
+    // What the old list still had to write is replaced by the new list.
+    if (pendingKeep?.saved === saved) {
+      clearTimeout(pendingKeep.timer);
+      pendingKeep = null;
+    }
+    Object.assign(hl, { saved: next, selected: "" });
+    await kept.save(next);
+    const thumbs = await keptThumbs(next);
+    if (hl.saved === next) hl.thumbs = thumbs;
+    // Past the file writes: the page changed outside SDK-invoked code.
+    plugin.update();
   }
   /**
    * Ranges of the file playing as the last parts of the Collection, in order, as many as fit (the rest is said
@@ -1795,7 +1856,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       state: "none", name: "", duration: "", percent: 0, left: -1, scanned: 0, loudness: true, first: false, reason: "", raw: "", count: COUNTS.indexOf(settings.highlightCount as never), remaining: 0, total: 0, length: "", picked: -1,
       "only-loud": false, ...modelView(),
     };
-    if (!view || !state.duration) return { highlights: empty, heat: heatOf({ curve: "", bands: "", picked: "", seconds: 0 }), head: -1, highlightRows: [], regions: [] as Candidate[] };
+    if (!view || !state.duration) return { highlights: empty, heat: heatOf({ curve: "", bands: "", picked: "", seconds: 0 }), head: -1, line: -1, highlightRows: [], regions: [] as Candidate[] };
     const duration = state.duration;
     const head = state.position !== null ? Math.max(0, Math.min(1, state.position / duration)) : -1;
     const running = scan && scan.key === view.key ? scan : null;
@@ -1825,7 +1886,7 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
         scanned: saved ? minutesSince(saved.scanned) : 0,
         loudness: saved?.mode !== "sounds",
         // R4: the model found no sound that stands out, only loud moments.
-        "only-loud": saved?.mode === "sounds" && rows.length > 0 && !saved.candidates.some((candidate) => candidate.sounds),
+        "only-loud": saved?.mode === "sounds" && saved.line === undefined && rows.length > 0 && !saved.candidates.some((candidate) => candidate.sounds),
         first: view.first,
         reason: view.problem.reason,
         raw: view.problem.raw.slice(0, 200),
@@ -1855,6 +1916,11 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
         ...(dismissed.length ? [{ id: "restore", range: "", brief: "", badge: "", kind: "", kind2: "", level: 0, level1: 0, level2: 0, lu: "", selected: false, thumb: null, restore: dismissed.length }] : []),
       ],
       regions: running ? [] : others,
+      // The loudness line's height in the curve's view box (0 top – 100 bottom); -1 while it is off.
+      line: (() => {
+        const lined = lineScan();
+        return lined ? lineY(lined.average! + settings.highlightLine, curveScale(lined.curve, lined.average!)) : -1;
+      })(),
     };
   }
 
@@ -1944,6 +2010,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       highlights: found.highlights,
       heat: found.heat,
       heatHead: found.head,
+      heatLine: found.line,
+      lineOn,
       highlightRows: found.highlightRows,
       mode: tabMode(state),
       canClip: clippable(state),
@@ -2275,6 +2343,13 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   // Up and Down while the list has the focus (the tab's own keys: -1 or 1).
   on("stepHighlight", (step: number) => stepHighlight(Number(step)));
   on("heatClicked", (ratio: number) => heatClicked(Number(ratio)));
+  on("heatScrubbed", (ratio: number) => heatScrubbed(Number(ratio)));
+  // The loudness line: the toggle, the line let go, Suggest Parts Above the Line.
+  on("setLine", (on: boolean) => {
+    lineOn = on === true;
+  });
+  on("lineReleased", (y: number) => lineReleased(Number(y)));
+  on("suggestAbove", () => suggestAbove());
   // The list's rows on screen changed (a scroll past a row, another height): the rows come in view ask for pictures.
   on("highlightsSeen", (first: number, count: number) => {
     const next = { first: Math.max(0, Math.floor(Number(first)) || 0), count: Math.max(1, Math.min(40, Math.ceil(Number(count)) || 1)) };

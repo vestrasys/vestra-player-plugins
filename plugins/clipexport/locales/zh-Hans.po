@@ -197,16 +197,16 @@ msgstr "声音模型无法在这台电脑上运行。"
 msgid "Export failed: {}"
 msgstr "导出失败：{}"
 
-#: main.ts:205 ui/tab.slint:1905 ui/tab.slint:2888
+#: main.ts:205 ui/tab.slint:2004 ui/tab.slint:3016
 msgid "Clip"
 msgstr "片段"
 
 #. {} is how many suggestions are left on the Highlights page.
-#: main.ts:205 ui/tab.slint:1907 ui/tab.slint:1912 ui/tab.slint:2924
+#: main.ts:205 ui/tab.slint:2006 ui/tab.slint:2011 ui/tab.slint:3052
 msgid "Highlights"
 msgstr "高光"
 
-#: main.ts:252 ui/tab.slint:941
+#: main.ts:252 ui/tab.slint:955
 msgid "Show in Folder"
 msgstr "在文件夹中显示"
 
@@ -226,7 +226,7 @@ msgstr "请选择一个已有的文件夹。"
 msgid "Clip folder: {}"
 msgstr "片段文件夹：{}"
 
-#: main.ts:513 ui/tab.slint:2465
+#: main.ts:513 ui/tab.slint:2569
 msgid "Export Clip"
 msgstr "导出片段"
 
@@ -234,7 +234,7 @@ msgstr "导出片段"
 msgid "Exporting the last {} seconds"
 msgstr "正在导出最后 {} 秒"
 
-#: main.ts:900 main.ts:1739
+#: main.ts:900 main.ts:1802
 msgid "Added as part {}"
 msgstr "已加入为第 {} 段"
 
@@ -245,7 +245,7 @@ msgid "Add Again"
 msgstr "再次添加"
 
 #. {} is the number of the part in the Collection that is this range (it was not added again).
-#: main.ts:925 main.ts:1743
+#: main.ts:925 main.ts:1806
 #, x-machine
 msgid "Already in the Collection as part {}"
 msgstr "已在合集中，为第 {} 段"
@@ -283,7 +283,7 @@ msgstr "第 {} 段没有视频：请移除"
 msgid "Part {} is outside its file: remove it"
 msgstr "第 {} 段超出了文件范围：请移除"
 
-#: main.ts:1053 main.ts:2304
+#: main.ts:1053 main.ts:2381
 msgid "Export Collection"
 msgstr "导出合集"
 
@@ -292,140 +292,145 @@ msgid "Transition applied to every join."
 msgstr "已将此过渡用于所有衔接。"
 
 #. the button of "N highlights found" on the video: it opens the Highlights page.
-#: main.ts:1632
+#: main.ts:1633
 msgid "Show"
 msgstr "查看"
 
-#: main.ts:1633 ui/tab.slint:2759
+#: main.ts:1634 ui/tab.slint:2887
 msgid "Nothing stood out in this video."
 msgstr "这个视频里没有突出的片段。"
 
-#: main.ts:1634
+#: main.ts:1635
 msgid "1 highlight found"
 msgstr "找到 1 个高光片段"
 
 #. {} is a number of suggested ranges (2 or more).
-#: main.ts:1636
+#: main.ts:1637
 msgid "{} highlights found"
 msgstr "找到 {} 个高光片段"
 
+#: main.ts:1756
+#, x-machine
+msgid "Nothing is louder than the line."
+msgstr "没有比这条线更响的部分。"
+
 #. {} is how many suggestions (2 or more) Add All did not add because they were parts already.
-#: main.ts:1746
+#: main.ts:1809
 #, x-machine
 msgid "{} were already in the Collection"
 msgstr "{} 段已在合集中"
 
-#: main.ts:1861 manifest.json
+#: main.ts:1929 manifest.json
 msgid "Clip Export"
 msgstr "片段导出"
 
-#: main.ts:2031 main.ts:2334
+#: main.ts:2101 main.ts:2411
 msgid "The Clip Export tab could not open."
 msgstr "无法打开“片段导出”页签。"
 
-#: main.ts:2303
+#: main.ts:2380
 msgid "Export Clip…"
 msgstr "导出片段…"
 
-#: main.ts:2303 main.ts:2304 main.ts:2424
+#: main.ts:2380 main.ts:2381 main.ts:2501
 msgid "Export"
 msgstr "导出"
 
-#: main.ts:2303 main.ts:2304 main.ts:2429 ui/tab.slint:2363
+#: main.ts:2380 main.ts:2381 main.ts:2506 ui/tab.slint:2467
 msgid "Nothing to export"
 msgstr "没有可导出的内容"
 
-#: main.ts:2304
+#: main.ts:2381
 msgid "Clip Export Tab"
 msgstr "片段导出页签"
 
-#: main.ts:2304
+#: main.ts:2381
 msgid "Export Clip Range"
 msgstr "导出片段范围"
 
-#: main.ts:2304 ui/tab.slint:1715 ui/tab.slint:2397
+#: main.ts:2381 ui/tab.slint:1814 ui/tab.slint:2501
 msgid "Set Clip Start"
 msgstr "设为片段起点"
 
-#: main.ts:2304 ui/tab.slint:1724 ui/tab.slint:2417
+#: main.ts:2381 ui/tab.slint:1823 ui/tab.slint:2521
 msgid "Set Clip End"
 msgstr "设为片段终点"
 
-#: main.ts:2304
+#: main.ts:2381
 msgid "Export Tasks…"
 msgstr "导出任务…"
 
-#: main.ts:2304
+#: main.ts:2381
 msgid "Clip Export Settings…"
 msgstr "片段导出设置…"
 
-#: main.ts:2304
+#: main.ts:2381
 msgid "Clip Folder…"
 msgstr "片段文件夹…"
 
-#: main.ts:2304 ui/tab.slint:2855
+#: main.ts:2381 ui/tab.slint:2983
 msgid "Open Clip Folder"
 msgstr "打开片段文件夹"
 
-#: main.ts:2304
+#: main.ts:2381
 msgid "Show Last Clip in Folder"
 msgstr "在文件夹中显示最近的片段"
 
-#: main.ts:2304 ui/tab.slint:2531
+#: main.ts:2381 ui/tab.slint:2635
 msgid "Add Range to Collection"
 msgstr "将范围加入合集"
 
-#: main.ts:2304
+#: main.ts:2381
 msgid "Show Collection"
 msgstr "显示合集"
 
-#: main.ts:2304
+#: main.ts:2381
 msgid "Clear Collection"
 msgstr "清空合集"
 
-#: main.ts:2304
+#: main.ts:2381
 msgid "Undo Clear Collection"
 msgstr "撤销清空合集"
 
-#: main.ts:2304 ui/tab.slint:1180
+#: main.ts:2381 ui/tab.slint:1196
 msgid "Remove from Collection"
 msgstr "从合集中移除"
 
-#: main.ts:2304
+#: main.ts:2381
 msgid "Undo Apply to All"
 msgstr "撤销全部应用"
 
-#: main.ts:2304
+#: main.ts:2381
 #, x-machine
 msgid "Add Range Again"
 msgstr "再次添加范围"
 
-#: main.ts:2304 ui/tab.slint:2725 ui/tab.slint:2729
+#: main.ts:2381 ui/tab.slint:2794 ui/tab.slint:2853 ui/tab.slint:2857
 msgid "Find Highlights"
 msgstr "查找高光"
 
-#: main.ts:2304
+#: main.ts:2381
 msgid "Add Highlight to Collection"
 msgstr "将高光添加到合集"
 
-#: main.ts:2304
+#: main.ts:2381
 msgid "Dismiss Highlight"
 msgstr "忽略高光"
 
-#: main.ts:2304
+#: main.ts:2381
 msgid "Show Highlights"
 msgstr "显示高光"
 
-#: main.ts:2357
+#: main.ts:2434
 msgid "Clip start: {}"
 msgstr "片段起点：{}"
 
-#: main.ts:2362
+#: main.ts:2439
 msgid "Clip end: {}"
 msgstr "片段终点：{}"
 
 #. {} is 10, 30, 60 or 120.
-#: main.ts:2423 ui/tab.slint:2453
+#: main.ts:2500 ui/tab.slint:2557
 msgid "Export Last {} Seconds"
 msgstr "导出最后 {} 秒"
 
@@ -482,7 +487,7 @@ msgid "none"
 msgstr "无"
 
 #. {} is frames per second.
-#: ui/parts.slint:94 ui/tab.slint:2283
+#: ui/parts.slint:94 ui/tab.slint:2387
 msgid "{} fps"
 msgstr "{} fps"
 
@@ -649,27 +654,27 @@ msgstr "已开始导出，可在结果中查看。"
 msgid "Restarted."
 msgstr "已重新开始。"
 
-#: ui/parts.slint:196 ui/tab.slint:714
+#: ui/parts.slint:196 ui/tab.slint:728
 msgid "Fast"
 msgstr "快速"
 
-#: ui/parts.slint:197 ui/tab.slint:715
+#: ui/parts.slint:197 ui/tab.slint:729
 msgid "Precise"
 msgstr "精确"
 
-#: ui/parts.slint:205 ui/tab.slint:2259 ui/tab.slint:2260
+#: ui/parts.slint:205 ui/tab.slint:2363 ui/tab.slint:2364
 msgid "Same as source"
 msgstr "与源相同"
 
-#: ui/parts.slint:206 ui/tab.slint:2232 ui/tab.slint:2259 ui/tab.slint:2260
+#: ui/parts.slint:206 ui/tab.slint:2336 ui/tab.slint:2363 ui/tab.slint:2364
 msgid "High quality"
 msgstr "高画质"
 
-#: ui/parts.slint:207 ui/tab.slint:2259 ui/tab.slint:2260
+#: ui/parts.slint:207 ui/tab.slint:2363 ui/tab.slint:2364
 msgid "Small file"
 msgstr "小文件"
 
-#: ui/parts.slint:208 ui/tab.slint:2259
+#: ui/parts.slint:208 ui/tab.slint:2363
 msgid "Custom"
 msgstr "自定义"
 
@@ -695,7 +700,7 @@ msgstr "{} 天前"
 #. {} is a number of seconds.
 #. {} is a clip's length in seconds ("3.5").
 #. {} is a length in seconds ("1.0").
-#: ui/parts.slint:235 ui/tab.slint:871 ui/tab.slint:1150 ui/tab.slint:1242 ui/tab.slint:1658 ui/tab.slint:1731 ui/tab.slint:2041 ui/tab.slint:2042 ui/tab.slint:2043 ui/tab.slint:2044 ui/tab.slint:2347 ui/tab.slint:2941
+#: ui/parts.slint:235 ui/tab.slint:885 ui/tab.slint:1166 ui/tab.slint:1258 ui/tab.slint:1757 ui/tab.slint:1830 ui/tab.slint:2145 ui/tab.slint:2146 ui/tab.slint:2147 ui/tab.slint:2148 ui/tab.slint:2451 ui/tab.slint:3069
 msgid "{} s"
 msgstr "{} 秒"
 
@@ -715,719 +720,734 @@ msgid "about {0}–{1} min"
 msgstr "约 {0}–{1} 分钟"
 
 #. {0} is the time a Fast cut starts at (the keyframe), {1} how many seconds before the typed start.
-#: ui/tab.slint:776
+#: ui/tab.slint:790
 msgid "{0} (−{1} s)"
 msgstr "{0}（提前 {1} 秒）"
 
-#: ui/tab.slint:820
+#: ui/tab.slint:834
 msgid "Default name"
 msgstr "恢复默认名称"
 
-#: ui/tab.slint:893
+#: ui/tab.slint:907
 msgid "File moved or deleted"
 msgstr "文件已移动或删除"
 
-#: ui/tab.slint:894
+#: ui/tab.slint:908
 msgid "Failed: {}"
 msgstr "失败：{}"
 
 #. {} is a time range.
-#: ui/tab.slint:897
+#: ui/tab.slint:911
 msgid "Queued · {}"
 msgstr "排队中 · {}"
 
 #. {} is a percentage.
-#: ui/tab.slint:899 ui/tab.slint:1056
+#: ui/tab.slint:913 ui/tab.slint:1070
 msgid "Finishing…"
 msgstr "正在完成…"
 
 #. {0} is a percentage, {1} seconds.
-#: ui/tab.slint:902
+#: ui/tab.slint:916
 msgid "Exporting · {0} % · about {1} s left"
 msgstr "导出中 · {0}% · 约剩 {1} 秒"
 
 #. {} is a percentage.
-#: ui/tab.slint:904
+#: ui/tab.slint:918
 msgid "Exporting · {} %"
 msgstr "导出中 · {}%"
 
 #. {0} is a task state (Exporting), {1} the time spent (0:12).
-#: ui/tab.slint:906 ui/tab.slint:2231
+#: ui/tab.slint:920 ui/tab.slint:2335
 msgid "{0} · {1}"
 msgstr "{0} · {1}"
 
-#: ui/tab.slint:908
+#: ui/tab.slint:922
 msgid "{} MB"
 msgstr "{} MB"
 
-#: ui/tab.slint:926 ui/tab.slint:1024 ui/tab.slint:1525 ui/tab.slint:1570
+#: ui/tab.slint:940 ui/tab.slint:1038 ui/tab.slint:1624 ui/tab.slint:1669
 msgid "Cancel"
 msgstr "取消"
 
-#: ui/tab.slint:931 ui/tab.slint:2742
+#: ui/tab.slint:945 ui/tab.slint:2870
 msgid "Retry"
 msgstr "重试"
 
-#: ui/tab.slint:936
+#: ui/tab.slint:950
 msgid "Open"
 msgstr "打开"
 
-#: ui/tab.slint:946
+#: ui/tab.slint:960
 msgid "Remove from List"
 msgstr "从列表中移除"
 
 #. {} is the file or folder name.
-#: ui/tab.slint:1021
+#: ui/tab.slint:1035
 msgid "Exporting {}"
 msgstr "正在导出 {}"
 
 #. {0} is the transition being written, {1} how many the merged export has.
-#: ui/tab.slint:1052
+#: ui/tab.slint:1066
 msgid "transition {0} / {1}"
 msgstr "过渡 {0} / {1}"
 
 #. {0} is the part being written, {1} how many parts the merged export has.
-#: ui/tab.slint:1054
+#: ui/tab.slint:1068
 msgid "part {0} / {1}"
 msgstr "第 {0} / {1} 段"
 
 #. {0} is a percentage, {1} a number of minutes.
-#: ui/tab.slint:1057 ui/tab.slint:1586
+#: ui/tab.slint:1071 ui/tab.slint:1685
 msgid "{} %"
 msgstr "{}%"
 
 #. {} is a number of seconds.
-#: ui/tab.slint:1059
+#: ui/tab.slint:1073
 msgid "about {} s left"
 msgstr "约剩 {} 秒"
 
 #. {} is the number of exports waiting (1–4).
-#: ui/tab.slint:1062
+#: ui/tab.slint:1076
 msgid "+{} queued"
 msgstr "另有 {} 个排队"
 
-#: ui/tab.slint:1170
+#: ui/tab.slint:1186
 msgid "Locate…"
 msgstr "定位…"
 
-#: ui/tab.slint:1211
+#: ui/tab.slint:1227
 msgid "Transitions: Precise only"
 msgstr "过渡：仅限精确"
 
 #. {0} is a transition with its direction ("Slide ←"), {1} its length in seconds ("1.5").
-#: ui/tab.slint:1214
+#: ui/tab.slint:1230
 msgid "{0} · {1} s"
 msgstr "{0} · {1} 秒"
 
 #. {0} and {1} are part numbers ("Part 2 → 3"); then what happens to the sound.
-#: ui/tab.slint:1216
+#: ui/tab.slint:1232
 msgid "Part {0} → {1}. Click to change."
 msgstr "第 {0} 段 → 第 {1} 段。点击更改。"
 
 #. {} is a number of parts (2 or more).
-#: ui/tab.slint:1357
+#: ui/tab.slint:1373
 msgid "1 part"
 msgstr "1 段"
 
 #. {} is a number of parts (2 or more).
-#: ui/tab.slint:1357
+#: ui/tab.slint:1373
 msgid "{} parts"
 msgstr "{} 段"
 
-#: ui/tab.slint:1376
+#: ui/tab.slint:1392
 msgid "transitions off in Fast"
 msgstr "快速模式下不使用过渡"
 
 #. {} is the seconds the transition takes off the length ("1.0").
-#: ui/tab.slint:1378
+#: ui/tab.slint:1394
 msgid "1 transition −{} s"
 msgstr "1 个过渡 −{} 秒"
 
 #. {0} is a number of transitions (2 or more), {1} the seconds they take off ("2.5").
-#: ui/tab.slint:1380
+#: ui/tab.slint:1396
 msgid "{0} transitions −{1} s"
 msgstr "{0} 个过渡 −{1} 秒"
 
-#: ui/tab.slint:1400
+#: ui/tab.slint:1416
 msgid "Export Merged"
 msgstr "合并导出"
 
-#: ui/tab.slint:1405
+#: ui/tab.slint:1421
 msgid "Export the parts as one file into the clip folder"
 msgstr "将这些片段合并为一个文件，导出到片段文件夹"
 
-#: ui/tab.slint:1411 ui/tab.slint:2479
+#: ui/tab.slint:1427 ui/tab.slint:2583
 msgid "Export As…"
 msgstr "导出为…"
 
-#: ui/tab.slint:1413
+#: ui/tab.slint:1429
 msgid "Export the parts as one file you choose"
 msgstr "将这些片段合并为一个文件，导出到你选择的位置"
 
-#: ui/tab.slint:1522
+#: ui/tab.slint:1621
 msgid "Downloading sound model"
 msgstr "正在下载声音模型"
 
 #. {0} and {1} are megabytes (31 of 74), {2} a number of seconds.
-#: ui/tab.slint:1541
+#: ui/tab.slint:1640
 msgid "{0} of {1} MB · about {2} s left"
 msgstr "{0} / {1} MB · 约剩 {2} 秒"
 
 #. {0} and {1} are megabytes (31 of 74), {2} a number of seconds.
-#: ui/tab.slint:1541
+#: ui/tab.slint:1640
 msgid "{0} of {1} MB"
 msgstr "{0} / {1} MB"
 
-#: ui/tab.slint:1548
+#: ui/tab.slint:1647
 msgid "Loudness Only"
 msgstr "只按响度"
 
-#: ui/tab.slint:1549
+#: ui/tab.slint:1648
 msgid "Scan without the model: loud moments only"
 msgstr "不用模型扫描：只找响度峰值"
 
-#: ui/tab.slint:1567
+#: ui/tab.slint:1666
 msgid "Scanning sound"
 msgstr "正在扫描声音"
 
 #. {0} is a percentage, {1} a number of minutes.
-#: ui/tab.slint:1586
+#: ui/tab.slint:1685
 msgid "{0} % · about {1} min left"
 msgstr "{0}% · 约剩 {1} 分钟"
 
 #. {} is how many loudness units (LU) the suggestion's loudest moment is above the video's average.
-#: ui/tab.slint:1619
+#: ui/tab.slint:1718
 msgid "+{} LU above the video's average"
 msgstr "比全片平均响度高 {} LU"
 
 #. {0} and {1} are two sounds of one suggestion, the stronger first ("Laughter + applause").
-#: ui/tab.slint:1678
+#: ui/tab.slint:1777
 msgid "{0} + {1}"
 msgstr "{0} + {1}"
 
-#: ui/tab.slint:1690
+#: ui/tab.slint:1789
 msgid "Add to Collection"
 msgstr "添加到合集"
 
-#: ui/tab.slint:1698
+#: ui/tab.slint:1797
 msgid "Dismiss"
 msgstr "忽略"
 
-#: ui/tab.slint:1711 ui/tab.slint:2383
+#: ui/tab.slint:1810 ui/tab.slint:2487
 msgid "Start"
 msgstr "起点"
 
-#: ui/tab.slint:1720 ui/tab.slint:2404
+#: ui/tab.slint:1819 ui/tab.slint:2508
 msgid "End"
 msgstr "终点"
 
 #. {} is how many suggestions were dismissed.
-#: ui/tab.slint:1758
+#: ui/tab.slint:1857
 msgid "Restore {} dismissed"
 msgstr "恢复已忽略的 {} 条"
 
 #. {} is the number the new part gets in the Collection.
-#: ui/tab.slint:1825
+#: ui/tab.slint:1924
 msgid "as part {}"
 msgstr "作为第 {} 段"
 
 #. after "as part N" in the tooltip of + Add ("as part 5 · overlaps part 2"); {} is the overlapped part's number.
-#: ui/tab.slint:1828
+#: ui/tab.slint:1927
 #, x-machine
 msgid "overlaps part {}"
 msgstr "与第 {} 段重叠"
 
-#: ui/tab.slint:1840
+#: ui/tab.slint:1939
 msgid "Fast cut copies the streams: lossless and done in seconds, but a clip can only start on a keyframe."
 msgstr "快速剪切直接复制数据流：无损，几秒即可完成，但片段只能从关键帧开始。"
 
 #. {0} and {2} are times, {1} seconds.
-#: ui/tab.slint:1844
+#: ui/tab.slint:1943
 msgid "It will start at {0}, {1} s before your start, and end at {2}."
 msgstr "它将从 {0} 开始（比你设的起点早 {1} 秒），在 {2} 结束。"
 
 #. {0} and {1} are times.
-#: ui/tab.slint:1846
+#: ui/tab.slint:1945
 msgid "It will start at {0} and end at {1}."
 msgstr "它将从 {0} 开始，在 {1} 结束。"
 
-#: ui/tab.slint:1847
+#: ui/tab.slint:1946
 msgid "It starts on the keyframe at or before your start."
 msgstr "它将从你设的起点处或之前最近的关键帧开始。"
 
-#: ui/tab.slint:1848
+#: ui/tab.slint:1947
 msgid "Its streams do not fit in MP4, so it is saved as MKV."
 msgstr "其数据流无法放入 MP4，因此保存为 MKV。"
 
-#: ui/tab.slint:1849
+#: ui/tab.slint:1948
 msgid "Pick Precise to start on the exact frame."
 msgstr "要从精确的帧开始，请选择“精确”。"
 
-#: ui/tab.slint:1850
+#: ui/tab.slint:1949
 msgid "Precise re-encodes from the exact frame, and can include video effects and subtitles."
 msgstr "“精确”从精确的那一帧起重新编码，并可包含视频效果和字幕。"
 
 #. {0} and {1} are times.
-#: ui/tab.slint:1852
+#: ui/tab.slint:1951
 msgid "Precise re-encodes from the exact frame {0} to {1}, and can include video effects and subtitles."
 msgstr "“精确”从 {0} 这一帧起重新编码到 {1}，并可包含视频效果和字幕。"
 
 #. what the GIF and WebP outputs write.
-#: ui/tab.slint:1855
+#: ui/tab.slint:1954
 msgid "Animated GIF: at most 480 px and 15 fps, no sound, loops, up to 60 s."
 msgstr "动态 GIF：最大 480 像素、15 fps，无声音，循环播放，最长 60 秒。"
 
-#: ui/tab.slint:1856
+#: ui/tab.slint:1955
 msgid "Animated WebP: at most 640 px and 20 fps, no sound, loops, up to 60 s."
 msgstr "动态 WebP：最大 640 像素、20 fps，无声音，循环播放，最长 60 秒。"
 
 #. {0} seconds of media, {1} megabytes ("46" or "55–80"), {2} a time span ("2 s", "about 1–3 min").
-#: ui/tab.slint:1861
+#: ui/tab.slint:1960
 msgid "Length {0} s · ≈ {1} MB · ≈ {2}"
 msgstr "时长 {0} 秒 · 约 {1} MB · 约 {2}"
 
 #. {0} seconds of media, {1} a time span ("2 s", "about 1–3 min").
-#: ui/tab.slint:1863
+#: ui/tab.slint:1962
 msgid "Length {0} s · ≈ {1}"
 msgstr "时长 {0} 秒 · 约 {1}"
 
 #. {0} is a part number; {1} and {2} are what differs (a size, a codec, a frame rate) in that part and in part 1.
-#: ui/tab.slint:1874
+#: ui/tab.slint:1973
 msgid "Fast: part {0} is {1}, part 1 is {2}"
 msgstr "快速：第 {0} 段是 {1}，第 1 段是 {2}"
 
-#: ui/tab.slint:1880
+#: ui/tab.slint:1979
 msgid "Switched to Precise: transitions need re-encoding."
 msgstr "已切换为精确：过渡需要重新编码。"
 
-#: ui/tab.slint:1881
+#: ui/tab.slint:1980
 msgid "Transitions: Precise only. Fast joins with cuts."
 msgstr "过渡：仅限精确。快速模式直接切换拼接。"
 
-#: ui/tab.slint:1884
+#: ui/tab.slint:1983
 msgid "Fast copies the streams: only when every part has the same codecs, size, frame rate and audio."
 msgstr "快速直接复制流：仅当每一段的编码、尺寸、帧率和音频都相同时可用。"
 
 #. {0} is a size in pixels (3840×1714), {1} frames per second.
-#: ui/tab.slint:1888
+#: ui/tab.slint:1987
 msgid "Precise re-encodes every part to {0} · {1} fps like part 1: other sizes get black bars, audio is resampled to 48 kHz stereo. Quality: the Clip page's Advanced."
 msgstr "精确会把每一段重新编码为与第 1 段相同的 {0} · {1} fps：尺寸不同的会加黑边，音频重采样为 48 kHz 立体声。质量：见“片段”页的“高级”。"
 
-#: ui/tab.slint:1889
+#: ui/tab.slint:1988
 msgid "Precise re-encodes every part to the first part's size and frame rate: other sizes get black bars, audio is resampled to 48 kHz stereo. Quality: the Clip page's Advanced."
 msgstr "精确会把每一段重新编码为第 1 段的尺寸和帧率：尺寸不同的会加黑边，音频重采样为 48 kHz 立体声。质量：见“片段”页的“高级”。"
 
 #. {} is how many suggestions are left on the Highlights page.
-#: ui/tab.slint:1907
+#: ui/tab.slint:2006
 msgid "Highlights ({})"
 msgstr "高光（{}）"
 
-#: ui/tab.slint:1908
+#: ui/tab.slint:2007
 msgid "Results ({})"
 msgstr "结果（{}）"
 
-#: ui/tab.slint:1908
+#: ui/tab.slint:2007
 msgid "Results"
 msgstr "结果"
 
-#: ui/tab.slint:1909
+#: ui/tab.slint:2008
 msgid "Settings"
 msgstr "设置"
 
 #. {0} and {1} are part numbers: the transition from part 1 into part 2.
-#: ui/tab.slint:2012
+#: ui/tab.slint:2116
 msgid "Transition {0} → {1}"
 msgstr "过渡 {0} → {1}"
 
 #. the Escape key as printed on keyboards (closes the picker).
-#: ui/tab.slint:2014
+#: ui/tab.slint:2118
 msgid "Esc"
 msgstr "Esc"
 
-#: ui/tab.slint:2031
+#: ui/tab.slint:2135
 msgid "Direction"
 msgstr "方向"
 
-#: ui/tab.slint:2040
+#: ui/tab.slint:2144
 msgid "Duration"
 msgstr "时长"
 
 #. {} is the longest transition at this junction in seconds ("8.2").
-#: ui/tab.slint:2058
+#: ui/tab.slint:2162
 msgid "Up to {} s here (half of the shorter part)"
 msgstr "此处最长 {} 秒（较短一段的一半）"
 
-#: ui/tab.slint:2063
+#: ui/tab.slint:2167
 msgid "Apply to All"
 msgstr "全部应用"
 
-#: ui/tab.slint:2064
+#: ui/tab.slint:2168
 msgid "Use for every join and for new parts"
 msgstr "用于所有衔接以及新加的段"
 
 #. {} is the number of junctions (places between two parts).
-#: ui/tab.slint:2069
+#: ui/tab.slint:2173
 msgid "1 join"
 msgstr "1 处衔接"
 
 #. {} is the number of junctions (places between two parts).
-#: ui/tab.slint:2069
+#: ui/tab.slint:2173
 msgid "{} joins"
 msgstr "{} 处衔接"
 
-#: ui/tab.slint:2094 ui/tab.slint:2508 ui/tab.slint:2894
+#: ui/tab.slint:2198 ui/tab.slint:2612 ui/tab.slint:3022
 msgid "Collection"
 msgstr "合集"
 
-#: ui/tab.slint:2096 ui/tab.slint:2543
+#: ui/tab.slint:2200 ui/tab.slint:2647
 msgid "Clear"
 msgstr "清空"
 
 #. the button that adds the Range to the Collection; Added is its label once the Range is in it (a state).
-#: ui/tab.slint:2097 ui/tab.slint:2525
+#: ui/tab.slint:2201 ui/tab.slint:2629
 #, x-machine
 msgid "Added"
 msgstr "已添加"
 
-#: ui/tab.slint:2153
+#: ui/tab.slint:2257
 msgid "Show or hide this tab"
 msgstr "显示或隐藏此页签"
 
 #. {0} is the format (GIF or WebP), {1} pixels on the longer side of the picture, {2} frames per second, {3} the longest image in seconds.
-#: ui/tab.slint:2219 ui/tab.slint:2220
+#: ui/tab.slint:2323 ui/tab.slint:2324
 msgid "{0} · {1} px long edge · {2} fps · up to {3} s"
 msgstr "{0} · 长边 {1} px · {2} fps · 最长 {3} 秒"
 
-#: ui/tab.slint:2226
+#: ui/tab.slint:2330
 msgid "Advanced"
 msgstr "高级"
 
-#: ui/tab.slint:2232 ui/tab.slint:2255
+#: ui/tab.slint:2336 ui/tab.slint:2359
 msgid "Same as source (stream copy)"
 msgstr "与源相同（复制数据流）"
 
-#: ui/tab.slint:2245 ui/tab.slint:2310
+#: ui/tab.slint:2349 ui/tab.slint:2414
 msgid "Audio"
 msgstr "音频"
 
-#: ui/tab.slint:2254
+#: ui/tab.slint:2358
 msgid "Quality"
 msgstr "画质"
 
-#: ui/tab.slint:2264
+#: ui/tab.slint:2368
 msgid "High quality (H.264 + AAC in MP4)"
 msgstr "高画质（MP4，H.264 + AAC）"
 
-#: ui/tab.slint:2271
+#: ui/tab.slint:2375
 msgid "Resolution"
 msgstr "分辨率"
 
-#: ui/tab.slint:2273 ui/tab.slint:2283
+#: ui/tab.slint:2377 ui/tab.slint:2387
 msgid "Source"
 msgstr "源"
 
-#: ui/tab.slint:2280
+#: ui/tab.slint:2384
 msgid "Frame rate"
 msgstr "帧率"
 
-#: ui/tab.slint:2290
+#: ui/tab.slint:2394
 msgid "Source bitrate"
 msgstr "源码率"
 
-#: ui/tab.slint:2290
+#: ui/tab.slint:2394
 msgid "Quality number {}"
 msgstr "质量值 {}"
 
-#: ui/tab.slint:2301
+#: ui/tab.slint:2405
 msgid "Speed"
 msgstr "速度"
 
-#: ui/tab.slint:2303
+#: ui/tab.slint:2407
 msgid "Faster"
 msgstr "较快"
 
-#: ui/tab.slint:2303
+#: ui/tab.slint:2407
 msgid "Balanced"
 msgstr "均衡"
 
-#: ui/tab.slint:2303
+#: ui/tab.slint:2407
 msgid "Smaller"
 msgstr "较小"
 
-#: ui/tab.slint:2313
+#: ui/tab.slint:2417
 msgid "AAC {} kb/s"
 msgstr "AAC {} kb/s"
 
-#: ui/tab.slint:2322
+#: ui/tab.slint:2426
 msgid "Reset"
 msgstr "重置"
 
-#: ui/tab.slint:2328
+#: ui/tab.slint:2432
 msgid "Include video effects"
 msgstr "包含画面效果"
 
-#: ui/tab.slint:2334
+#: ui/tab.slint:2438
 msgid "Burn in subtitles"
 msgstr "烧录字幕"
 
-#: ui/tab.slint:2339
+#: ui/tab.slint:2443
 msgid "Effects and subtitles: Precise only"
 msgstr "效果和字幕：仅“精确”"
 
-#: ui/tab.slint:2344
+#: ui/tab.slint:2448
 msgid "Range"
 msgstr "范围"
 
-#: ui/tab.slint:2362
+#: ui/tab.slint:2466
 msgid "This picture is made by a plugin"
 msgstr "此画面由插件生成"
 
-#: ui/tab.slint:2367
+#: ui/tab.slint:2471
 msgid "There is no file to cut."
 msgstr "没有可剪切的文件。"
 
-#: ui/tab.slint:2368
+#: ui/tab.slint:2472
 msgid "Open a local file to cut clips."
 msgstr "打开本地文件才能导出片段。"
 
-#: ui/tab.slint:2369
+#: ui/tab.slint:2473
 msgid "Open a local video file to cut clips."
 msgstr "打开本地视频文件以导出片段。"
 
-#: ui/tab.slint:2393 ui/tab.slint:2413
+#: ui/tab.slint:2497 ui/tab.slint:2517
 msgid "Now"
 msgstr "当前"
 
-#: ui/tab.slint:2436
+#: ui/tab.slint:2540
 msgid "Use A-B range"
 msgstr "使用 A-B 范围"
 
-#: ui/tab.slint:2439
+#: ui/tab.slint:2543
 msgid "Copy the A-B loop into Start and End"
 msgstr "将 A-B 循环填入开始和结束"
 
 #. {0} and {1} are the A and B times of the loop.
-#: ui/tab.slint:2441
+#: ui/tab.slint:2545
 msgid "A {0} · B {1}"
 msgstr "A {0} · B {1}"
 
 #. {} is 10, 30, 60 or 120.
-#: ui/tab.slint:2447
+#: ui/tab.slint:2551
 msgid "Last {} s"
 msgstr "最后 {} 秒"
 
-#: ui/tab.slint:2472
+#: ui/tab.slint:2576
 msgid "Export as {} into the clip folder"
 msgstr "导出为 {}，存到片段文件夹"
 
-#: ui/tab.slint:2473
+#: ui/tab.slint:2577
 msgid "Export the range into the clip folder"
 msgstr "将此范围导出到片段文件夹"
 
-#: ui/tab.slint:2481
+#: ui/tab.slint:2585
 msgid "Export the range into a file you choose"
 msgstr "将此范围导出到你选择的文件"
 
-#: ui/tab.slint:2494
+#: ui/tab.slint:2598
 msgid "Use Precise"
 msgstr "使用“精确”"
 
 #. the button that adds the Range to the Collection; Added is its label once the Range is in it (a state).
-#: ui/tab.slint:2525
+#: ui/tab.slint:2629
 msgid "Add"
 msgstr "添加"
 
 #. the tooltip of Added; {} is the number of the part that is the Range.
-#: ui/tab.slint:2530
+#: ui/tab.slint:2634
 #, x-machine
 msgid "Part {} is this range. Click to show it."
 msgstr "第 {} 段就是这个范围。点击显示它。"
 
-#: ui/tab.slint:2557
+#: ui/tab.slint:2661
 msgid "Join ranges from any local videos into one file:"
 msgstr "把任意本地视频的范围合成一个文件："
 
-#: ui/tab.slint:2558
+#: ui/tab.slint:2662
 msgid "set a range above, then + Add."
 msgstr "在上方设好范围，再点 + 添加。"
 
-#: ui/tab.slint:2634
+#: ui/tab.slint:2738
 msgid "Open a local video file to find highlights."
 msgstr "打开一个本地视频文件来查找高光。"
 
 #. {} is how long ago ("3 d ago").
-#: ui/tab.slint:2658
+#: ui/tab.slint:2765
 msgid "Scanned just now"
 msgstr "刚刚扫描"
 
 #. {} is how long ago ("3 d ago").
-#: ui/tab.slint:2658
+#: ui/tab.slint:2765
 msgid "Scanned {}"
 msgstr "{}扫描"
 
-#: ui/tab.slint:2659
+#: ui/tab.slint:2766
 msgid "loudness only"
 msgstr "只按响度"
 
-#: ui/tab.slint:2661
+#: ui/tab.slint:2768
 msgid "the file's first audio track"
 msgstr "文件的第一条音轨"
 
-#: ui/tab.slint:2665
-msgid "Scan Again"
-msgstr "重新扫描"
+#: ui/tab.slint:2773
+#, x-machine
+msgid "Loudness line: drag it up or down on the strip to choose what counts as loud"
+msgstr "响度线：在条带上上下拖动，决定多响才算响"
 
-#: ui/tab.slint:2673
+#: ui/tab.slint:2781
 msgid "Listens to the sound only: it cannot see the picture. A range starts at the pause before the reaction and ends after it."
 msgstr "只听声音，看不到画面。片段从反应之前的停顿开始，到反应结束之后。"
 
-#: ui/tab.slint:2682
+#: ui/tab.slint:2791
+msgid "Scan Again"
+msgstr "重新扫描"
+
+#: ui/tab.slint:2801
+#, x-machine
+msgid "Suggest Parts Above the Line"
+msgstr "建议线上方的片段"
+
+#: ui/tab.slint:2803
+#, x-machine
+msgid "Replaces the suggestions with the parts louder than the line"
+msgstr "用比这条线更响的片段替换建议"
+
+#: ui/tab.slint:2810
 msgid "Finds the moments the audience reacts to:"
 msgstr "找出观众有反应的片段："
 
-#: ui/tab.slint:2683
+#: ui/tab.slint:2811
 msgid "laughter, applause, cheering and loud peaks."
 msgstr "笑声、掌声、欢呼和响度峰值。"
 
-#: ui/tab.slint:2684
+#: ui/tab.slint:2812
 msgid "Best on stand-up, talk shows, streams and sports."
 msgstr "最适合脱口秀、访谈、直播和体育比赛。"
 
-#: ui/tab.slint:2687
+#: ui/tab.slint:2815
 msgid "The file changed since the last scan."
 msgstr "文件在上次扫描之后改动过。"
 
 #. {} is the size of the download in megabytes.
-#: ui/tab.slint:2693
+#: ui/tab.slint:2821
 msgid "Needs a sound model: one download ({} MB),"
 msgstr "需要一个声音模型：只下载一次（{} MB），"
 
-#: ui/tab.slint:2694
+#: ui/tab.slint:2822
 msgid "verified after download. The video stays on this computer."
 msgstr "下载后校验。视频不会离开这台电脑。"
 
-#: ui/tab.slint:2702
+#: ui/tab.slint:2830
 msgid "The scan starts when it finishes."
 msgstr "下载完成后自动开始扫描。"
 
 #. {} is why the download failed (a short technical reason).
-#: ui/tab.slint:2705
+#: ui/tab.slint:2833
 msgid "Download failed: {}"
 msgstr "下载失败：{}"
 
 #. {} is why the download failed (a short technical reason).
-#: ui/tab.slint:2705
+#: ui/tab.slint:2833
 msgid "Download failed"
 msgstr "下载失败"
 
-#: ui/tab.slint:2708
+#: ui/tab.slint:2836
 msgid "The download did not match its checksum"
 msgstr "下载的文件校验不通过，"
 
-#: ui/tab.slint:2709
+#: ui/tab.slint:2837
 msgid "and was deleted."
 msgstr "已删除。"
 
-#: ui/tab.slint:2713
+#: ui/tab.slint:2841
 msgid "No internet connection."
 msgstr "没有网络连接。"
 
-#: ui/tab.slint:2714
+#: ui/tab.slint:2842
 msgid "The model downloads once; scans then work offline."
 msgstr "模型只需下载一次，之后扫描不需要联网。"
 
-#: ui/tab.slint:2742
+#: ui/tab.slint:2870
 msgid "Download and Scan"
 msgstr "下载并扫描"
 
-#: ui/tab.slint:2742
+#: ui/tab.slint:2870
 msgid "Download Again"
 msgstr "重新下载"
 
-#: ui/tab.slint:2753
+#: ui/tab.slint:2881
 msgid "Runs in the background: keep watching."
 msgstr "在后台运行，可以继续观看。"
 
-#: ui/tab.slint:2755
+#: ui/tab.slint:2883
 msgid "This video has no sound to scan."
 msgstr "这个视频没有声音可以扫描。"
 
-#: ui/tab.slint:2760
+#: ui/tab.slint:2888
 msgid "This listens for audience sound: films and"
 msgstr "这个功能听的是观众的声音，"
 
-#: ui/tab.slint:2761
+#: ui/tab.slint:2889
 msgid "music often have none."
 msgstr "电影和音乐里通常没有。"
 
-#: ui/tab.slint:2765
+#: ui/tab.slint:2893
 msgid "Only loud moments here. Loud is not always good:"
 msgstr "只找到响度峰值。声音大不等于精彩，"
 
-#: ui/tab.slint:2766
+#: ui/tab.slint:2894
 msgid "check before adding."
 msgstr "添加前先看一眼。"
 
-#: ui/tab.slint:2771
+#: ui/tab.slint:2899
 msgid "Suggestions"
 msgstr "建议"
 
 #. {0} suggestions are left of the {1} listed.
-#: ui/tab.slint:2814
+#: ui/tab.slint:2942
 msgid "{0} of {1} left"
 msgstr "还剩 {0} / {1}"
 
 #. {} is a number of suggestions (2 or more).
-#: ui/tab.slint:2816
+#: ui/tab.slint:2944
 msgid "1 suggestion"
 msgstr "1 条建议"
 
 #. {} is a number of suggestions (2 or more).
-#: ui/tab.slint:2816
+#: ui/tab.slint:2944
 msgid "{} suggestions"
 msgstr "{} 条建议"
 
-#: ui/tab.slint:2832
+#: ui/tab.slint:2960
 msgid "Add All"
 msgstr "全部添加"
 
-#: ui/tab.slint:2847
+#: ui/tab.slint:2975
 msgid "No clips yet."
 msgstr "还没有片段。"
 
-#: ui/tab.slint:2857
+#: ui/tab.slint:2985
 msgid "Clear Finished"
 msgstr "清除已完成"
 
-#: ui/tab.slint:2874
+#: ui/tab.slint:3002
 msgid "Save to"
 msgstr "保存设置"
 
-#: ui/tab.slint:2881
+#: ui/tab.slint:3009
 msgid "Save to the media folder when possible"
 msgstr "条件允许时储存到播放文件夹"
 
-#: ui/tab.slint:2886
+#: ui/tab.slint:3014
 msgid "File name"
 msgstr "文件名"
 
-#: ui/tab.slint:2903
+#: ui/tab.slint:3031
 msgid "Click a variable to add it to the file name. Existing files are never overwritten: a number is added."
 msgstr "点击变量，将其添加到文件名中。已有文件不会被覆盖，会自动加上编号。"
 
 #. {} is the size of the sound model's files in megabytes.
-#: ui/tab.slint:2928
+#: ui/tab.slint:3056
 msgid "Sound model · {} MB"
 msgstr "声音模型 · {} MB"
 
-#: ui/tab.slint:2930
+#: ui/tab.slint:3058
 msgid "Remove"
 msgstr "移除"
 
-#: ui/tab.slint:2935
+#: ui/tab.slint:3063
 msgid "Last N s"
 msgstr "最后 N 秒"
 
-#: ui/tab.slint:2938
+#: ui/tab.slint:3066
 msgid "Last clip length"
 msgstr "“最后 N 秒”的长度"

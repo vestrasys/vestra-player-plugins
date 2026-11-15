@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.0
+
+**Who must change: nobody.** No new permission and the same player (0.9.0 or later). Settings, the Collection, Results and kept Highlights carry over.
+
+- **Highlights**, the loudness strip:
+  - **Drag to seek**: a drag on the strip seeks as the pointer moves, as the player's seek bar does (the playhead follows the pointer; one seek at a time, only the newest position sent, exact seeks). A click still seeks, or selects the suggestion whose band it hits. Nothing runs between drags.
+  - **Scan Again** is now a button the size of Find Highlights (it was a small icon beside "Scanned …"); only its label differs.
+  - **The loudness line**: in the small button's place, a toggle draws a line across the strip in the accent colour, and the loudness over it stronger. Drag it up or down; while it shows, the strip moves the line and does not seek. **Suggest Parts Above the Line**, under Scan Again, makes the parts louder than the line the page's suggestions, in place of the scan's: parts less than 3 seconds apart are one, parts shorter than 3 seconds are left out (shorter than the 3-second loudness the strip shows), at most 100 (the loudest), each of kind Loud. They are kept with the file as a scan's are; Scan Again brings back the scan's own. With nothing over the line the list stays and the video says "Nothing is louder than the line." The line starts 5 LU over the video's average loudness (where a scan calls a moment loud) and is kept as a setting, as LU over the average, so it means as loud in every video; the toggle is off again after a restart, so the strip seeks by default.
+- English, Simplified Chinese, German, Spanish, French, Japanese and Korean (the new texts are machine translations, marked as such in the catalogs).
+
 ## 0.7.1
 
 **Who must change: nobody.** No new permission and the same player (0.9.0 or later). Settings, the Collection, Results and kept Highlights carry over.
