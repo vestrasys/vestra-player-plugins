@@ -1343,3 +1343,106 @@ test("kept results with the parts over the line: both lists read back with their
   const damaged = savedOf({ ...base, above: { line: "x", candidates: [] }, shown: "above" })!;
   assert.deepEqual([damaged.above, damaged.shown, damaged.candidates.length], [undefined, undefined, 1]);
 });
+
+/** The plugin's drag gestures, each seek held until `open()`: what ends them, and when. */
+function heldScrubs(plugin: { player: { scrub(): { active: boolean; seek(seconds: number, options?: { keyframes?: boolean }): Promise<boolean>; end(): void } } }) {
+  let open: () => void = () => {};
+  const gate = new Promise<void>((done) => (open = done));
+  const made: { active: boolean }[] = [];
+  const real = plugin.player.scrub.bind(plugin.player);
+  Object.defineProperty(plugin.player, "scrub", {
+    configurable: true,
+    value: () => {
+      const scrub = real();
+      const held = {
+        get active() {
+          return scrub.active;
+        },
+        seek: (seconds: number, options?: { keyframes?: boolean }) => gate.then(() => scrub.seek(seconds, options)),
+        end: () => scrub.end(),
+      };
+      made.push(held);
+      return held;
+    },
+  });
+  return { made, open: () => open() };
+}
+
+test("a released drag whose last seek has not landed yet is ended by the next press and by hiding the tab", async () => {
+  const setup = await withMedia();
+  const host = new TestHost();
+  fakeFfmpeg(host);
+  setup.play(host);
+  const { plugin, stop } = await startIn(host, setup.data);
+  const scrubs = heldScrubs(plugin as never);
+  try {
+    await showHighlights(host);
+    await eventually(() => page(host).state, "ready");
+    host.mounted().emit("find-highlights");
+    await eventually(() => page(host).state, "done");
+    // A drag let go while its seek is still on its way: its gesture waits for it…
+    host.mounted().emit("heat-scrubbed", 0.5, true);
+    await until(() => scrubs.made.length === 1, "the first gesture");
+    host.mounted().emit("heat-released");
+    await host.settle();
+    assert.equal(scrubs.made[0]!.active, true, "waiting for its last seek");
+    // …and a new press ends it now.
+    host.mounted().emit("heat-scrubbed", 0.6, true);
+    await until(() => scrubs.made.length === 2, "the second gesture");
+    assert.equal(scrubs.made[0]!.active, false, "the next press ended the waiting gesture");
+    host.mounted().emit("heat-released");
+    await host.settle();
+    assert.equal(scrubs.made[1]!.active, true);
+    // Hiding the tab ends the one waiting too.
+    host.mountOther("sidebar", "vestra.playlist", { title: "Playlist" });
+    host.selectTab("vestra.playlist");
+    await until(() => scrubs.made[1]!.active === false, "the hidden tab ended the waiting gesture");
+    await until(() => !host.listening.has("source.state"), "nothing follows the player's state");
+  } finally {
+    scrubs.open();
+    await stop();
+    await setup.cleanup();
+  }
+});
+
+test("the loudness line appearing during a drag (a scan finishing with the toggle on) ends the drag's gesture: its later moves do not seek", async () => {
+  const setup = await withMedia();
+  const host = new TestHost();
+  let release: () => void = () => {};
+  let held = true;
+  fakeFfmpeg(host, talk, () => (held ? new Promise((done) => (release = done)) : Promise.resolve()));
+  setup.play(host);
+  const { stop } = await startIn(host, setup.data);
+  try {
+    await showHighlights(host);
+    await eventually(() => page(host).state, "ready");
+    host.mounted().emit("set-line", true);
+    host.mounted().emit("find-highlights");
+    await eventually(() => page(host).state, "scanning");
+    assert.equal(tab(host)["heat-line"], -1, "no line while the scan runs");
+    const why = () => (host.listeningWhy.get("source.state") ?? []).length;
+    const before = why();
+    // A drag during the scan seeks.
+    host.mounted().emit("heat-scrubbed", 0.5, true);
+    await until(() => host.seeks.at(-1)?.seconds === 300, "the drag seeks");
+    await until(() => why() > before, "its gesture follows the player's state");
+    // The scan finishes: the line shows mid-drag.
+    held = false;
+    release();
+    await eventually(() => page(host).state, "done");
+    await until(() => (tab(host)["heat-line"] as number) >= 0, "the line shows");
+    const seeks = host.seeks.length;
+    host.mounted().emit("heat-scrubbed", 0.7, false);
+    await until(() => why() <= before, "the gesture ended when the line showed");
+    await host.settle();
+    await tick();
+    assert.equal(host.seeks.length, seeks, "the drag's later moves do not seek");
+    // The release the tab now always sends for a drag that seeked does nothing more.
+    host.mounted().emit("heat-released");
+    await host.settle();
+    assert.equal(host.seeks.length, seeks);
+  } finally {
+    await stop();
+    await setup.cleanup();
+  }
+});

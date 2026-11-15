@@ -1595,15 +1595,17 @@ component HeatStrip inherits Rectangle {
                         root.line-held = true;
                     }
                 } else if event.kind == PointerEventKind.up {
-                    if root.line-held && root.line >= 0 {
-                        root.settling = true;
-                        root.line-released(root.line-draft);
-                    } else if root.scrubbing {
+                    // A drag that seeked always says it ended, also when the line appeared during it.
+                    if root.scrubbing {
                         root.scrubbing = false;
                         root.scrub-held = true;
                         root.settling = true;
                         root.released();
-                    } else if root.line < 0 {
+                    }
+                    if root.line-held && root.line >= 0 {
+                        root.settling = true;
+                        root.line-released(root.line-draft);
+                    } else if root.line < 0 && !root.scrub-held {
                         root.clicked(self.mouse-x / self.width);
                     }
                 } else if event.kind == PointerEventKind.cancel {

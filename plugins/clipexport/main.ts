@@ -1724,14 +1724,17 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
    * when the plugin stops. Nothing runs between drags.
    */
   let scrubbing: { scrub: Scrub; last: Promise<unknown> } | null = null;
+  /** A released drag's gesture, waiting for its last seek: a new press, a hidden tab or the plugin stopping ends it now. */
+  let ending: Scrub | null = null;
   function heatScrubbed(ratio: number, first: boolean) {
     if (first) {
-      scrubbing?.scrub.end();
-      scrubbing = null;
+      endScrub();
       const state = player.state;
       if (lineShown() || !clippable(state) || !state.duration) return;
       scrubbing = { scrub: player.scrub(), last: Promise.resolve() };
     }
+    // The line appeared during the drag (a scan finished, the session's toggle read late): the drag stops seeking.
+    if (lineShown()) return endScrub();
     const gesture = scrubbing;
     const duration = player.state.duration;
     if (!gesture || !Number.isFinite(ratio) || !duration) return;
@@ -1743,12 +1746,20 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   function heatReleased() {
     const gesture = scrubbing;
     scrubbing = null;
-    if (gesture) void gesture.last.then(() => gesture.scrub.end());
+    if (!gesture) return;
+    ending?.end();
+    ending = gesture.scrub;
+    void gesture.last.then(() => {
+      gesture.scrub.end();
+      if (ending === gesture.scrub) ending = null;
+    });
   }
-  /** The tab hid or the plugin stops: the gesture ends now. */
+  /** A new press, the tab hid, the line shows, or the plugin stops: the gestures, open or ending, end now. */
   function endScrub() {
     scrubbing?.scrub.end();
     scrubbing = null;
+    ending?.end();
+    ending = null;
   }
   plugin.onDispose(endScrub);
 
@@ -1771,6 +1782,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     (kept) => {
       if (kept !== true || lineSet) return;
       lineOn = true;
+      // A drag started before this read stops seeking now that the line shows.
+      endScrub();
       plugin.update();
     },
     () => {},
