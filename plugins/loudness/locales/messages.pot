@@ -41,7 +41,7 @@ msgid "A live EBU R128 loudness meter: momentary, short-term and integrated LUFS
 msgstr ""
 
 #: manifest.json
-msgid "Measures how loud what you play is, the way broadcasters do (EBU R128, ITU-R BS.1770). Tools ▸ Loudness Meter… opens a small window with momentary and short-term loudness as bars, integrated loudness and loudness range of what has played, and the highest true peak, updated ten times a second. It only measures: the sound you hear is not changed. The meter runs while its window is open and is taken out of the sound path when you close it. To make quiet dialogue and loud scenes more even, use the player's own Normalize (Shift+N)."
+msgid "Measures how loud what you play is, the way broadcasters do (EBU R128, ITU-R BS.1770). Tools ▸ Loudness Meter… opens a small window with momentary and short-term loudness as bars, integrated loudness and loudness range of what has played, and the highest true peak, updated ten times a second. It only measures: the sound you hear is not changed. The meter runs while its window is open and is taken out of the sound path when you close it. To make quiet dialogue and loud scenes more even, use the player's own Normalize (Shift+N).\n→ Menu: Tools ▸ Loudness Meter"
 msgstr ""
 
 #: manifest.json

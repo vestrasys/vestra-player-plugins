@@ -266,8 +266,8 @@ msgid "Real-time GPU upscaling with mpv GLSL shaders: Anime4K for anime; AMD FSR
 msgstr "用 mpv GLSL 着色器在 GPU 上实时超分辨率：动画用 Anime4K；真人影像用 AMD FSR 1、RAVU 和 FSRCNNX"
 
 #: manifest.json
-msgid "Sharpens and enlarges the video on the GPU while it plays, with mpv shaders bundled in the plugin: Anime4K for anime (six modes, Fast, HQ or Ultra), AMD FSR 1 for everything else, and RAVU (light) or FSRCNNX (high) for live action, plus three add-ons: chroma upscaling (CfL), SSIM downscaling for videos larger than the window, and adaptive sharpening. Video ▸ Shader Upscaling… opens a window to choose them, turn upscaling on and off, and see what is applied. Needs GPU rendering: macOS, or Windows with Video ▸ GPU Rendering (Experimental). Remembers your choice."
-msgstr "播放时在 GPU 上锐化并放大视频，使用插件自带的 mpv 着色器：动画用 Anime4K（六种模式，快速、高画质或超高画质），其他内容用 AMD FSR 1，真人影像还可用 RAVU（轻量）或 FSRCNNX（高画质），另有三个附加项：色度放大（CfL）、视频大于窗口时的 SSIM 缩小，以及自适应锐化。“视频 ▸ 着色器超分辨率…”打开一个窗口，可进行选择、开关超分辨率，并查看当前应用的内容。需要 GPU 渲染：macOS，或在 Windows 上打开“视频 ▸ GPU 渲染（实验性）”。会记住你的选择。"
+msgid "Sharpens and enlarges the video on the GPU while it plays, with mpv shaders bundled in the plugin: Anime4K for anime (six modes, Fast, HQ or Ultra), AMD FSR 1 for everything else, and RAVU (light) or FSRCNNX (high) for live action, plus three add-ons: chroma upscaling (CfL), SSIM downscaling for videos larger than the window, and adaptive sharpening. Video ▸ Shader Upscaling… opens a window to choose them, turn upscaling on and off, and see what is applied. Needs GPU rendering: macOS, or Windows with Video ▸ GPU Rendering (Experimental). Remembers your choice.\n→ Menu: Video ▸ Shader Upscaling"
+msgstr "播放时在 GPU 上锐化并放大视频，使用插件自带的 mpv 着色器：动画用 Anime4K（六种模式，快速、高画质或超高画质），其他内容用 AMD FSR 1，真人影像还可用 RAVU（轻量）或 FSRCNNX（高画质），另有三个附加项：色度放大（CfL）、视频大于窗口时的 SSIM 缩小，以及自适应锐化。“视频 ▸ 着色器超分辨率…”打开一个窗口，可进行选择、开关超分辨率，并查看当前应用的内容。需要 GPU 渲染：macOS，或在 Windows 上打开“视频 ▸ GPU 渲染（实验性）”。会记住你的选择。\n→ 菜单：视频 ▸ 着色器超分辨率"
 
 #: manifest.json
 msgid "video"

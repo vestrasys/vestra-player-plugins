@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.4
+
+- The description ends with the store's "how to open" line, `→ Menu: Games ▸ VestraNES ▸ Load ROM`, translated: the store shows it on the card and under "Where to find it".
+
 ## 0.4.3
 
 - Needs Vestra Player 0.9.0 or later (SDK 1.9.0): the manifest no longer lists `capabilities`; `activate` starts with `await plugin.player.read()`, which the declaration used to imply. Nothing else changes.
