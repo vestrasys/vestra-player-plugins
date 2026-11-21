@@ -78,8 +78,7 @@ plugin.
 ### Tests
 
 - [ ] There is at least one `tests/*.test.ts` or `tests/*.test.mjs`, and
-      `vestra-plugin test` passes on macOS, Windows and Linux with Node.js
-      26. (CI)
+      `vestra-plugin test` passes on macOS, Windows and Linux with Node.js 26. (CI)
 
 ### Player events and state
 
@@ -190,6 +189,20 @@ One plugin at a time:
 ```sh
 npm run plugin -- check <name>   # also: test, build, pack
 ```
+
+CI also compiles your `.slint` files with Slint's compiler at the player's
+version, so a Slint error (an unknown property, a missing import) fails the
+pull request instead of the install in the player. That version is
+`PLAYER_SLINT` in the SDK's `dist/slint-version.js`; print it with
+`node -p 'require("./node_modules/@vestra-player/sdk/dist/slint-version.js").PLAYER_SLINT'`.
+`check` does the same locally once `slint-ui` at that version is installed
+(`npm i -D slint-ui@<PLAYER_SLINT>` in your own project, or
+`npm i --no-save slint-ui@<PLAYER_SLINT>` in this repository, after `npm ci`).
+On Linux its native module also needs `libinput10`, `libxkbcommon0`,
+`libudev1`, `libgbm1`, `libfontconfig1` and `libfreetype6` (CI installs
+them; most desktops already have them). Without the compiler, `check` prints
+one line and passes. It is optional for you, and never a dependency of a
+plugin.
 
 ## Open the pull request
 

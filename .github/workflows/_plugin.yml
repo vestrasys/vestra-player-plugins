@@ -1,9 +1,9 @@
 name: Plugin
 
 # Reusable (ci.yml, publish.yml, weekly.yml): one plugin's strict type
-# check, tests and package, on Ubuntu, Windows and macOS with Node 26 (the
-# player's Node; @vestra-player/sdk 1.5 needs >=26). No secrets, read-only
-# token.
+# check (its .slint files compiled), tests and package, on Ubuntu, Windows
+# and macOS with Node 26 (the player's Node; @vestra-player/sdk 1.5 needs
+# >=26). No secrets, read-only token.
 
 on:
   workflow_call:
@@ -63,6 +63,35 @@ jobs:
         run: |
           npm install --no-save --ignore-scripts --no-audit --no-fund "@vestra-player/sdk@$SDK"
           npm ls @vestra-player/sdk
+      # The Linux build of slint-ui's native module links these shared
+      # libraries (its DT_NEEDED besides libc/libstdc++/libgcc); the runner
+      # image lacks libinput10, so loading it fails without this step.
+      - name: Shared libraries slint-ui needs on Linux
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends libinput10 libxkbcommon0 libudev1 libgbm1 libfontconfig1 libfreetype6
+      # The Slint compiler at the player's version (PLAYER_SLINT, read from
+      # the installed SDK, SDK 1.10.0 or later): `check` then compiles the
+      # plugin's .slint files as the player does at install and fails on a
+      # Slint error. A CI-only tool, never a dependency of the repository or
+      # of a plugin: in no package.json or lockfile (MAINTAINING.md, CI).
+      # Exact version, no install scripts (it has none); the native compiler
+      # comes from a per-platform optional package (linux-x64-gnu,
+      # win32-x64-msvc, darwin-arm64: macos-latest is Apple silicon; there is
+      # no Intel-Mac build). Installed in one command with an SDK override,
+      # because a second --no-save install reverts the first. Not in the
+      # lockfile, so Scorecard PinnedDependencies reports this step too.
+      - name: Install slint-ui at the player's Slint version (not committed)
+        run: |
+          SLINT=$(node -p 'require("./node_modules/@vestra-player/sdk/dist/slint-version.js").PLAYER_SLINT')
+          specs=("slint-ui@$SLINT")
+          if [[ "$SDK" != locked ]]; then
+            specs+=("@vestra-player/sdk@$SDK")
+          fi
+          npm install --no-save --ignore-scripts --no-audit --no-fund "${specs[@]}"
+          npm ls slint-ui @vestra-player/sdk
+          node -e 'require("slint-ui")'
       # The plugin's own npm dependencies, if any: lockfile required,
       # npm ci --ignore-scripts, no native code, allowed licenses
       # (scripts/lib/dependencies.mjs). scripts/plugin.mjs repeats the checks.
@@ -77,8 +106,17 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: node scripts/verify-shader-sources.mjs "plugins/$PLUGIN"
       # Every command also checks manifest.json against the player's rules.
+      # check passes with a "slint: ... not compiled" line when it does not
+      # find or cannot load slint-ui; here that is a failure, so a mismatch
+      # between the SDK finding slint-ui and the require above cannot pass
+      # silently.
       - name: Type check
-        run: node scripts/plugin.mjs check "$PLUGIN"
+        run: |
+          node scripts/plugin.mjs check "$PLUGIN" 2>&1 | tee "$RUNNER_TEMP/check.log"
+          if grep -q "slint: .*not compiled" "$RUNNER_TEMP/check.log"; then
+            echo "::error::.slint files not compiled (see the slint: line above)"
+            exit 1
+          fi
       - name: Test
         run: node scripts/plugin.mjs test "$PLUGIN"
       - name: Pack
