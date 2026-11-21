@@ -63,6 +63,14 @@ jobs:
         run: |
           npm install --no-save --ignore-scripts --no-audit --no-fund "@vestra-player/sdk@$SDK"
           npm ls @vestra-player/sdk
+      # The Linux build of slint-ui's native module links these shared
+      # libraries (its DT_NEEDED besides libc/libstdc++/libgcc); the runner
+      # image lacks libinput10, so loading it fails without this step.
+      - name: Shared libraries slint-ui needs on Linux
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends libinput10 libxkbcommon0 libudev1 libgbm1 libfontconfig1 libfreetype6
       # The Slint compiler at the player's version (PLAYER_SLINT, read from
       # the installed SDK, SDK 1.10.0 or later): `check` then compiles the
       # plugin's .slint files as the player does at install and fails on a

@@ -78,8 +78,7 @@ plugin.
 ### Tests
 
 - [ ] There is at least one `tests/*.test.ts` or `tests/*.test.mjs`, and
-      `vestra-plugin test` passes on macOS, Windows and Linux with Node.js
-      26. (CI)
+      `vestra-plugin test` passes on macOS, Windows and Linux with Node.js 26. (CI)
 
 ### Player events and state
 
@@ -196,7 +195,8 @@ version, so a Slint error (an unknown property, a missing import) fails the
 pull request instead of the install in the player. `check` does the same
 locally once the compiler is installed (`npm i -D slint-ui@1.18.1` in your
 own project, or `npm i --no-save slint-ui@1.18.1` in this repository, after
-`npm ci`); without it, `check` prints one line and passes. It is optional
+`npm ci`; on Linux it also needs `libinput10`, `libxkbcommon0`,
+`libgbm1` and `libfontconfig1`); without it, `check` prints one line and passes. It is optional
 for you, and never a dependency of a plugin.
 
 ## Open the pull request
