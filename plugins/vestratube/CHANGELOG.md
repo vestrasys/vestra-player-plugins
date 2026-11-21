@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.5
+
+- The description ends with the store's "how to open" line, `→ Sidebar: VestraTube tab; Menu: Open ▸ VestraTube`, translated: the store shows it on the card and under "Where to find it". A plugin with a sidebar tab names the sidebar first.
+
 ## 0.5.4
 
 - Needs Vestra Player 0.9.0 or later (SDK 1.9.0): the manifest no longer lists `capabilities`; `activate` starts with `plugin.player.subscribe()` and `await plugin.player.read()`, which the declarations used to imply. Nothing else changes.

@@ -58,6 +58,14 @@ plugin.
 - [ ] The display fields the store shows are filled in: `name`, `author`,
       `punchline`, `description`, `tags`, `license`, `sourceUrl`; `icon` is
       optional. (Review)
+- [ ] The `description` ends with the store's "how to open" line: a last
+      line `→ ` and at most 48 characters saying where the plugin is found
+      once installed, in the player's words with ` ▸ ` between menu levels
+      (`→ Menu: Tools ▸ Loudness Meter`). A plugin with a sidebar tab names
+      the sidebar first (`→ Sidebar: Clip Export tab`), and adds its next
+      entry after `; ` only while the line stays within 48 characters
+      (`→ Sidebar: VestraTube tab; Menu: Open ▸ VestraTube`). Translations
+      keep the arrow and the limit; a longer line is not shown. (Review)
 - [ ] `minPlayerVersion` is set when the plugin needs a newer player than
       0.1; a plugin that calls `plugin.player.subscribe()` or
       `plugin.player.read()` needs 0.9.0. (Review)

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+
+- The description ends with the store's "how to open" line, `→ Menu: Playback ▸ Skip Silence`, translated: the store shows it on the card and under "Where to find it".
+- A store icon (`assets/icon.png`, 256 × 256): a jump arrow over the silence between two waveforms.
+
 ## 0.1.0
 
 - First release: **Playback ▸ Skip Silence** skips the silent stretches of a local video or audio file while it plays (off by default, remembered).

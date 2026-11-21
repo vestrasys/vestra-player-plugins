@@ -131,8 +131,8 @@ msgid "Search YouTube in the sidebar and play videos right away"
 msgstr "在侧栏搜索 YouTube，即点即播"
 
 #: manifest.json
-msgid "A YouTube sidebar for Vestra Player: search, see thumbnails, titles, durations and channels, and play a video with a double-click. Download videos as MKV files, or play and download a single video from its link. No sign-in and nothing to install: the YouTube part uses the bundled open-source library youtubei.js, downloads use the player's own ffmpeg."
-msgstr "Vestra Player 的 YouTube 侧栏：搜索视频，查看缩略图、标题、时长和频道，双击即可播放。可将视频下载为 MKV 文件，也可以通过链接播放或下载单个视频。无需登录、无需安装任何程序：YouTube 部分使用内置的开源库 youtubei.js，下载使用播放器自带的 ffmpeg。"
+msgid "A YouTube sidebar for Vestra Player: search, see thumbnails, titles, durations and channels, and play a video with a double-click. Download videos as MKV files, or play and download a single video from its link. No sign-in and nothing to install: the YouTube part uses the bundled open-source library youtubei.js, downloads use the player's own ffmpeg.\n→ Sidebar: VestraTube tab; Menu: Open ▸ VestraTube"
+msgstr "Vestra Player 的 YouTube 侧栏：搜索视频，查看缩略图、标题、时长和频道，双击即可播放。可将视频下载为 MKV 文件，也可以通过链接播放或下载单个视频。无需登录、无需安装任何程序：YouTube 部分使用内置的开源库 youtubei.js，下载使用播放器自带的 ffmpeg。\n→ 侧边栏：VestraTube 标签；菜单：打开 ▸ VestraTube"
 
 #: manifest.json
 msgid "online video"
