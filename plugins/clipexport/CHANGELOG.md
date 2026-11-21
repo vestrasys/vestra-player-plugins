@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.1
+
+- The description ends with the store's "how to open" line, `→ Sidebar: Clip Export tab`, translated: the store shows it on the card and under "Where to find it". A plugin with a sidebar tab names the sidebar first.
+
 ## 0.8.0
 
 **Who must change: nobody.** No new permission and the same player (0.9.0 or later). Settings, the Collection, Results and kept Highlights carry over.

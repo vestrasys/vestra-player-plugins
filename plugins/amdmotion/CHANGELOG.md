@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2
+
+- The description ends with the store's "how to open" line, `→ Menu: Video ▸ AMD Motion Smoothing`, translated: the store shows it on the card and under "Where to find it".
+- A store icon (`assets/icon.png`, 256 × 256): smoother motion as a ghost trail of discs, in a red-to-orange gradient.
+
 ## 0.1.1
 
 - Needs Vestra Player 0.9.0 or later (SDK 1.9.0): the manifest no longer lists `capabilities`; the plugin needed no call in its place. Nothing else changes.

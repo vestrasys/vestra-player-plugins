@@ -98,8 +98,8 @@ msgid "Crops away the solid-colour border around a video's picture"
 msgstr "裁去视频画面周围的纯色边框"
 
 #: manifest.json
-msgid "Some videos are larger than their picture: a 2560×1440 picture in a corner of a 3840×2160 video, the rest one solid colour. Auto Frame finds the picture when a video file on this computer starts and crops the video to it, so the picture fills the window. Films with bars only above and below, or only at the sides, are left as they are. It reads a few frames of the file with the player's FFmpeg, remembers the answer per file and says on the video what it did. Video ▸ Auto Frame turns it on and off, detects again, and shows the full picture of one file."
-msgstr "有些视频比其中的画面大：例如 3840×2160 的视频只在一角有 2560×1440 的画面，其余部分是同一种纯色。播放本机上的视频文件时，自动取景会找到画面并把视频裁切到画面，让画面充满窗口。只在上下或只在左右有边框的影片保持原样。它用播放器自带的 FFmpeg 读取文件中的几帧，按文件记住结果，并在视频上提示所做的处理。“视频 ▸ 自动取景”可以开关此功能、重新检测，以及让某个文件显示完整画面。"
+msgid "Some videos are larger than their picture: a 2560×1440 picture in a corner of a 3840×2160 video, the rest one solid colour. Auto Frame finds the picture when a video file on this computer starts and crops the video to it, so the picture fills the window. Films with bars only above and below, or only at the sides, are left as they are. It reads a few frames of the file with the player's FFmpeg, remembers the answer per file and says on the video what it did. Video ▸ Auto Frame turns it on and off, detects again, and shows the full picture of one file.\n→ Automatic; Menu: Video ▸ Auto Frame"
+msgstr "有些视频比其中的画面大：例如 3840×2160 的视频只在一角有 2560×1440 的画面，其余部分是同一种纯色。播放本机上的视频文件时，自动取景会找到画面并把视频裁切到画面，让画面充满窗口。只在上下或只在左右有边框的影片保持原样。它用播放器自带的 FFmpeg 读取文件中的几帧，按文件记住结果，并在视频上提示所做的处理。“视频 ▸ 自动取景”可以开关此功能、重新检测，以及让某个文件显示完整画面。\n→ 自动；菜单：视频 ▸ 自动取景"
 
 #: manifest.json
 msgid "video"

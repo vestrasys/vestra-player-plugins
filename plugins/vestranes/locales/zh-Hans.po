@@ -78,8 +78,8 @@ msgid "Play NES games in the player, with the keyboard"
 msgstr "在播放器里用键盘玩 NES 游戏"
 
 #: manifest.json
-msgid "An NES (Famicom) emulator for Vestra Player: load an iNES ROM from Games ▸ VestraNES and its picture and sound play in the player. While the small VestraNES window is in front, the keyboard is the controller: arrow keys, X, Z, A and S; the player's own shortcuts are not affected. Emulation by the bundled open-source library JSNES. No games included."
-msgstr "Vestra Player 的 NES（红白机）模拟器：从「游戏 ▸ VestraNES」加载 iNES 格式的 ROM，画面和声音在播放器里播放。VestraNES 小窗口在前台时，键盘就是手柄：方向键、X、Z、A 和 S；播放器自己的快捷键不受影响。模拟由内置的开源库 JSNES 完成。不附带游戏。"
+msgid "An NES (Famicom) emulator for Vestra Player: load an iNES ROM from Games ▸ VestraNES and its picture and sound play in the player. While the small VestraNES window is in front, the keyboard is the controller: arrow keys, X, Z, A and S; the player's own shortcuts are not affected. Emulation by the bundled open-source library JSNES. No games included.\n→ Menu: Games ▸ VestraNES ▸ Load ROM"
+msgstr "Vestra Player 的 NES（红白机）模拟器：从「游戏 ▸ VestraNES」加载 iNES 格式的 ROM，画面和声音在播放器里播放。VestraNES 小窗口在前台时，键盘就是手柄：方向键、X、Z、A 和 S；播放器自己的快捷键不受影响。模拟由内置的开源库 JSNES 完成。不附带游戏。\n→ 菜单：游戏 ▸ VestraNES ▸ 加载 ROM"
 
 #: manifest.json
 msgid "Emulator"
