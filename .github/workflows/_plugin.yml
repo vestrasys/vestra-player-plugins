@@ -106,8 +106,17 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: node scripts/verify-shader-sources.mjs "plugins/$PLUGIN"
       # Every command also checks manifest.json against the player's rules.
+      # check passes with a "slint: ... not compiled" line when it does not
+      # find or cannot load slint-ui; here that is a failure, so a mismatch
+      # between the SDK finding slint-ui and the require above cannot pass
+      # silently.
       - name: Type check
-        run: node scripts/plugin.mjs check "$PLUGIN"
+        run: |
+          node scripts/plugin.mjs check "$PLUGIN" 2>&1 | tee "$RUNNER_TEMP/check.log"
+          if grep -q "slint: .*not compiled" "$RUNNER_TEMP/check.log"; then
+            echo "::error::.slint files not compiled (see the slint: line above)"
+            exit 1
+          fi
       - name: Test
         run: node scripts/plugin.mjs test "$PLUGIN"
       - name: Pack
