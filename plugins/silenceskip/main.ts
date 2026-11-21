@@ -97,6 +97,9 @@ interface Saved {
   last: number;
 }
 
+/** The id of the selected audio track of `state`, `null` without one. */
+const selectedTrack = (state: PlayerState) => state.audioTracks?.find((t) => t.selected)?.id ?? null;
+
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /**
@@ -124,6 +127,14 @@ export default function activate(plugin: Plugin) {
   // The player calls this when playback is about to reach a silence: LEAD
   // seconds before it, or at once when a seek lands inside it.
   const silence = plugin.trigger().enter(({ range, state }) => skip(range, state));
+  // Armed with the audio track a scan read: the player calls `leave` when
+  // another one is selected (also in its own menu), and the file is scanned
+  // again for that track's sound. `enter` (the track already selected when
+  // armed) needs nothing.
+  const track = plugin
+    .trigger()
+    .enter(() => {})
+    .leave(() => void rescan().catch((error) => log(error)));
 
   /** While on: the event listener and the scan. */
   let active: Scope | null = null;
@@ -168,10 +179,10 @@ export default function activate(plugin: Plugin) {
 
   // ------------------------------------------------------------------ scanning
   /** Where a file's scan is kept: a key of 1 KiB at most whatever the path. */
-  async function scanKey(path: string) {
+  async function scanKey(path: string, stream: number) {
     const real = await realpath(path);
     const info = await stat(real);
-    const id = `${real}|${info.size}|${Math.trunc(info.mtimeMs)}|${settings.value.thresholdDb}`;
+    const id = `${real}|${info.size}|${Math.trunc(info.mtimeMs)}|${settings.value.thresholdDb}|${stream}`;
     return `scan:${createHash("sha256").update(id).digest("hex")}`;
   }
 
@@ -195,12 +206,18 @@ export default function activate(plugin: Plugin) {
 
   /**
    * Draw the stretches and hand them to the trigger, while the source of
-   * `state` is still the one playing. Only the source is compared, read
-   * just before: a pause or a seek (also this plugin's own skip) during the
-   * scan must not stop it from drawing and arming.
+   * `state` is still the one playing. Only the source and its audio track
+   * are compared, read just before: a pause or a seek (also this plugin's
+   * own skip) during the scan must not stop it from drawing and arming.
    */
   async function publish(state: PlayerState, silences: Span[], duration: number, signal: AbortSignal) {
-    if ((await player.refresh()).sourceId !== state.sourceId || signal.aborted) return;
+    const now = await player.refresh();
+    if (now.sourceId !== state.sourceId || signal.aborted) return;
+    const selected = selectedTrack(state);
+    // Another track was picked before the trigger below could see it change.
+    if (selectedTrack(now) !== selected) return void rescan().catch((error) => log(error));
+    if (selected === null) track.off();
+    else track.firesOn(when.audioTrack(selected));
     const spans = longest(skippable(silences, settings.value.minLength, duration), SHOWN_RANGES);
     layer.setRanges(
       spans.map((s) => ({ start: s.start, end: s.end, style: "region" as const, title: text("Silence") })),
@@ -221,15 +238,19 @@ export default function activate(plugin: Plugin) {
     const duration = state.duration;
     // A duration is needed to plan the windows; a live stream has none.
     const scope = active;
-    if (!scope || state.phase !== "ready" || !path || duration === null || duration <= 0) return;
+    // Whatever comes next, the scan running now is of something else: stop
+    // its ffmpeg window before any return.
     job?.abort();
+    job = null;
+    if (!scope || state.phase !== "ready" || !path || duration === null || duration <= 0) return;
     const controller = new AbortController();
     job = controller;
     const { signal } = controller;
     try {
+      const stream = audioStream(state.audioTracks);
       let key: string;
       try {
-        key = await scanKey(path);
+        key = await scanKey(path, stream);
       } catch (error) {
         log("cannot read", path, error);
         return;
@@ -238,7 +259,6 @@ export default function activate(plugin: Plugin) {
       const scan = (await session.get<Scan>(key)) ?? { silences: [], done: [], count: windowCount(duration) };
       await publish(state, scan.silences, duration, signal);
       const threshold = settings.value.thresholdDb;
-      const stream = audioStream(state.audioTracks);
       for (;;) {
         // The playhead now: the next window is the one it plays, or the first not read after it.
         const now = await player.refresh();
@@ -313,6 +333,7 @@ export default function activate(plugin: Plugin) {
       active = null;
       layer.setRanges([]);
       silence.off();
+      track.off();
     }
   }
 

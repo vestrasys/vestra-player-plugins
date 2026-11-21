@@ -86,7 +86,8 @@ async function playing(path: string, options: { enabled?: boolean; locale?: "zh-
 
 /** The position list the plugin's trigger waits on, as `[start, end]` pairs. */
 function armed(host: TestHost): number[][] | null {
-  const [kept] = host.triggers;
+  // The silence trigger: the one whose condition is an `all` with the position list.
+  const kept = host.triggers.find((t) => typeof t.when === "object" && t.when !== null && "all" in t.when);
   if (!kept) return null;
   const parts = (kept.when as { all: Record<string, unknown>[] }).all;
   const position = parts.find((p) => "position" in p)?.position as { ranges: number[][]; lead: number };
@@ -396,6 +397,83 @@ test("another file mid-scan: the old scan's results never reach it", async () =>
     host.setSource({ position: 10.3 });
     await host.settle(50);
     assert.equal(host.seeks.length, 0);
+    await stop();
+  });
+});
+
+test("a stream or address opened mid-scan stops the running ffmpeg window: nothing of the old file is kept", async () => {
+  await withFile(async (path) => {
+    const host = new TestHost();
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const answer = fakeFfmpeg(SILENCES);
+    host.tools.handle("ffmpeg", async (args) => {
+      await gate;
+      return answer(args);
+    });
+    open(host, path);
+    const { stop } = await startPlugin(activate, { directory, host });
+    await host.command("toggle").run();
+    await until(host, () => host.tools.calls.length === 1);
+    open(host, "https://example.com/other.mp4");
+    await host.settle(20);
+    release();
+    await host.settle(100);
+    assert.equal(host.tools.calls.length, 1);
+    assert.deepEqual([...host.sessionStorage.keys()].filter((k) => k.startsWith("scan")), []);
+    await stop();
+  });
+});
+
+/** Two embedded audio tracks, `selected` the chosen one. */
+const tracks = (selected: number) =>
+  [1, 2].map((trackId) => ({
+    trackId,
+    streamIndex: trackId,
+    selected: trackId === selected,
+    external: false,
+    codec: "aac",
+    title: null,
+    language: null,
+  }));
+
+/** Whether a trigger waits on the selected audio track being `id`. */
+const onTrack = (host: TestHost, id: number) => host.triggers.some((t) => JSON.stringify(t.when) === JSON.stringify({ audioTrack: id }));
+
+test("another audio track is scanned for its own silences; going back to the first reads nothing again", async () => {
+  await withFile(async (path) => {
+    const host = new TestHost();
+    // Track 2 (`0:a:1`) has one long silence of its own.
+    const first = fakeFfmpeg(SILENCES);
+    const second = fakeFfmpeg([{ start: 50, end: 60 }]);
+    host.tools.handle("ffmpeg", (args) => (args.includes("0:a:1?") ? second(args) : first(args)));
+    host.openElsewhere(path, "loading");
+    host.setSource({ phase: "ready", duration: 300, position: 0, paused: false, audioTracks: tracks(1) });
+    const { stop } = await startPlugin(activate, { directory, host });
+    await host.command("toggle").run();
+    await until(host, () => ranges(host).length === 2 && host.tools.calls.length === 3);
+    assert.ok(onTrack(host, 1));
+
+    // The user picks track 2 (here as in the player's own menu): the trigger's leave scans again.
+    host.setSource({ audioTracks: tracks(2) });
+    const spans = [[50 + PAD, 60 - PAD]];
+    await until(host, () => host.tools.calls.length === 6 && JSON.stringify(armed(host)) === JSON.stringify(spans));
+    assert.ok(host.tools.calls.slice(3).every((c) => c.args.includes("0:a:1?")));
+    assert.deepEqual(
+      ranges(host).map((r) => [r.start, r.end]),
+      spans,
+    );
+    assert.ok(onTrack(host, 2));
+
+    // Back to track 1: its scan is kept, so it is drawn and armed without ffmpeg.
+    host.setSource({ audioTracks: tracks(1) });
+    await until(host, () => armed(host)?.length === 2);
+    await host.settle(50);
+    assert.equal(host.tools.calls.length, 6);
+    assert.deepEqual(armed(host), [
+      [FIRST.start, FIRST.end],
+      [SECOND.start, SECOND.end],
+    ]);
     await stop();
   });
 });

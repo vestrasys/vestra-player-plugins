@@ -48,6 +48,7 @@ playback speed stays as you set it.
 - Vestra Player 0.10.0 or later.
 - Only files on this computer: streams and web addresses are not read.
 - The selected audio track of the file is read; an external audio track
-  you loaded is not, the file's first track is read instead.
+  you loaded is not, the file's first track is read instead. Picking
+  another track while it plays reads that track.
 - Each skip is a seek: on a video with keyframes far apart the jump can
   take a moment.
