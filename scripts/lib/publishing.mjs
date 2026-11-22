@@ -15,16 +15,14 @@
  * the previous signed index's + 1 on every publish (1 for the first, and
  * when the previous index has none); each store asset carries its sha256 and
  * size; a plugin's optional `translations` holds its display fields in
- * the languages its package translates them to; a version's optional `scan`
- * holds the boundary categories its code uses (scripts/lib/scan.mjs);
- * everything is covered by the signature.
+ * the languages its package translates them to; everything is covered by
+ * the signature.
  */
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { idProblems } from "./registry.mjs";
 import { revokedProblems } from "./revoked.mjs";
-import { scanProblems } from "./scan.mjs";
 import { isVersion } from "./semver.mjs";
 import { verifyIndex } from "./signing.mjs";
 
@@ -109,13 +107,13 @@ const VERSION_KEYS = [
   "version",
   "apiVersion",
   "minPlayerVersion",
-  // Legacy: versions published before SDK 1.9.0 only (see indexProblems).
+  // Legacy keys, kept as signed on older versions only (see indexProblems).
   "capabilities",
+  "scan",
   "downloadUrl",
   "sha256",
   "size",
   "published",
-  "scan",
 ];
 const TOP_KEYS = [
   "schema",
@@ -309,7 +307,16 @@ export function indexProblems(index, { legacy = false } = {}) {
         Number.isNaN(Date.parse(entry.published))
       )
         problems.push(`${where}: published must be an ISO 8601 date`);
-      problems.push(...scanProblems(entry.scan, where));
+      // Only versions published before SDK 1.11.0 may have it, kept as
+      // signed (scripts/lib/release.mjs refuses it on a new version); no
+      // client reads it.
+      if (
+        entry.scan !== undefined &&
+        (entry.scan === null ||
+          typeof entry.scan !== "object" ||
+          Array.isArray(entry.scan))
+      )
+        problems.push(`${where}: scan, when present, must be an object`);
     });
   });
   return problems;

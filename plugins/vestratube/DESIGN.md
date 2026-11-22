@@ -290,7 +290,7 @@ export struct VideoRow { key: string, title: string, channel: string, duration: 
 export global TubeBridge { in property <[VideoRow]> rows; in-out property <string> query; callback search(string); … }
 ```
 
-Capabilities: `commands`, `events`, `ui.window`, `ui.dialog`, `ui.mount`,
+Manifest declarations (until SDK 1.9.0): `commands`, `events`, `ui.window`, `ui.dialog`, `ui.mount`,
 `ui.osd`, `playback.read`, `playback.control`, `source.resolve` (0.3 plus
 `ui.mount` and `ui.osd`). `minPlayerVersion` 0.5.4 (rows kept in place when the
 list's length changes; the player change landed after the 0.5.3 version bump, so

@@ -135,9 +135,8 @@ behind it:
 - `vestra.` is reserved for the player's built-in plugins: neither an id
   nor an owner here may use it. `npm run registry` and the publish build
   enforce these rules.
-- A manifest declares no `capabilities` (SDK 1.9.0 removed them;
-  `vestra-plugin check` and the pack refuse the field, and the package
-  check refuses a packed manifest that has it). A plugin turns on the
+- A manifest has only the fields `vestra-plugin check` knows; the check
+  and the pack refuse any other. A plugin turns on the
   player's events with `plugin.player.subscribe()` and its start-up state
   with `await plugin.player.read()`. Listing and running commands and
   leading the palette stay with built-in plugins: the player refuses them
@@ -539,7 +538,7 @@ On the pull request (`Add someone.cool-visualizer`, or
 
 - **Registry owners** ([`registry.yml`](.github/workflows/registry.yml)) checks that the author is in `owners` of a new registration, or already an owner of one they change. It runs from the base branch and never runs the pull request's code.
 - **CI** ([`ci.yml`](.github/workflows/ci.yml)) validates the file (`npm run registry`) and dry-runs the publish flow. Today that dry run fails on any registration (third-party builds are not implemented), which is what keeps registrations from being merged; once they are, it builds and tests the plugin from the registered commit.
-- **Review**: a maintainer reads the source at the commit (for an update, the diff since the previous one): that it does what its README says, that the categories `vestra-plugin scan` reports match what it does, and how it uses files, the network and child processes.
+- **Review**: a maintainer reads the source at the commit (for an update, the diff since the previous one): that it does what its README says, and how it uses files, the network and child processes.
 
 After the merge, [`publish.yml`](.github/workflows/publish.yml) builds the package at the commit without secrets, releases it as `<id>-v<version>` with a build provenance attestation, signs the index in a separate job that never runs plugin code, and deploys it.
 
@@ -625,8 +624,7 @@ plugins ──▶ static ──┬──▶ plugin × N ──┬──▶ build
    for every plugin, without the npm cache. Nothing is built for release
    unless they pass.
 1. **build** (no secrets, no token while plugin code runs): `npm ci`, packs every plugin whose version has no Release yet with
-   `vestra-plugin pack`; writes the unsigned `index.json` (with the
-   [capability scan](#indexjson) of each version it adds) and the store
+   `vestra-plugin pack`; writes the unsigned `index.json` and the store
    assets. A version that is already released is never released again (it
    is packed once more into a scratch directory only to read its
    translations for `index.json`); earlier versions come from the published
@@ -637,7 +635,7 @@ plugins ──▶ static ──┬──▶ plugin × N ──┬──▶ build
    checks the build artifact as untrusted data (each package's and store
    asset's sha256 and size against the index; the version history, `revoked`
    (append-only) and `generated` (previous + 1) against the previously signed
-   index; no `capabilities` in a new version; `revoked` against
+   index; no legacy `capabilities` or `scan` in a new version; `revoked` against
    `revoked.json`; nothing on the site but
    `index.json` and the assets it references), creates the Releases with
    `gh release create`, and signs `index.json`.
@@ -686,8 +684,7 @@ and Pages of a private repository need authentication or a paid plan):
       "versions": [
         { "version": "0.3.0", "apiVersion": "vestra/1", "minPlayerVersion": "0.2.0",
           "downloadUrl": "https://…/zysilm.vestratube-0.3.0.vxp",
-          "sha256": "…", "size": 9370, "published": "2026-10-21T…Z",
-          "scan": { "uses": ["clipboard"], "method": "types", "sdk": "1.8.0" } }
+          "sha256": "…", "size": 9370, "published": "2026-10-21T…Z" }
       ]
     }
   ],
@@ -744,30 +741,14 @@ and Pages of a private repository need authentication or a paid plan):
   present and the English field otherwise. The signature covers it, and
   `indexProblems` (`scripts/lib/publishing.mjs`) checks its shape in the
   build and the signing job.
-- `scan` (optional, in a version entry) is the capability scan of that
-  version's source: `uses` lists the boundary categories its code crosses
-  (`player`, `plugins`, `clipboard`, `credentials`, `camera`,
-  `microphone`, `screen`, `notifications`; each once, in this order,
-  `[]` when none), `method` says how the source was read (`types`,
-  `names` or `mixed`; with the last two `uses` is a best effort) and
-  `sdk` is the SDK version whose table decided. The build runs the SDK's
-  `vestra-plugin scan` (SDK 1.8.0 and later) on `plugins/<name>/` for every
-  version it adds to the index and stores these three fields only;
-  `vestra-plugin scan plugins/<name>` prints where each category was
-  found. A version that is published already keeps its entry as signed, so
-  it gets a `scan` only if it was built with one. The store shows `uses`
-  before installing and compares it between two versions; it is a report
-  and gates nothing (files, the network and other programs are outside it:
-  see [Security review](#security-review)). The signature covers it, and
-  `indexProblems` checks its shape (`scripts/lib/scan.mjs`). Since SDK 1.9.0
-  the scan is the only disclosure: manifests declare nothing.
-- `capabilities` (legacy, in a version entry) is the list a manifest
-  declared before SDK 1.9.0. Versions published before then keep it as
-  signed; the build never writes it, and the signing job refuses a new
-  version that has it. When present, `indexProblems` checks that it is an
-  array of strings. Clients must not rely on it.
-- Compatibility: `generated`, the asset fields, `translations` and `scan`
-  were added within `schema` 1, and `capabilities` became optional in it. Clients ignore unknown keys (the store does), so older
+- Legacy keys of a version entry: `capabilities` (versions published
+  before SDK 1.9.0) and `scan` (versions published with SDK 1.8.0 to
+  1.10.x). A published version keeps its entry exactly as signed, so they
+  stay on those versions; the build never writes them, the signing job
+  refuses a new version that has one, and `indexProblems` only checks
+  their shape (an array of strings, an object). No client reads them.
+- Compatibility: `generated`, the asset fields and `translations` were
+  added within `schema` 1, and `capabilities` became optional in it. Clients ignore unknown keys (the store does), so older
   clients read the new index unchanged; this repository's own scripts still
   read an index from before them as the previous index.
 

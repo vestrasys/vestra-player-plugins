@@ -252,6 +252,51 @@ test("capabilities: kept on versions signed before SDK 1.9.0, never on a new ver
   );
 });
 
+test("scan: kept on versions signed before SDK 1.11.0, never on a new version", async () => {
+  // A previously signed version with the field, as versions published with
+  // SDK 1.8.0 to 1.10.x have it.
+  const first = await build(await repository({ version: "1.0.0" }));
+  const previous = structuredClone(first.index);
+  previous.plugins[0].versions[0].scan = {
+    uses: ["clipboard"],
+    method: "types",
+    sdk: "1.10.1",
+  };
+  assert.deepEqual(indexProblems(previous), []);
+  const second = await build(await repository({ version: "1.1.0" }), {
+    previous,
+  });
+  const [added, kept] = second.index.plugins[0].versions;
+  assert.equal("scan" in added, false);
+  assert.deepEqual(kept.scan, previous.plugins[0].versions[0].scan);
+  const released = releases.fixture({
+    "someone.demo-v1.0.0": { published: NOW },
+  });
+  assert.deepEqual(
+    (await check(second.out, second.index, { previous, releases: released }))
+      .problems,
+    [],
+  );
+
+  // A new version that carries it is refused by the signing job.
+  const tampered = structuredClone(second.index);
+  tampered.plugins[0].versions[0].scan = { uses: [] };
+  assert.match(
+    (
+      await check(second.out, tampered, { previous, releases: released })
+    ).problems.join("\n"),
+    /someone\.demo 1\.1\.0: a new version has no scan/,
+  );
+
+  // When present, it is still an object.
+  const malformed = structuredClone(previous);
+  malformed.plugins[0].versions[0].scan = ["clipboard"];
+  assert.match(
+    indexProblems(malformed).join("\n"),
+    /versions\[0\]: scan, when present, must be an object/,
+  );
+});
+
 test("a released version is not rebuilt", async () => {
   const first = await build(await repository());
   const again = await build(await repository(), { previous: first.index });

@@ -63,7 +63,7 @@ export const REASON = {
   // The player keeps no reference for the token: forgotten (a development load's references end with the player's run).
   partUnknown: "The player no longer remembers a part's file. Remove the part and add its range again.",
   cannotRead: "The player cannot read this file.",
-  noCapability: "This version of the player cannot do this.",
+  notAllowed: "This version of the player cannot do this.",
   noFfmpeg: "The transitions need FFmpeg, which the player could not find.",
   transitionFailed: "Could not write the transitions.",
   undoFull: "There is no room to bring the cleared parts back: the Collection holds at most 100. Remove parts, then Undo again.",

@@ -3,8 +3,8 @@
  * Portability scan of the plugins (workflow §1.5 in the player repository):
  * string literals in plugins/ (without tests, dist, vendor, node_modules)
  * that name system command paths or macOS-only commands, and
- * `process.platform` branches. Plugins must not call system commands; ask the
- * player for a cross-platform capability or use plain Node instead.
+ * `process.platform` branches. Plugins must not call system commands; use the
+ * player's API or plain Node instead.
  *
  *   npm run portability
  *

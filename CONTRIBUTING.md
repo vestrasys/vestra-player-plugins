@@ -48,8 +48,7 @@ plugin.
 ### Manifest
 
 - [ ] `vestra-plugin check` accepts it: `id`, `apiVersion` (`vestra/1`),
-      `entry`, no unknown fields (`capabilities` is one since SDK 1.9.0:
-      a manifest declares nothing), and every display field
+      `entry`, no unknown fields, and every display field
       within the player's limits (`name` and `author` 64 characters,
       `punchline` 120, `description` 2000, at most 8 `tags` of 24 characters,
       `license` 64, `sourceUrl` an `https:` address, `icon` a PNG or JPEG of
@@ -110,14 +109,6 @@ Nothing limits file or network access either: plugins run as ordinary
 Node.js processes without a sandbox. That is why a maintainer reads every
 plugin's source.
 
-What the store discloses comes only from a scan of the code. When a version
-is published, the build scans its source with the SDK's `vestra-plugin
-scan` and stores the boundary categories the code uses (`player`,
-`plugins`, `clipboard`, `credentials`, …) in the index; the store shows
-them before installing and when an update changes them. You declare
-nothing for it; `npx vestra-plugin scan plugins/<name>` prints what it
-finds and where.
-
 ### Imports
 
 - [ ] Code imports only Node built-ins, `@vestra-player/sdk`, the plugin's
@@ -139,7 +130,7 @@ finds and where.
 - [ ] No system commands: no string that names a system path (`/usr/bin/`,
       `/bin/`, `/opt/homebrew`, `/System/`, `/Library/`, `/Applications/`,
       …) and no macOS-only program (`open`, `osascript`, `pbcopy`, …) passed
-      to `spawn` or `exec`. Ask the player for a capability or use plain Node
+      to `spawn` or `exec`. Use the player's API or plain Node
       instead. (CI: `npm run portability`; it also lists every
       `process.platform` branch for the reviewer, without failing)
 
@@ -184,7 +175,7 @@ Linux, and some checks the commands above do not include:
   the downloaded upstream file
   ([Third-party files and licenses](#third-party-files-and-licenses));
 - the package check: the packed `.vxp` has the source manifest's id,
-  version and API version and no `capabilities`, a `.js` entry, no `.ts`
+  version and API version, a `.js` entry, no `.ts`
   or test files, no `node_modules`, no native code, and the license files
   it must ship;
 - the index dry run: the publish flow end to end with a throwaway key
