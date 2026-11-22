@@ -20,6 +20,33 @@ export const isSettings = (value: unknown): value is Settings =>
   typeof value === "object" &&
   MODES.some((m) => m.mode === (value as { mode?: unknown }).mode);
 
+/** How often the open window reads the player's dropped frames while the converter runs. */
+export const DROP_CHECK_MS = 2000;
+/** The span the drop rate is judged over: the last samples covering it. */
+export const DROP_WINDOW_MS = 6000;
+/** Sustained dropping: at least this many frames a second over the span (60 → 1 of 60 lost). */
+export const DROPS_PER_SECOND = 1;
+
+/** One reading of `player.stats().framesDropped`. */
+export interface DropSample {
+  at: number;
+  dropped: number;
+}
+
+/**
+ * Whether frames are being dropped steadily: the samples span at least
+ * {@link DROP_WINDOW_MS} and the dropped count rose by
+ * {@link DROPS_PER_SECOND} a second or more over the newest such span.
+ * A seek or a new video resets mpv's count: a fall starts afresh.
+ */
+export function dropping(samples: readonly DropSample[]): boolean {
+  const last = samples.at(-1);
+  if (!last) return false;
+  const first = [...samples].reverse().find((s) => last.at - s.at >= DROP_WINDOW_MS);
+  if (!first || last.dropped < first.dropped) return false;
+  return (last.dropped - first.dropped) / ((last.at - first.at) / 1000) >= DROPS_PER_SECOND;
+}
+
 /** Reasons that hold for the whole player run: the window says the plugin cannot work here. */
 const FIXED = ["engine", "platform", "no-gpu", "runtime", "filter"];
 
@@ -46,6 +73,9 @@ export default async function activate(plugin: Plugin) {
   });
   /** The player's state as last read; `null` until then. */
   let state: MotionState | null = null;
+  /** Dropped-frame readings while the window is open and the converter runs; the hint they lead to, by renderer ("" = none). */
+  let drops: DropSample[] = [];
+  let hint: "" | "gpu" | "software" = "";
   let busy = false;
   const window = plugin.windows.create("motion.slint");
 
@@ -80,7 +110,55 @@ export default async function activate(plugin: Plugin) {
     modeIndex: MODES.findIndex((m) => m.mode === store.value.mode),
     busy,
     ...status(),
+    hint:
+      hint === "gpu"
+        ? text("Frames are being dropped: a lower resolution or Double Frame Rate instead of Match Display helps.")
+        : hint === "software"
+          ? text("Frames are being dropped: GPU rendering (Picture ▸ Rendering) or a lower resolution helps.")
+          : "",
   }));
+
+  /**
+   * While the window is open and the converter runs: read the player's
+   * dropped frames every {@link DROP_CHECK_MS} and, when they are dropped
+   * steadily, show a hint (what helps depends on the renderer). Only the
+   * open window reads; nothing runs while it is closed.
+   */
+  let checking: ReturnType<typeof setInterval> | null = null;
+  const stopChecking = () => {
+    if (checking) clearInterval(checking);
+    checking = null;
+    drops = [];
+    if (hint) {
+      hint = "";
+      plugin.update();
+    }
+  };
+  const checkDrops = async () => {
+    if (!following || state?.active === "off" || state === null) return stopChecking();
+    const stats = await plugin.player.stats().catch(() => null);
+    if (stats === null || stats.framesDropped === null) return;
+    const now = Date.now();
+    drops = [...drops.filter((s) => now - s.at <= DROP_WINDOW_MS + DROP_CHECK_MS), { at: now, dropped: stats.framesDropped }];
+    // Shown while frames are dropped steadily; cleared after a full span without.
+    let next = hint;
+    if (dropping(drops)) next = (await plugin.rendering.state().catch(() => null))?.mode === "gpu" ? "gpu" : "software";
+    else if (drops.at(-1)!.at - drops[0]!.at >= DROP_WINDOW_MS) next = "";
+    if (next !== hint) {
+      hint = next;
+      plugin.update();
+    }
+  };
+  // The plugin stopping ends the readings too.
+  plugin.onDispose(() => {
+    if (checking) clearInterval(checking);
+    checking = null;
+  });
+  const followDrops = () => {
+    if (following && state?.active && state.active !== "off") checking ??= setInterval(() => void checkDrops(), DROP_CHECK_MS);
+    else stopChecking();
+  };
+
 
   const read = async () => {
     state = await motion.state().catch(() => state);
@@ -102,6 +180,7 @@ export default async function activate(plugin: Plugin) {
         return;
       }
       store.save({ mode });
+      followDrops();
       const reason = reasonOf(mode);
       const { osd } = MODES.find((m) => m.mode === mode)!;
       if (reason && state.active === "off") await plugin.osd.show("{} (waiting: {})", [text(osd), reason.message]);
@@ -123,6 +202,7 @@ export default async function activate(plugin: Plugin) {
   const unfollow = () => {
     void following?.dispose();
     following = null;
+    stopChecking();
   };
   window.onClose(unfollow);
   window.on("closeWindow", () => {
@@ -134,9 +214,11 @@ export default async function activate(plugin: Plugin) {
     await window.show();
     following ??= motion.onChange((next) => {
       state = next;
+      followDrops();
       plugin.update();
     });
     await read();
+    followDrops();
   }
 
   plugin.commands.add({

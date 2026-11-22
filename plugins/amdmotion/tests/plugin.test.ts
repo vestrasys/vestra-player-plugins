@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { startPlugin, TestHost } from "@vestra-player/sdk/testing";
-import activate, { DEFAULT_SETTINGS, isSettings, MODES, WINDOW_TITLE } from "../main.ts";
+import activate, { DEFAULT_SETTINGS, DROP_CHECK_MS, dropping, isSettings, MODES, WINDOW_TITLE } from "../main.ts";
 
 const directory = new URL("..", import.meta.url);
 const ITEM = "amdmotion.window";
@@ -112,6 +112,48 @@ test("a reason that can pass keeps the mode and shows it; the player's changes f
     host.window(HANDLE).emit("closeWindow");
     await host.settle();
     assert.ok(!host.listening.has("video.motion.changed"));
+  } finally {
+    await stop();
+  }
+});
+
+test("dropping(): steady drops over the span, not a single burst or a reset", () => {
+  const at = (s: number, dropped: number) => ({ at: s * 1000, dropped });
+  assert.equal(dropping([]), false);
+  assert.equal(dropping([at(0, 0), at(2, 9)]), false, "not a full span yet");
+  assert.equal(dropping([at(0, 0), at(2, 2), at(4, 4), at(6, 6)]), true, "1 a second");
+  assert.equal(dropping([at(0, 0), at(2, 1), at(4, 2), at(6, 3)]), false, "0.5 a second");
+  assert.equal(dropping([at(0, 40), at(2, 0), at(4, 1), at(6, 2)]), false, "the count fell (a seek, a new video)");
+});
+
+test("while the window is open and it converts, steady dropped frames show a hint; it clears when they stop and nothing is read once closed", async (t) => {
+  t.mock.timers.enable({ apis: ["setInterval", "Date"], now: 0 });
+  const host = new TestHost();
+  const { stop } = await start(host);
+  try {
+    await host.command(ITEM).run();
+    host.window(HANDLE).emit("pickMode", 1);
+    await host.settle();
+    assert.equal(host.motion.mode, "double");
+    const tick = async (dropped: number) => {
+      host.stats = { ...host.stats, framesDropped: dropped };
+      t.mock.timers.tick(DROP_CHECK_MS);
+      await host.settle();
+    };
+    for (const dropped of [0, 4, 8, 12]) await tick(dropped);
+    assert.match(String(props(host).hint), /^Frames are being dropped: a lower resolution/, "GPU rendering's advice");
+    for (let i = 0; i < 4; i++) await tick(12);
+    assert.equal(props(host).hint, "", "cleared after a span without drops");
+    // With software rendering the advice is GPU rendering.
+    host.videoRender.gpu = false;
+    for (const dropped of [20, 30, 40, 50]) await tick(dropped);
+    assert.ok(String(props(host).hint).includes("GPU rendering (Picture ▸ Rendering)"), String(props(host).hint));
+    // Closed: no more reads.
+    host.window(HANDLE).emit("closeWindow");
+    await host.settle();
+    const reads = host.calls.filter((c) => c.method === "player.stats").length;
+    for (let i = 0; i < 3; i++) await tick(60);
+    assert.equal(host.calls.filter((c) => c.method === "player.stats").length, reads);
   } finally {
     await stop();
   }

@@ -38,6 +38,8 @@ export component MotionWindow inherits Window {
     in property <int> tone;
     // The player's reason, under the status line ("" = nothing more to say).
     in property <string> detail;
+    // Frames are being dropped while it converts, and what helps ("" = none).
+    in property <string> hint;
     callback pick-mode(int);
     callback close-window();
 
@@ -95,6 +97,7 @@ export component MotionWindow inherits Window {
             }
         }
         if root.detail != "": Paragraph { text: root.detail; }
+        if root.hint != "": Paragraph { text: root.hint; color: Theme.danger; }
         Rectangle { height: 1px; background: Theme.line; }
         Paragraph {
             text: @tr("Needs Windows with an NVIDIA GeForce RTX 30 series or newer GPU and NVIDIA driver 573.38 or newer. The player decides what the GPU can keep up with: large or fast videos are not offered.");

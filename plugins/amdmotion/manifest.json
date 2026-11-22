@@ -1,6 +1,6 @@
 {
   "id": "zysilm.amdmotion",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "apiVersion": "vestra/1",
   "entry": "main.ts",
   "name": "AMD Motion Smoothing",
