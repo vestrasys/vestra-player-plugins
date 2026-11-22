@@ -121,6 +121,13 @@ test("dropping(): steady drops over the span, not a single burst or a reset", ()
   assert.equal(dropping([at(0, 0), at(2, 2), at(4, 4), at(6, 6)]), true, "1 a second");
   assert.equal(dropping([at(0, 0), at(2, 1), at(4, 2), at(6, 3)]), false, "0.5 a second");
   assert.equal(dropping([at(0, 40), at(2, 0), at(4, 1), at(6, 2)]), false, "the count fell (a seek, a new video)");
+  // One burst (a seek, the decoder reopening, a resize, the converter starting) is not steady.
+  assert.equal(dropping([at(0, 0), at(2, 30), at(4, 30), at(6, 30)]), false, "a burst in the first reading");
+  assert.equal(dropping([at(0, 0), at(2, 0), at(4, 0), at(6, 30)]), false, "a burst in the last reading");
+  assert.equal(dropping([at(0, 0), at(2, 0), at(4, 15), at(6, 15)]), false, "a burst in the middle");
+  assert.equal(dropping([at(0, 0), at(2, 15), at(4, 15), at(6, 30)]), false, "two bursts, not in a row");
+  assert.equal(dropping([at(0, 0), at(2, 0), at(4, 3), at(6, 6)]), true, "two readings in a row at 1.5 a second");
+  assert.equal(dropping([at(0, 0), at(2, 9), at(4, 9), at(6, 30), at(8, 33)]), true, "the newest span: drops in its last two readings");
 });
 
 test("while the window is open and it converts, steady dropped frames show a hint; it clears when they stop and nothing is read once closed", { skip: !modelled }, async (t) => {
@@ -137,9 +144,23 @@ test("while the window is open and it converts, steady dropped frames show a hin
       t.mock.timers.tick(DROP_CHECK_MS);
       await host.settle();
     };
-    for (const dropped of [0, 4, 8, 12]) await tick(dropped);
-    assert.match(String(props(host).hint), /^Frames are being dropped: a lower resolution/, "GPU rendering's advice");
-    for (let i = 0; i < 4; i++) await tick(12);
+    // A single burst: no hint.
+    for (const dropped of [0, 30, 30, 30]) await tick(dropped);
+    assert.equal(props(host).hint, "", "a burst is not steady");
+    for (const dropped of [34, 38, 42, 46]) await tick(dropped);
+    // GPU rendering's advice, for the mode: already Double Frame Rate.
+    assert.equal(props(host).hint, "Frames are being dropped: a lower resolution helps.");
+    host.window(HANDLE).emit("pickMode", 2);
+    await host.settle();
+    assert.equal(nvidia(host)!.mode, "display");
+    assert.equal(
+      props(host).hint,
+      "Frames are being dropped: a lower resolution or Double Frame Rate instead of Match Display helps.",
+      "with Match Display, Double Frame Rate helps too",
+    );
+    host.window(HANDLE).emit("pickMode", 1);
+    await host.settle();
+    for (const dropped of [46, 46, 46, 46]) await tick(dropped);
     assert.equal(props(host).hint, "", "cleared after a span without drops");
     // With software rendering the advice is GPU rendering.
     host.videoRender.gpu = false;

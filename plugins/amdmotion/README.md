@@ -20,6 +20,6 @@ Your choice is remembered and applied again at the next start.
 ## Limits
 
 - The player offers a mode only where it measured that the GPU and the renderer keep up: videos of 10 to 30 fps in 8-bit SDR (not 10-bit or HDR); with software rendering up to 1080p at 30 fps, with GPU rendering up to 4K at 24 fps (Double) and 1080p on a 60 Hz display (Match Display). If the GPU still falls behind, the player first uses a faster motion search, then turns smoothing off for that video and says why.
-- If frames are being dropped while the window is open, it says so under the status, with what helps (GPU rendering, a lower resolution, or Double Frame Rate instead of Match Display).
+- If frames are being dropped while the window is open, it says so under the status, with what helps (GPU rendering, a lower resolution, or Double Frame Rate instead of Match Display when that is the mode). A single burst, such as after a seek, does not count.
 - It does not run together with the player's AI Upscaling (one needs the frames on the GPU, the other in memory) or with Frame Doubling (the frame rate would be doubled twice): while either is on, smoothing waits and says so.
 - Doubling makes film look like video (the "soap-opera effect"); that is why it is off by default.

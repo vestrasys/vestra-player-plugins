@@ -53,6 +53,9 @@ msgid "Frames are being dropped: a lower resolution or Double Frame Rate instead
 msgstr ""
 
 #: main.ts:121
+msgid "Frames are being dropped: a lower resolution helps."
+msgstr ""
+
 msgid "Frames are being dropped: GPU rendering (Picture ▸ Rendering) or a lower resolution helps."
 msgstr ""
 

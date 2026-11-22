@@ -54,6 +54,9 @@ msgid "Frames are being dropped: a lower resolution or Double Frame Rate instead
 msgstr "正在丢帧：降低分辨率，或用“双倍帧率”代替“匹配显示器”，会有帮助。"
 
 #: main.ts:117
+msgid "Frames are being dropped: a lower resolution helps."
+msgstr "正在丢帧：降低分辨率会有帮助。"
+
 msgid "Frames are being dropped: GPU rendering (Picture ▸ Rendering) or a lower resolution helps."
 msgstr "正在丢帧：开启 GPU 渲染（画面 ▸ 渲染）或降低分辨率会有帮助。"
 

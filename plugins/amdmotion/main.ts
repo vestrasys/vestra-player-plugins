@@ -35,16 +35,22 @@ export interface DropSample {
 
 /**
  * Whether frames are being dropped steadily: the samples span at least
- * {@link DROP_WINDOW_MS} and the dropped count rose by
- * {@link DROPS_PER_SECOND} a second or more over the newest such span.
- * A seek or a new video resets mpv's count: a fall starts afresh.
+ * {@link DROP_WINDOW_MS}, the dropped count rose by
+ * {@link DROPS_PER_SECOND} a second or more over the newest such span, and
+ * it rose in at least two readings in a row within it. One burst (a seek,
+ * the decoder reopening, a resize, the converter starting) falls within one
+ * reading and is not steady. A seek or a new video resets mpv's count: a
+ * fall starts afresh.
  */
 export function dropping(samples: readonly DropSample[]): boolean {
   const last = samples.at(-1);
   if (!last) return false;
-  const first = [...samples].reverse().find((s) => last.at - s.at >= DROP_WINDOW_MS);
+  const from = samples.findLastIndex((s) => last.at - s.at >= DROP_WINDOW_MS);
+  const first = samples[from];
   if (!first || last.dropped < first.dropped) return false;
-  return (last.dropped - first.dropped) / ((last.at - first.at) / 1000) >= DROPS_PER_SECOND;
+  if ((last.dropped - first.dropped) / ((last.at - first.at) / 1000) < DROPS_PER_SECOND) return false;
+  const span = samples.slice(from);
+  return span.some((s, i) => i >= 2 && s.dropped > span[i - 1]!.dropped && span[i - 1]!.dropped > span[i - 2]!.dropped);
 }
 
 /** Reasons that hold for the whole player run: the window says the plugin cannot work here. */
@@ -110,9 +116,13 @@ export default async function activate(plugin: Plugin) {
     modeIndex: MODES.findIndex((m) => m.mode === store.value.mode),
     busy,
     ...status(),
+    // What helps: with GPU rendering, Double Frame Rate instead of Match
+    // Display (when that is the mode) or a lower resolution.
     hint:
       hint === "gpu"
-        ? text("Frames are being dropped: a lower resolution or Double Frame Rate instead of Match Display helps.")
+        ? store.value.mode === "display"
+          ? text("Frames are being dropped: a lower resolution or Double Frame Rate instead of Match Display helps.")
+          : text("Frames are being dropped: a lower resolution helps.")
         : hint === "software"
           ? text("Frames are being dropped: GPU rendering (Picture ▸ Rendering) or a lower resolution helps.")
           : "",

@@ -2,7 +2,7 @@
 
 ## 0.1.3
 
-- While the window is open and the converter runs, the plugin reads the player's dropped frames every 2 s (`player.stats()`, only then) and, when frames are dropped steadily (one a second or more over 6 s), says so under the status with what helps: GPU rendering or a lower resolution with software rendering; a lower resolution or Double Frame Rate instead of Match Display with GPU rendering. It clears after 6 s without drops. Translated (Simplified Chinese).
+- While the window is open and the converter runs, the plugin reads the player's dropped frames every 2 s (`player.stats()`, only then) and, when frames are dropped steadily (one a second or more over 6 s, and in at least two readings in a row, so one burst from a seek, a resize or the converter starting does not count), says so under the status with what helps: GPU rendering or a lower resolution with software rendering; with GPU rendering a lower resolution, and Double Frame Rate instead of Match Display when Match Display is the mode. It clears after 6 s without drops. Translated (Simplified Chinese).
 
 ## 0.1.2
 
