@@ -722,6 +722,56 @@ test("slides on a white background (boxes that move) are not cropped", async () 
   }
 });
 
+test("idle without a crop: nothing keeps it running, it parks, and the next file wakes it", async () => {
+  const { paths, cleanup } = await files(["plain.mp4", "framed.mp4"]);
+  const [plain, framed] = paths as [string, string];
+  const video: Video = { width: 1920, height: 1080, duration: 80, background: GREY, content: always({ x: 0, y: 0, width: 1280, height: 720 }) };
+  const host = makeHost(new Map([[plain, { ...video, content: always(null) }], [framed, video]]));
+  const { stop } = await startPlugin(activate, { directory, host });
+  try {
+    assert.deepEqual(host.keepsRunning, []);
+    host.openElsewhere(plain);
+    await until(host, () => ffmpegRuns(host) === 8, "the detection");
+    await host.settle(50);
+    assert.deepEqual(host.keepsRunning, [], "no crop: nothing keeps it running");
+    assert.equal(host.sent("processing.replace").length, 0, "no filter chain was made");
+    await host.park();
+    assert.equal(host.parked, true);
+
+    // The next file's source events wake it, and it frames that file as before.
+    host.openElsewhere(framed);
+    await until(host, () => !host.parked && host.osd.includes("Auto-framed to 1280×720"), "the wake and the crop");
+    assert.equal(chain(host).length, 2);
+    assert.equal(ffmpegRuns(host), 16, "the parked file was not read again");
+  } finally {
+    await stop();
+    await cleanup();
+  }
+});
+
+test("started again on the file it framed without a crop: carries on without reading the file again", async () => {
+  const { paths, cleanup } = await files(["plain.mp4"]);
+  const plain = paths[0]!;
+  const host = makeHost(new Map([[plain, { width: 1920, height: 1080, duration: 80, background: GREY, content: always(null) }]]));
+  let started = await startPlugin(activate, { directory, host });
+  try {
+    host.openElsewhere(plain);
+    await until(host, () => ffmpegRuns(host) === 8, "the detection");
+    await host.settle(50);
+    await started.stop();
+    // A run started again in the same player run (a wake): the file is known, no detection, no message.
+    started = await startPlugin(activate, { directory, host });
+    await host.settle(50);
+    assert.equal(ffmpegRuns(host), 8);
+    assert.equal(host.command("detect").state.enabled, true);
+    assert.deepEqual(host.osd, []);
+    assert.deepEqual(host.keepsRunning, []);
+  } finally {
+    await started.stop();
+    await cleanup();
+  }
+});
+
 test("a crop that takes effect after more than 3 s (slow decoder, paused) is kept", async () => {
   const { paths, cleanup } = await files(["a.mp4"]);
   let since: number | null = null;

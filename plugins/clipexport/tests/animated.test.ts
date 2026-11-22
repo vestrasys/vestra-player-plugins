@@ -509,10 +509,9 @@ test("the player's check of the destination folder (the fake above): a job whose
   checkDestinations(host);
   host.openElsewhere("/media/one.mp4");
   host.setSource({ position: 2, duration: 120 });
-  // What the manifest's events and playback.read did before SDK 1.9.0.
+  // What playback.read did before SDK 1.9.0 (the player's state, read once).
   const { plugin, stop } = await startPlugin(
     async (plugin) => {
-      plugin.player.subscribe();
       await plugin.player.read();
     },
     { directory, host, locale: "en" },

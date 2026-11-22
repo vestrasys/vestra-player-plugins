@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import type { ImageRef, Plugin, Scope, TextValue } from "@vestra-player/sdk";
+import type { ImageRef, Plugin, Scope, StateStream, TextValue } from "@vestra-player/sdk";
 import type { Page, Video, YouTube } from "./youtube.ts";
 import { formatDuration, isOffline, isTextError, oneLine, thumbnailUrl, videoIdOf } from "./youtube.ts";
 
@@ -93,6 +93,29 @@ export function mountPanel(plugin: Plugin, youtube: YouTube, actions: PanelActio
         return "";
     }
   }
+
+  /**
+   * The row of the video playing is marked while the tab shows: the player's
+   * state is followed (a stream) only then, so a tab in the background
+   * follows nothing and the plugin may go to standby.
+   */
+  let feed: StateStream | null = null;
+  const follow = () => {
+    const shown = !!panel.state?.effective;
+    if (shown === (feed !== null)) return;
+    if (shown) {
+      // Its first call brings the state now; each call is followed by an update pass.
+      feed = plugin.player.stream(() => {});
+    } else {
+      feed?.stop();
+      feed = null;
+    }
+  };
+  void panel.ready.then(follow, () => {});
+  // The tab came or went (the SDK takes the layout into `panel.state` first). A
+  // listener of this event keeps nothing running; it starts the plugin from
+  // standby when the user shows the tab.
+  plugin.player.on("layout.changed", follow);
 
   panel.bind(() => {
     const current = videoIdOf(plugin.player.state.source);

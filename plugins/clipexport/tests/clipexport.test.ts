@@ -331,9 +331,12 @@ test("lazy activation: the export commands are player conditions; a background t
     await host.settle();
     await eventually(() => tab(host).mode, "none", "followed while it shows");
     host.selectTab("vestra.playlist");
-    // The layout is read after the event; the binding then runs again without reading the player's state.
+    // The layout event stops the tab's stream of the player's state.
     await until(() => !host.listening.has("source.state"));
     assert.deepEqual(host.keepsRunning, []);
+    // No export and the tab in the background: the player may put it in standby.
+    await host.park();
+    assert.equal(host.parked, true);
   } finally {
     await stop();
   }

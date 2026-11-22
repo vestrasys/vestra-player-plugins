@@ -494,9 +494,9 @@ test("the manifest's display texts are English with a Simplified Chinese transla
   const manifest = JSON.parse(await readFile(new URL("manifest.json", directory), "utf8"));
   assert.equal(manifest.id, "zysilm.vestratube", "the id matches the plugin name");
   assert.equal(manifest.name, "VestraTube");
-  assert.equal(manifest.version, "0.5.5");
+  assert.equal(manifest.version, "0.5.6");
   assert.equal(manifest.icon, "assets/icon.png", "store icon");
-  assert.equal(manifest.minPlayerVersion, "0.9.0", "images in rows (0.5.1); rows kept in place when the length changes (0.5.4); no declarations (0.9.0)");
+  assert.equal(manifest.minPlayerVersion, "0.11.0", "images in rows (0.5.1); rows kept in place when the length changes (0.5.4); no declarations (0.9.0); SDK 1.11 (0.11.0)");
   assert.equal(manifest.capabilities, undefined, "no declarations (SDK 1.9.0): the sidebar mounts without ui.mount");
   for (const value of [manifest.name, manifest.punchline, manifest.description, ...manifest.tags])
     assert.doesNotMatch(value, /[　-鿿＀-￯]/, "English source text");
@@ -600,6 +600,39 @@ test("selecting, playing and thumbnails leave the row values alone (rows are upd
     assert.equal((panel.props.thumbs as unknown[]).length, before.length, "one thumbnail per row");
   } finally {
     await stop();
+  }
+});
+
+test("the playing row follows the player only while the tab shows; in the background nothing keeps the plugin running", async () => {
+  const host = new TestHost();
+  host.mountOther("sidebar", "vestra.playlist", { title: "Playlist" }); // the playlist's tab is first and current
+  const { stop } = await start({ host });
+  try {
+    await host.settle();
+    assert.deepEqual(host.keepsRunning, []);
+    assert.equal(host.listening.has("source.state"), false, "a background tab follows nothing");
+    await host.park();
+    assert.equal(host.parked, true);
+  } finally {
+    await stop();
+  }
+
+  // The user shows the tab: it follows the player while it shows.
+  const shown = new TestHost();
+  shown.mountOther("sidebar", "vestra.playlist", { title: "Playlist" });
+  const again = await start({ host: shown });
+  try {
+    await shown.settle();
+    shown.selectTab("zysilm.vestratube");
+    await eventually(shown, () => assert.equal(shown.listening.has("source.state"), true));
+    // Another plugin or the Open dialog plays a YouTube video: its row is marked.
+    shown.openElsewhere(`https://www.youtube.com/watch?v=${vid(2)}`);
+    await eventually(shown, () => assert.equal(shown.mounted().props["playing-key"], vid(2)));
+    shown.selectTab("vestra.playlist");
+    await eventually(shown, () => assert.equal(shown.listening.has("source.state"), false));
+    assert.deepEqual(shown.keepsRunning, []);
+  } finally {
+    await again.stop();
   }
 });
 

@@ -28,7 +28,6 @@ export const WINDOW_TITLE = "Loudness Meter…";
  */
 export default async function activate(plugin: Plugin) {
   const { text } = plugin.i18n;
-  plugin.player.subscribe();
   await plugin.player.read();
 
   let readings: Readings = EMPTY;
@@ -101,13 +100,12 @@ export default async function activate(plugin: Plugin) {
       follow(scope);
       plugin.update();
     });
+    // The status line shows the player's state while the window is open: a
+    // stream for as long as it is open (it ends with `scope`; each call is
+    // followed by an update pass).
+    scope.player.stream(() => {});
     // Another file: its loudness is measured on its own.
-    let source = plugin.player.state.sourceId;
-    scope.player.onChange((state) => {
-      if (state.sourceId === source) return;
-      source = state.sourceId;
-      void restart(scope);
-    });
+    scope.player.on("source.opening", () => void restart(scope));
   };
 
   const end = () => {
