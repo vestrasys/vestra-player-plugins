@@ -19,6 +19,7 @@ To install one, open the store in [Vestra Player](https://github.com/vestrasys/v
 | [Auto Frame](plugins/autoframe) | `zysilm.autoframe` | Crops away the solid-colour border around a video's picture |
 | [Clip Export](plugins/clipexport) | `zysilm.clipexport` | Cut part of a video into a new file: a lossless stream copy, a re-encoded MP4, or an animated GIF or WebP |
 | [Loudness](plugins/loudness) | `zysilm.loudness` | A live loudness meter, measured the way broadcasters do it (EBU R128, ITU-R BS.1770) |
+| [NVIDIA Motion Smoothing](plugins/nvidiamotion) | `zysilm.nvidiamotion` | Smoother motion with real in-between frames from your NVIDIA GeForce RTX GPU |
 | [Shader Upscale](plugins/shaderupscale) | `zysilm.shaderupscale` | Real-time GPU upscaling with mpv GLSL shaders: Anime4K for anime; AMD FSR 1, RAVU and FSRCNNX for live action |
 | [Silence Skipper](plugins/silenceskip) | `zysilm.silenceskip` | Skips the silent stretches of a video or audio file while it plays |
 | [VestraNES](plugins/vestranes) | `zysilm.vestranes` | Play NES games in the player, with the keyboard |
