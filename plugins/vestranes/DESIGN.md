@@ -37,7 +37,7 @@ later (below) and a ROM file. Nothing else: no playlist, no other plugin.
 | 0.3.2 (built in) | 0.4.0 (VestraNES) | Why |
 | --- | --- | --- |
 | A file resolver for `.nes` (`plugin.resolvers.add`) and a drop provider: Open File, a drop on the video, the playlist and Previous/Next ran ROMs | No resolver, no drop provider: **Load ROM…** in the menu and the window | User ruling. Also leaves `.nes` free for another emulator plugin |
-| Capabilities `producer.av`, `commands`, `events`, `playback.read`, `playback.control`, `ui.window`, `ui.dialog`, `ui.drop`, `source.resolve` | `commands`, `ui.window`, `ui.dialog`, `playback.read`, `playback.control`, `producer.av` | No resolver (`source.resolve`), no drop (`ui.drop`). `events` is gone: the only state read is after a stream stopped, with `player.refresh()` |
+| Manifest declarations (until SDK 1.9.0) `producer.av`, `commands`, `events`, `playback.read`, `playback.control`, `ui.window`, `ui.dialog`, `ui.drop`, `source.resolve` | `commands`, `ui.window`, `ui.dialog`, `playback.read`, `playback.control`, `producer.av` | No resolver (`source.resolve`), no drop (`ui.drop`). `events` is gone: the only state read is after a stream stopped, with `player.refresh()` |
 | **Emulator ▸ Open NES ROM… / Stop NES / NES Tools…** | **Games ▸ VestraNES ▸ Load ROM… / Stop / VestraNES Window…** | User ruling (§2) |
 | No keyboard control | The window is the controller (§3) | User ruling |
 | A ROM that failed to open replaced the running game (the open was the player's) | A ROM that fails to load leaves the running game alone and the window says why | The load is the plugin's until `openStream` succeeds |
@@ -191,7 +191,7 @@ To be confirmed in the GUI with the Pinyin input method active.
   source (the user opens a file) shows "Replaced by another source."; F4
   shows "Stopped."; the stream failing shows "Emulator stopped: <reason>".
   The stream's `onStop` tells them apart, reading the player's state with
-  `player.refresh()` (no `events` capability).
+  `player.refresh()` (no event subscription).
 - **Stop** closes the source before the frame connection (the SDK's
   `Stream.stop()` order), so the player never reports a transport failure.
 - **Pausing** is the player's: `frame()` is not called while paused.

@@ -93,7 +93,7 @@ const BLOCKING = {
 function sourceError(error: unknown, unsupported: Reason = "addLocal") {
   const code = (error as { code?: string }).code;
   const reason: Partial<Record<string, Reason>> = {
-    unsupported, stale: "changed", busy: "busy", limit: "tooManyFiles", unavailable: "unavailable", capability: "noCapability",
+    unsupported, stale: "changed", busy: "busy", limit: "tooManyFiles", unavailable: "unavailable", "builtin-only": "notAllowed",
     "source-missing": "partMissing", "source-changed": "partChanged", missing: "partUnknown",
   };
   const known = code ? reason[code] : undefined;

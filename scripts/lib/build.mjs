@@ -28,13 +28,10 @@
  * already is packed again into a scratch directory for them and not
  * released a second time.
  *
- * `scan` (scripts/lib/scan.mjs) is the capability scan of the plugin's
- * source, stored in every version entry the build adds when the caller
- * passes a scanner (scripts/build-index.mjs passes the SDK's, 1.8.0 and
- * later). A version kept from the previous index is never scanned: its
- * entry stays as signed, including the `capabilities` that versions
- * published before SDK 1.9.0 carry. New entries have no `capabilities`:
- * manifests no longer declare them, and the scan is the only disclosure.
+ * A version kept from the previous index stays exactly as signed, including
+ * the legacy keys that older versions carry (`capabilities` before SDK
+ * 1.9.0, `scan` before SDK 1.11.0; scripts/lib/publishing.mjs). A new
+ * entry has neither.
  *
  * Output:
  *   <out>/site/index.json                         unsigned
@@ -200,8 +197,6 @@ function displayFiles(directory, manifest) {
  *   releases      a provider from publishing.mjs `releases`
  *   now           ISO date for new versions' `published`
  *   pack          (directory, id, version, outDirectory) → .vxp path
- *   scan          (directory, label) → the `scan` of a new version entry
- *                 (scripts/lib/scan.mjs); null (the default): no `scan`
  *   log           progress lines
  * Returns { index, packed: [{ id, version, file }] }.
  */
@@ -214,7 +209,6 @@ export async function buildIndex({
   releases,
   now = new Date().toISOString(),
   pack = packWithSdk,
-  scan = null,
   log = console.log,
 }) {
   const revoked = await readRevoked(join(root, "revoked.json"));
@@ -301,13 +295,6 @@ export async function buildIndex({
           size: entry.size,
           published: entry.published,
         });
-        if (scan) {
-          const found = await scan(directory, `plugins/${name}`);
-          versions.at(-1).scan = found;
-          log(
-            `${id} ${version}: scan uses [${found.uses.join(", ")}] (${found.method}, SDK ${found.sdk})`,
-          );
-        }
       }
       versions.sort((a, b) => compareVersions(b.version, a.version));
 

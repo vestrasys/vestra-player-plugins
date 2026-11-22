@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.2
+
+- The player's refusal by who is asking is now the code `builtin-only` (SDK 1.11.0, player with Release B); Clip Export shows "This version of the player cannot do this." for it. Nothing else changes. Who must change: nobody.
+
 ## 0.8.1
 
 - The description ends with the store's "how to open" line, `→ Sidebar: Clip Export tab`, translated: the store shows it on the card and under "Where to find it". A plugin with a sidebar tab names the sidebar first.

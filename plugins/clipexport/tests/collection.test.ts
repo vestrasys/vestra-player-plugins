@@ -339,8 +339,8 @@ test("double-click previews a part: its file opens at the part's start and Start
   }
 });
 
-test("capability errors: when the player refuses media.sources nothing is remembered; when it refuses the open no preview", async () => {
-  // The player's `capability` refusal (SDK 1.9.0: no declarations; an older player refused these without one).
+test("refusals: when the player refuses media.sources nothing is remembered; when it refuses the open no preview", async () => {
+  // A refusal by who is asking (`builtin-only`, SDK 1.11.0): the player sends it only for built-in-only requests, but the plugin handles it wherever it comes.
   const refused = {
     add: ["media.sources.remember", "media.sources.get", "media.sources.locate", "media.sources.forget", "media.sources.list"],
     preview: ["media.sources.open"],
@@ -349,19 +349,19 @@ test("capability errors: when the player refuses media.sources nothing is rememb
     const host = new TestHost();
     for (const method of refused[action])
       host.handle(method, () => {
-        throw new HostError("capability", `${method} is not available`);
+        throw new HostError("builtin-only", `${method} is not available`);
       });
     play(host, "/media/one.mp4");
     const { stop } = await startPlugin(activate, { directory, host, id: ID, locale: "en" });
     try {
       if (action === "add") {
         host.mounted().emit("add-part", "1", "2");
-        await said(host, REASON.noCapability);
+        await said(host, REASON.notAllowed);
         assert.equal(rows(host).length, 0);
       } else {
         await add(host, "1", "2");
         host.mounted().emit("preview-part", rows(host)[0]!.id);
-        await said(host, REASON.noCapability);
+        await said(host, REASON.notAllowed);
         assert.equal(host.sourceOpens.length, 0);
       }
     } finally {
