@@ -594,6 +594,9 @@ test("one menu item, Video ▸ Shader Upscaling…, next to the rendering items;
     assert.equal(held(host), undefined);
     // Off, it holds nothing: with lazy activation the player may stop it.
     assert.deepEqual(host.keepsRunning, []);
+    assert.deepEqual([...host.listening], [], "no stream of the player's state");
+    await host.park();
+    assert.equal(host.parked, true);
   } finally {
     await stop();
   }
@@ -1311,7 +1314,7 @@ test("store listing: the id of the directory, the name, a 256×256 icon, the pla
   const manifest = JSON.parse(await readFile(new URL("manifest.json", directory), "utf8"));
   assert.equal(manifest.id, "zysilm.shaderupscale"); // <owner>.<directory>, as the repository requires
   assert.equal(manifest.name, "Shader Upscale for Vestra Player");
-  assert.equal(manifest.minPlayerVersion, "0.9.0"); // the shader channel (0.5.20), the Choice drop-down (0.6.0), the crash guard (0.6.3), no declarations (0.9.0)
+  assert.equal(manifest.minPlayerVersion, "0.11.0"); // the shader channel (0.5.20), the Choice drop-down (0.6.0), the crash guard (0.6.3), no declarations (0.9.0), SDK 1.11 (0.11.0)
   assert.equal(manifest.icon, "assets/icon.png");
   const png = await readFile(new URL(manifest.icon, directory));
   assert.equal(png.toString("latin1", 1, 4), "PNG");

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.2
+
+**Who must change: nobody.** Needs Vestra Player 0.11.0 or later (SDK 1.11.0).
+
+- The meter window follows the player's state with a stream while it is open, and only then; another file is learnt from the player's source event (a source opening) while the window is open. With the window never opened the plugin follows nothing and holds nothing, so the player may stop it while idle.
+- The meter, its status line, Restart and the new measurement for another file are unchanged.
+
 ## 0.1.1
 
 - The description ends with the store's "how to open" line, `→ Menu: Tools ▸ Loudness Meter`, translated: the store shows it on the card and under "Where to find it".

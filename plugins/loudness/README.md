@@ -18,7 +18,7 @@ To make quiet dialogue and loud scenes more even, turn on the player's own **Nor
 
 ## Requirements
 
-- Vestra Player 0.9.0 or later, on macOS or Windows.
+- Vestra Player 0.11.0 or later, on macOS or Windows.
 
 ## Limits
 

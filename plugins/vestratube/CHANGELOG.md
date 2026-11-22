@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.6
+
+**Who must change: nobody.** Needs Vestra Player 0.11.0 or later (SDK 1.11.0).
+
+- The mark on the row of the video playing follows the player while the VestraTube tab shows: a stream of the player's state while the tab is the current one, stopped when another tab is shown; the tab learns that it came or went from the player's layout events. A background tab follows nothing and keeps nothing running.
+- Search, playing, downloads, the link window and the resolver for YouTube links are unchanged.
+
 ## 0.5.5
 
 - The description ends with the store's "how to open" line, `→ Sidebar: VestraTube tab; Menu: Open ▸ VestraTube`, translated: the store shows it on the card and under "Where to find it". A plugin with a sidebar tab names the sidebar first.

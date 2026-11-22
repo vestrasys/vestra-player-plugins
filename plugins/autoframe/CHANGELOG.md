@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.3
+
+**Who must change: nobody.** Needs Vestra Player 0.11.0 or later (SDK 1.11.0). Settings and the per-file cache carry over.
+
+- Learns of a new file from the player's source events (a source opening, a source ready) instead of following every change of the player's state. The events start the plugin again when the player has stopped it while idle.
+- The crop chain is made at the first crop. A run that crops nothing (no file with a border, Auto-Frame Videos off, the full picture shown) holds nothing, so the player may stop it while idle. Started again in the same player run on the file it already framed, it carries on without reading the file again, and "Auto Frame needs ffmpeg, which was not found" is still said once per player run.
+- What is cropped, when, the menu and the messages are unchanged.
+
 ## 0.1.2
 
 - The description ends with the store's "how to open" line, `→ Automatic; Menu: Video ▸ Auto Frame`, translated: the store shows it on the card and under "Where to find it".

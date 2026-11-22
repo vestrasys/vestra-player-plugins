@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.3
+
+**Who must change: nobody.** Needs Vestra Player 0.11.0 or later (SDK 1.11.0). Settings carry over.
+
+- Built with SDK 1.11.0: the plugin no longer asks for the player's events at the start; it never read the player's state. Off, it holds nothing (the player may stop it while idle); on, its shaders keep it running, as before.
+- The window, the presets and the shaders are unchanged.
+
 ## 0.3.2
 
 - The description ends with the store's "how to open" line, `→ Menu: Video ▸ Shader Upscaling`, translated: the store shows it on the card and under "Where to find it".
