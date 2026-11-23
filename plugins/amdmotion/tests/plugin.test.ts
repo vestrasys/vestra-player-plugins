@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { startPlugin, TestHost } from "@vestra-player/sdk/testing";
-import activate, { DEFAULT_SETTINGS, DROP_CHECK_MS, dropping, isSettings, MODES, SETTLE_MS, WINDOW_TITLE } from "../main.ts";
+import activate, { CATEGORY, DEFAULT_SETTINGS, DROP_CHECK_MS, dropping, isSettings, MODES, modeCommandId, SETTLE_MS, WINDOW_ID, WINDOW_TITLE } from "../main.ts";
 
 const directory = new URL("..", import.meta.url);
 const ITEM = "amdmotion.window";
@@ -32,7 +32,8 @@ test("one Video menu item opens the window; off by default and nothing asked at 
     assert.ok(host.listening.has("video.motion.changed"), "followed while open");
     assert.deepEqual(
       host.calls.filter((c) => c.method === "video.motion.state").map((c) => c.params),
-      [{ engine: "amd" }],
+      [{ engine: "amd" }, { engine: "amd" }],
+      "read at start (for the mode commands) and when the window opens",
     );
   } finally {
     await stop();
@@ -213,4 +214,155 @@ test("settings: only the three modes", () => {
   assert.equal(isSettings({ mode: "display" }), true);
   assert.equal(isSettings({ mode: "triple" }), false);
   assert.equal(isSettings(null), false);
+});
+
+/** The mode commands' state as the player shows it: `[enabled, checked, reason]` per mode, in MODES order. */
+const modeStates = (host: TestHost) =>
+  MODES.map((m) => {
+    const { enabled, checked, reason } = host.command(modeCommandId(m.mode)).state;
+    return [enabled, checked, reason];
+  });
+
+test("three mode commands for the palette and Ask Vestra: outside the menus, named for what people ask, checked on the saved mode", async () => {
+  const host = new TestHost();
+  const { stop } = await start(host);
+  try {
+    await host.settle();
+    for (const m of MODES) {
+      const { declaration } = host.command(modeCommandId(m.mode));
+      assert.deepEqual(declaration.path ?? [], [], "not in the menus: the window's menu item stays the only one");
+      assert.equal(declaration.title, m.command);
+      assert.equal(declaration.category, CATEGORY);
+      assert.equal(declaration.home, WINDOW_ID);
+      assert.equal(declaration.radio, true);
+    }
+    assert.equal(CATEGORY, "AMD Motion Smoothing");
+    // The words people ask with, in the palette row `Category: Title`.
+    const rows = MODES.map((m) => `${CATEGORY}: ${m.command}`).join(" ");
+    for (const word of ["Motion Smoothing", "Smoother Video", "Smoothest Motion", "Frame Rate", "AMD"])
+      assert.ok(rows.includes(word), word);
+    assert.deepEqual(modeStates(host), [
+      [true, true, null],
+      [true, false, null],
+      [true, false, null],
+    ]);
+    assert.deepEqual(host.keepsRunning, [], "off: nothing keeps the plugin running");
+  } finally {
+    await stop();
+  }
+});
+
+test("running a mode command sets the mode, saves it and moves the check mark; the window's choice moves it too", async () => {
+  const data = await mkdtemp(join(tmpdir(), "amdmotion-cmd-"));
+  const host = new TestHost();
+  const first = await start(host, data);
+  try {
+    await host.command(modeCommandId("double")).run();
+    await host.settle();
+    assert.equal(host.motion.mode, "double");
+    assert.equal(host.nvidiaMotion.mode, "off", "the other engine is not asked");
+    assert.equal(host.osd.at(-1), "AMD motion smoothing: double frame rate");
+    assert.deepEqual(
+      modeStates(host).map(([, checked]) => checked),
+      [false, true, false],
+    );
+    await host.command(WINDOW_ID).run();
+    host.window(HANDLE).emit("pickMode", 2);
+    await host.settle();
+    assert.equal(host.motion.mode, "display");
+    assert.deepEqual(
+      modeStates(host).map(([, checked]) => checked),
+      [false, false, true],
+    );
+    await host.command(modeCommandId("off")).run();
+    await host.settle();
+    assert.equal(host.motion.mode, "off");
+    assert.equal(props(host)["mode-index"], 0, "the open window follows");
+    await host.command(modeCommandId("double")).run();
+    await host.settle();
+  } finally {
+    await first.stop();
+  }
+  assert.deepEqual(JSON.parse(await readFile(join(data, "settings.json"), "utf8")), { mode: "double" });
+  const again = new TestHost();
+  const second = await start(again, data);
+  try {
+    await again.settle();
+    assert.deepEqual(
+      modeStates(again).map(([, checked]) => checked),
+      [false, true, false],
+      "the saved mode is checked at the next start",
+    );
+  } finally {
+    await second.stop();
+  }
+});
+
+test("without an AMD GPU both modes are greyed out with the player's reason; Off stays", async () => {
+  const host = new TestHost();
+  const reason = { code: "no-gpu", message: "no AMD GPU: AMD motion smoothing needs an AMD Radeon GPU" };
+  host.motion.double = reason;
+  host.motion.display = reason;
+  const { stop } = await start(host);
+  try {
+    await host.settle();
+    assert.deepEqual(modeStates(host), [
+      [true, true, null],
+      [false, false, { $vestraText: "Not available: {}", args: [reason.message] }],
+      [false, false, { $vestraText: "Not available: {}", args: [reason.message] }],
+    ]);
+    assert.deepEqual(host.keepsRunning, []);
+  } finally {
+    await stop();
+  }
+});
+
+test("Match Display is greyed out with software rendering, not while GPU rendering starts; a reason that can pass greys nothing", async () => {
+  const rendering = { code: "rendering", message: "Match Display needs GPU rendering" };
+  const software = new TestHost();
+  software.motion.display = rendering;
+  software.motion.double = { code: "upscaling", message: "AI upscaling is on" };
+  const first = await start(software);
+  try {
+    await software.settle();
+    assert.deepEqual(modeStates(software), [
+      [true, true, null],
+      [true, false, null],
+      [false, false, { $vestraText: "Not available: {}", args: [rendering.message] }],
+    ]);
+  } finally {
+    await first.stop();
+  }
+  const starting = new TestHost();
+  starting.motion.display = rendering;
+  starting.motion.renderingStarting = true;
+  starting.rendering.reason = { code: "pending", message: "GPU rendering is starting" };
+  const second = await start(starting);
+  try {
+    await starting.settle();
+    assert.equal(starting.command(modeCommandId("display")).state.enabled, true, "set keeps the request while GPU rendering starts");
+    await starting.command(modeCommandId("display")).run();
+    await starting.settle();
+    assert.equal(starting.motion.mode, "display");
+  } finally {
+    await second.stop();
+  }
+});
+
+test("while the window is open the mode commands follow the player's state", async () => {
+  const host = new TestHost();
+  const { stop } = await start(host);
+  try {
+    await host.command(WINDOW_ID).run();
+    await host.settle();
+    const reason = { code: "runtime", message: "the converter cannot start on this system" };
+    host.motion.double = reason;
+    host.motion.display = reason;
+    host.motionChanged();
+    await host.settle();
+    assert.equal(host.command(modeCommandId("double")).state.enabled, false);
+    assert.deepEqual(host.command(modeCommandId("double")).state.reason, { $vestraText: "Not available: {}", args: [reason.message] });
+  } finally {
+    await stop();
+  }
 });

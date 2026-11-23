@@ -1,90 +1,103 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: zysilm.nvidiamotion 0.1.0\n"
+"Project-Id-Version: zysilm.nvidiamotion 0.2.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: main.ts:93
+#: main.ts:153
 msgid "Switching…"
 msgstr ""
 
-#: main.ts:94 main.ts:97 main.ts:113
+#: main.ts:154 main.ts:157 main.ts:173 main.ts:253
 msgid "Off"
 msgstr ""
 
-#: main.ts:94
+#: main.ts:154
 msgid "On"
 msgstr ""
 
-#: main.ts:96
+#: main.ts:156
 msgid "Not available on this computer"
 msgstr ""
 
-#: main.ts:102
+#: main.ts:162
 msgid "On: {} → {} fps on {}"
 msgstr ""
 
-#: main.ts:102
+#: main.ts:162
 msgid "On: {} → {} fps"
 msgstr ""
 
-#: main.ts:104
+#: main.ts:164
 msgid "The GPU uses the faster optical flow setting to keep up."
 msgstr ""
 
-#: main.ts:108
+#: main.ts:168
 msgid "Waiting"
 msgstr ""
 
-#: main.ts:109
+#: main.ts:169
 msgid "On: applies when a video plays"
 msgstr ""
 
-#: main.ts:113
+#: main.ts:173
 msgid "Double Frame Rate"
 msgstr ""
 
-#: main.ts:113
+#: main.ts:173
 msgid "Match Display"
 msgstr ""
 
-#: main.ts:119
+#: main.ts:182
 msgid "Frames are being dropped: a lower resolution or Double Frame Rate instead of Match Display helps."
 msgstr ""
 
-#: main.ts:121
+#: main.ts:183
 msgid "Frames are being dropped: a lower resolution helps."
 msgstr ""
 
+#: main.ts:185
 msgid "Frames are being dropped: rendering on the CPU cannot keep up; GPU Rendering (Picture ▸ Rendering) or a lower resolution helps."
 msgstr ""
 
-#: main.ts:182
+#: main.ts:253
+msgid "Double Frame Rate (Smoother Video)"
+msgstr ""
+
+#: main.ts:253
+msgid "Match Display (Smoothest Motion)"
+msgstr ""
+
+#: main.ts:254 manifest.json motion.slint:24
+msgid "NVIDIA Motion Smoothing"
+msgstr ""
+
+#: main.ts:268
+msgid "Not available: {}"
+msgstr ""
+
+#: main.ts:298
 msgid "NVIDIA motion smoothing unavailable: {}"
 msgstr ""
 
-#: main.ts:189
+#: main.ts:306
 msgid "{} (waiting: {})"
 msgstr ""
 
-#: main.ts:189 main.ts:190
+#: main.ts:306 main.ts:307
 msgid "NVIDIA motion smoothing: off"
 msgstr ""
 
-#: main.ts:189 main.ts:190
+#: main.ts:306 main.ts:307
 msgid "NVIDIA motion smoothing: double frame rate"
 msgstr ""
 
-#: main.ts:189 main.ts:190
+#: main.ts:306 main.ts:307
 msgid "NVIDIA motion smoothing: match display"
 msgstr ""
 
-#: main.ts:229
+#: main.ts:346
 msgid "NVIDIA Motion Smoothing…"
-msgstr ""
-
-#: manifest.json motion.slint:24
-msgid "NVIDIA Motion Smoothing"
 msgstr ""
 
 #: manifest.json
@@ -93,7 +106,7 @@ msgstr ""
 
 #: manifest.json
 msgid ""
-"Doubles the video's frame rate while it plays, with in-between frames made from the optical flow that the hardware of your NVIDIA GeForce RTX 30 series or newer GPU measures between frames: not blended frames. Video ▸ NVIDIA Motion Smoothing… opens a window to choose Off, Double Frame Rate or Match Display (the doubled frames paced to the display, with GPU rendering) and shows what runs or why not. Needs Windows with an RTX 30 series or newer GPU and NVIDIA driver 573.38 or newer; it does nothing on other GPUs or systems. Off by default; remembers your choice.\n"
+"Doubles the video's frame rate while it plays, with in-between frames made from the optical flow that the hardware of your NVIDIA GeForce RTX 30 series or newer GPU measures between frames: not blended frames. Video ▸ NVIDIA Motion Smoothing… opens a window to choose Off, Double Frame Rate or Match Display (the doubled frames paced to the display, with GPU rendering) and shows what runs or why not. The command palette and Ask Vestra can also choose a mode in one step. Needs Windows with an RTX 30 series or newer GPU and NVIDIA driver 573.38 or newer; it does nothing on other GPUs or systems. Off by default; remembers your choice.\n"
 "→ Menu: Video ▸ NVIDIA Motion Smoothing"
 msgstr ""
 

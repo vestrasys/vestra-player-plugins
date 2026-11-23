@@ -5,88 +5,101 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: main.ts:93
+#: main.ts:153
 msgid "Switching…"
 msgstr "正在切换…"
 
-#: main.ts:94 main.ts:97 main.ts:113
+#: main.ts:154 main.ts:157 main.ts:173 main.ts:253
 msgid "Off"
 msgstr "关"
 
-#: main.ts:94
+#: main.ts:154
 msgid "On"
 msgstr "开"
 
-#: main.ts:96
+#: main.ts:156
 msgid "Not available on this computer"
 msgstr "此电脑不可用"
 
-#: main.ts:102
+#: main.ts:162
 msgid "On: {} → {} fps on {}"
 msgstr "开：{} → {} fps（{}）"
 
-#: main.ts:102
+#: main.ts:162
 msgid "On: {} → {} fps"
 msgstr "开：{} → {} fps"
 
-#: main.ts:104
+#: main.ts:164
 msgid "The GPU uses the faster optical flow setting to keep up."
 msgstr "GPU 正用较快的光流设置以跟上速度。"
 
-#: main.ts:108
+#: main.ts:168
 msgid "Waiting"
 msgstr "等待中"
 
-#: main.ts:109
+#: main.ts:169
 msgid "On: applies when a video plays"
 msgstr "开：播放视频时生效"
 
-#: main.ts:113
+#: main.ts:173
 msgid "Double Frame Rate"
 msgstr "双倍帧率"
 
-#: main.ts:113
+#: main.ts:173
 msgid "Match Display"
 msgstr "匹配显示器"
 
-#: main.ts:119
+#: main.ts:182
 msgid "Frames are being dropped: a lower resolution or Double Frame Rate instead of Match Display helps."
 msgstr "正在丢帧：降低分辨率，或用“双倍帧率”代替“匹配显示器”，会有帮助。"
 
-#: main.ts:121
+#: main.ts:183
 msgid "Frames are being dropped: a lower resolution helps."
 msgstr "正在丢帧：降低分辨率会有帮助。"
 
+#: main.ts:185
 msgid "Frames are being dropped: rendering on the CPU cannot keep up; GPU Rendering (Picture ▸ Rendering) or a lower resolution helps."
 msgstr "正在丢帧：CPU 渲染跟不上；开启 GPU 渲染（画面 ▸ 渲染）或降低分辨率会有帮助。"
 
-#: main.ts:182
+#: main.ts:253
+msgid "Double Frame Rate (Smoother Video)"
+msgstr "双倍帧率（更流畅）"
+
+#: main.ts:253
+msgid "Match Display (Smoothest Motion)"
+msgstr "匹配显示器（最流畅）"
+
+#: main.ts:254 manifest.json motion.slint:24
+msgid "NVIDIA Motion Smoothing"
+msgstr "NVIDIA 运动平滑"
+
+#: main.ts:268
+msgid "Not available: {}"
+msgstr "不可用：{}"
+
+#: main.ts:298
 msgid "NVIDIA motion smoothing unavailable: {}"
 msgstr "NVIDIA 运动平滑不可用：{}"
 
-#: main.ts:189
+#: main.ts:306
 msgid "{} (waiting: {})"
 msgstr "{}（等待中：{}）"
 
-#: main.ts:189 main.ts:190
+#: main.ts:306 main.ts:307
 msgid "NVIDIA motion smoothing: off"
 msgstr "NVIDIA 运动平滑：关"
 
-#: main.ts:189 main.ts:190
+#: main.ts:306 main.ts:307
 msgid "NVIDIA motion smoothing: double frame rate"
 msgstr "NVIDIA 运动平滑：双倍帧率"
 
-#: main.ts:189 main.ts:190
+#: main.ts:306 main.ts:307
 msgid "NVIDIA motion smoothing: match display"
 msgstr "NVIDIA 运动平滑：匹配显示器"
 
-#: main.ts:229
+#: main.ts:346
 msgid "NVIDIA Motion Smoothing…"
 msgstr "NVIDIA 运动平滑…"
-
-#: manifest.json motion.slint:24
-msgid "NVIDIA Motion Smoothing"
-msgstr "NVIDIA 运动平滑"
 
 #: manifest.json
 msgid "Smoother motion with real in-between frames from your NVIDIA GeForce RTX GPU"
@@ -94,10 +107,10 @@ msgstr "用 NVIDIA GeForce RTX GPU 生成真实的中间帧，让画面运动更
 
 #: manifest.json
 msgid ""
-"Doubles the video's frame rate while it plays, with in-between frames made from the optical flow that the hardware of your NVIDIA GeForce RTX 30 series or newer GPU measures between frames: not blended frames. Video ▸ NVIDIA Motion Smoothing… opens a window to choose Off, Double Frame Rate or Match Display (the doubled frames paced to the display, with GPU rendering) and shows what runs or why not. Needs Windows with an RTX 30 series or newer GPU and NVIDIA driver 573.38 or newer; it does nothing on other GPUs or systems. Off by default; remembers your choice.\n"
+"Doubles the video's frame rate while it plays, with in-between frames made from the optical flow that the hardware of your NVIDIA GeForce RTX 30 series or newer GPU measures between frames: not blended frames. Video ▸ NVIDIA Motion Smoothing… opens a window to choose Off, Double Frame Rate or Match Display (the doubled frames paced to the display, with GPU rendering) and shows what runs or why not. The command palette and Ask Vestra can also choose a mode in one step. Needs Windows with an RTX 30 series or newer GPU and NVIDIA driver 573.38 or newer; it does nothing on other GPUs or systems. Off by default; remembers your choice.\n"
 "→ Menu: Video ▸ NVIDIA Motion Smoothing"
 msgstr ""
-"播放时把视频帧率提高一倍，中间帧根据 NVIDIA GeForce RTX 30 系列或更新 GPU 的硬件在两帧之间测得的光流生成，而不是两帧混合。“视频 ▸ NVIDIA 运动平滑…”打开一个窗口，可选“关”“双倍帧率”或“匹配显示器”（双倍后的帧再按显示器刷新率输出，需 GPU 渲染），并显示当前效果或不能使用的原因。需要装有 RTX 30 系列或更新 GPU、NVIDIA 驱动 573.38 或更新版本的 Windows；在其他 GPU 或系统上不起作用。默认关闭，会记住你的选择。\n"
+"播放时把视频帧率提高一倍，中间帧根据 NVIDIA GeForce RTX 30 系列或更新 GPU 的硬件在两帧之间测得的光流生成，而不是两帧混合。“视频 ▸ NVIDIA 运动平滑…”打开一个窗口，可选“关”“双倍帧率”或“匹配显示器”（双倍后的帧再按显示器刷新率输出，需 GPU 渲染），并显示当前效果或不能使用的原因。也可以在命令面板或 Ask Vestra 中一步选择模式。需要装有 RTX 30 系列或更新 GPU、NVIDIA 驱动 573.38 或更新版本的 Windows；在其他 GPU 或系统上不起作用。默认关闭，会记住你的选择。\n"
 "→ 菜单：视频 ▸ NVIDIA 运动平滑"
 
 #: manifest.json

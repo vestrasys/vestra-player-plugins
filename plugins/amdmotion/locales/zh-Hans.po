@@ -5,88 +5,101 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: main.ts:89
+#: main.ts:149
 msgid "Switching…"
 msgstr "正在切换…"
 
-#: main.ts:90 main.ts:93 main.ts:109
+#: main.ts:150 main.ts:153 main.ts:169 main.ts:250
 msgid "Off"
 msgstr "关"
 
-#: main.ts:90
+#: main.ts:150
 msgid "On"
 msgstr "开"
 
-#: main.ts:92
+#: main.ts:152
 msgid "Not available on this computer"
 msgstr "此电脑不可用"
 
-#: main.ts:98
+#: main.ts:158
 msgid "On: {} → {} fps on {}"
 msgstr "开：{} → {} fps（{}）"
 
-#: main.ts:98
+#: main.ts:158
 msgid "On: {} → {} fps"
 msgstr "开：{} → {} fps"
 
-#: main.ts:100
+#: main.ts:160
 msgid "The GPU uses the faster motion search to keep up."
 msgstr "GPU 正用较快的运动搜索以跟上速度。"
 
-#: main.ts:104
+#: main.ts:164
 msgid "Waiting"
 msgstr "等待中"
 
-#: main.ts:105
+#: main.ts:165
 msgid "On: applies when a video plays"
 msgstr "开：播放视频时生效"
 
-#: main.ts:109
+#: main.ts:169
 msgid "Double Frame Rate"
 msgstr "双倍帧率"
 
-#: main.ts:109
+#: main.ts:169
 msgid "Match Display"
 msgstr "匹配显示器"
 
-#: main.ts:115
+#: main.ts:178
 msgid "Frames are being dropped: a lower resolution or Double Frame Rate instead of Match Display helps."
 msgstr "正在丢帧：降低分辨率，或用“双倍帧率”代替“匹配显示器”，会有帮助。"
 
-#: main.ts:117
+#: main.ts:179
 msgid "Frames are being dropped: a lower resolution helps."
 msgstr "正在丢帧：降低分辨率会有帮助。"
 
+#: main.ts:181
 msgid "Frames are being dropped: rendering on the CPU cannot keep up; GPU Rendering (Picture ▸ Rendering) or a lower resolution helps."
 msgstr "正在丢帧：CPU 渲染跟不上；开启 GPU 渲染（画面 ▸ 渲染）或降低分辨率会有帮助。"
 
-#: main.ts:179
+#: main.ts:250
+msgid "Double Frame Rate (Smoother Video)"
+msgstr "双倍帧率（更流畅）"
+
+#: main.ts:250
+msgid "Match Display (Smoothest Motion)"
+msgstr "匹配显示器（最流畅）"
+
+#: main.ts:251 manifest.json motion.slint:24
+msgid "AMD Motion Smoothing"
+msgstr "AMD 运动平滑"
+
+#: main.ts:265
+msgid "Not available: {}"
+msgstr "不可用：{}"
+
+#: main.ts:295
 msgid "AMD motion smoothing unavailable: {}"
 msgstr "AMD 运动平滑不可用：{}"
 
-#: main.ts:186
+#: main.ts:303
 msgid "{} (waiting: {})"
 msgstr "{}（等待中：{}）"
 
-#: main.ts:186 main.ts:187
+#: main.ts:303 main.ts:304
 msgid "AMD motion smoothing: off"
 msgstr "AMD 运动平滑：关"
 
-#: main.ts:186 main.ts:187
+#: main.ts:303 main.ts:304
 msgid "AMD motion smoothing: double frame rate"
 msgstr "AMD 运动平滑：双倍帧率"
 
-#: main.ts:186 main.ts:187
+#: main.ts:303 main.ts:304
 msgid "AMD motion smoothing: match display"
 msgstr "AMD 运动平滑：匹配显示器"
 
-#: main.ts:226
+#: main.ts:343
 msgid "AMD Motion Smoothing…"
 msgstr "AMD 运动平滑…"
-
-#: manifest.json motion.slint:24
-msgid "AMD Motion Smoothing"
-msgstr "AMD 运动平滑"
 
 #: manifest.json
 msgid "Smoother motion with real in-between frames from your AMD Radeon GPU"
@@ -94,10 +107,10 @@ msgstr "用 AMD Radeon GPU 生成真实的中间帧，让画面运动更流畅"
 
 #: manifest.json
 msgid ""
-"Doubles the video's frame rate while it plays, with in-between frames made by the motion estimation of AMD's frame-rate converter (AMF) on your AMD Radeon GPU: not blended frames. Video ▸ AMD Motion Smoothing… opens a window to choose Off, Double Frame Rate or Match Display (the doubled frames paced to the display, with GPU rendering) and shows what runs or why not. Needs Windows with an AMD Radeon GPU and the AMD graphics driver; it does nothing on other GPUs or systems. Off by default; remembers your choice.\n"
+"Doubles the video's frame rate while it plays, with in-between frames made by the motion estimation of AMD's frame-rate converter (AMF) on your AMD Radeon GPU: not blended frames. Video ▸ AMD Motion Smoothing… opens a window to choose Off, Double Frame Rate or Match Display (the doubled frames paced to the display, with GPU rendering) and shows what runs or why not. The command palette and Ask Vestra can also choose a mode in one step. Needs Windows with an AMD Radeon GPU and the AMD graphics driver; it does nothing on other GPUs or systems. Off by default; remembers your choice.\n"
 "→ Menu: Video ▸ AMD Motion Smoothing"
 msgstr ""
-"播放时把视频帧率提高一倍，中间帧由 AMD Radeon GPU 上 AMD 帧率转换器（AMF）的运动估计生成，而不是两帧混合。“视频 ▸ AMD 运动平滑…”打开一个窗口，可选“关”“双倍帧率”或“匹配显示器”（双倍后的帧再按显示器刷新率输出，需 GPU 渲染），并显示当前效果或不能使用的原因。需要装有 AMD Radeon GPU 和 AMD 显卡驱动的 Windows；在其他 GPU 或系统上不起作用。默认关闭，会记住你的选择。\n"
+"播放时把视频帧率提高一倍，中间帧由 AMD Radeon GPU 上 AMD 帧率转换器（AMF）的运动估计生成，而不是两帧混合。“视频 ▸ AMD 运动平滑…”打开一个窗口，可选“关”“双倍帧率”或“匹配显示器”（双倍后的帧再按显示器刷新率输出，需 GPU 渲染），并显示当前效果或不能使用的原因。也可以在命令面板或 Ask Vestra 中一步选择模式。需要装有 AMD Radeon GPU 和 AMD 显卡驱动的 Windows；在其他 GPU 或系统上不起作用。默认关闭，会记住你的选择。\n"
 "→ 菜单：视频 ▸ AMD 运动平滑"
 
 #: manifest.json
