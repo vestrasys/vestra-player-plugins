@@ -14,7 +14,7 @@ Your choice is remembered and applied again at the next start.
 ## Requirements
 
 - Windows with an **NVIDIA GeForce RTX 30 series or newer GPU** (RTX 30, 40, 50) and **NVIDIA driver 573.38 or newer**. On a laptop with two GPUs the NVIDIA one converts, whichever draws the picture. On older NVIDIA GPUs (RTX 20, GTX), other GPUs and other systems the window says it is not available and nothing changes.
-- A Vestra Player with the NVIDIA engine (the release after 0.10.3 that ships it). An older player answers that it has no NVIDIA converter, and the window says so.
+- Vestra Player 0.11.1 or newer, the release that ships the NVIDIA engine.
 - *Match Display* needs GPU rendering. With software rendering, *Double Frame Rate* works only where twice the video's rate is the display's (30 fps on a 60 Hz screen).
 
 ## Limits
