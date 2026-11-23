@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { startPlugin, TestHost } from "@vestra-player/sdk/testing";
-import activate, { DEFAULT_SETTINGS, isSettings, MODES, WINDOW_TITLE } from "../main.ts";
+import activate, { DEFAULT_SETTINGS, DROP_CHECK_MS, dropping, isSettings, MODES, SETTLE_MS, WINDOW_TITLE } from "../main.ts";
 
 const directory = new URL("..", import.meta.url);
 const ITEM = "amdmotion.window";
@@ -112,6 +112,97 @@ test("a reason that can pass keeps the mode and shows it; the player's changes f
     host.window(HANDLE).emit("closeWindow");
     await host.settle();
     assert.ok(!host.listening.has("video.motion.changed"));
+  } finally {
+    await stop();
+  }
+});
+
+test("dropping(): steady drops over the span, not a single burst or a reset", () => {
+  const at = (s: number, dropped: number) => ({ at: s * 1000, dropped });
+  assert.equal(dropping([]), false);
+  assert.equal(dropping([at(0, 0), at(2, 9)]), false, "not a full span yet");
+  assert.equal(dropping([at(0, 0), at(2, 2), at(4, 4), at(6, 6)]), true, "1 a second");
+  assert.equal(dropping([at(0, 0), at(2, 1), at(4, 2), at(6, 3)]), false, "0.5 a second");
+  assert.equal(dropping([at(0, 40), at(2, 0), at(4, 1), at(6, 2)]), false, "the count fell (a seek, a new video)");
+  // One burst (a seek, the decoder reopening, a resize, the converter starting) is not steady.
+  assert.equal(dropping([at(0, 0), at(2, 30), at(4, 30), at(6, 30)]), false, "a burst in the first reading");
+  assert.equal(dropping([at(0, 0), at(2, 0), at(4, 0), at(6, 30)]), false, "a burst in the last reading");
+  assert.equal(dropping([at(0, 0), at(2, 0), at(4, 15), at(6, 15)]), false, "a burst in the middle");
+  assert.equal(dropping([at(0, 0), at(2, 15), at(4, 15), at(6, 30)]), false, "two bursts, not in a row");
+  assert.equal(dropping([at(0, 0), at(2, 0), at(4, 3), at(6, 6)]), true, "two readings in a row at 1.5 a second");
+  assert.equal(dropping([at(0, 0), at(2, 9), at(4, 9), at(6, 30), at(8, 33)]), true, "the newest span: drops in its last two readings");
+});
+
+test("while the window is open and it converts, steady dropped frames show a hint; it clears when they stop and nothing is read once closed", async (t) => {
+  t.mock.timers.enable({ apis: ["setInterval", "Date"], now: 0 });
+  const host = new TestHost();
+  const { stop } = await start(host);
+  try {
+    await host.command(ITEM).run();
+    host.window(HANDLE).emit("pickMode", 1);
+    await host.settle();
+    assert.equal(host.motion.mode, "double");
+    const tick = async (dropped: number) => {
+      host.stats = { ...host.stats, framesDropped: dropped };
+      t.mock.timers.tick(DROP_CHECK_MS);
+      await host.settle();
+    };
+    const ticks = async (...counts: number[]) => {
+      for (const dropped of counts) await tick(dropped);
+    };
+    // A (re)start leaves three readings unjudged: the one that sees it and those within SETTLE_MS.
+    assert.equal(SETTLE_MS / DROP_CHECK_MS, 3);
+    // The converter's start-up burst spans two readings, then nothing: no hint
+    // (two rising readings alone would have shown one).
+    assert.equal(dropping([0, 20, 42, 42].map((d, i) => ({ at: i * DROP_CHECK_MS, dropped: d }))), true);
+    await ticks(0, 20, 42);
+    await ticks(42, 42, 42, 42);
+    assert.equal(props(host).hint, "", "the start-up burst is not judged");
+    // A single burst later: no hint.
+    await ticks(72, 72, 72, 72);
+    assert.equal(props(host).hint, "", "a burst is not steady");
+    // Steady drops: GPU rendering's advice, for the mode: already Double Frame Rate.
+    await ticks(76, 80, 84, 88);
+    assert.equal(props(host).hint, "Frames are being dropped: a lower resolution helps.");
+    host.window(HANDLE).emit("pickMode", 2);
+    await host.settle();
+    assert.equal(host.motion.mode, "display");
+    assert.equal(
+      props(host).hint,
+      "Frames are being dropped: a lower resolution or Double Frame Rate instead of Match Display helps.",
+      "with Match Display, Double Frame Rate helps too",
+    );
+    // Back to Double: a restart; its burst is not judged, and a span without drops clears the hint.
+    host.window(HANDLE).emit("pickMode", 1);
+    await host.settle();
+    await ticks(88, 110, 130);
+    await ticks(130, 130, 130, 130);
+    assert.equal(props(host).hint, "", "cleared after a span without drops");
+    // The fallback step (the faster search) restarts the converter: its burst is not judged either.
+    host.motion.performance = true;
+    host.motionChanged();
+    await host.settle();
+    await ticks(150, 170, 190);
+    await ticks(190, 190, 190, 190);
+    assert.equal(props(host).hint, "", "the fallback step's burst is not judged");
+    // A new video or a seek (mpv's count falls): its burst is not judged.
+    await ticks(0, 25, 50);
+    await ticks(50, 50, 50, 50);
+    assert.equal(props(host).hint, "", "a new video's burst is not judged");
+    // With software rendering the advice names the CPU.
+    host.videoRender.gpu = false;
+    await ticks(60, 70, 80, 90);
+    assert.equal(
+      props(host).hint,
+      "Frames are being dropped: rendering on the CPU cannot keep up; GPU Rendering (Picture ▸ Rendering) or a lower resolution helps.",
+      "software rendering: the CPU is what cannot keep up",
+    );
+    // Closed: no more reads.
+    host.window(HANDLE).emit("closeWindow");
+    await host.settle();
+    const reads = host.calls.filter((c) => c.method === "player.stats").length;
+    for (let i = 0; i < 3; i++) await tick(60);
+    assert.equal(host.calls.filter((c) => c.method === "player.stats").length, reads);
   } finally {
     await stop();
   }

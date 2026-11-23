@@ -1,0 +1,137 @@
+msgid ""
+msgstr ""
+"Language: zh-Hans\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#: main.ts:93
+msgid "Switching…"
+msgstr "正在切换…"
+
+#: main.ts:94 main.ts:97 main.ts:113
+msgid "Off"
+msgstr "关"
+
+#: main.ts:94
+msgid "On"
+msgstr "开"
+
+#: main.ts:96
+msgid "Not available on this computer"
+msgstr "此电脑不可用"
+
+#: main.ts:102
+msgid "On: {} → {} fps on {}"
+msgstr "开：{} → {} fps（{}）"
+
+#: main.ts:102
+msgid "On: {} → {} fps"
+msgstr "开：{} → {} fps"
+
+#: main.ts:104
+msgid "The GPU uses the faster optical flow setting to keep up."
+msgstr "GPU 正用较快的光流设置以跟上速度。"
+
+#: main.ts:108
+msgid "Waiting"
+msgstr "等待中"
+
+#: main.ts:109
+msgid "On: applies when a video plays"
+msgstr "开：播放视频时生效"
+
+#: main.ts:113
+msgid "Double Frame Rate"
+msgstr "双倍帧率"
+
+#: main.ts:113
+msgid "Match Display"
+msgstr "匹配显示器"
+
+#: main.ts:119
+msgid "Frames are being dropped: a lower resolution or Double Frame Rate instead of Match Display helps."
+msgstr "正在丢帧：降低分辨率，或用“双倍帧率”代替“匹配显示器”，会有帮助。"
+
+#: main.ts:121
+msgid "Frames are being dropped: a lower resolution helps."
+msgstr "正在丢帧：降低分辨率会有帮助。"
+
+msgid "Frames are being dropped: rendering on the CPU cannot keep up; GPU Rendering (Picture ▸ Rendering) or a lower resolution helps."
+msgstr "正在丢帧：CPU 渲染跟不上；开启 GPU 渲染（画面 ▸ 渲染）或降低分辨率会有帮助。"
+
+#: main.ts:182
+msgid "NVIDIA motion smoothing unavailable: {}"
+msgstr "NVIDIA 运动平滑不可用：{}"
+
+#: main.ts:189
+msgid "{} (waiting: {})"
+msgstr "{}（等待中：{}）"
+
+#: main.ts:189 main.ts:190
+msgid "NVIDIA motion smoothing: off"
+msgstr "NVIDIA 运动平滑：关"
+
+#: main.ts:189 main.ts:190
+msgid "NVIDIA motion smoothing: double frame rate"
+msgstr "NVIDIA 运动平滑：双倍帧率"
+
+#: main.ts:189 main.ts:190
+msgid "NVIDIA motion smoothing: match display"
+msgstr "NVIDIA 运动平滑：匹配显示器"
+
+#: main.ts:229
+msgid "NVIDIA Motion Smoothing…"
+msgstr "NVIDIA 运动平滑…"
+
+#: manifest.json motion.slint:24
+msgid "NVIDIA Motion Smoothing"
+msgstr "NVIDIA 运动平滑"
+
+#: manifest.json
+msgid "Smoother motion with real in-between frames from your NVIDIA GeForce RTX GPU"
+msgstr "用 NVIDIA GeForce RTX GPU 生成真实的中间帧，让画面运动更流畅"
+
+#: manifest.json
+msgid ""
+"Doubles the video's frame rate while it plays, with in-between frames made from the optical flow that the hardware of your NVIDIA GeForce RTX 30 series or newer GPU measures between frames: not blended frames. Video ▸ NVIDIA Motion Smoothing… opens a window to choose Off, Double Frame Rate or Match Display (the doubled frames paced to the display, with GPU rendering) and shows what runs or why not. Needs Windows with an RTX 30 series or newer GPU and NVIDIA driver 573.38 or newer; it does nothing on other GPUs or systems. Off by default; remembers your choice.\n"
+"→ Menu: Video ▸ NVIDIA Motion Smoothing"
+msgstr ""
+"播放时把视频帧率提高一倍，中间帧根据 NVIDIA GeForce RTX 30 系列或更新 GPU 的硬件在两帧之间测得的光流生成，而不是两帧混合。“视频 ▸ NVIDIA 运动平滑…”打开一个窗口，可选“关”“双倍帧率”或“匹配显示器”（双倍后的帧再按显示器刷新率输出，需 GPU 渲染），并显示当前效果或不能使用的原因。需要装有 RTX 30 系列或更新 GPU、NVIDIA 驱动 573.38 或更新版本的 Windows；在其他 GPU 或系统上不起作用。默认关闭，会记住你的选择。\n"
+"→ 菜单：视频 ▸ NVIDIA 运动平滑"
+
+#: manifest.json
+msgid "video"
+msgstr "视频"
+
+#: manifest.json
+msgid "motion"
+msgstr "运动"
+
+#: manifest.json
+msgid "smoothing"
+msgstr "平滑"
+
+#: manifest.json
+msgid "frame rate"
+msgstr "帧率"
+
+#: manifest.json
+msgid "nvidia"
+msgstr "nvidia"
+
+#: motion.slint:53
+msgid "Mode"
+msgstr "模式"
+
+#: motion.slint:70
+msgid "Double Frame Rate shows twice the frames, with real in-between frames made from the GPU's optical flow. Match Display also paces them to the display (GPU rendering only). Doubling makes film look like video, so it is off by default."
+msgstr "“双倍帧率”显示两倍的帧，中间帧根据 GPU 的光流真实生成。“匹配显示器”还会按显示器刷新率输出（仅 GPU 渲染）。帧率翻倍会让电影看起来像录像，所以默认关闭。"
+
+#: motion.slint:103
+msgid "Needs Windows with an NVIDIA GeForce RTX 30 series or newer GPU and NVIDIA driver 573.38 or newer. The player decides what the GPU can keep up with: large or fast videos are not offered."
+msgstr "需要装有 NVIDIA GeForce RTX 30 系列或更新 GPU、NVIDIA 驱动 573.38 或更新版本的 Windows。播放器会判断 GPU 能否跟上：过大或帧率过高的视频不提供此功能。"
+
+#: motion.slint:109
+msgid "Close"
+msgstr "关闭"

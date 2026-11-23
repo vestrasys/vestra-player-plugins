@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3
+
+- While the window is open and the converter runs, the plugin reads the player's dropped frames every 2 s (`player.stats()`, only then) and, when frames are dropped steadily (one a second or more over 6 s, and in at least two readings in a row; the first 6 s after the converter starts, restarts (mode change, fallback step) or a new video are not judged, so its start-up burst and one burst from a seek or a resize do not count), says so under the status with what helps: with software rendering, that rendering on the CPU cannot keep up and GPU Rendering or a lower resolution helps; with GPU rendering a lower resolution, and Double Frame Rate instead of Match Display when Match Display is the mode. It clears after 6 s without drops. Translated (Simplified Chinese).
+
 ## 0.1.2
 
 - The description ends with the store's "how to open" line, `→ Menu: Video ▸ AMD Motion Smoothing`, translated: the store shows it on the card and under "Where to find it".
