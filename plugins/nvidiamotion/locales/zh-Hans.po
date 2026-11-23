@@ -57,8 +57,8 @@ msgstr "正在丢帧：降低分辨率，或用“双倍帧率”代替“匹配
 msgid "Frames are being dropped: a lower resolution helps."
 msgstr "正在丢帧：降低分辨率会有帮助。"
 
-msgid "Frames are being dropped: GPU rendering (Picture ▸ Rendering) or a lower resolution helps."
-msgstr "正在丢帧：开启 GPU 渲染（画面 ▸ 渲染）或降低分辨率会有帮助。"
+msgid "Frames are being dropped: rendering on the CPU cannot keep up; GPU Rendering (Picture ▸ Rendering) or a lower resolution helps."
+msgstr "正在丢帧：CPU 渲染跟不上；开启 GPU 渲染（画面 ▸ 渲染）或降低分辨率会有帮助。"
 
 #: main.ts:182
 msgid "NVIDIA motion smoothing unavailable: {}"

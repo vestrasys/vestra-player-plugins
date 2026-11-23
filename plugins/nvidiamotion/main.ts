@@ -128,7 +128,7 @@ export default async function activate(plugin: Plugin) {
           ? text("Frames are being dropped: a lower resolution or Double Frame Rate instead of Match Display helps.")
           : text("Frames are being dropped: a lower resolution helps.")
         : hint === "software"
-          ? text("Frames are being dropped: GPU rendering (Picture ▸ Rendering) or a lower resolution helps.")
+          ? text("Frames are being dropped: rendering on the CPU cannot keep up; GPU Rendering (Picture ▸ Rendering) or a lower resolution helps.")
           : "",
   }));
 

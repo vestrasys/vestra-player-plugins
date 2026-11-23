@@ -165,7 +165,11 @@ test("while the window is open and it converts, steady dropped frames show a hin
     // With software rendering the advice is GPU rendering.
     host.videoRender.gpu = false;
     for (const dropped of [20, 30, 40, 50]) await tick(dropped);
-    assert.ok(String(props(host).hint).includes("GPU rendering (Picture ▸ Rendering)"), String(props(host).hint));
+    assert.equal(
+      props(host).hint,
+      "Frames are being dropped: rendering on the CPU cannot keep up; GPU Rendering (Picture ▸ Rendering) or a lower resolution helps.",
+      "software rendering: the CPU is what cannot keep up",
+    );
     // Closed: no more reads.
     host.window(HANDLE).emit("closeWindow");
     await host.settle();
