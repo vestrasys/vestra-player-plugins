@@ -11,6 +11,8 @@ Right-click menu **Video ▸ AMD Motion Smoothing…** opens a small window:
 
 Your choice is remembered and applied again at the next start.
 
+The **command palette** (and **Ask Vestra** in it) can also choose a mode in one step: *AMD Motion Smoothing: Off*, *Double Frame Rate (Smoother Video)* or *Match Display (Smoothest Motion)*, with the mode in use marked. On a computer where a mode cannot work, its command is greyed out with the reason, so asking Vestra for "smoother video" picks the motion smoothing of your GPU.
+
 ## Requirements
 
 - Windows with an **AMD Radeon GPU** and the AMD graphics driver (it brings AMD's AMF runtime). On a laptop with two GPUs the AMD one converts, whichever draws the picture. On other GPUs and systems the window says it is not available and nothing changes.

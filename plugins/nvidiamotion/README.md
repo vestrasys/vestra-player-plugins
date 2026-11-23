@@ -11,6 +11,8 @@ Right-click menu **Video ▸ NVIDIA Motion Smoothing…** opens a small window:
 
 Your choice is remembered and applied again at the next start.
 
+The **command palette** (and **Ask Vestra** in it) can also choose a mode in one step: *NVIDIA Motion Smoothing: Off*, *Double Frame Rate (Smoother Video)* or *Match Display (Smoothest Motion)*, with the mode in use marked. On a computer where a mode cannot work, its command is greyed out with the reason, so asking Vestra for "smoother video" picks the motion smoothing of your GPU.
+
 ## Requirements
 
 - Windows with an **NVIDIA GeForce RTX 30 series or newer GPU** (RTX 30, 40, 50) and **NVIDIA driver 573.38 or newer**. On a laptop with two GPUs the NVIDIA one converts, whichever draws the picture. On older NVIDIA GPUs (RTX 20, GTX), other GPUs and other systems the window says it is not available and nothing changes.

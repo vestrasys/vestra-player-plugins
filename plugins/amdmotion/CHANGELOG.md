@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.0
+
+- Three commands choose a mode in one step from the command palette and Ask Vestra: *AMD Motion Smoothing: Off*, *Double Frame Rate (Smoother Video)* and *Match Display (Smoothest Motion)*. They are radio items checked on the saved mode (the window's choice moves the mark too), in the category AMD Motion Smoothing with the window as their place, and outside the menus: Video ▸ AMD Motion Smoothing… stays the only menu item. A mode that cannot work on this computer for the whole run (without an AMD Radeon GPU, a missing driver runtime, or Match Display with software rendering) is greyed out with the player's reason, so on a computer with NVIDIA's GPU Ask Vestra sees that this plugin's modes do not work there. The state is read at start, after a choice and while the window is open; nothing listens while it is closed, so the plugin still holds nothing while off. Translated (Simplified Chinese). The description says the palette and Ask Vestra can choose a mode.
+
 ## 0.1.3
 
 - While the window is open and the converter runs, the plugin reads the player's dropped frames every 2 s (`player.stats()`, only then) and, when frames are dropped steadily (one a second or more over 6 s, and in at least two readings in a row; the first 6 s after the converter starts, restarts (mode change, fallback step) or a new video are not judged, so its start-up burst and one burst from a seek or a resize do not count), says so under the status with what helps: with software rendering, that rendering on the CPU cannot keep up and GPU Rendering or a lower resolution helps; with GPU rendering a lower resolution, and Double Frame Rate instead of Match Display when Match Display is the mode. It clears after 6 s without drops. Translated (Simplified Chinese).
