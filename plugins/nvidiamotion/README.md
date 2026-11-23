@@ -19,7 +19,7 @@ Your choice is remembered and applied again at the next start.
 
 ## Limits
 
-- If frames are being dropped while the window is open, it says so under the status, with what helps (GPU rendering, a lower resolution, or Double Frame Rate instead of Match Display when that is the mode). A single burst, such as after a seek, does not count.
+- If frames are being dropped while the window is open, it says so under the status, with what helps (GPU rendering, a lower resolution, or Double Frame Rate instead of Match Display when that is the mode). A single burst, such as when the converter starts or after a seek, does not count.
 - The player chooses the converter's settings: the finest quality that keeps up (slow optical flow on a 4-pixel grid), the faster setting for videos above 1440p. It offers a mode only where it measured that the GPU and the renderer keep up: videos of 10 to 30 fps in 8-bit SDR (not 10-bit or HDR), up to 4K at 30 fps; with software rendering a slower computer may drop frames at 4K, and the window says so. If the GPU still falls behind, the player first uses the faster setting, then turns smoothing off for that video and says why.
 - It does not run together with the player's AI Upscaling, with Frame Doubling, or with AMD Motion Smoothing while that one is on (one converter at a time): smoothing waits and says why.
 - Thin structures (railings, grass, leaves) and things that cover each other can show thin lines or torn edges in the made frames, more in very fast motion. Doubling also makes film look like video (the "soap-opera effect"); that is why it is off by default.

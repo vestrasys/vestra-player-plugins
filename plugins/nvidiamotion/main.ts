@@ -26,6 +26,21 @@ export const DROP_CHECK_MS = 2000;
 export const DROP_WINDOW_MS = 6000;
 /** Sustained dropping: at least this many frames a second over the span (60 → 1 of 60 lost). */
 export const DROPS_PER_SECOND = 1;
+/**
+ * After the converter (re)starts, its first frames come in a burst that
+ * can span two readings (measured 2026-11-23: NVIDIA 4K30 dropped 42 in
+ * its first 5 s, then none; AMD 4K24 alike): the readings of this long
+ * after a start are not judged.
+ */
+export const SETTLE_MS = DROP_WINDOW_MS;
+
+/**
+ * What starts the converter again when it changes: running or not and the
+ * mode, the fallback step (`searchMode`), the video (its rate). A new
+ * video or a seek also shows as mpv's dropped count falling.
+ */
+export const runKey = (state: Pick<MotionState, "active" | "searchMode" | "sourceFps">) =>
+  `${state.active}|${state.searchMode}|${state.sourceFps}`;
 
 /** One reading of `player.stats().framesDropped`. */
 export interface DropSample {
@@ -139,10 +154,14 @@ export default async function activate(plugin: Plugin) {
    * open window reads; nothing runs while it is closed.
    */
   let checking: ReturnType<typeof setInterval> | null = null;
+  /** The converter run the readings belong to ({@link runKey}) and when its start-up burst is over. */
+  let run: string | null = null;
+  let settled = 0;
   const stopChecking = () => {
     if (checking) clearInterval(checking);
     checking = null;
     drops = [];
+    run = null;
     if (hint) {
       hint = "";
       plugin.update();
@@ -153,6 +172,14 @@ export default async function activate(plugin: Plugin) {
     const stats = await plugin.player.stats().catch(() => null);
     if (stats === null || stats.framesDropped === null) return;
     const now = Date.now();
+    // A (re)start: its burst is not judged; the readings start afresh after it.
+    const key = runKey(state);
+    if (key !== run || stats.framesDropped < (drops.at(-1)?.dropped ?? 0)) {
+      run = key;
+      settled = now + SETTLE_MS;
+      drops = [];
+    }
+    if (now < settled) return;
     drops = [...drops.filter((s) => now - s.at <= DROP_WINDOW_MS + DROP_CHECK_MS), { at: now, dropped: stats.framesDropped }];
     // Shown while frames are dropped steadily; cleared after a full span without.
     let next = hint;
