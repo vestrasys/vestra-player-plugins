@@ -924,7 +924,9 @@ test("crash safety: the player refuses with previous-crash: the choice is kept, 
   const data = await mkdtemp(join(tmpdir(), "shaderupscale-"));
   const choice = { ...DEFAULT_SETTINGS, on: true, anime4k: { mode: "A+A", quality: "hq" } };
   await writeFile(join(data, "upscaling.json"), JSON.stringify(choice));
-  const { host, window, stop } = await opened(refusing(windowsGpu(), CRASH_DAYS), "en", data);
+  const refused = refusing(windowsGpu(), CRASH_DAYS);
+  refused.expectError("previous-crash"); // the refusal the test is about (shown in the status, logged)
+  const { host, window, stop } = await opened(refused, "en", data);
   try {
     await eventually(host, () => assert.equal(window.props.status, REFUSED));
     assert.equal(held(host), undefined);
@@ -957,7 +959,9 @@ test("crash safety: the player refuses with previous-crash: the choice is kept, 
 test("crash safety: while refused, Turn Off saves off; Turn On then tries exactly once and shows the same reason", async () => {
   const data = await mkdtemp(join(tmpdir(), "shaderupscale-"));
   await writeFile(join(data, "upscaling.json"), JSON.stringify({ ...DEFAULT_SETTINGS, on: true }));
-  const { host, window, stop } = await opened(refusing(windowsGpu()), "en", data);
+  const refused = refusing(windowsGpu());
+  refused.expectError("previous-crash");
+  const { host, window, stop } = await opened(refused, "en", data);
   try {
     await eventually(host, () => assert.equal(window.props.status, REFUSED));
     window.emit("toggle");
@@ -970,6 +974,7 @@ test("crash safety: while refused, Turn Off saves off; Turn On then tries exactl
     });
     assert.equal(attempts(host).length, 1);
     // The explicit Turn On: one attempt, refused again, the same reason, no OSD of the plugin's.
+    host.expectError("previous-crash");
     window.emit("toggle");
     await eventually(host, () => assert.equal(attempts(host).length, 2));
     await host.settle(100);
@@ -999,6 +1004,7 @@ test("crash safety: refused while off: Turn On is the one attempt, with no OSD a
   const { host, window, stop } = await opened(refusing(windowsGpu()));
   try {
     assert.equal(attempts(host).length, 0);
+    host.expectError("previous-crash");
     window.emit("toggle");
     await eventually(host, () => assert.equal(window.props.status, REFUSED));
     await host.settle(100);
@@ -1013,7 +1019,9 @@ test("crash safety: refused while off: Turn On is the one attempt, with no OSD a
 test("crash safety: a stop and wake of the plugin within the player run does not send again; a new player run does", async () => {
   const data = await mkdtemp(join(tmpdir(), "shaderupscale-"));
   await writeFile(join(data, "upscaling.json"), JSON.stringify({ ...DEFAULT_SETTINGS, on: true }));
-  const first = await opened(refusing(windowsGpu()), "en", data);
+  const refused = refusing(windowsGpu());
+  refused.expectError("previous-crash");
+  const first = await opened(refused, "en", data);
   await eventually(first.host, () => assert.equal(first.window.props.status, REFUSED));
   const session = first.host.sessionStorage;
   await first.stop();
@@ -1104,6 +1112,7 @@ test("a switch to software rendering during the run: the status says to restart"
   try {
     window.emit("toggle");
     await eventually(host, () => assert.deepEqual(held(host), paths(anime4kFiles("A", "fast"))));
+    host.expectError("unsupported");
     host.failVideoRender("unsupported", "the player switched to software rendering");
     await host.settle();
     assert.equal(held(host), undefined);
@@ -1141,12 +1150,14 @@ test("a shader that does not compile: the status and the OSD say so, once", asyn
   try {
     window.emit("toggle");
     await eventually(host, () => assert.deepEqual(held(host), paths(anime4kFiles("A", "fast"))));
+    host.expectError("failed");
     host.failVideoShaders(HANDLE, "shader compile failed: ERROR: 0:39: 'x' : undeclared identifier");
     await host.settle();
     assert.equal(window.props.status, "On, but a shader did not compile");
     assert.equal(window.props.tone, 3);
     assert.match(String(window.props.detail), /ERROR: 0:39/);
     assert.equal(host.osd.at(-1), "Shader Upscaling: a shader did not compile");
+    host.expectError("failed");
     host.failVideoShaders(HANDLE, "shader compile failed again");
     await host.settle();
     assert.equal(host.osd.filter((line) => /did not compile/.test(line)).length, 1);
@@ -1160,6 +1171,7 @@ test("other plugins hold most of the 16 shaders: the status says there is no roo
   host.videoShaders.others = 12;
   const { window, stop } = await opened(host);
   try {
+    host.expectError("limit");
     window.emit("toggle");
     await eventually(host, () => assert.equal(window.props.status, "On, but not applied"));
     assert.match(String(window.props.detail), /^Other plugins' shaders leave no room/);
@@ -1244,6 +1256,7 @@ for (const locale of ["en", "zh-Hans"] as const) {
       assert.deepEqual(held(gpuRun.host), paths([CHROMA_FILE, ...anime4kFiles("C+A", "ultra"), DOWNSCALE_FILE, SHARPEN_FILE]));
       assert.equal(gpuRun.host.osd.length, 3); // on, off, on (the longest name: Ultra and the three add-ons)
     });
+    gpuRun.host.expectError("failed");
     gpuRun.host.failVideoShaders(HANDLE, "broken");
     await eventually(gpuRun.host, () => assert.equal(gpuRun.host.osd.length, 4));
     // The live-action upscalers with the three add-ons.
