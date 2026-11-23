@@ -37,6 +37,9 @@ test("one Tools menu item; nothing goes to mpv and nothing keeps the plugin runn
     assert.deepEqual(host.mpv.commands, []);
     assert.deepEqual([...host.mpv.observed], []);
     assert.deepEqual(host.keepsRunning, []);
+    assert.deepEqual([...host.listening], [], "no stream of the player's state");
+    await host.park();
+    assert.equal(host.parked, true);
   } finally {
     await stop();
   }
@@ -56,6 +59,7 @@ test("opening the window appends the measuring filter and observes its metadata;
     assert.equal(props(host).status, "Waiting for sound…");
     assert.equal(props(host).momentary, "—");
     assert.equal(props(host)["can-restart"], true);
+    assert.equal(host.listening.has("source.state"), true, "the open window follows the player's state");
 
     host.window(HANDLE).userClose();
     await host.settle();
@@ -63,6 +67,7 @@ test("opening the window appends the measuring filter and observes its metadata;
     assert.equal(host.mpv.labels.has("af/loudness"), false);
     assert.deepEqual([...host.mpv.observed], []);
     assert.deepEqual(host.keepsRunning, [], "a closed meter holds nothing");
+    assert.deepEqual([...host.listening], [], "the stream ended with the window");
   } finally {
     await stop();
   }

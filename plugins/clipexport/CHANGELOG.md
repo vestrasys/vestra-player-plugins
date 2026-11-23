@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.3
+
+**Who must change: nobody.** Needs Vestra Player 0.11.0 or later (SDK 1.11.0). Settings, the Collection, Results and kept Highlights carry over.
+
+- While its tab shows, the tab follows the player's state with a stream, which stops when the tab goes to the background; the tab learns that it came or went from the player's layout events. A background tab follows nothing and keeps nothing running, as before.
+- Open Clip Folder reads the file playing when it runs, so the key and the palette use the current file while the tab is hidden.
+- What the tab shows, the exports and the commands are unchanged.
+
 ## 0.8.2
 
 - The player's refusal by who is asking is now the code `builtin-only` (SDK 1.11.0, player with Release B); Clip Export shows "This version of the player cannot do this." for it. Nothing else changes. Who must change: nobody.

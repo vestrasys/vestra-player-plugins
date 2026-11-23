@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { realpath, stat } from "node:fs/promises";
 import { isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { FilterStatus, PluginError, Plugin } from "@vestra-player/sdk";
+import type { FilterStatus, Plugin, PlayerState, PluginError, VideoFilter } from "@vestra-player/sdk";
 import {
   analyseFrame,
   cropNodes,
@@ -193,6 +193,22 @@ export const frameArgs = (path: string, time: number) => [
 const same = (a: { width: number; height: number }, b: { width: number; height: number }) =>
   a.width === b.width && a.height === b.height;
 
+/** The `storage.session` key of {@link Remembered}. */
+export const SESSION = "autoframe";
+
+/**
+ * What one player run already did, kept through standby: a run that cropped
+ * nothing may be stopped while idle, and the next start carries on from here.
+ */
+export interface Remembered {
+  /** The source whose automatic framing started. */
+  handled: number | null;
+  /** A crop was on (then the run never went to standby; a restart frames again). */
+  cropped: boolean;
+  /** "ffmpeg was not found" was said. */
+  toldMissing: boolean;
+}
+
 /** The file playing now, once its cache key is known. */
 interface Current {
   sourceId: number;
@@ -213,12 +229,19 @@ interface Current {
  * chain, which keeps zero-copy hardware decoding.
  */
 export default async function activate(plugin: Plugin) {
-  plugin.player.subscribe(); // the player's events from now on
   await plugin.player.read(); // the player's state and timeline, read once
+  /** What this player run already did, kept through standby (`storage.session`). */
+  const remembered = await plugin.storage.session.get<Remembered>(SESSION).catch(() => undefined);
   const { text } = plugin.i18n;
   const settings = plugin.storage.json<Settings>("settings", { defaults: DEFAULT_SETTINGS, validate: isSettings });
   const cache = plugin.storage.json<Cache>("cache", { defaults: { files: {} }, validate: isCache });
-  const filter = plugin.video.filter("autoframe");
+  /**
+   * The crop chain, made at the first crop: a filter keeps the plugin
+   * running from the moment it exists, so a run that never crops (no file
+   * with a border, Auto Frame off) can go to standby.
+   */
+  let filter: VideoFilter | null = null;
+  const chainFilter = () => (filter ??= plugin.video.filter("autoframe"));
 
   /** The crop nodes last set (`[]`: none). */
   let nodes: CropNode[] = [];
@@ -230,8 +253,8 @@ export default async function activate(plugin: Plugin) {
   /** The source whose crop the OSD already announced. */
   let announced: number | null = null;
   let stopped = false;
-  /** ffmpeg or ffprobe was missing: said once per run. */
-  let toldMissing = false;
+  /** ffmpeg or ffprobe was missing: said once per player run (kept through standby). */
+  let toldMissing = remembered?.toldMissing === true;
   /**
    * Bumped by every change that decides the crop anew (another source, the
    * menu items, a new detection): work started before it sets no chain.
@@ -257,7 +280,8 @@ export default async function activate(plugin: Plugin) {
     if (next.length === 0) unwatch();
     nodes = next;
     everSet = true;
-    filter.set(next);
+    chainFilter().set(next);
+    remember();
   }
   const clear = () => setChain([]);
 
@@ -289,13 +313,14 @@ export default async function activate(plugin: Plugin) {
   /** Waits until the chain is applied or refused (at most 3 s). */
   function settled(): Promise<FilterStatus> {
     const done = (s: FilterStatus) => s.state === "applied" || s.state === "failed";
-    if (done(filter.status)) return Promise.resolve(filter.status);
+    const chain = chainFilter(); // called only once a chain was set
+    if (done(chain.status)) return Promise.resolve(chain.status);
     return new Promise((resolve) => {
       const timer = setTimeout(() => {
         listener.dispose();
-        resolve(filter.status);
+        resolve(chain.status);
       }, 3000);
-      const listener = filter.onStatus((s) => {
+      const listener = chain.onStatus((s) => {
         if (!done(s)) return;
         clearTimeout(timer);
         listener.dispose();
@@ -328,6 +353,7 @@ export default async function activate(plugin: Plugin) {
       if (code === "unavailable") {
         if (manual || !toldMissing) await plugin.osd.show("Auto Frame needs ffmpeg, which was not found");
         toldMissing = true;
+        remember();
       } else if (manual) {
         await plugin.osd.show("Auto Frame could not read this video");
       }
@@ -547,25 +573,41 @@ export default async function activate(plugin: Plugin) {
   }
 
   // ------------------------------------------------------------------ the player
+  /** The source last seen (from `source.opening` and `source.ready`). */
   let seen: number | null = null;
+  /** The source whose automatic framing has started. */
   let handled: number | null = null;
 
-  async function begin(sourceId: number, path: string) {
-    let key: string;
+  /** Keeps what a woken run needs to carry on as one run would (`storage.session`). */
+  function remember() {
+    const value: Remembered = { handled, cropped: nodes.length > 0, toldMissing };
+    void plugin.storage.session.set(SESSION, value).catch(() => {});
+  }
+
+  /** The cache key of the source's file, or `null` (logged) when the file cannot be read. */
+  async function keyOf(path: string): Promise<string | null> {
     try {
-      key = await fileKey(path);
+      return await fileKey(path);
     } catch (error) {
       log("cannot read", path, error);
-      return;
+      return null;
     }
-    if (stopped || plugin.player.state.sourceId !== sourceId) return;
+  }
+
+  async function begin(sourceId: number, path: string) {
+    const key = await keyOf(path);
+    if (key === null) return;
+    if (stopped || seen !== sourceId || plugin.player.state.sourceId !== sourceId) return;
     current = { sourceId, path, key };
     plugin.update();
     await frame(false);
   }
 
-  const onPlayer = () => {
-    const state = plugin.player.state;
+  /**
+   * A source event's state (or the state read at the start): another source
+   * resets what was found; a local file that is ready is framed once.
+   */
+  const onPlayer = (state: PlayerState) => {
     if (stopped) return;
     if (state.sourceId !== seen) {
       // Another source: what was found for the last one does not apply.
@@ -579,11 +621,29 @@ export default async function activate(plugin: Plugin) {
     }
     if (state.phase !== "ready" || state.sourceId === handled) return;
     handled = state.sourceId;
+    remember();
     const path = state.kind === "media" ? localPath(state.source) : null;
     if (path) void begin(state.sourceId, path).catch((error) => log(error));
   };
-  plugin.player.onChange(onPlayer);
-  onPlayer();
+
+  // The source events wake the plugin from standby and keep nothing running;
+  // a source closed without another one (`source.ended`, `stopped`) keeps its
+  // id, so it changes nothing here, as before.
+  plugin.player.on("source.opening", ({ state }) => onPlayer(state));
+  plugin.player.on("source.ready", ({ state }) => onPlayer(state));
+
+  const start = plugin.player.state;
+  const path = start.kind === "media" ? localPath(start.source) : null;
+  if (path !== null && remembered?.handled === start.sourceId && !remembered.cropped) {
+    // Woken from standby on the file it already framed: nothing was cropped
+    // (a crop keeps the plugin running), so only the file is known again,
+    // before the menu items can be used.
+    seen = handled = start.sourceId;
+    const key = await keyOf(path);
+    if (key !== null && seen === start.sourceId) current = { sourceId: start.sourceId, path, key };
+  } else {
+    onPlayer(start);
+  }
 
   // ------------------------------------------------------------------ the menu
   const noFile = () => (current ? null : text("Play a video file on this computer to use Auto Frame"));

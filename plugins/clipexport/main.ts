@@ -1,6 +1,6 @@
 import { access, constants, mkdir, readdir, rm, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-import type { CommandOptions, ExportCheck, ExportPart, ImageRef, Panel, PanelState, Plugin, PlayerState, Scrub, Text } from "@vestra-player/sdk";
+import type { CommandOptions, ExportCheck, ExportPart, ImageRef, Panel, PanelState, Plugin, PlayerState, Scrub, StateStream, Text } from "@vestra-player/sdk";
 import {
   abRange, animatedOf, animatedOutput, AUDIO_RATES, codecArgs, crfOf, defaultRange, effectiveMethod, estimate, exportEncoding, fastContainer, HEIGHTS, keyframeArgs, LAST_SECONDS, lastRange, lastSeconds,
   METHODS, methodOf, NO_TIMELINE, OUTPUTS, parseCodec, parseKeyframes, PRESET_ENCODE, presetOf, PRESETS, RATES, snapStart, SPEEDS, timeline, timelineWindow,
@@ -145,7 +145,6 @@ const elapsed = (from: number | undefined) => {
  * data and says it in its Slint files.
  */
 export default async function activate(plugin: Plugin, options: Partial<Options> = {}) {
-  plugin.player.subscribe(); // the player's events from now on
   await plugin.player.read(); // the player's state and timeline, read once
   const { player, osd } = plugin;
   const { text } = plugin.i18n;
@@ -377,7 +376,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   }
   /** The folder clips go to now, created when missing, opened in the file manager. */
   const openFolder = async () => {
-    const folder = await targetFolder(player.state.source);
+    // Read now: the key and the palette run it while the tab (and its stream) may be hidden.
+    const folder = await targetFolder((await player.refresh()).source);
     await plugin.system.openPath(folder).catch(() => {
       throw new Failure("cannotOpen");
     });
@@ -2040,6 +2040,8 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
   /** Whether the tab was on screen at the last pass; a timer refreshes the rows meanwhile. */
   let live = false;
   let ticker: ReturnType<typeof setInterval> | undefined;
+  /** The player's state followed while the tab shows (`follow`). */
+  let feed: StateStream | null = null;
   plugin.onDispose(() => clearInterval(ticker));
   /**
    * The tab's values. What it shows of the player's state is read only while
@@ -2162,6 +2164,10 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     if (on === live) return;
     live = on;
     clearInterval(ticker);
+    // What the tab shows of the player's state follows it while the tab shows, and only then: a stream (each of
+    // its calls brings the state and an update pass), stopped when the tab goes.
+    feed?.stop();
+    feed = on ? player.stream(() => {}) : null;
     if (on) {
       if (settings.page === "results") unseen = 0;
       void recheck();
@@ -2180,8 +2186,9 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
       panel.set({ clipStart: form.start, clipEnd: form.end });
     }
   }
-  // Not `panel.onChange`: a listener of the layout would keep the plugin running while idle (lazy activation);
-  // the binding above reads the state passively and is run again when it changes.
+  // Not `panel.onChange`: a listener of the panel would keep the plugin running while idle (lazy activation). The
+  // layout event keeps nothing running (the SDK takes it into `panel.state` first) and starts the plugin from standby.
+  player.on("layout.changed", () => follow(panel.state));
   void panel.ready.then(
     () => follow(panel.state),
     (error) => console.error(`[clipexport] the tab did not mount: ${message(error)}`),
