@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.4
+
+- A part's thumbnail is captured on the player's state as it is then: pausing or seeking while Add All's thumbnails are made no longer leaves the parts after it without a picture. A part whose file is no longer playing gets none (as before), without an error in the log.
+
 ## 0.8.3
 
 **Who must change: nobody.** Needs Vestra Player 0.11.0 or later (SDK 1.11.0). Settings, the Collection, Results and kept Highlights carry over.

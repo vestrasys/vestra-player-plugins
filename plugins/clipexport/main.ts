@@ -797,19 +797,30 @@ export default async function activate(plugin: Plugin, options: Partial<Options>
     if (part.thumb && partFolder) void rm(join(partFolder, part.thumb), { force: true }).catch(() => {});
   };
   /**
-   * Capture the part's first frame from the file playing (`seen`) as a full
-   * frame, then scale it with ffmpeg (the Results thumbnails' path) to twice
-   * the row's size; the full frame is deleted. Without ffmpeg, or on a
-   * failure, the row keeps its icon.
+   * Capture the part's first frame from the file it was added from (`added`: the state then) as a full frame, then
+   * scale it with ffmpeg (the Results thumbnails' path) to twice the row's size; the full frame is deleted. Without
+   * ffmpeg, or on a failure, the row keeps its icon.
    */
-  async function partThumbnail(part: Part, seen: PlayerState) {
+  async function partThumbnail(part: Part, added: PlayerState) {
     if (!partFolder || !(await plugin.tools.available("ffmpeg").catch(() => false))) return;
     let snapshot: Awaited<ReturnType<typeof plugin.media.capture>> | undefined;
     // The frame as asked for, and as the player wrote it (its outcome); only files in the plugin's own folder are deleted.
     let asked = "";
     let frame = "";
     try {
-      snapshot = await plugin.media.capture({ ifCurrent: seen, at: part.start });
+      // On the state as it is now: a pause or a seek since the part was added (or since the queue's last capture)
+      // changes the player's stamp, and a capture on an older state is refused as stale; such a refusal is retried
+      // once on a fresh read. Another file opened since the part was added: no frame of it is the part's.
+      for (let retried = false; ; retried = true) {
+        const now = await player.refresh();
+        if (now.sourceId !== added.sourceId || now.source !== added.source || !collection.find(part.id)) return;
+        try {
+          snapshot = await plugin.media.capture({ ifCurrent: now, at: part.start });
+          break;
+        } catch (error) {
+          if (retried || (error as { code?: string }).code !== "stale") throw error;
+        }
+      }
       await mkdir(partFolder, { recursive: true });
       // A new name each time: an export never overwrites a file.
       const stamp = Date.now();

@@ -1488,3 +1488,132 @@ test("the strip's pointer area is the strip's size: a ToolTipArea outside a layo
   assert.match(area, /width: 100%;/);
   assert.match(area, /height: 100%;/);
 });
+
+// ---------------------------------------------------------------- the Collection's thumbnail queue
+
+/** The part thumbnail's ffmpeg run: it scales the captured frame (wherever the player wrote it), not a frame of the file (`media`: the row thumbnails). */
+const isPartScale = (args: string[], media: string) => args.includes("-i") && args[args.indexOf("-i") + 1] !== media;
+/**
+ * Pretend to be ffmpeg for Add All's thumbnail queue: the scan's windows from `many`, a small picture for each part's
+ * frame, held until the test lets it go (`scales`: one release per part, in order), nothing for anything else.
+ */
+function heldScales(host: TestHost, media: string) {
+  const scales: (() => void)[] = [];
+  host.tools.handle("ffmpeg", async (args) => {
+    if (isScan(args)) return { stdout: momentaryOutput(args, many) };
+    if (!isPartScale(args, media)) return { stdout: "" };
+    await new Promise<void>((done) => scales.push(done));
+    return { stdout: "small jpeg" };
+  });
+  return scales;
+}
+type PartRow = { thumb: unknown };
+const parts = (host: TestHost) => (tab(host).parts ?? []) as PartRow[];
+const hasThumb = (row: PartRow) => row.thumb !== null && row.thumb !== undefined;
+/** Scan the file playing and Add All of its 10 suggestions; the thumbnail queue starts. */
+async function addAllTen(host: TestHost) {
+  await showHighlights(host);
+  await eventually(() => page(host).state, "ready");
+  host.mounted().emit("find-highlights");
+  await eventually(() => page(host).state, "done");
+  await eventually(() => rows(host).length, 10);
+  host.mounted().emit("add-all-highlights");
+  await until(() => parts(host).length === 10, "ten parts");
+}
+/** console.error's lines while `body` runs (a refused capture is said there only). */
+async function logged(body: () => Promise<void>) {
+  const errors: string[] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => void errors.push(args.join(" "));
+  try {
+    await body();
+  } finally {
+    console.error = original;
+  }
+  return errors.filter((line) => line.includes("part thumbnail"));
+}
+
+test("Add All's thumbnail queue: the user pausing and seeking while it runs loses no part's picture", async () => {
+  const setup = await withMedia(3000);
+  const host = new TestHost();
+  const scales = heldScales(host, setup.media);
+  setup.play(host);
+  const { stop } = await startIn(host, setup.data);
+  try {
+    const errors = await logged(async () => {
+      await addAllTen(host);
+      // Each capture waits for the one before it; between them the user pauses, seeks, plays and seeks again.
+      const actions = ["play-pause", "seek-forward", "play-pause", "seek-backward"];
+      for (let i = 0; i < 10; i++) {
+        await until(() => scales.length === i + 1, `part ${i + 1}'s frame`);
+        if (actions[i]) await host.coreAction(actions[i]!).run();
+        scales[i]!();
+      }
+      await until(() => parts(host).every(hasThumb), "every part's picture");
+    });
+    assert.equal(host.sent("snapshot.capture").length, 10, "one capture a part, none refused");
+    assert.deepEqual(errors, []);
+  } finally {
+    await stop();
+    await setup.cleanup();
+  }
+});
+
+test("Add All's thumbnail queue: a stale refusal (the state changed between the read and the capture) is retried once", async () => {
+  const setup = await withMedia(3000);
+  const host = new TestHost();
+  const scales = heldScales(host, setup.media);
+  setup.play(host);
+  const { stop } = await startIn(host, setup.data);
+  try {
+    const errors = await logged(async () => {
+      let refused = 0;
+      host.handle("snapshot.capture", () => {
+        refused++;
+        host.reset("snapshot.capture");
+        throw new HostError("stale", "the player's state changed");
+      });
+      await addAllTen(host);
+      for (let i = 0; i < 10; i++) {
+        await until(() => scales.length === i + 1, `part ${i + 1}'s frame`);
+        scales[i]!();
+      }
+      await until(() => parts(host).every(hasThumb), "every part's picture");
+      assert.equal(refused, 1);
+    });
+    assert.deepEqual(errors, []);
+  } finally {
+    await stop();
+    await setup.cleanup();
+  }
+});
+
+test("Add All's thumbnail queue: another file opened while it runs: the parts left get no picture (no frame of the other file), and nothing is logged", async () => {
+  const setup = await withMedia(3000);
+  const host = new TestHost();
+  const scales = heldScales(host, setup.media);
+  setup.play(host);
+  const { stop } = await startIn(host, setup.data);
+  try {
+    const errors = await logged(async () => {
+      await addAllTen(host);
+      await until(() => scales.length === 1, "the first part's frame");
+      host.openElsewhere("/media/other.mp4");
+      host.setSource({ position: 2, duration: 600 });
+      scales[0]!();
+
+      await until(() => parts(host).filter(hasThumb).length === 1, "the one captured before");
+      // The queue runs to its end without a capture.
+      await host.settle();
+      await tick();
+      await host.settle();
+    });
+    assert.equal(host.sent("snapshot.capture").length, 1, "no capture of the other file");
+    assert.equal(scales.length, 1);
+    assert.deepEqual(parts(host).map(hasThumb), [true, false, false, false, false, false, false, false, false, false]);
+    assert.deepEqual(errors, []);
+  } finally {
+    await stop();
+    await setup.cleanup();
+  }
+});
