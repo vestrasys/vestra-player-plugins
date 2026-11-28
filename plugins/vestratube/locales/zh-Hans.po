@@ -45,84 +45,84 @@ msgstr "下载结束，但没有得到完整的 MKV 文件。"
 msgid "YouTube refused the download (HTTP {})."
 msgstr "YouTube 拒绝了下载（HTTP {}）。"
 
-#: main.ts:68
+#: main.ts:69
 msgid "Playback failed: {}"
 msgstr "播放失败：{}"
 
-#: main.ts:70
+#: main.ts:71
 msgid "The player is busy. Try again later."
 msgstr "播放器忙，请稍后重试。"
 
-#: main.ts:73
+#: main.ts:74
 msgid "The player can't open this link."
 msgstr "播放器无法打开这个链接。"
 
-#: main.ts:76
+#: main.ts:77
 msgid "The playback request failed."
 msgstr "播放请求失败。"
 
-#: main.ts:84
+#: main.ts:85
 msgid "Timed out waiting for the video to be ready."
 msgstr "等待视频就绪超时。"
 
-#: main.ts:92
+#: main.ts:93
 msgid "Another source replaced the playback request."
 msgstr "播放请求已被其他来源替换。"
 
-#: main.ts:93
+#: main.ts:94
 msgid "The playback request has ended."
 msgstr "播放请求已结束。"
 
-#: main.ts:97
+#: main.ts:98
 msgid "The video failed to load."
 msgstr "视频载入失败。"
 
-#: main.ts:132
+#: main.ts:133
 msgid "Save YouTube Video"
 msgstr "保存 YouTube 视频"
 
-#: main.ts:146
+#: main.ts:147
 msgid "Resolving the video…"
 msgstr "正在解析视频…"
 
-#: main.ts:166 youtube.slint:13
+#: main.ts:167 youtube.slint:13
 msgid "Paste a YouTube video link to play or download it."
 msgstr "粘贴 YouTube 视频链接以播放或下载。"
 
-#: main.ts:179
+#: main.ts:180
 msgid "Resolving and loading the video and audio…"
 msgstr "正在解析并加载视频与音频…"
 
-#: main.ts:181
+#: main.ts:182
 msgid "The video is ready."
 msgstr "视频已就绪。"
 
-#: main.ts:183
+#: main.ts:184
 msgid "A download is already running."
 msgstr "已有一个下载正在进行。"
 
-#: main.ts:188
+#: main.ts:189
 msgid "No save location was chosen."
 msgstr "已取消选择保存位置。"
 
-#: main.ts:191 main.ts:231
+#: main.ts:192 main.ts:232
 msgid "Saved: {}"
 msgstr "已保存：{}"
 
-#: main.ts:196
+#: main.ts:197
 msgid "Cancelled."
 msgstr "已取消。"
 
-#: main.ts:235
+#: main.ts:236
 msgid "Download cancelled."
 msgstr "已取消下载。"
 
 #. the plugin's name (a brand); usually kept as it is.
-#: main.ts:252 manifest.json panel.ts:55 youtube.slint:8
+#: main.ts:253 manifest.json panel.ts:70 youtube.slint:8
 msgid "VestraTube"
 msgstr "VestraTube"
 
-#: main.ts:259
+#: main.ts:260
 msgid "YouTube Link…"
 msgstr "YouTube 链接…"
 
@@ -131,8 +131,12 @@ msgid "Search YouTube in the sidebar and play videos right away"
 msgstr "在侧栏搜索 YouTube，即点即播"
 
 #: manifest.json
-msgid "A YouTube sidebar for Vestra Player: search, see thumbnails, titles, durations and channels, and play a video with a double-click. Download videos as MKV files, or play and download a single video from its link. No sign-in and nothing to install: the YouTube part uses the bundled open-source library youtubei.js, downloads use the player's own ffmpeg.\n→ Sidebar: VestraTube tab; Menu: Open ▸ VestraTube"
-msgstr "Vestra Player 的 YouTube 侧栏：搜索视频，查看缩略图、标题、时长和频道，双击即可播放。可将视频下载为 MKV 文件，也可以通过链接播放或下载单个视频。无需登录、无需安装任何程序：YouTube 部分使用内置的开源库 youtubei.js，下载使用播放器自带的 ffmpeg。\n→ 侧边栏：VestraTube 标签；菜单：打开 ▸ VestraTube"
+msgid ""
+"A YouTube sidebar for Vestra Player: search, see thumbnails, titles, durations and channels, and play a video with a double-click. Download videos as MKV files, or play and download a single video from its link. No sign-in and nothing to install: the YouTube part uses the bundled open-source library youtubei.js, downloads use the player's own ffmpeg.\n"
+"→ Sidebar: VestraTube tab; Menu: Open ▸ VestraTube"
+msgstr ""
+"Vestra Player 的 YouTube 侧栏：搜索视频，查看缩略图、标题、时长和频道，双击即可播放。可将视频下载为 MKV 文件，也可以通过链接播放或下载单个视频。无需登录、无需安装任何程序：YouTube 部分使用内置的开源库 youtubei.js，下载使用播放器自带的 ffmpeg。\n"
+"→ 侧边栏：VestraTube 标签；菜单：打开 ▸ VestraTube"
 
 #: manifest.json
 msgid "online video"
@@ -146,51 +150,51 @@ msgstr "YouTube"
 msgid "download"
 msgstr "下载"
 
-#: panel.ts:70
+#: panel.ts:85
 msgid "Search and press Enter"
 msgstr "请搜索并按回车键"
 
-#: panel.ts:72
+#: panel.ts:87
 msgid "Searching…"
 msgstr "正在搜索…"
 
-#: panel.ts:74
+#: panel.ts:89
 msgid "No videos found."
 msgstr "没有找到视频。"
 
-#: panel.ts:187 panel.ts:210 youtube.ts:235
+#: panel.ts:231 panel.ts:254 youtube.ts:235
 msgid "No network connection."
 msgstr "无网络连接。"
 
-#: panel.ts:273 youtube.slint:59
+#: panel.ts:323 youtube.slint:59
 msgid "Play"
 msgstr "播放"
 
-#: panel.ts:281 sidebar.slint:382
+#: panel.ts:331 sidebar.slint:371
 msgid "Download…"
 msgstr "下载…"
 
-#: panel.ts:290 sidebar.slint:376
+#: panel.ts:340 sidebar.slint:365
 msgid "Cancel Download"
 msgstr "取消下载"
 
-#: sidebar.slint:165
+#: sidebar.slint:152
 msgid "Search YouTube"
 msgstr "搜索 YouTube"
 
-#: sidebar.slint:243
+#: sidebar.slint:233
 msgid "LIVE"
 msgstr "直播"
 
-#: sidebar.slint:303
+#: sidebar.slint:292
 msgid "Loading…"
 msgstr "正在加载…"
 
-#: sidebar.slint:310 sidebar.slint:332
+#: sidebar.slint:299 sidebar.slint:321
 msgid "Retry"
 msgstr "重试"
 
-#: sidebar.slint:368
+#: sidebar.slint:357
 msgid "Open URL…"
 msgstr "打开链接…"
 
@@ -218,30 +222,34 @@ msgstr "仅支持 HTTPS 的 YouTube 视频链接。"
 msgid "Enter the link of a single YouTube video (watch, shorts, live or youtu.be)."
 msgstr "请输入单个 YouTube 视频链接（watch、shorts、live 或 youtu.be）。"
 
-#: youtube.ts:250 youtube.ts:261
+#: youtube.ts:250 youtube.ts:277
 msgid "YouTube search failed: {}"
 msgstr "YouTube 搜索失败：{}"
 
-#: youtube.ts:322
+#: youtube.ts:267
+msgid "YouTube answered in a format this version of VestraTube cannot read ({}). A newer version of the plugin may fix it."
+msgstr "YouTube 返回的格式这个版本的 VestraTube 无法读取（{}）。插件的新版本可能会修复。"
+
+#: youtube.ts:338
 msgid "YouTube refused this video's streams. Try again later."
 msgstr "YouTube 拒绝提供这个视频的流，请稍后再试。"
 
-#: youtube.ts:325
+#: youtube.ts:341
 msgid "VestraTube could not read this video: {}. A newer version of the plugin may fix it."
 msgstr "VestraTube 无法读取这个视频：{}。插件的新版本可能会修复。"
 
-#: youtube.ts:329
+#: youtube.ts:345
 msgid "This video has no stream the player can play."
 msgstr "这个视频没有播放器能播放的流。"
 
-#: youtube.ts:335
+#: youtube.ts:351
 msgid "YouTube asked to confirm you're not a bot. This network is flagged; try another network."
 msgstr "YouTube 要求确认你不是机器人。当前网络被标记，请换一个网络。"
 
-#: youtube.ts:336
+#: youtube.ts:352
 msgid "YouTube: {}"
 msgstr "YouTube：{}"
 
-#: youtube.ts:336
+#: youtube.ts:352
 msgid "YouTube can't play this video ({})."
 msgstr "YouTube 无法播放这个视频（{}）。"

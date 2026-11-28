@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.7
+
+**Who must change: nobody.** Needs Vestra Player 0.11.0 or later (SDK 1.11.0), as before.
+
+- **Fixed: a search could find nothing.** YouTube answers some sessions with a newer layout of search results (youtubei.js parses them as `LockupView`), which VestraTube skipped, so every search in that session showed "No videos found." (a session lasts 30 minutes). Those results are rows again, with title, channel, duration and the LIVE mark; continuation pages too.
+- **Results VestraTube cannot read are a failure, not an empty list.** When YouTube's answer has video results but none can be read, the panel says so ("YouTube answered in a format this version of VestraTube cannot read (…). A newer version of the plugin may fix it.") with **Retry**, the node types go to the plugin log, and Retry asks with a fresh session. A page of shorts only still shows "No videos found.".
+- Playing, downloads, the link window and the resolver for YouTube links are unchanged.
+
 ## 0.5.6
 
 **Who must change: nobody.** Needs Vestra Player 0.11.0 or later (SDK 1.11.0).

@@ -178,7 +178,8 @@ the player's 32 MB per-view image budget.
 | Nothing searched yet | start (no request to YouTube) | "Search and press Enter" |
 | Searching | a search is running | "Searching…" (the old rows are cleared at once) |
 | Results | ≥ 1 video | the rows |
-| Empty | 0 videos | "No videos found." |
+| Empty | 0 videos (a page of shorts only counts as 0) | "No videos found." |
+| Unreadable layout | the answer has video nodes (`Video`, or `LockupView` of kind `VIDEO`, since 0.5.7) but none gives a row; or nodes of a type we do not know | "YouTube answered in a format this version of VestraTube cannot read ({types})…" + Retry; the types go to the plugin log; the session is dropped, so Retry starts a fresh one. Before 0.5.7 this was "No videos found.", with nothing logged |
 | Offline | `fetch` fails (`TypeError`, `ENOTFOUND`, `ECONNREFUSED`, `ECONNRESET`, `ETIMEDOUT`, `EAI_AGAIN`) | "No network connection." + Retry |
 | Library error | anything else the library throws | "YouTube search failed: {reason}" + Retry |
 | Loading the next page | a continuation is running | "Loading…" at the end of the list |
