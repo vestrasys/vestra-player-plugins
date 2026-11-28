@@ -111,8 +111,10 @@ const REFUSED = [...FIXED, "rendering"];
  * Motion Smoothing…, opens a window with the mode (Off, Double Frame Rate,
  * Match Display), what it does and why a mode cannot work. The player owns
  * the converter: the Apple silicon and macOS check, the rate rules per
- * renderer, the size limit it learns when the Mac falls behind (`overload`,
- * then `size` for that size and larger in this run) and the formats (HDR is
+ * renderer, the size limit it learns when the Mac falls behind (`overload`
+ * for that video; after two playbacks of about that size fell far behind,
+ * `size` for that size and larger until a plugin sets the mode again, here
+ * when the user chooses a mode, or the player restarts) and the formats (HDR is
  * `format`); the plugin asks for a mode and shows the player's reasons. A
  * player before the Apple engine (SDK 1.11.5) refuses the engine name, so
  * the manifest's `minPlayerVersion` names the first player with it.

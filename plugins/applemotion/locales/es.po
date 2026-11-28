@@ -5,95 +5,95 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: main.ts:157
+#: main.ts:159
 msgid "Switching…"
 msgstr "Cambiando…"
 
-#: main.ts:158 main.ts:161 main.ts:178 main.ts:258
+#: main.ts:160 main.ts:163 main.ts:180 main.ts:260
 msgid "Off"
 msgstr "Desactivado"
 
-#: main.ts:158
+#: main.ts:160
 msgid "On"
 msgstr "Activado"
 
-#: main.ts:160
+#: main.ts:162
 msgid "Not available on this computer"
 msgstr "No disponible en este equipo"
 
-#: main.ts:166
+#: main.ts:168
 msgid "On: {} → {} fps on {}"
 msgstr "Activado: {} → {} fps en {}"
 
-#: main.ts:166
+#: main.ts:168
 msgid "On: {} → {} fps"
 msgstr "Activado: {} → {} fps"
 
-#: main.ts:173
+#: main.ts:175
 msgid "Waiting"
 msgstr "En espera"
 
-#: main.ts:174
+#: main.ts:176
 msgid "On: applies when a video plays"
 msgstr "Activado: se aplica al reproducir un vídeo"
 
-#: main.ts:178
+#: main.ts:180
 msgid "Double Frame Rate"
 msgstr "Duplicar fotogramas"
 
-#: main.ts:178
+#: main.ts:180
 msgid "Match Display"
 msgstr "Ajustar a la pantalla"
 
-#: main.ts:187
+#: main.ts:189
 msgid "Frames are being dropped: a lower resolution or Double Frame Rate instead of Match Display helps."
 msgstr "Se están perdiendo fotogramas: ayuda una resolución menor o Duplicar fotogramas en lugar de Ajustar a la pantalla."
 
-#: main.ts:188
+#: main.ts:190
 msgid "Frames are being dropped: a lower resolution helps."
 msgstr "Se están perdiendo fotogramas: ayuda una resolución menor."
 
-#: main.ts:190
+#: main.ts:192
 msgid "Frames are being dropped: rendering on the CPU cannot keep up; GPU Rendering (Picture ▸ Rendering) or a lower resolution helps."
 msgstr "Se están perdiendo fotogramas: el renderizado en la CPU no da abasto; ayuda el Renderizado por GPU (Imagen ▸ Renderizado) o una resolución menor."
 
-#: main.ts:258
+#: main.ts:260
 msgid "Double Frame Rate (Smoother Video)"
 msgstr "Duplicar fotogramas (vídeo más fluido)"
 
-#: main.ts:258
+#: main.ts:260
 msgid "Match Display (Smoothest Motion)"
 msgstr "Ajustar a la pantalla (movimiento más fluido)"
 
-#: main.ts:259 manifest.json motion.slint:24
+#: main.ts:261 manifest.json motion.slint:24
 msgid "Apple Motion Smoothing"
 msgstr "Suavizado de movimiento de Apple"
 
-#: main.ts:273
+#: main.ts:275
 msgid "Not available: {}"
 msgstr "No disponible: {}"
 
-#: main.ts:303
+#: main.ts:305
 msgid "Apple motion smoothing unavailable: {}"
 msgstr "Suavizado de movimiento de Apple no disponible: {}"
 
-#: main.ts:311
+#: main.ts:313
 msgid "{} (waiting: {})"
 msgstr "{} (en espera: {})"
 
-#: main.ts:311 main.ts:312
+#: main.ts:313 main.ts:314
 msgid "Apple motion smoothing: off"
 msgstr "Suavizado de movimiento de Apple: desactivado"
 
-#: main.ts:311 main.ts:312
+#: main.ts:313 main.ts:314
 msgid "Apple motion smoothing: double frame rate"
 msgstr "Suavizado de movimiento de Apple: duplicar fotogramas"
 
-#: main.ts:311 main.ts:312
+#: main.ts:313 main.ts:314
 msgid "Apple motion smoothing: match display"
 msgstr "Suavizado de movimiento de Apple: ajustar a la pantalla"
 
-#: main.ts:351
+#: main.ts:353
 msgid "Apple Motion Smoothing…"
 msgstr "Suavizado de movimiento de Apple…"
 
@@ -142,8 +142,8 @@ msgid "Double Frame Rate shows twice the frames, with real in-between frames mad
 msgstr "Duplicar fotogramas muestra el doble de fotogramas, con fotogramas intermedios reales creados por la interpolación de Apple. Ajustar a la pantalla además los ajusta al ritmo de la pantalla (solo renderizado por GPU). Duplicar hace que el cine parezca vídeo, por eso está desactivado por defecto."
 
 #: motion.slint:103
-msgid "Needs a Mac with Apple silicon and macOS 15.4 or newer. How large a video the Mac keeps up with depends on the Mac: a size it fell behind on is not offered again until the player restarts. HDR videos are not smoothed."
-msgstr "Requiere un Mac con chip Apple y macOS 15.4 o posterior. El tamaño de vídeo que el Mac puede seguir depende del Mac: un tamaño en el que se quedó atrás no se vuelve a ofrecer hasta reiniciar el reproductor. Los vídeos HDR no se suavizan."
+msgid "Needs a Mac with Apple silicon and macOS 15.4 or newer. How large a video the Mac keeps up with depends on the Mac: a size it fell far behind on twice waits until you turn smoothing off and on again or restart the player. HDR videos are not smoothed."
+msgstr "Requiere un Mac con chip Apple y macOS 15.4 o posterior. El tamaño de vídeo que el Mac puede seguir depende del Mac: un tamaño en el que se quedó muy atrás dos veces espera hasta que desactives y vuelvas a activar el suavizado o reinicies el reproductor. Los vídeos HDR no se suavizan."
 
 #: motion.slint:109
 msgid "Close"

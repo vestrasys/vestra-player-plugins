@@ -5,95 +5,95 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: main.ts:157
+#: main.ts:159
 msgid "Switching…"
 msgstr "切り替え中…"
 
-#: main.ts:158 main.ts:161 main.ts:178 main.ts:258
+#: main.ts:160 main.ts:163 main.ts:180 main.ts:260
 msgid "Off"
 msgstr "オフ"
 
-#: main.ts:158
+#: main.ts:160
 msgid "On"
 msgstr "オン"
 
-#: main.ts:160
+#: main.ts:162
 msgid "Not available on this computer"
 msgstr "このコンピューターでは使用できません"
 
-#: main.ts:166
+#: main.ts:168
 msgid "On: {} → {} fps on {}"
 msgstr "オン：{} → {} fps（{}）"
 
-#: main.ts:166
+#: main.ts:168
 msgid "On: {} → {} fps"
 msgstr "オン：{} → {} fps"
 
-#: main.ts:173
+#: main.ts:175
 msgid "Waiting"
 msgstr "待機中"
 
-#: main.ts:174
+#: main.ts:176
 msgid "On: applies when a video plays"
 msgstr "オン：動画の再生時に適用"
 
-#: main.ts:178
+#: main.ts:180
 msgid "Double Frame Rate"
 msgstr "フレームレートを 2 倍"
 
-#: main.ts:178
+#: main.ts:180
 msgid "Match Display"
 msgstr "ディスプレイに合わせる"
 
-#: main.ts:187
+#: main.ts:189
 msgid "Frames are being dropped: a lower resolution or Double Frame Rate instead of Match Display helps."
 msgstr "フレームが落ちています：解像度を下げるか、「ディスプレイに合わせる」の代わりに「フレームレートを 2 倍」を使うと改善します。"
 
-#: main.ts:188
+#: main.ts:190
 msgid "Frames are being dropped: a lower resolution helps."
 msgstr "フレームが落ちています：解像度を下げると改善します。"
 
-#: main.ts:190
+#: main.ts:192
 msgid "Frames are being dropped: rendering on the CPU cannot keep up; GPU Rendering (Picture ▸ Rendering) or a lower resolution helps."
 msgstr "フレームが落ちています：CPU での描画が追いつきません。GPU レンダリング（映像 ▸ レンダリング）を使うか解像度を下げると改善します。"
 
-#: main.ts:258
+#: main.ts:260
 msgid "Double Frame Rate (Smoother Video)"
 msgstr "フレームレートを 2 倍（より滑らか）"
 
-#: main.ts:258
+#: main.ts:260
 msgid "Match Display (Smoothest Motion)"
 msgstr "ディスプレイに合わせる（最も滑らか）"
 
-#: main.ts:259 manifest.json motion.slint:24
+#: main.ts:261 manifest.json motion.slint:24
 msgid "Apple Motion Smoothing"
 msgstr "Apple モーションスムージング"
 
-#: main.ts:273
+#: main.ts:275
 msgid "Not available: {}"
 msgstr "使用できません：{}"
 
-#: main.ts:303
+#: main.ts:305
 msgid "Apple motion smoothing unavailable: {}"
 msgstr "Apple モーションスムージングを使用できません：{}"
 
-#: main.ts:311
+#: main.ts:313
 msgid "{} (waiting: {})"
 msgstr "{}（待機中：{}）"
 
-#: main.ts:311 main.ts:312
+#: main.ts:313 main.ts:314
 msgid "Apple motion smoothing: off"
 msgstr "Apple モーションスムージング：オフ"
 
-#: main.ts:311 main.ts:312
+#: main.ts:313 main.ts:314
 msgid "Apple motion smoothing: double frame rate"
 msgstr "Apple モーションスムージング：フレームレートを 2 倍"
 
-#: main.ts:311 main.ts:312
+#: main.ts:313 main.ts:314
 msgid "Apple motion smoothing: match display"
 msgstr "Apple モーションスムージング：ディスプレイに合わせる"
 
-#: main.ts:351
+#: main.ts:353
 msgid "Apple Motion Smoothing…"
 msgstr "Apple モーションスムージング…"
 
@@ -142,8 +142,8 @@ msgid "Double Frame Rate shows twice the frames, with real in-between frames mad
 msgstr "「フレームレートを 2 倍」は 2 倍のフレームを表示し、中間フレームは Apple のフレーム補間で本物として作られます。「ディスプレイに合わせる」はさらにディスプレイのリフレッシュレートに合わせて表示します（GPU レンダリングのみ）。2 倍にすると映画がビデオのように見えるため、初期設定はオフです。"
 
 #: motion.slint:103
-msgid "Needs a Mac with Apple silicon and macOS 15.4 or newer. How large a video the Mac keeps up with depends on the Mac: a size it fell behind on is not offered again until the player restarts. HDR videos are not smoothed."
-msgstr "Apple シリコン搭載で macOS 15.4 以降の Mac が必要です。どの大きさの動画まで追いつけるかは Mac によって異なり、一度追いつけなかった大きさはプレーヤーを再起動するまで使えません。HDR 動画はスムージングされません。"
+msgid "Needs a Mac with Apple silicon and macOS 15.4 or newer. How large a video the Mac keeps up with depends on the Mac: a size it fell far behind on twice waits until you turn smoothing off and on again or restart the player. HDR videos are not smoothed."
+msgstr "Apple シリコン搭載で macOS 15.4 以降の Mac が必要です。どの大きさの動画まで追いつけるかは Mac によって異なります。2 回大きく遅れた大きさは、モーションスムージングをオフにしてからオンに戻すか、プレーヤーを再起動するまで待機します。HDR 動画はスムージングされません。"
 
 #: motion.slint:109
 msgid "Close"

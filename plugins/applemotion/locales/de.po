@@ -5,95 +5,95 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: main.ts:157
+#: main.ts:159
 msgid "Switching…"
 msgstr "Wird umgeschaltet…"
 
-#: main.ts:158 main.ts:161 main.ts:178 main.ts:258
+#: main.ts:160 main.ts:163 main.ts:180 main.ts:260
 msgid "Off"
 msgstr "Aus"
 
-#: main.ts:158
+#: main.ts:160
 msgid "On"
 msgstr "An"
 
-#: main.ts:160
+#: main.ts:162
 msgid "Not available on this computer"
 msgstr "Auf diesem Computer nicht verfügbar"
 
-#: main.ts:166
+#: main.ts:168
 msgid "On: {} → {} fps on {}"
 msgstr "An: {} → {} fps auf {}"
 
-#: main.ts:166
+#: main.ts:168
 msgid "On: {} → {} fps"
 msgstr "An: {} → {} fps"
 
-#: main.ts:173
+#: main.ts:175
 msgid "Waiting"
 msgstr "Wartet"
 
-#: main.ts:174
+#: main.ts:176
 msgid "On: applies when a video plays"
 msgstr "An: gilt, wenn ein Video läuft"
 
-#: main.ts:178
+#: main.ts:180
 msgid "Double Frame Rate"
 msgstr "Doppelte Bildrate"
 
-#: main.ts:178
+#: main.ts:180
 msgid "Match Display"
 msgstr "An Display anpassen"
 
-#: main.ts:187
+#: main.ts:189
 msgid "Frames are being dropped: a lower resolution or Double Frame Rate instead of Match Display helps."
 msgstr "Es werden Bilder verworfen: Eine niedrigere Auflösung oder Doppelte Bildrate statt An Display anpassen hilft."
 
-#: main.ts:188
+#: main.ts:190
 msgid "Frames are being dropped: a lower resolution helps."
 msgstr "Es werden Bilder verworfen: Eine niedrigere Auflösung hilft."
 
-#: main.ts:190
+#: main.ts:192
 msgid "Frames are being dropped: rendering on the CPU cannot keep up; GPU Rendering (Picture ▸ Rendering) or a lower resolution helps."
 msgstr "Es werden Bilder verworfen: Das Rendern auf der CPU kommt nicht mit; GPU-Rendering (Bild ▸ Rendering) oder eine niedrigere Auflösung hilft."
 
-#: main.ts:258
+#: main.ts:260
 msgid "Double Frame Rate (Smoother Video)"
 msgstr "Doppelte Bildrate (flüssigeres Video)"
 
-#: main.ts:258
+#: main.ts:260
 msgid "Match Display (Smoothest Motion)"
 msgstr "An Display anpassen (flüssigste Bewegung)"
 
-#: main.ts:259 manifest.json motion.slint:24
+#: main.ts:261 manifest.json motion.slint:24
 msgid "Apple Motion Smoothing"
 msgstr "Apple-Bewegungsglättung"
 
-#: main.ts:273
+#: main.ts:275
 msgid "Not available: {}"
 msgstr "Nicht verfügbar: {}"
 
-#: main.ts:303
+#: main.ts:305
 msgid "Apple motion smoothing unavailable: {}"
 msgstr "Apple-Bewegungsglättung nicht verfügbar: {}"
 
-#: main.ts:311
+#: main.ts:313
 msgid "{} (waiting: {})"
 msgstr "{} (wartet: {})"
 
-#: main.ts:311 main.ts:312
+#: main.ts:313 main.ts:314
 msgid "Apple motion smoothing: off"
 msgstr "Apple-Bewegungsglättung: aus"
 
-#: main.ts:311 main.ts:312
+#: main.ts:313 main.ts:314
 msgid "Apple motion smoothing: double frame rate"
 msgstr "Apple-Bewegungsglättung: doppelte Bildrate"
 
-#: main.ts:311 main.ts:312
+#: main.ts:313 main.ts:314
 msgid "Apple motion smoothing: match display"
 msgstr "Apple-Bewegungsglättung: an Display anpassen"
 
-#: main.ts:351
+#: main.ts:353
 msgid "Apple Motion Smoothing…"
 msgstr "Apple-Bewegungsglättung…"
 
@@ -142,8 +142,8 @@ msgid "Double Frame Rate shows twice the frames, with real in-between frames mad
 msgstr "Doppelte Bildrate zeigt doppelt so viele Bilder, mit echten Zwischenbildern aus Apples Bildinterpolation. An Display anpassen gibt sie zusätzlich im Takt des Displays aus (nur GPU-Rendering). Das Verdoppeln lässt Filme wie Video aussehen, daher ist es standardmäßig aus."
 
 #: motion.slint:103
-msgid "Needs a Mac with Apple silicon and macOS 15.4 or newer. How large a video the Mac keeps up with depends on the Mac: a size it fell behind on is not offered again until the player restarts. HDR videos are not smoothed."
-msgstr "Benötigt einen Mac mit Apple-Chip und macOS 15.4 oder neuer. Wie große Videos der Mac schafft, hängt vom Mac ab: Eine Größe, bei der er zurückfiel, wird bis zum Neustart des Players nicht mehr angeboten. HDR-Videos werden nicht geglättet."
+msgid "Needs a Mac with Apple silicon and macOS 15.4 or newer. How large a video the Mac keeps up with depends on the Mac: a size it fell far behind on twice waits until you turn smoothing off and on again or restart the player. HDR videos are not smoothed."
+msgstr "Benötigt einen Mac mit Apple-Chip und macOS 15.4 oder neuer. Wie große Videos der Mac schafft, hängt vom Mac ab: Eine Größe, bei der er zweimal weit zurückfiel, wartet, bis Sie die Glättung aus- und wieder einschalten oder den Player neu starten. HDR-Videos werden nicht geglättet."
 
 #: motion.slint:109
 msgid "Close"

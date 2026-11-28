@@ -357,6 +357,7 @@ const RUN_LONG = [
   { code: "platform", message: "Apple motion smoothing needs macOS: Apple's frame interpolation does not exist on this system" },
   { code: "no-gpu", message: "Apple motion smoothing needs a Mac with Apple silicon" },
   { code: "runtime", message: "Apple motion smoothing needs macOS 15.4 or newer" },
+  { code: "filter", message: "this player was built without Apple's frame interpolation" },
 ];
 
 for (const reason of RUN_LONG)
@@ -436,6 +437,29 @@ test("falling behind: `overload` straight away (no faster setting), then `size` 
     await host.settle();
     assert.equal(props(host).tone, 1);
     assert.equal(props(host).detail, "");
+  } finally {
+    await stop();
+  }
+});
+
+test("`other-engine` while AMD's converter is on for another plugin: the chosen mode waits with the player's reason and is not greyed out", async () => {
+  const host = new TestHost();
+  host.motion.mode = "double"; // another plugin turned AMD's on: it holds the converter
+  const { stop } = await start(host);
+  try {
+    await host.command(ITEM).run();
+    host.window(HANDLE).emit("pickMode", 1);
+    await host.settle();
+    assert.equal(host.appleMotion.mode, "double", "kept: it applies once AMD's is off");
+    assert.equal(props(host).status, "Waiting");
+    assert.equal(props(host).tone, 2);
+    assert.match(String(props(host).detail), /AMD/i, "the message names the holder");
+    assert.deepEqual(
+      modeStates(host).map(([enabled]) => enabled),
+      [true, true, true],
+      "a reason that can pass greys nothing",
+    );
+    assert.match(String(host.osd.at(-1)), /^Apple motion smoothing: double frame rate \(waiting: /);
   } finally {
     await stop();
   }

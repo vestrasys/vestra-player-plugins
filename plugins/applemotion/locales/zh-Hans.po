@@ -5,95 +5,95 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: main.ts:157
+#: main.ts:159
 msgid "Switching…"
 msgstr "正在切换…"
 
-#: main.ts:158 main.ts:161 main.ts:178 main.ts:258
+#: main.ts:160 main.ts:163 main.ts:180 main.ts:260
 msgid "Off"
 msgstr "关"
 
-#: main.ts:158
+#: main.ts:160
 msgid "On"
 msgstr "开"
 
-#: main.ts:160
+#: main.ts:162
 msgid "Not available on this computer"
 msgstr "此电脑不可用"
 
-#: main.ts:166
+#: main.ts:168
 msgid "On: {} → {} fps on {}"
 msgstr "开：{} → {} fps（{}）"
 
-#: main.ts:166
+#: main.ts:168
 msgid "On: {} → {} fps"
 msgstr "开：{} → {} fps"
 
-#: main.ts:173
+#: main.ts:175
 msgid "Waiting"
 msgstr "等待中"
 
-#: main.ts:174
+#: main.ts:176
 msgid "On: applies when a video plays"
 msgstr "开：播放视频时生效"
 
-#: main.ts:178
+#: main.ts:180
 msgid "Double Frame Rate"
 msgstr "双倍帧率"
 
-#: main.ts:178
+#: main.ts:180
 msgid "Match Display"
 msgstr "匹配显示器"
 
-#: main.ts:187
+#: main.ts:189
 msgid "Frames are being dropped: a lower resolution or Double Frame Rate instead of Match Display helps."
 msgstr "正在丢帧：降低分辨率，或用“双倍帧率”代替“匹配显示器”，会有帮助。"
 
-#: main.ts:188
+#: main.ts:190
 msgid "Frames are being dropped: a lower resolution helps."
 msgstr "正在丢帧：降低分辨率会有帮助。"
 
-#: main.ts:190
+#: main.ts:192
 msgid "Frames are being dropped: rendering on the CPU cannot keep up; GPU Rendering (Picture ▸ Rendering) or a lower resolution helps."
 msgstr "正在丢帧：CPU 渲染跟不上；开启 GPU 渲染（画面 ▸ 渲染）或降低分辨率会有帮助。"
 
-#: main.ts:258
+#: main.ts:260
 msgid "Double Frame Rate (Smoother Video)"
 msgstr "双倍帧率（更流畅）"
 
-#: main.ts:258
+#: main.ts:260
 msgid "Match Display (Smoothest Motion)"
 msgstr "匹配显示器（最流畅）"
 
-#: main.ts:259 manifest.json motion.slint:24
+#: main.ts:261 manifest.json motion.slint:24
 msgid "Apple Motion Smoothing"
 msgstr "Apple 运动平滑"
 
-#: main.ts:273
+#: main.ts:275
 msgid "Not available: {}"
 msgstr "不可用：{}"
 
-#: main.ts:303
+#: main.ts:305
 msgid "Apple motion smoothing unavailable: {}"
 msgstr "Apple 运动平滑不可用：{}"
 
-#: main.ts:311
+#: main.ts:313
 msgid "{} (waiting: {})"
 msgstr "{}（等待中：{}）"
 
-#: main.ts:311 main.ts:312
+#: main.ts:313 main.ts:314
 msgid "Apple motion smoothing: off"
 msgstr "Apple 运动平滑：关"
 
-#: main.ts:311 main.ts:312
+#: main.ts:313 main.ts:314
 msgid "Apple motion smoothing: double frame rate"
 msgstr "Apple 运动平滑：双倍帧率"
 
-#: main.ts:311 main.ts:312
+#: main.ts:313 main.ts:314
 msgid "Apple motion smoothing: match display"
 msgstr "Apple 运动平滑：匹配显示器"
 
-#: main.ts:351
+#: main.ts:353
 msgid "Apple Motion Smoothing…"
 msgstr "Apple 运动平滑…"
 
@@ -142,8 +142,8 @@ msgid "Double Frame Rate shows twice the frames, with real in-between frames mad
 msgstr "“双倍帧率”显示两倍的帧，中间帧由 Apple 的插帧技术真实生成。“匹配显示器”还会按显示器刷新率输出（仅 GPU 渲染）。帧率翻倍会让电影看起来像录像，所以默认关闭。"
 
 #: motion.slint:103
-msgid "Needs a Mac with Apple silicon and macOS 15.4 or newer. How large a video the Mac keeps up with depends on the Mac: a size it fell behind on is not offered again until the player restarts. HDR videos are not smoothed."
-msgstr "需要搭载 Apple 芯片、macOS 15.4 或更新版本的 Mac。能跟上多大的视频取决于这台 Mac：某个尺寸跟不上之后，在播放器重启前不再对该尺寸提供此功能。HDR 视频不做平滑。"
+msgid "Needs a Mac with Apple silicon and macOS 15.4 or newer. How large a video the Mac keeps up with depends on the Mac: a size it fell far behind on twice waits until you turn smoothing off and on again or restart the player. HDR videos are not smoothed."
+msgstr "需要搭载 Apple 芯片、macOS 15.4 或更新版本的 Mac。能跟上多大的视频取决于这台 Mac：某个尺寸两次严重跟不上之后，该尺寸会一直等待，直到你关闭再重新开启运动平滑，或重启播放器。HDR 视频不做平滑。"
 
 #: motion.slint:109
 msgid "Close"

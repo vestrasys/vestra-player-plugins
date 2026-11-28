@@ -22,7 +22,7 @@ The **command palette** (and **Ask Vestra** in it) can also choose a mode in one
 ## Limits
 
 - If frames are being dropped while the window is open, it says so under the status, with what helps (GPU rendering, a lower resolution, or Double Frame Rate instead of Match Display when that is the mode). A single burst, such as when the converter starts or after a seek, does not count.
-- How large a video your Mac keeps up with depends on its chip; 4K can be too much for the smaller ones. The first video that is too large falls behind: the player turns smoothing off for it and says why, and from then on videos of that size or larger wait with the reason until the player restarts. Smaller videos are still smoothed.
+- How large a video your Mac keeps up with depends on its chip; 4K can be too much for the smaller ones. A video that is too large falls far behind: the player turns smoothing off for that video only and says why, and the next video is tried again. Once two videos of about that size fell far behind (with GPU rendering), videos of that size or larger wait with the reason until you turn smoothing off and on again (or choose the other mode) or restart the player. Smaller videos are still smoothed.
 - Videos of 10 to 30 fps; 10-bit SDR is fine, HDR is not smoothed (the window says why).
 - When smoothing starts, the first moment of the video can play undoubled while macOS gets its frame interpolation ready.
 - It does not run together with a frame-doubling video filter of another plugin (Frame Doubling): smoothing waits and says why.
