@@ -1,6 +1,6 @@
 {
   "id": "zysilm.vestratube",
-  "version": "0.5.6",
+  "version": "0.5.7",
   "apiVersion": "vestra/1",
   "entry": "main.ts",
   "name": "VestraTube",

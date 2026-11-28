@@ -1,6 +1,6 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: zysilm.vestratube 0.5.0\n"
+"Project-Id-Version: zysilm.vestratube 0.5.6\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
@@ -44,84 +44,84 @@ msgstr ""
 msgid "YouTube refused the download (HTTP {})."
 msgstr ""
 
-#: main.ts:68
+#: main.ts:69
 msgid "Playback failed: {}"
 msgstr ""
 
-#: main.ts:70
+#: main.ts:71
 msgid "The player is busy. Try again later."
 msgstr ""
 
-#: main.ts:73
+#: main.ts:74
 msgid "The player can't open this link."
 msgstr ""
 
-#: main.ts:76
+#: main.ts:77
 msgid "The playback request failed."
 msgstr ""
 
-#: main.ts:84
+#: main.ts:85
 msgid "Timed out waiting for the video to be ready."
 msgstr ""
 
-#: main.ts:92
+#: main.ts:93
 msgid "Another source replaced the playback request."
 msgstr ""
 
-#: main.ts:93
+#: main.ts:94
 msgid "The playback request has ended."
 msgstr ""
 
-#: main.ts:97
+#: main.ts:98
 msgid "The video failed to load."
 msgstr ""
 
-#: main.ts:132
+#: main.ts:133
 msgid "Save YouTube Video"
 msgstr ""
 
-#: main.ts:146
+#: main.ts:147
 msgid "Resolving the video…"
 msgstr ""
 
-#: main.ts:166 youtube.slint:13
+#: main.ts:167 youtube.slint:13
 msgid "Paste a YouTube video link to play or download it."
 msgstr ""
 
-#: main.ts:179
+#: main.ts:180
 msgid "Resolving and loading the video and audio…"
 msgstr ""
 
-#: main.ts:181
+#: main.ts:182
 msgid "The video is ready."
 msgstr ""
 
-#: main.ts:183
+#: main.ts:184
 msgid "A download is already running."
 msgstr ""
 
-#: main.ts:188
+#: main.ts:189
 msgid "No save location was chosen."
 msgstr ""
 
-#: main.ts:191 main.ts:231
+#: main.ts:192 main.ts:232
 msgid "Saved: {}"
 msgstr ""
 
-#: main.ts:196
+#: main.ts:197
 msgid "Cancelled."
 msgstr ""
 
-#: main.ts:235
+#: main.ts:236
 msgid "Download cancelled."
 msgstr ""
 
 #. the plugin's name (a brand); usually kept as it is.
-#: main.ts:252 manifest.json panel.ts:55 youtube.slint:8
+#: main.ts:253 manifest.json panel.ts:70 youtube.slint:8
 msgid "VestraTube"
 msgstr ""
 
-#: main.ts:259
+#: main.ts:260
 msgid "YouTube Link…"
 msgstr ""
 
@@ -130,7 +130,9 @@ msgid "Search YouTube in the sidebar and play videos right away"
 msgstr ""
 
 #: manifest.json
-msgid "A YouTube sidebar for Vestra Player: search, see thumbnails, titles, durations and channels, and play a video with a double-click. Download videos as MKV files, or play and download a single video from its link. No sign-in and nothing to install: the YouTube part uses the bundled open-source library youtubei.js, downloads use the player's own ffmpeg.\n→ Sidebar: VestraTube tab; Menu: Open ▸ VestraTube"
+msgid ""
+"A YouTube sidebar for Vestra Player: search, see thumbnails, titles, durations and channels, and play a video with a double-click. Download videos as MKV files, or play and download a single video from its link. No sign-in and nothing to install: the YouTube part uses the bundled open-source library youtubei.js, downloads use the player's own ffmpeg.\n"
+"→ Sidebar: VestraTube tab; Menu: Open ▸ VestraTube"
 msgstr ""
 
 #: manifest.json
@@ -145,51 +147,51 @@ msgstr ""
 msgid "download"
 msgstr ""
 
-#: panel.ts:70
+#: panel.ts:85
 msgid "Search and press Enter"
 msgstr ""
 
-#: panel.ts:72
+#: panel.ts:87
 msgid "Searching…"
 msgstr ""
 
-#: panel.ts:74
+#: panel.ts:89
 msgid "No videos found."
 msgstr ""
 
-#: panel.ts:187 panel.ts:210 youtube.ts:235
+#: panel.ts:231 panel.ts:254 youtube.ts:235
 msgid "No network connection."
 msgstr ""
 
-#: panel.ts:273 youtube.slint:59
+#: panel.ts:323 youtube.slint:59
 msgid "Play"
 msgstr ""
 
-#: panel.ts:281 sidebar.slint:382
+#: panel.ts:331 sidebar.slint:371
 msgid "Download…"
 msgstr ""
 
-#: panel.ts:290 sidebar.slint:376
+#: panel.ts:340 sidebar.slint:365
 msgid "Cancel Download"
 msgstr ""
 
-#: sidebar.slint:165
+#: sidebar.slint:152
 msgid "Search YouTube"
 msgstr ""
 
-#: sidebar.slint:243
+#: sidebar.slint:233
 msgid "LIVE"
 msgstr ""
 
-#: sidebar.slint:303
+#: sidebar.slint:292
 msgid "Loading…"
 msgstr ""
 
-#: sidebar.slint:310 sidebar.slint:332
+#: sidebar.slint:299 sidebar.slint:321
 msgid "Retry"
 msgstr ""
 
-#: sidebar.slint:368
+#: sidebar.slint:357
 msgid "Open URL…"
 msgstr ""
 
@@ -217,30 +219,34 @@ msgstr ""
 msgid "Enter the link of a single YouTube video (watch, shorts, live or youtu.be)."
 msgstr ""
 
-#: youtube.ts:250 youtube.ts:261
+#: youtube.ts:250 youtube.ts:277
 msgid "YouTube search failed: {}"
 msgstr ""
 
-#: youtube.ts:322
+#: youtube.ts:267
+msgid "YouTube answered in a format this version of VestraTube cannot read ({}). A newer version of the plugin may fix it."
+msgstr ""
+
+#: youtube.ts:338
 msgid "YouTube refused this video's streams. Try again later."
 msgstr ""
 
-#: youtube.ts:325
+#: youtube.ts:341
 msgid "VestraTube could not read this video: {}. A newer version of the plugin may fix it."
 msgstr ""
 
-#: youtube.ts:329
+#: youtube.ts:345
 msgid "This video has no stream the player can play."
 msgstr ""
 
-#: youtube.ts:335
+#: youtube.ts:351
 msgid "YouTube asked to confirm you're not a bot. This network is flagged; try another network."
 msgstr ""
 
-#: youtube.ts:336
+#: youtube.ts:352
 msgid "YouTube: {}"
 msgstr ""
 
-#: youtube.ts:336
+#: youtube.ts:352
 msgid "YouTube can't play this video ({})."
 msgstr ""

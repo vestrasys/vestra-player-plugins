@@ -46,6 +46,35 @@ const node = (n: number, extra: Record<string, unknown> = {}) => ({
   is_live: false,
   ...extra,
 });
+/** The newer search layout some sessions get (youtubei.js `LockupView`, as parsed on 2026-11-27). */
+const text = (value: string) => ({ text: value, toString: () => value });
+const lockup = (n: number, badge: { text: string; badge_style?: string } | null = { text: `${n}:05` }, type = "VIDEO") => ({
+  type: "LockupView",
+  content_id: vid(n),
+  content_type: type,
+  content_image: {
+    type: "ThumbnailView",
+    overlays: [
+      { type: "ThumbnailBottomOverlayView", badges: badge ? [{ type: "ThumbnailBadgeView", ...badge }] : [] },
+      { type: "ThumbnailHoverOverlayToggleActionsView" },
+    ],
+  },
+  metadata: {
+    type: "LockupMetadataView",
+    title: text(`Video ${n}`),
+    metadata: {
+      type: "ContentMetadataView",
+      metadata_rows: [
+        {
+          metadata_parts: [
+            { text: null, avatar_stack: { type: "AvatarStackView", text: text(`Channel ${n}`) } },
+            { text: text("23M"), avatar_stack: null },
+          ],
+        },
+      ],
+    },
+  },
+});
 const format = (fields: Partial<TubeFormat> & { deciphered?: string }): TubeFormat & { calls: unknown[] } => {
   const calls: unknown[] = [];
   return {
@@ -494,7 +523,7 @@ test("the manifest's display texts are English with a Simplified Chinese transla
   const manifest = JSON.parse(await readFile(new URL("manifest.json", directory), "utf8"));
   assert.equal(manifest.id, "zysilm.vestratube", "the id matches the plugin name");
   assert.equal(manifest.name, "VestraTube");
-  assert.equal(manifest.version, "0.5.6");
+  assert.equal(manifest.version, "0.5.7");
   assert.equal(manifest.icon, "assets/icon.png", "store icon");
   assert.equal(manifest.minPlayerVersion, "0.11.0", "images in rows (0.5.1); rows kept in place when the length changes (0.5.4); no declarations (0.9.0); SDK 1.11 (0.11.0)");
   assert.equal(manifest.capabilities, undefined, "no declarations (SDK 1.9.0): the sidebar mounts without ui.mount");
@@ -665,6 +694,67 @@ test("searching, empty, and clearing the box back to the start", async () => {
     panel.emit("query-changed", "");
     await eventually(host, () => assert.equal(panel.props.message, "请搜索并按回车键"));
   } finally {
+    await stop();
+  }
+});
+
+test("the newer search layout (LockupView) becomes rows as the old one does", async () => {
+  assert.deepEqual(toVideo(lockup(10)), { id: vid(10), title: "Video 10", channel: "Channel 10", seconds: 605, live: false });
+  assert.equal(toVideo(lockup(1, { text: "1:02:05" }))!.seconds, 3725);
+  assert.deepEqual(toVideo(lockup(2, { text: "LIVE", badge_style: "THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE" })), {
+    id: vid(2),
+    title: "Video 2",
+    channel: "Channel 2",
+    seconds: null,
+    live: true,
+  });
+  assert.equal(toVideo(lockup(3, null))!.seconds, null, "no badge: no duration");
+  assert.equal(toVideo(lockup(4, null, "SHORT")), null, "shorts stay out");
+  assert.equal(toVideo({ ...lockup(5), content_id: "short" }), null);
+
+  const { host, tube, stop } = await start();
+  try {
+    tube.results = () => ({ ...page([]), videos: [lockup(1), lockup(2), lockup(3, null, "SHORT")] });
+    await searchFor(host);
+    assert.deepEqual(
+      rows(host).map(({ key, title, channel, duration }) => ({ key, title, channel, duration })),
+      [1, 2].map((n) => ({ key: vid(n), title: `Video ${n}`, channel: `Channel ${n}`, duration: `${n}:05` })),
+    );
+  } finally {
+    await stop();
+  }
+});
+
+test("results in a layout this version cannot read are a failure with Retry, not \"No videos found.\"", async () => {
+  const { host, tube, stop } = await start({ locale: "zh-Hans" });
+  const logged: unknown[][] = [];
+  const log = console.error;
+  console.error = (...args: unknown[]) => void logged.push(args);
+  try {
+    // A layout YouTube may serve next: video nodes of a type toVideo does not know.
+    tube.results = () => ({ ...page([]), videos: [{ type: "VideoViewModel" }, { type: "ShortsLockupView" }] });
+    const panel = host.mounted();
+    panel.emit("search", "anything");
+    await eventually(host, () =>
+      assert.equal(
+        panel.props.message,
+        "YouTube 返回的格式这个版本的 VestraTube 无法读取（VideoViewModel）。插件的新版本可能会修复。",
+      ),
+    );
+    assert.equal(panel.props["can-retry"], true);
+    assert.ok(logged.some((args) => /could not be read \(VideoViewModel\)/.test(String(args[0]))), "logged");
+    // Retry asks YouTube with a fresh session: the answer may come in the layout we read.
+    tube.results = () => page([1, 2, 3]);
+    panel.emit("retry");
+    await eventually(host, () => assert.equal(rows(host).length, 3));
+    assert.deepEqual(tube.sessions, [false, false]);
+
+    // A page of shorts only is not a failure: shorts are left out on purpose.
+    tube.results = () => ({ ...page([]), videos: [{ type: "ShortsLockupView" }, lockup(4, null, "SHORT")] });
+    panel.emit("search", "shorts");
+    await eventually(host, () => assert.equal(panel.props.message, "没有找到视频。"));
+  } finally {
+    console.error = log;
     await stop();
   }
 });

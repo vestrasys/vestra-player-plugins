@@ -244,19 +244,35 @@ export class YouTube {
 
   async search(query: string): Promise<Page> {
     try {
-      const tube = await this.#session(false);
-      return this.#page(await tube.search(query, { type: "video" }));
+      const tube = this.#session(false);
+      return this.#page(await (await tube).search(query, { type: "video" }), tube);
     } catch (error) {
       throw this.#explain(error, (reason) => this.#words.error("YouTube search failed: {}", [reason]));
     }
   }
 
-  #page(result: TubeSearch): Page {
+  /**
+   * One page of results. A page whose video nodes this version cannot read is a failure with
+   * its reason, not "No videos found.": the node types are logged, and the session is
+   * forgotten, so Retry asks YouTube with a fresh one.
+   */
+  #page(result: TubeSearch, tube: Promise<Tube>): Page {
     const videos = result.videos.map(toVideo).filter((video): video is Video => video !== null);
+    if (!videos.length) {
+      const unread = unreadTypes(result.videos);
+      if (unread.length) {
+        console.error(`VestraTube: YouTube's search results could not be read (${unread.join(", ")})`);
+        if (this.#sessions.get(false)?.tube === tube) this.#sessions.delete(false);
+        throw this.#words.error(
+          "YouTube answered in a format this version of VestraTube cannot read ({}). A newer version of the plugin may fix it.",
+          [unread.join(", ")],
+        );
+      }
+    }
     const more = result.has_continuation
       ? async () => {
           try {
-            return this.#page(await result.getContinuation());
+            return this.#page(await result.getContinuation(), tube);
           } catch (error) {
             throw this.#explain(error, (reason) => this.#words.error("YouTube search failed: {}", [reason]));
           }
@@ -348,6 +364,7 @@ export class YouTube {
   }
 }
 
+type TextNode = { toString(): string } | null | undefined;
 type VideoNode = {
   type?: string;
   video_id?: unknown;
@@ -358,9 +375,62 @@ type VideoNode = {
   is_live?: unknown;
   badges?: readonly { label?: unknown }[];
 };
+/**
+ * The newer search result layout (YouTube serves it to some sessions instead of `Video`,
+ * seen 2026-11-27): the id and kind on the node, the title and channel in `metadata`, the
+ * duration or LIVE as a badge on the thumbnail.
+ */
+type LockupNode = {
+  type: "LockupView";
+  content_id?: unknown;
+  content_type?: unknown;
+  content_image?: { overlays?: readonly { badges?: readonly { text?: unknown; badge_style?: unknown }[] }[] };
+  metadata?: {
+    title?: TextNode;
+    metadata?: {
+      metadata_rows?: readonly { metadata_parts?: readonly { text?: TextNode; avatar_stack?: { text?: TextNode } | null }[] }[];
+    } | null;
+  } | null;
+};
+
+/** Search nodes that are not rows on purpose: shorts (DESIGN.md §1) and lockups of other kinds. */
+const skipped = (node: unknown) => {
+  const v = node as { type?: unknown; content_type?: unknown } | null;
+  return v?.type === "ShortsLockupView" || v?.type === "ReelItem" || (v?.type === "LockupView" && v.content_type !== "VIDEO");
+};
+/** The types of video nodes that gave no row and are not skipped on purpose (a layout we cannot read). */
+export function unreadTypes(nodes: readonly unknown[]): string[] {
+  const types = nodes
+    .filter((node) => !skipped(node) && toVideo(node) === null)
+    .map((node) => String((node as { type?: unknown } | null)?.type ?? "unknown"));
+  return [...new Set(types)];
+}
+
+/** "10:35" → 635, "1:02:05" → 3725; anything else (LIVE, UPCOMING, "SHORTS") → null. */
+function clockSeconds(text: string): number | null {
+  if (!/^\d+(:\d{2}){1,2}$/.test(text)) return null;
+  const seconds = text.split(":").reduce((total, part) => total * 60 + Number(part), 0);
+  return seconds > 0 ? seconds : null;
+}
+
+function lockupVideo(v: LockupNode): Video | null {
+  if (v.content_type !== "VIDEO" || !validId(v.content_id)) return null;
+  const title = oneLine(String(v.metadata?.title ?? ""), 300);
+  if (!title) return null;
+  const first = v.metadata?.metadata?.metadata_rows?.[0]?.metadata_parts?.[0];
+  const author = first?.avatar_stack?.text ?? first?.text;
+  const channel = author ? oneLine(String(author), 120) : "";
+  const badges = (v.content_image?.overlays ?? []).flatMap((overlay) => overlay.badges ?? []);
+  const live = badges.some(
+    (badge) => /LIVE/.test(String(badge.badge_style ?? "")) || /^live$/i.test(String(badge.text ?? "").trim()),
+  );
+  const seconds = badges.map((badge) => clockSeconds(String(badge.text ?? "").trim())).find((s) => s !== null) ?? null;
+  return { id: v.content_id, title, channel, seconds: live ? null : seconds, live };
+}
 
 /** A search result node, or null for anything that is not a playable video (shorts shelves, channels, ads). */
 export function toVideo(node: unknown): Video | null {
+  if ((node as { type?: unknown } | null)?.type === "LockupView") return lockupVideo(node as LockupNode);
   const v = node as VideoNode | null;
   if (!v || v.type !== "Video") return null;
   const id = validId(v.video_id) ? v.video_id : validId(v.id) ? v.id : null;
