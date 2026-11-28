@@ -16,6 +16,7 @@ To install one, open the store in [Vestra Player](https://github.com/vestrasys/v
 | Plugin | Id | What it does |
 | --- | --- | --- |
 | [AMD Motion Smoothing](plugins/amdmotion) | `zysilm.amdmotion` | Smoother motion with real in-between frames from your AMD Radeon GPU |
+| [Apple Motion Smoothing](plugins/applemotion) | `zysilm.applemotion` | Smoother motion with real in-between frames from your Mac's Apple silicon |
 | [Auto Frame](plugins/autoframe) | `zysilm.autoframe` | Crops away the solid-colour border around a video's picture |
 | [Clip Export](plugins/clipexport) | `zysilm.clipexport` | Cut part of a video into a new file: a lossless stream copy, a re-encoded MP4, or an animated GIF or WebP |
 | [Loudness](plugins/loudness) | `zysilm.loudness` | A live loudness meter, measured the way broadcasters do it (EBU R128, ITU-R BS.1770) |

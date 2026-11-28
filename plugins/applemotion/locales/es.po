@@ -1,0 +1,150 @@
+msgid ""
+msgstr ""
+"Language: es\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: main.ts:159
+msgid "Switching…"
+msgstr "Cambiando…"
+
+#: main.ts:160 main.ts:163 main.ts:180 main.ts:260
+msgid "Off"
+msgstr "Desactivado"
+
+#: main.ts:160
+msgid "On"
+msgstr "Activado"
+
+#: main.ts:162
+msgid "Not available on this computer"
+msgstr "No disponible en este equipo"
+
+#: main.ts:168
+msgid "On: {} → {} fps on {}"
+msgstr "Activado: {} → {} fps en {}"
+
+#: main.ts:168
+msgid "On: {} → {} fps"
+msgstr "Activado: {} → {} fps"
+
+#: main.ts:175
+msgid "Waiting"
+msgstr "En espera"
+
+#: main.ts:176
+msgid "On: applies when a video plays"
+msgstr "Activado: se aplica al reproducir un vídeo"
+
+#: main.ts:180
+msgid "Double Frame Rate"
+msgstr "Duplicar fotogramas"
+
+#: main.ts:180
+msgid "Match Display"
+msgstr "Ajustar a la pantalla"
+
+#: main.ts:189
+msgid "Frames are being dropped: a lower resolution or Double Frame Rate instead of Match Display helps."
+msgstr "Se están perdiendo fotogramas: ayuda una resolución menor o Duplicar fotogramas en lugar de Ajustar a la pantalla."
+
+#: main.ts:190
+msgid "Frames are being dropped: a lower resolution helps."
+msgstr "Se están perdiendo fotogramas: ayuda una resolución menor."
+
+#: main.ts:192
+msgid "Frames are being dropped: rendering on the CPU cannot keep up; GPU Rendering (Picture ▸ Rendering) or a lower resolution helps."
+msgstr "Se están perdiendo fotogramas: el renderizado en la CPU no da abasto; ayuda el Renderizado por GPU (Imagen ▸ Renderizado) o una resolución menor."
+
+#: main.ts:260
+msgid "Double Frame Rate (Smoother Video)"
+msgstr "Duplicar fotogramas (vídeo más fluido)"
+
+#: main.ts:260
+msgid "Match Display (Smoothest Motion)"
+msgstr "Ajustar a la pantalla (movimiento más fluido)"
+
+#: main.ts:261 manifest.json motion.slint:24
+msgid "Apple Motion Smoothing"
+msgstr "Suavizado de movimiento de Apple"
+
+#: main.ts:275
+msgid "Not available: {}"
+msgstr "No disponible: {}"
+
+#: main.ts:305
+msgid "Apple motion smoothing unavailable: {}"
+msgstr "Suavizado de movimiento de Apple no disponible: {}"
+
+#: main.ts:313
+msgid "{} (waiting: {})"
+msgstr "{} (en espera: {})"
+
+#: main.ts:313 main.ts:314
+msgid "Apple motion smoothing: off"
+msgstr "Suavizado de movimiento de Apple: desactivado"
+
+#: main.ts:313 main.ts:314
+msgid "Apple motion smoothing: double frame rate"
+msgstr "Suavizado de movimiento de Apple: duplicar fotogramas"
+
+#: main.ts:313 main.ts:314
+msgid "Apple motion smoothing: match display"
+msgstr "Suavizado de movimiento de Apple: ajustar a la pantalla"
+
+#: main.ts:353
+msgid "Apple Motion Smoothing…"
+msgstr "Suavizado de movimiento de Apple…"
+
+#: manifest.json
+msgid "Smoother motion with real in-between frames from your Mac's Apple silicon"
+msgstr "Movimiento más fluido con fotogramas intermedios reales del chip Apple de tu Mac"
+
+#: manifest.json
+msgid ""
+"Doubles the video's frame rate while it plays, with in-between frames made by Apple's frame interpolation (VideoToolbox) on your Mac's Apple silicon: not blended frames. Video ▸ Apple Motion Smoothing… opens a window to choose Off, Double Frame Rate or Match Display (the doubled frames paced to the display, with GPU rendering) and shows what runs or why not. The command palette and Ask Vestra can also choose a mode in one step. Needs a Mac with Apple silicon and macOS 15.4 or newer; it does nothing on other computers or systems. Off by default; remembers your choice.\n"
+"→ Menu: Video ▸ Apple Motion Smoothing"
+msgstr ""
+"Duplica la frecuencia de fotogramas del vídeo mientras se reproduce, con fotogramas intermedios creados por la interpolación de fotogramas de Apple (VideoToolbox) en el chip Apple de tu Mac: no fotogramas mezclados. Video ▸ Suavizado de movimiento de Apple… abre una ventana para elegir Desactivado, Duplicar fotogramas o Ajustar a la pantalla (los fotogramas duplicados al ritmo de la pantalla, con renderizado por GPU) y muestra qué funciona o por qué no. La paleta de comandos y Ask Vestra también pueden elegir un modo en un paso. Requiere un Mac con chip Apple y macOS 15.4 o posterior; no hace nada en otros equipos o sistemas. Desactivado por defecto; recuerda tu elección.\n"
+"→ Menú: Video ▸ Suavizado de movimiento de Apple"
+
+#: manifest.json
+msgid "video"
+msgstr "vídeo"
+
+#: manifest.json
+msgid "motion"
+msgstr "movimiento"
+
+#: manifest.json
+msgid "smoothing"
+msgstr "suavizado"
+
+#: manifest.json
+msgid "frame rate"
+msgstr "fotogramas"
+
+#: manifest.json
+msgid "apple"
+msgstr "apple"
+
+#: manifest.json
+msgid "mac"
+msgstr "mac"
+
+#: motion.slint:53
+msgid "Mode"
+msgstr "Modo"
+
+#: motion.slint:70
+msgid "Double Frame Rate shows twice the frames, with real in-between frames made by Apple's frame interpolation. Match Display also paces them to the display (GPU rendering only). Doubling makes film look like video, so it is off by default."
+msgstr "Duplicar fotogramas muestra el doble de fotogramas, con fotogramas intermedios reales creados por la interpolación de Apple. Ajustar a la pantalla además los ajusta al ritmo de la pantalla (solo renderizado por GPU). Duplicar hace que el cine parezca vídeo, por eso está desactivado por defecto."
+
+#: motion.slint:103
+msgid "Needs a Mac with Apple silicon and macOS 15.4 or newer. How large a video the Mac keeps up with depends on the Mac: a size it fell far behind on twice waits until you turn smoothing off and on again or restart the player. HDR videos are not smoothed."
+msgstr "Requiere un Mac con chip Apple y macOS 15.4 o posterior. El tamaño de vídeo que el Mac puede seguir depende del Mac: un tamaño en el que se quedó muy atrás dos veces espera hasta que desactives y vuelvas a activar el suavizado o reinicies el reproductor. Los vídeos HDR no se suavizan."
+
+#: motion.slint:109
+msgid "Close"
+msgstr "Cerrar"
